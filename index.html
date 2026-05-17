@@ -404,7 +404,7 @@ tr:last-child td{border-bottom:none}
               <select class="sel" id="openFormF" onchange="renderOpen()"><option value="">Tất cả Form</option></select>
               <select class="sel" id="openYearF" onchange="renderOpen()"><option value="">Tất cả năm</option></select>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
-                <input class="srch" id="openSrch" placeholder="Tìm kiếm..." oninput="renderOpen()">
+                <input class="srch" id="openSrch" placeholder="Tìm kiếm..." oninput="dRenderOpen()">
               </div>
             </div>
             <div class="tbl-wrap">
@@ -508,7 +508,7 @@ tr:last-child td{border-bottom:none}
               <select class="sel" id="afFormF" onchange="renderAF()"><option value="">Tất cả Form</option></select>
               <select class="sel" id="afYearF" onchange="renderAF()"><option value="">Tất cả năm</option></select>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
-                <input class="srch" id="afSrch" placeholder="Tìm kiếm..." oninput="renderAF()">
+                <input class="srch" id="afSrch" placeholder="Tìm kiếm..." oninput="dRenderAF()">
               </div>
             </div>
             <div class="tbl-wrap">
@@ -547,7 +547,7 @@ tr:last-child td{border-bottom:none}
               <button class="pill" onclick="setPAV('Lately Closed',this)">Lately</button>
               <select class="sel" id="pavoiYearF" onchange="renderPavoi()"><option value="">Tất cả năm</option></select>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
-                <input class="srch" id="pavoiSrch" placeholder="Tìm kiếm..." oninput="renderPavoi()">
+                <input class="srch" id="pavoiSrch" placeholder="Tìm kiếm..." oninput="dRenderPavoi()">
               </div>
             </div>
             <div class="tbl-wrap">
@@ -594,7 +594,7 @@ tr:last-child td{border-bottom:none}
               <button class="pill" onclick="setAuditF('InProgress','status',this)">In Progress</button>
               <select class="sel" id="auditYearF" onchange="renderAudit()"><option value="">Tất cả năm</option></select>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
-                <input class="srch" id="auditSrch" placeholder="Tìm kiếm..." oninput="renderAudit()">
+                <input class="srch" id="auditSrch" placeholder="Tìm kiếm..." oninput="dRenderAudit()">
               </div>
             </div>
             <div class="tbl-wrap">
@@ -1117,7 +1117,7 @@ const { createClient } = supabase;
 const sb = createClient(SUPA_URL, SUPA_KEY);
 
 // ── STATE ────────────────────────────────────────────────────
-let curUser = null, allData = [], auditData = [], charts = {}, userFilter = 'all';
+let curUser = null, allData = [], auditData = [], charts = {}, userFilter = 'all', isLoading = false;
 const PS = 25; // page size
 
 // Table states — mỗi table có state riêng
@@ -1144,10 +1144,18 @@ async function doLogin() {
   try {
     const {data,error} = await sb.from('users').select('*').eq('email',email).single();
     if(error||!data){showAl(al,'error','Email không tồn tại.');return;}
-    if(data.password!==pass){showAl(al,'error','Mật khẩu không đúng.');return;}
+    const hash = await hashPass(pass);
+    const passOk = data.password === hash || data.password === pass;
+    if(!passOk){showAl(al,'error','Mật khẩu không đúng.');return;}
+    // Silently migrate plain-text password to SHA-256 hash on next login
+    if(data.password === pass) sb.from('users').update({password:hash}).eq('id',data.id);
     if(data.role==='pending'){g('loginForm').style.display='none';g('authTabs').style.display='none';g('pendingBox').style.display='';return;}
     if(data.role==='rejected'){showAl(al,'error','Tài khoản đã bị từ chối.');return;}
-    curUser=data; sessionStorage.setItem('qaUser',JSON.stringify(data)); initApp();
+    curUser=data;
+    // Never store password in sessionStorage
+    const safeUser={id:data.id,email:data.email,full_name:data.full_name,role:data.role};
+    sessionStorage.setItem('qaUser',JSON.stringify(safeUser));
+    initApp();
   } catch(e){showAl(al,'error','Lỗi: '+e.message);}
   finally{g('btnLogin').disabled=false;}
 }
@@ -1163,7 +1171,8 @@ async function doRegister() {
   try {
     const {data:ex}=await sb.from('users').select('id').eq('email',email).single();
     if(ex){showAl(al,'error','Email đã được đăng ký.');return;}
-    const {error}=await sb.from('users').insert({email,password:pass,full_name:name,role:'pending'});
+    const hash=await hashPass(pass);
+    const {error}=await sb.from('users').insert({email,password:hash,full_name:name,role:'pending'});
     if(error)throw error;
     showAl(al,'success','✓ Đăng ký thành công! Chờ Admin phê duyệt.');
     g('rName').value=g('rEmail').value=g('rPass').value=g('rPass2').value='';
@@ -1190,6 +1199,11 @@ function initApp() {
   loadData();
 }
 
+const dRenderOpen  = debounce(renderOpen,  300);
+const dRenderAF    = debounce(renderAF,    300);
+const dRenderPavoi = debounce(renderPavoi, 300);
+const dRenderAudit = debounce(renderAudit, 300);
+
 window.addEventListener('DOMContentLoaded',()=>{
   const s=sessionStorage.getItem('qaUser');
   if(s){curUser=JSON.parse(s);initApp();}
@@ -1197,6 +1211,8 @@ window.addEventListener('DOMContentLoaded',()=>{
 
 // ── DATA LOADING ─────────────────────────────────────────────
 async function loadData() {
+  if(isLoading){toast('Đang tải dữ liệu, vui lòng chờ...','info');return;}
+  isLoading=true;
   setOv(true,'Đang kết nối Galileo...','');
   try {
 
@@ -1386,7 +1402,7 @@ async function loadData() {
     console.error(e);
     toast('Lỗi load data: '+e.message,'err');
     showLoadError(e.message);
-  }
+  } finally { isLoading=false; }
 }
 
 async function fetchAll(url) {
@@ -1588,79 +1604,6 @@ function renderStatTblsFor(d) {
 }
 
 
-function renderKPIs() {
-  const d=allData;
-  const tot  = d.length;
-  const open = d.filter(r=>r.semantic_status==='Open').length;
-  const ov   = d.filter(r=>r.semantic_status==='Overdue').length;
-  const on   = d.filter(r=>r.semantic_status==='On-time Closed').length;
-  const late = d.filter(r=>r.semantic_status==='Lately Closed').length;
-  const cls  = d.filter(r=>r.semantic_status==='Closed').length;
-  // On-time rate chỉ tính trên form có Target date (CAR, MCAR, PAVOI...)
-  const totalWithTgt = on + late;
-  const c1 = d.filter(r=>r.overdue_cat==='CAT I').length;
-  const c2 = d.filter(r=>r.overdue_cat==='CAT II').length;
-  const c3 = d.filter(r=>r.overdue_cat==='CAT III').length;
-
-  s('k-total',tot); s('k-open',open);
-  s('k-over',ov);
-  s('k-over-r', pct(ov/(open+ov||1))+' của Open+Overdue');
-  s('k-on',on);
-  s('k-on-r','On-time: '+pct(on/(totalWithTgt||1))+' (form có target)');
-  s('k-late',late);
-  s('k-cls',cls);
-  s('k-c1',c1); s('k-c2',c2); s('k-c3',c3);
-}
-
-// ── STAT TABLES ───────────────────────────────────────────────
-function renderStatTbls() {
-  const CLOSED_S = ['On-time Closed','Lately Closed','Closed'];
-  const total = allData.length;
-
-  // Sort forms by total count desc
-  const formCounts = {};
-  allData.forEach(r=>{ if(r.report_title) formCounts[r.report_title]=(formCounts[r.report_title]||0)+1; });
-  const forms = Object.keys(formCounts).sort((a,b)=>formCounts[b]-formCounts[a]);
-
-  g('statForm').innerHTML = forms.map(f=>{
-    const rows = allData.filter(r=>r.report_title===f);
-    const op = rows.filter(r=>r.semantic_status==='Open').length;
-    const ov = rows.filter(r=>r.semantic_status==='Overdue').length;
-    const cl = rows.filter(r=>CLOSED_S.includes(r.semantic_status)).length;
-    const pctTot = Math.round(rows.length/total*100);
-    return `<tr>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${f}</td>
-      <td style="text-align:center;color:var(--blue)">${op||'—'}</td>
-      <td style="text-align:center;color:#ff6b6b">${ov||'—'}</td>
-      <td style="text-align:center;color:var(--green)">${cl}</td>
-      <td style="text-align:center"><b>${rows.length}</b></td>
-      <td style="text-align:center;color:var(--muted)">${pctTot}%</td>
-    </tr>`;
-  }).join('');
-
-  const fc = g('statFormCount');
-  if(fc) fc.textContent = forms.length + ' loại form';
-
-  // Metrics
-  const ontime  = allData.filter(r=>r.semantic_status==='On-time Closed').length;
-  const lately  = allData.filter(r=>r.semantic_status==='Lately Closed').length;
-  const ov2     = allData.filter(r=>r.semantic_status==='Overdue').length;
-  const openCnt = allData.filter(r=>r.semantic_status==='Open').length;
-  const withTgt = ontime + lately;
-  const cat3    = allData.filter(r=>r.overdue_cat==='CAT III').length;
-  const rep     = allData.filter(r=>r.is_rep).length;
-
-  s('mc-open-ov',   openCnt + ov2);
-  s('mc-open-ov-r', pct((openCnt+ov2)/total) + ' của tổng');
-  s('mc-ontime-r',  pct(ontime/(withTgt||1)));
-  s('mc-ontime-v',  ontime + ' / ' + withTgt + ' form có target');
-  s('mc-cat3',      cat3);
-  s('mc-rep',       rep);
-  s('mc-rep-r',     pct(rep/total) + ' tỷ lệ lặp');
-
-  g('statMeta').innerHTML='';
-}
-
 // ── CHARTS ────────────────────────────────────────────────────
 const CO={responsive:true,maintainAspectRatio:false,
   plugins:{legend:{labels:{color:'#8B949E',font:{size:10},boxWidth:10}}},
@@ -1668,37 +1611,6 @@ const CO={responsive:true,maintainAspectRatio:false,
           y:{ticks:{color:'#8B949E',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}}}};
 function dc(id){if(charts[id]){charts[id].destroy();delete charts[id]}}
 
-function buildCharts() {
-  // Status donut
-  dc('cStatus');
-  const SC_COLOR={'Open':'#58A6FF','Overdue':'#ff6b6b','On-time Closed':'#3FB950','Lately Closed':'#D29922','Closed':'#6E7681'};
-  const VALID_STATUS=new Set(['Open','Overdue','On-time Closed','Lately Closed','Closed']);
-  const sc={};
-  allData.filter(r=>VALID_STATUS.has(r.semantic_status)).forEach(r=>{sc[r.semantic_status]=(sc[r.semantic_status]||0)+1});
-  charts['cStatus']=new Chart(g('cStatus'),{type:'doughnut',
-    data:{labels:Object.keys(sc),datasets:[{data:Object.values(sc),backgroundColor:Object.keys(sc).map(k=>SC_COLOR[k]||'#555'),borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#8B949E',font:{size:10},boxWidth:8}}}}});
-
-  buildFormChart();
-  buildMonthChart();
-
-  // Overdue CAT donut
-  dc('cCat');
-  const cats={'CAT I':0,'CAT II':0,'CAT III':0};
-  allData.filter(r=>r.semantic_status==='Overdue').forEach(r=>{if(r.overdue_cat)cats[r.overdue_cat]++});
-  charts['cCat']=new Chart(g('cCat'),{type:'doughnut',
-    data:{labels:Object.keys(cats),datasets:[{data:Object.values(cats),backgroundColor:['#F0883E','#ff6b6b','#cc0000'],borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#8B949E',font:{size:10},boxWidth:8}}}}});
-
-  // Overdue by form
-  dc('cOvForm');
-  const of={};
-  allData.filter(r=>r.semantic_status==='Overdue').forEach(r=>{const f=r.report_title||'?';of[f]=(of[f]||0)+1});
-  const sof=Object.entries(of).sort((a,b)=>b[1]-a[1]).slice(0,12);
-  charts['cOvForm']=new Chart(g('cOvForm'),{type:'bar',
-    data:{labels:sof.map(f=>f[0]),datasets:[{data:sof.map(f=>f[1]),backgroundColor:'#ff6b6b',borderRadius:4}]},
-    options:{...CO,indexAxis:'y',plugins:{legend:{display:false}}}});
-}
 
 function buildFormChart() {
   dc('cForm');
@@ -1813,6 +1725,21 @@ function buildKPICharts() {
     const rep=rows.filter(r=>r.is_rep).length;
     return`<tr><td>${y}</td><td style="color:var(--yellow)">${rep}</td><td>${rows.length}</td><td><b>${pct(rep/(rows.length||1))}</b></td></tr>`;
   }).join('');
+
+  // Overdue page charts — built here since buildKPICharts is called from renderAll
+  dc('cCat');
+  const cats={'CAT I':0,'CAT II':0,'CAT III':0};
+  allData.filter(r=>r.semantic_status==='Overdue').forEach(r=>{if(r.overdue_cat)cats[r.overdue_cat]++});
+  charts['cCat']=new Chart(g('cCat'),{type:'doughnut',
+    data:{labels:Object.keys(cats),datasets:[{data:Object.values(cats),backgroundColor:['#F0883E','#ff6b6b','#cc0000'],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#8B949E',font:{size:10},boxWidth:8}}}}});
+  dc('cOvForm');
+  const ovf={};
+  allData.filter(r=>r.semantic_status==='Overdue').forEach(r=>{const f=r.report_title||'?';ovf[f]=(ovf[f]||0)+1});
+  const sovf=Object.entries(ovf).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  charts['cOvForm']=new Chart(g('cOvForm'),{type:'bar',
+    data:{labels:sovf.map(f=>f[0]),datasets:[{data:sovf.map(f=>f[1]),backgroundColor:'#ff6b6b',borderRadius:4}]},
+    options:{...CO,indexAxis:'y',plugins:{legend:{display:false}}}});
 }
 
 // ── TABLE: OPEN RFI ──────────────────────────────────────────
@@ -1846,16 +1773,16 @@ function renderOpen() {
   data=sortD(data,ts.sort,ts.asc);
   renderPaged('openBody','openInfo','openPg','openCnt',data,ts,r=>`
     <tr>
-      <td><b>${r.report_number||'—'}</b></td>
-      <td><span style="font-size:11px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">${r.report_title||'—'}</span></td>
+      <td><b>${esc(r.report_number)||'—'}</b></td>
+      <td><span style="font-size:11px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">${esc(r.report_title)||'—'}</span></td>
       <td>${sBadge(r.semantic_status)}</td>
       <td style="font-size:11px;color:var(--muted)">${fd(r.raised_date)}</td>
       <td>${fd(r.Target_date)}</td>
       <td>${ageDis(r.report_ageing,r.semantic_status)}</td>
       <td>${cBadge(r.overdue_cat)}</td>
-      <td>${r.finding_level||'—'}</td>
+      <td>${esc(r.finding_level)||'—'}</td>
       <td>${r.is_rep?'<span style="color:var(--yellow)">⚠ Yes</span>':'—'}</td>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)">${r.audit_title||'—'}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)">${esc(r.audit_title)||'—'}</td>
     </tr>`);
 }
 
@@ -1876,14 +1803,14 @@ function renderOv() {
   data=sortD(data,ts.sort,ts.asc);
   renderPaged('ovBody','ovInfo','ovPg','ovCnt',data,ts,r=>`
     <tr>
-      <td><b>${r.report_number||'—'}</b></td>
-      <td><span style="font-size:11px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">${r.report_title||'—'}</span></td>
+      <td><b>${esc(r.report_number)||'—'}</b></td>
+      <td><span style="font-size:11px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">${esc(r.report_title)||'—'}</span></td>
       <td style="font-size:11px;color:var(--muted)">${fd(r.raised_date)}</td>
       <td>${fd(r.Target_date)}</td>
       <td>${ageDis(r.report_ageing,r.semantic_status)}</td>
       <td>${cBadge(r.overdue_cat)}</td>
-      <td>${r.finding_level||'—'}</td>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)">${r.audit_title||'—'}</td>
+      <td>${esc(r.finding_level)||'—'}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)">${esc(r.audit_title)||'—'}</td>
     </tr>`);
 }
 
@@ -1914,18 +1841,18 @@ function renderAF() {
   data=sortD(data,ts.sort,ts.asc);
   renderPaged('afBody','afInfo','afPg','afCnt',data,ts,r=>`
     <tr>
-      <td><b>${r.report_number||'—'}</b></td>
-      <td><span style="font-size:11px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">${r.report_title||'—'}</span></td>
+      <td><b>${esc(r.report_number)||'—'}</b></td>
+      <td><span style="font-size:11px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">${esc(r.report_title)||'—'}</span></td>
       <td>${sBadge(r.semantic_status)}</td>
       <td style="font-size:11px;color:var(--muted)">${fd(r.raised_date)}</td>
       <td>${fd(r.Target_date)}</td>
       <td>${ageDis(r.report_ageing,r.semantic_status)}</td>
       <td>${cBadge(r.overdue_cat)}</td>
-      <td>${r.finding_level||'—'}</td>
+      <td>${esc(r.finding_level)||'—'}</td>
       <td>${r.is_rep?'<span style="color:var(--yellow)">⚠ Yes</span>':'—'}</td>
-      <td style="font-size:11px;color:var(--muted)">${r.audit_ref||'—'}</td>
-      <td style="font-size:11px;color:var(--blue)">${r.audit_number||'—'}</td>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)">${r.audit_title||'—'}</td>
+      <td style="font-size:11px;color:var(--muted)">${esc(r.audit_ref)||'—'}</td>
+      <td style="font-size:11px;color:var(--blue)">${esc(r.audit_number)||'—'}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)">${esc(r.audit_title)||'—'}</td>
     </tr>`);
 }
 
@@ -1991,17 +1918,17 @@ function renderPavoi() {
   data=sortD(data,ts.sort,ts.asc);
   renderPaged('pavoiBody','pavoiInfo','pavoiPg','pavoiCnt',data,ts,r=>`
     <tr>
-      <td><b>${r.report_number||'—'}</b></td>
+      <td><b>${esc(r.report_number)||'—'}</b></td>
       <td>${sBadge(r.semantic_status)}</td>
       <td style="font-size:11px;color:var(--muted)">${fd(r.raised_date)}</td>
       <td>${fd(r.Target_date)}</td>
       <td>${ageDis(r.report_ageing,r.semantic_status)}</td>
-      <td style="font-size:11px;color:var(--blue)">${r.report_ref||'—'}</td>
-      <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;font-size:11px">${r.rfv||'—'}</td>
-      <td>${r.verif_result?`<span style="color:${r.verif_result==='Satisfactory'?'var(--green)':'#ff6b6b'}">${r.verif_result}</span>`:'—'}</td>
-      <td style="font-size:11px">${r.dept||'—'}</td>
-      <td style="font-size:11px;color:var(--blue)">${r.audit_number||'—'}</td>
-      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)">${r.audit_title||'—'}</td>
+      <td style="font-size:11px;color:var(--blue)">${esc(r.report_ref)||'—'}</td>
+      <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;font-size:11px">${esc(r.rfv)||'—'}</td>
+      <td>${r.verif_result?`<span style="color:${r.verif_result==='Satisfactory'?'var(--green)':'#ff6b6b'}">${esc(r.verif_result)}</span>`:'—'}</td>
+      <td style="font-size:11px">${esc(r.dept)||'—'}</td>
+      <td style="font-size:11px;color:var(--blue)">${esc(r.audit_number)||'—'}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)">${esc(r.audit_title)||'—'}</td>
     </tr>`);
 }
 
@@ -2053,13 +1980,13 @@ function renderAudit() {
 
   renderPaged('auditBody','auditInfo','auditPg','auditCnt',data,ts,a=>`
     <tr>
-      <td><b style="color:var(--blue)">${a.number||'—'}</b></td>
-      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${a.title||'—'}</td>
+      <td><b style="color:var(--blue)">${esc(a.number)||'—'}</b></td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${esc(a.title)||'—'}</td>
       <td>${a.audit_type==='Internal Audit'?'<span class="badge b-admin">Internal Audit</span>':'<span class="badge b-open">Inspection</span>'}</td>
-      <td><span class="badge ${STATUS_COLOR[a.status]||'b-with'}">${a.status||'—'}</span></td>
+      <td><span class="badge ${STATUS_COLOR[a.status]||'b-with'}">${esc(a.status)||'—'}</span></td>
       <td style="font-size:11px">${fdYM(a.scheduled_start_date)}</td>
-      <td style="font-size:11px;color:var(--muted)">${a.lead_auditor_name||'—'}</td>
-      <td style="font-size:11px;color:var(--muted)">${a.primary_scope_item_name||'—'}</td>
+      <td style="font-size:11px;color:var(--muted)">${esc(a.lead_auditor_name)||'—'}</td>
+      <td style="font-size:11px;color:var(--muted)">${esc(a.primary_scope_item_name)||'—'}</td>
       <td style="text-align:center"><b>${a.finding_count||0}</b></td>
       <td style="text-align:center;color:var(--blue)">${a.open_count||0}</td>
       <td style="text-align:center;color:#ff6b6b">${a.overdue_count||0}</td>
@@ -2264,11 +2191,11 @@ async function loadUsers() {
     g('userBody').innerHTML=(data||[]).length===0
       ?'<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">Không có user</td></tr>'
       :data.map(u=>`<tr>
-        <td><b>${u.full_name}</b></td>
-        <td style="color:var(--muted)">${u.email}</td>
+        <td><b>${esc(u.full_name)}</b></td>
+        <td style="color:var(--muted)">${esc(u.email)}</td>
         <td>${rBadge(u.role)}</td>
         <td style="font-size:11px;color:var(--muted)">${fd(u.created_at)}</td>
-        <td style="font-size:11px;color:var(--muted)">${u.approved_by||'—'}</td>
+        <td style="font-size:11px;color:var(--muted)">${esc(u.approved_by)||'—'}</td>
         <td><div class="admin-actions">
           ${u.role==='pending'?`<button class="btn-approve" onclick="approveUser('${u.id}','${u.email}')">✓ Approve</button><button class="btn-reject" onclick="rejectUser('${u.id}')">✗ Reject</button>`:''}
           ${u.role==='approved'&&u.email!==curUser.email?`<button class="btn-make-admin" onclick="makeAdmin('${u.id}')">★ Admin</button><button class="btn-reject" onclick="rejectUser('${u.id}')">✗ Revoke</button>`:''}
@@ -2336,6 +2263,9 @@ function rBadge(r){const m={pending:'b-pend',approved:'b-appr',rejected:'b-reje'
 function sortD(data,col,asc){return[...data].sort((a,b)=>{let va=a[col],vb=b[col];if(va==null)va=asc?Infinity:-Infinity;if(vb==null)vb=asc?Infinity:-Infinity;if(typeof va==='string')return asc?va.localeCompare(vb):vb.localeCompare(va);return asc?va-vb:vb-va})}
 function g(id){return document.getElementById(id)}
 function s(id,v){const el=g(id);if(el)el.textContent=v}
+function esc(v){if(v==null)return'';return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function debounce(fn,ms){let t;return function(...a){clearTimeout(t);t=setTimeout(()=>fn.apply(this,a),ms)}}
+async function hashPass(p){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(p));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('')}
 function setOv(show,txt='',detail=''){
   g('overlay').classList.toggle('show',show);
   if(show){g('ovSpinner').style.display='';g('ovRetry').style.display='none';}
