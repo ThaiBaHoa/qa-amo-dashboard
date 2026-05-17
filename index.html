@@ -7,6 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -2132,29 +2133,145 @@ function generateReport(){
   </tr>`).join('');
 }
 
-async function exportPDF(){
+function exportPDF(){
+  if(!rptData.length){toast('Không có data','err');return;}
   const {jsPDF}=window.jspdf;
   setOv(true,'Đang tạo PDF...','Vui lòng chờ');
-  const el=g('reportPreview');
-  const prevStyle={overflow:el.style.overflow,height:el.style.height,flex:el.style.flex,minHeight:el.style.minHeight};
-  el.style.overflow='visible'; el.style.height='auto'; el.style.flex='none'; el.style.minHeight='0';
   try{
-    await new Promise(r=>setTimeout(r,80));
-    const canvas=await html2canvas(el,{scale:1.5,backgroundColor:'#161B22',useCORS:true,logging:false,scrollX:0,scrollY:0,windowWidth:el.scrollWidth,windowHeight:el.scrollHeight});
-    const img=canvas.toDataURL('image/png');
-    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-    const W=pdf.internal.pageSize.getWidth(), H=pdf.internal.pageSize.getHeight();
-    const ratio=W/canvas.width, sH=canvas.height*ratio;
-    let y=0;
-    while(y<sH){if(y>0)pdf.addPage();pdf.addImage(img,'PNG',0,-y,W,sH);y+=H;}
-    pdf.save(`QA_AMO_${getRptTitle().replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`);
+    const d=rptData, total=d.length;
+    const title=getRptTitle();
+    const dateStr=new Date().toLocaleDateString('vi-VN');
+    const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    const W=pdf.internal.pageSize.getWidth();
+
+    // ── Header ──
+    pdf.setFillColor(227,6,19); pdf.rect(0,0,W,18,'F');
+    pdf.setTextColor(255,255,255); pdf.setFontSize(10); pdf.setFont(undefined,'normal');
+    pdf.text('VietJet Air · Quality Assurance AMO',10,7);
+    pdf.setFontSize(14); pdf.setFont(undefined,'bold');
+    pdf.text(title,10,14);
+    pdf.setFontSize(9); pdf.setFont(undefined,'normal');
+    pdf.text(`Ngày xuất: ${dateStr}    Tổng: ${total} records`,W-10,14,{align:'right'});
+
+    // ── KPI summary row ──
+    const open=d.filter(r=>r.semantic_status==='Open').length;
+    const ov=d.filter(r=>r.semantic_status==='Overdue').length;
+    const on=d.filter(r=>r.semantic_status==='On-time Closed').length;
+    const late=d.filter(r=>r.semantic_status==='Lately Closed').length;
+    const cls=d.filter(r=>r.semantic_status==='Closed').length;
+    const rep=d.filter(r=>r.is_rep).length;
+    const c1=d.filter(r=>r.overdue_cat==='CAT I').length;
+    const c2=d.filter(r=>r.overdue_cat==='CAT II').length;
+    const c3=d.filter(r=>r.overdue_cat==='CAT III').length;
+    let y=22;
+    pdf.autoTable({
+      startY:y,
+      head:[['Total','Open','Overdue','On-time Closed','Lately Closed','Closed','Repetitive','CAT I','CAT II','CAT III']],
+      body:[[total,open,ov,on,late,cls,rep,c1,c2,c3]],
+      theme:'grid',
+      headStyles:{fillColor:[40,40,50],textColor:255,fontSize:8,fontStyle:'bold',halign:'center'},
+      bodyStyles:{fontSize:9,halign:'center',fontStyle:'bold'},
+      columnStyles:{1:{textColor:[88,166,255]},2:{textColor:[255,107,107]},3:{textColor:[63,185,80]},4:{textColor:[210,153,34]},6:{textColor:[240,136,62]},7:{textColor:[240,136,62]},8:{textColor:[255,107,107]},9:{textColor:[204,0,0]}},
+      margin:{left:10,right:10},
+    });
+    y=pdf.lastAutoTable.finalY+4;
+
+    // ── Tổng hợp theo Form ──
+    pdf.setFontSize(9); pdf.setFont(undefined,'bold'); pdf.setTextColor(180,180,180);
+    pdf.text('TỔNG HỢP THEO FORM',10,y+4); y+=7;
+    const forms=[...new Set(d.map(r=>r.report_title).filter(Boolean))].sort();
+    const CLOSED_S=['On-time Closed','Lately Closed','Closed'];
+    const formRows=forms.map(f=>{
+      const rows=d.filter(r=>r.report_title===f);
+      const op=rows.filter(r=>r.semantic_status==='Open').length;
+      const ov2=rows.filter(r=>r.semantic_status==='Overdue').length;
+      const on2=rows.filter(r=>r.semantic_status==='On-time Closed').length;
+      const la=rows.filter(r=>r.semantic_status==='Lately Closed').length;
+      const cl=rows.filter(r=>r.semantic_status==='Closed').length;
+      return[f,op||'—',ov2||'—',on2||'—',la||'—',cl||'—',rows.length,Math.round(rows.length/total*100)+'%'];
+    });
+    formRows.push(['Total',open||'—',ov||'—',on||'—',late||'—',cls||'—',total,'100%']);
+    pdf.autoTable({
+      startY:y,
+      head:[['Form','Open','Overdue','On-time','Lately','Closed','Total','%']],
+      body:formRows,
+      theme:'striped',
+      headStyles:{fillColor:[30,30,40],textColor:200,fontSize:8,fontStyle:'bold'},
+      bodyStyles:{fontSize:8},
+      columnStyles:{0:{cellWidth:60},1:{halign:'center',textColor:[88,166,255]},2:{halign:'center',textColor:[255,107,107]},3:{halign:'center',textColor:[63,185,80]},4:{halign:'center',textColor:[210,153,34]},5:{halign:'center'},6:{halign:'center',fontStyle:'bold'},7:{halign:'center'}},
+      footStyles:{fillColor:[20,20,30],fontStyle:'bold'},
+      margin:{left:10,right:10},
+      didDrawRow:(data)=>{if(data.row.index===formRows.length-1){pdf.setFillColor(30,30,50);}},
+    });
+
+    // ── Chi tiết — tất cả records, phân trang tự động ──
+    pdf.addPage();
+    // Re-draw header on new page
+    pdf.setFillColor(227,6,19); pdf.rect(0,0,W,12,'F');
+    pdf.setTextColor(255,255,255); pdf.setFontSize(9); pdf.setFont(undefined,'bold');
+    pdf.text(`${title} — CHI TIẾT (${total} records)`,10,8);
+    pdf.setFont(undefined,'normal'); pdf.text(dateStr,W-10,8,{align:'right'});
+
+    const detailRows=d.map(r=>[
+      r.report_number||'—',
+      r.report_title||'—',
+      r.semantic_status||'—',
+      fd(r.raised_date),
+      fd(r.Target_date),
+      r.report_ageing!=null?(r.semantic_status==='Open'||r.semantic_status==='Overdue'?`+${r.report_ageing}d`:`${r.report_ageing}d`):'—',
+      r.overdue_cat||'—',
+      r.audit_title||'—',
+    ]);
+    const statusColor=(s)=>{
+      if(s==='Overdue')return[255,107,107];
+      if(s==='Open')return[88,166,255];
+      if(s==='On-time Closed')return[63,185,80];
+      if(s==='Lately Closed')return[210,153,34];
+      return[150,150,150];
+    };
+    pdf.autoTable({
+      startY:15,
+      head:[['Report No','Form','Status','Raised','Target','Days','CAT','Audit']],
+      body:detailRows,
+      theme:'striped',
+      headStyles:{fillColor:[30,30,40],textColor:200,fontSize:7,fontStyle:'bold'},
+      bodyStyles:{fontSize:7,textColor:[200,200,200]},
+      columnStyles:{
+        0:{cellWidth:30,fontStyle:'bold',textColor:[220,220,220]},
+        1:{cellWidth:38},
+        2:{cellWidth:28,halign:'center'},
+        3:{cellWidth:20,halign:'center'},
+        4:{cellWidth:20,halign:'center'},
+        5:{cellWidth:18,halign:'center'},
+        6:{cellWidth:16,halign:'center'},
+        7:{cellWidth:'auto'},
+      },
+      margin:{left:10,right:10},
+      didParseCell:(data)=>{
+        if(data.column.index===2&&data.section==='body'){
+          data.cell.styles.textColor=statusColor(data.cell.raw);
+        }
+        if(data.column.index===5&&data.section==='body'){
+          const status=detailRows[data.row.index]?.[2];
+          if(status==='Overdue')data.cell.styles.textColor=[255,107,107];
+          else if(status==='Open')data.cell.styles.textColor=[63,185,80];
+        }
+        if(data.column.index===6&&data.section==='body'&&data.cell.raw!=='—'){
+          const cat=data.cell.raw;
+          data.cell.styles.textColor=cat==='CAT III'?[204,0,0]:cat==='CAT II'?[255,107,107]:[240,136,62];
+        }
+      },
+      didDrawPage:(data)=>{
+        const pageNum=pdf.internal.getCurrentPageInfo().pageNumber;
+        pdf.setFontSize(7); pdf.setTextColor(120,120,120);
+        pdf.text(`Trang ${pageNum}`,W/2,pdf.internal.pageSize.getHeight()-4,{align:'center'});
+      },
+    });
+
+    pdf.save(`QA_AMO_${title.replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`);
     toast('✓ PDF đã xuất!','ok');
-  }catch(e){toast('Lỗi PDF: '+e.message,'err');}
-  finally{
-    el.style.overflow=prevStyle.overflow; el.style.height=prevStyle.height;
-    el.style.flex=prevStyle.flex; el.style.minHeight=prevStyle.minHeight;
-    setOv(false);
-  }
+  }catch(e){toast('Lỗi PDF: '+e.message,'err');console.error(e);}
+  finally{setOv(false);}
 }
 
 function exportExcel(){
