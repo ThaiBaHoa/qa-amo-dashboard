@@ -301,8 +301,8 @@ tr:last-child td{border-bottom:none}
       <button class="auth-tab" onclick="switchAuth('register')">Đăng ký</button>
     </div>
     <div id="loginForm">
-      <div class="form-group"><label class="form-label">Email</label>
-        <input class="form-input" id="lEmail" type="email" placeholder="email@vietjetair.com" autocomplete="email"></div>
+      <div class="form-group"><label class="form-label">Tên đăng nhập</label>
+        <input class="form-input" id="lUsername" type="text" placeholder="Nhập tên đăng nhập" autocomplete="username"></div>
       <div class="form-group"><label class="form-label">Mật khẩu</label>
         <input class="form-input" id="lPass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
       <button class="btn-primary" id="btnLogin" onclick="doLogin()">Đăng nhập</button>
@@ -311,7 +311,9 @@ tr:last-child td{border-bottom:none}
     <div id="registerForm" style="display:none">
       <div class="form-group"><label class="form-label">Họ và tên</label>
         <input class="form-input" id="rName" type="text" placeholder="Nguyễn Văn A"></div>
-      <div class="form-group"><label class="form-label">Email</label>
+      <div class="form-group"><label class="form-label">Tên đăng nhập</label>
+        <input class="form-input" id="rUsername" type="text" placeholder="Ví dụ: nguyen.van.a" autocomplete="username"></div>
+      <div class="form-group"><label class="form-label">Email <span style="font-size:11px;color:var(--muted);font-weight:400">(chỉ để khai báo)</span></label>
         <input class="form-input" id="rEmail" type="email" placeholder="email@vietjetair.com"></div>
       <div class="form-group"><label class="form-label">Mật khẩu</label>
         <input class="form-input" id="rPass" type="password" placeholder="Tối thiểu 8 ký tự"></div>
@@ -1151,7 +1153,7 @@ tr:last-child td{border-bottom:none}
             </div>
             <div class="tbl-wrap">
               <table>
-                <thead><tr><th>Họ tên</th><th>Email</th><th>Role</th><th>Ngày đăng ký</th><th>Approved by</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Họ tên</th><th>Tên đăng nhập</th><th>Email khai báo</th><th>Role</th><th>Ngày đăng ký</th><th>Approved by</th><th>Actions</th></tr></thead>
                 <tbody id="userBody"></tbody>
               </table>
             </div>
@@ -1232,20 +1234,19 @@ function switchAuth(tab) {
 }
 
 async function doLogin() {
-  const email=g('lEmail').value.trim().toLowerCase(), pass=g('lPass').value;
+  const username=g('lUsername').value.trim().toLowerCase(), pass=g('lPass').value;
   const al=g('loginAlert'); showAl(al,'',''); g('btnLogin').disabled=true;
+  if(!username||!pass){showAl(al,'error','Vui lòng nhập tên đăng nhập và mật khẩu.');g('btnLogin').disabled=false;return;}
   try {
-    const {data,error} = await sb.from('users').select('*').eq('email',email).single();
-    if(error||!data){showAl(al,'error','Email không tồn tại.');return;}
+    const {data,error} = await sb.from('users').select('*').eq('email',username).single();
+    if(error||!data){showAl(al,'error','Tên đăng nhập không tồn tại.');return;}
     const hash = await hashPass(pass);
     const passOk = data.password === hash || data.password === pass;
     if(!passOk){showAl(al,'error','Mật khẩu không đúng.');return;}
-    // Silently migrate plain-text password to SHA-256 hash on next login
     if(data.password === pass) sb.from('users').update({password:hash}).eq('id',data.id);
     if(data.role==='pending'){g('loginForm').style.display='none';g('authTabs').style.display='none';g('pendingBox').style.display='';return;}
     if(data.role==='rejected'){showAl(al,'error','Tài khoản đã bị từ chối.');return;}
     curUser=data;
-    // Never store password in sessionStorage
     const safeUser={id:data.id,email:data.email,full_name:data.full_name,role:data.role};
     sessionStorage.setItem('qaUser',JSON.stringify(safeUser));
     initApp();
@@ -1254,21 +1255,23 @@ async function doLogin() {
 }
 
 async function doRegister() {
-  const name=g('rName').value.trim(), email=g('rEmail').value.trim().toLowerCase();
+  const name=g('rName').value.trim(), username=g('rUsername').value.trim().toLowerCase();
+  const contactEmail=g('rEmail').value.trim().toLowerCase();
   const pass=g('rPass').value, pass2=g('rPass2').value;
   const al=g('registerAlert');
-  if(!name||!email||!pass){showAl(al,'error','Vui lòng điền đầy đủ.');return;}
+  if(!name||!username||!pass){showAl(al,'error','Vui lòng điền đầy đủ họ tên, tên đăng nhập và mật khẩu.');return;}
+  if(!/^[a-z0-9._-]{3,30}$/.test(username)){showAl(al,'error','Tên đăng nhập chỉ gồm chữ thường, số, dấu chấm/gạch dưới (3–30 ký tự).');return;}
   if(pass.length<8){showAl(al,'error','Mật khẩu tối thiểu 8 ký tự.');return;}
   if(pass!==pass2){showAl(al,'error','Mật khẩu không khớp.');return;}
   g('btnRegister').disabled=true; showAl(al,'info','Đang gửi...');
   try {
-    const {data:ex}=await sb.from('users').select('id').eq('email',email).single();
-    if(ex){showAl(al,'error','Email đã được đăng ký.');return;}
+    const {data:ex}=await sb.from('users').select('id').eq('email',username).single();
+    if(ex){showAl(al,'error','Tên đăng nhập đã được sử dụng.');return;}
     const hash=await hashPass(pass);
-    const {error}=await sb.from('users').insert({email,password:hash,full_name:name,role:'pending'});
+    const {error}=await sb.from('users').insert({email:username,password:hash,full_name:name,contact_email:contactEmail||null,role:'pending'});
     if(error)throw error;
     showAl(al,'success','✓ Đăng ký thành công! Chờ Admin phê duyệt.');
-    g('rName').value=g('rEmail').value=g('rPass').value=g('rPass2').value='';
+    g('rName').value=g('rUsername').value=g('rEmail').value=g('rPass').value=g('rPass2').value='';
     setTimeout(()=>{g('registerForm').style.display='none';g('authTabs').style.display='none';g('pendingBox').style.display='';},2000);
   } catch(e){showAl(al,'error','Lỗi: '+e.message);}
   finally{g('btnRegister').disabled=false;}
@@ -1279,7 +1282,7 @@ function doLogout() {
   g('authWrap').style.display='flex'; g('app').style.display='none';
   g('loginForm').style.display=''; g('registerForm').style.display='none';
   g('pendingBox').style.display=''; g('authTabs').style.display='';
-  switchAuth('login'); g('lEmail').value=g('lPass').value=''; showAl(g('loginAlert'),'','');
+  switchAuth('login'); g('lUsername').value=g('lPass').value=''; showAl(g('loginAlert'),'','');
   g('pendingBox').style.display='none';
 }
 
@@ -2507,6 +2510,7 @@ async function loadUsers() {
       :data.map(u=>`<tr>
         <td><b>${esc(u.full_name)}</b></td>
         <td style="color:var(--muted)">${esc(u.email)}</td>
+        <td style="color:var(--muted);font-size:11px">${esc(u.contact_email)||'—'}</td>
         <td>${rBadge(u.role)}</td>
         <td style="font-size:11px;color:var(--muted)">${fd(u.created_at)}</td>
         <td style="font-size:11px;color:var(--muted)">${esc(u.approved_by)||'—'}</td>
