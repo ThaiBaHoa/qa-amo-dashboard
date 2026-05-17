@@ -1503,20 +1503,24 @@ async function loadData() {
         )
       );
 
-      // Fetch audit workflow stages (Preplanning, Perform, Report, Follow up, Closure)
+      // Fetch audit workflow stages — không dùng $select để discover toàn bộ fields
       let auditWfMap = {};
       try {
-        const auWfRaw = await fetchAll(
-          G_URL + 'dwreporting_audit_workflow' +
-          '?$select=audit_id,stage_type,stage_status,stage_owner_name,' +
-          'stage_completed_date,stage_target_date,' +
-          'scheduled_start_date,scheduled_end_date,actual_start_date,actual_end_date'
-        );
+        const auWfRaw = await fetchAll(G_URL + 'dwreporting_audit_workflow');
+        if (auWfRaw.length) {
+          console.log('[AuditWF] Endpoint OK. Sample record keys:', Object.keys(auWfRaw[0]));
+          console.log('[AuditWF] Sample record:', auWfRaw[0]);
+        } else {
+          console.warn('[AuditWF] Endpoint trả về 0 records');
+        }
         auWfRaw.forEach(s => {
-          if (!auditWfMap[s.audit_id]) auditWfMap[s.audit_id] = [];
-          auditWfMap[s.audit_id].push(s);
+          // Thử cả audit_id và các key thay thế phổ biến
+          const aid = s.audit_id ?? s.audit_fk ?? s.AuditId ?? s.id;
+          if (!aid) return;
+          if (!auditWfMap[aid]) auditWfMap[aid] = [];
+          auditWfMap[aid].push(s);
         });
-      } catch(e) { console.warn('Audit workflow load error:',e); }
+      } catch(e) { console.warn('[AuditWF] Load error (endpoint có thể không tồn tại):',e.message); }
 
       // Enrich audit với finding counts + audit workflow stages
       auditData = allAudits.map(a => {
@@ -2192,9 +2196,35 @@ function auditCurrentStage(stages) {
   return sorted.length ? sorted[sorted.length-1] : null;
 }
 
+// Sinh stages ước tính từ audit.status khi API không trả về workflow data
+function getAuditStageFallback(audit) {
+  const isInspection = audit.audit_type === 'Inspection';
+  const names = isInspection
+    ? ['Preplanning','Perform','Inspection Report','Finding follow up','Inspection closure']
+    : ['Preplanning','Perform','Audit Report',      'Finding follow up','Audit closure'];
+  // Số stages "Completed" theo status:
+  // Scheduled=0, InProgress=1, Performed=4, Closed=5
+  const doneCount = {Scheduled:0, InProgress:1, Performed:4, Closed:5}[audit.status] ?? 0;
+  return names.map((name,i) => ({
+    stage_type:           name,
+    stage_status:         i < doneCount ? 'Completed' : i === doneCount && doneCount < names.length ? 'InProgress' : 'NotStarted',
+    stage_owner_name:     audit.lead_auditor_name || null,
+    stage_completed_date: null,
+    stage_target_date:    null,
+    _fallback:            true,
+  }));
+}
+
+function getEffectiveStages(audit) {
+  const stages = audit?.audit_stages || [];
+  if (stages.length) return { stages, fallback: false };
+  if (!audit) return { stages: [], fallback: false };
+  return { stages: getAuditStageFallback(audit), fallback: true };
+}
+
 function renderAuditWfSummary(audit_id) {
   const audit = auditData.find(a => a.audit_id === audit_id);
-  const stages = audit?.audit_stages || [];
+  const { stages, fallback } = getEffectiveStages(audit);
   if (!stages.length) return '<span style="color:var(--muted);font-size:11px">—</span>';
   const cur = auditCurrentStage(stages);
   if (!cur) return '<span style="color:var(--muted);font-size:11px">—</span>';
@@ -2203,24 +2233,27 @@ function renderAuditWfSummary(audit_id) {
   const icon = prog ? '●' : '✓';
   const total   = sortAuditStages(stages).length;
   const doneNum = stages.filter(s=>s.stage_status==='Completed').length;
-  return `<span style="color:${col};font-size:11px;white-space:nowrap">${icon} ${cur.stage_type}</span>`+
+  const suffix  = fallback ? ' <span style="color:var(--muted);font-size:10px">(est.)</span>' : '';
+  return `<span style="color:${col};font-size:11px;white-space:nowrap">${icon} ${cur.stage_type}${suffix}</span>`+
     `<span style="color:var(--muted);font-size:10px;margin-left:5px">${doneNum}/${total}</span>`;
 }
 
 // Render audit workflow timeline (full) — dùng trong modal
-function renderAuditTimeline(stages) {
-  if (!stages || !stages.length)
-    return '<span style="color:var(--muted);font-size:12px">Chưa có thông tin workflow</span>';
+function renderAuditTimeline(audit) {
+  const { stages, fallback } = getEffectiveStages(audit);
   const sorted = sortAuditStages(stages);
-  return sorted.map((s,i) => {
+  const header = fallback
+    ? `<div style="font-size:10px;color:var(--orange);margin-bottom:8px">⚠ Dữ liệu ước tính theo trạng thái audit (${audit.status}) — chưa có API workflow</div>`
+    : '';
+  if (!sorted.length) return '<span style="color:var(--muted);font-size:12px">Chưa có thông tin workflow</span>';
+  return header + sorted.map((s,i) => {
     const done = s.stage_status === 'Completed';
     const prog = s.stage_status === 'InProgress';
-    const col  = done ? 'var(--green)' : prog ? 'var(--blue)' : 'var(--muted)';
-    const icon = done ? '✓' : prog ? '●' : '○';
-    const bg   = done ? 'rgba(63,185,80,.08)' : prog ? 'rgba(88,166,255,.1)' : 'rgba(255,255,255,.03)';
+    const col    = done ? 'var(--green)' : prog ? 'var(--blue)' : 'var(--muted)';
+    const icon   = done ? '✓' : prog ? '●' : '○';
+    const bg     = done ? 'rgba(63,185,80,.08)' : prog ? 'rgba(88,166,255,.1)' : 'rgba(255,255,255,.03)';
     const border = done ? 'rgba(63,185,80,.25)' : prog ? 'rgba(88,166,255,.3)' : 'var(--border)';
 
-    // Build date detail line
     const dateParts = [];
     if (s.scheduled_start_date) dateParts.push('Kế hoạch: '+new Date(s.scheduled_start_date).toLocaleDateString('vi-VN')+
       (s.scheduled_end_date?' → '+new Date(s.scheduled_end_date).toLocaleDateString('vi-VN'):''));
@@ -2278,7 +2311,7 @@ function showAuditDetail(auditId) {
   ].filter(Boolean).join(' · '));
 
   // Audit workflow timeline
-  g('adTimeline').innerHTML = renderAuditTimeline(audit.audit_stages || []);
+  g('adTimeline').innerHTML = renderAuditTimeline(audit);
 
   // Finding summary chips
   const open = findings.filter(r=>r.semantic_status==='Open').length;
