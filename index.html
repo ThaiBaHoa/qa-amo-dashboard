@@ -2196,7 +2196,7 @@ function exportPDF(){
       body:[[total,open,ov,on,late,cls,rep,c1,c2,c3]],
       theme:'grid',
       headStyles:{fillColor:HEAD,textColor:[160,160,170],fontSize:8,fontStyle:'bold',halign:'center'},
-      bodyStyles:{fontSize:12,halign:'center',fontStyle:'bold',fillColor:BG2,textColor:[220,220,220]},
+      bodyStyles:{fontSize:10,halign:'center',fontStyle:'bold',fillColor:BG2,textColor:[220,220,220]},
       columnStyles:{
         1:{textColor:[88,166,255]},2:{textColor:[255,100,100]},
         3:{textColor:[63,185,80]},4:{textColor:[210,153,34]},
@@ -2206,20 +2206,25 @@ function exportPDF(){
       margin:{left:10,right:10},
     });
 
-    // 4 charts in 2×2 grid
-    const cy=pdf.lastAutoTable.finalY+5;
-    const chW=(W-30)/2, chH=(H-cy-14)/2;
+    // 4 charts in 2×2 grid — fixed height for balanced proportions
+    const cy=pdf.lastAutoTable.finalY+7;
+    const chW=(W-28)/2;   // ~134mm wide
+    const chH=68;          // fixed 68mm tall  →  ~2:1 ratio, clean look
+    const chGapX=8, chGapY=6;
     [
-      {id:'rptCStatus',label:'Status Distribution',  x:10,         y:cy},
-      {id:'rptCForm',  label:'Top 10 Forms',          x:20+chW,     y:cy},
-      {id:'rptCMonth', label:'Monthly Trend',         x:10,         y:cy+chH+5},
-      {id:'rptCCat',   label:'Overdue by CAT',        x:20+chW,     y:cy+chH+5},
+      {id:'rptCStatus',label:'Status Distribution', x:10,            y:cy},
+      {id:'rptCForm',  label:'Top 10 Forms',         x:10+chW+chGapX, y:cy},
+      {id:'rptCMonth', label:'Monthly Trend',         x:10,            y:cy+chH+chGapY},
+      {id:'rptCCat',   label:'Overdue by CAT',        x:10+chW+chGapX, y:cy+chH+chGapY},
     ].forEach(({id,label,x,y})=>{
-      pdf.setFillColor(...BG2); pdf.roundedRect(x,y,chW,chH,2,2,'F');
-      pdf.setFontSize(7); pdf.setFont(undefined,'bold'); pdf.setTextColor(140,140,155);
-      pdf.text(label,x+3,y+5);
+      pdf.setFillColor(...BG2); pdf.roundedRect(x,y,chW,chH,3,3,'F');
+      // label bar inside card
+      pdf.setFillColor(...HEAD); pdf.roundedRect(x,y,chW,9,3,3,'F');
+      pdf.rect(x,y+6,chW,3,'F'); // square bottom corners of label bar
+      pdf.setFontSize(7.5); pdf.setFont(undefined,'bold'); pdf.setTextColor(170,170,185);
+      pdf.text(label,x+4,y+6.2);
       const img=chartImg(id);
-      if(img) pdf.addImage(img,'PNG',x+2,y+7,chW-4,chH-9);
+      if(img) pdf.addImage(img,'PNG',x+2,y+10,chW-4,chH-12);
     });
 
     // ─── PAGE 2: Form Summary ────────────────────────────────
