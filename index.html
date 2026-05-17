@@ -6,6 +6,9 @@
 <title>QA AMO · VietJet Air</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
   --red:#E30613;--dark:#0D1117;--card:#161B22;--card2:#21262D;
@@ -257,6 +260,7 @@ tr:last-child td{border-bottom:none}
         <button class="nav-item" onclick="showPage('allforms',this)"><span class="nav-icon">📄</span>All Forms</button>
         <button class="nav-item" onclick="showPage('pavoi',this)"><span class="nav-icon">🔍</span>PAVOI Detail</button>
         <button class="nav-item" onclick="showPage('auditplan',this)"><span class="nav-icon">📅</span>Audit Plan</button>
+        <button class="nav-item" onclick="showPage('reports',this)"><span class="nav-icon">📊</span>Xuất Báo Cáo</button>
         <div id="adminNav" style="display:none">
           <div class="nav-sec" style="margin-top:6px">Admin</div>
           <button class="nav-item" onclick="showPage('admin',this)"><span class="nav-icon">👤</span>Quản lý Users</button>
@@ -275,6 +279,12 @@ tr:last-child td{border-bottom:none}
       <div class="topbar">
         <div class="topbar-title" id="pageTitle">Overview</div>
         <div class="topbar-right">
+          <div id="overviewYearFilter" style="display:none;align-items:center;gap:6px">
+            <span style="font-size:11px;color:var(--muted)">Lọc năm:</span>
+            <select class="sel" id="ovYearFilter" onchange="filterOverviewYear()" style="padding:4px 10px;font-size:12px">
+              <option value="all">Tất cả năm</option>
+            </select>
+          </div>
           <div class="live-badge" id="liveBadge" style="display:none">● <span id="recCount">0</span> reports</div>
           <button class="btn-sm" onclick="loadData()">↻ Refresh</button>
         </div>
@@ -601,6 +611,122 @@ tr:last-child td{border-bottom:none}
           </div>
         </div>
 
+
+        <!-- REPORTS PAGE -->
+        <div class="page" id="page-reports">
+          <div class="chart-card" style="margin-bottom:12px">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end">
+              <div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500">Lọc theo</div>
+                <select class="sel" id="rptFilterType" onchange="updateReportFilters()" style="width:100%;padding:7px 10px">
+                  <option value="month">Theo Tháng/Năm</option>
+                  <option value="quarter">Theo Quý/Năm</option>
+                  <option value="form">Theo Form Type</option>
+                  <option value="all">Tất cả</option>
+                </select>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500">Năm</div>
+                <select class="sel" id="rptYear" onchange="generateReport()" style="width:100%;padding:7px 10px">
+                  <option value="all">Tất cả năm</option>
+                </select>
+              </div>
+              <div id="rptPeriodWrap">
+                <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500" id="rptPeriodLabel">Tháng</div>
+                <select class="sel" id="rptPeriod" onchange="generateReport()" style="width:100%;padding:7px 10px">
+                  <option value="all">Tất cả</option>
+                </select>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500">Form Type</div>
+                <select class="sel" id="rptForm" onchange="generateReport()" style="width:100%;padding:7px 10px">
+                  <option value="all">Tất cả form</option>
+                </select>
+              </div>
+              <div style="display:flex;gap:8px">
+                <button onclick="exportPDF()" style="padding:7px 14px;border-radius:8px;border:none;background:#E30613;color:white;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">📄 PDF</button>
+                <button onclick="exportExcel()" style="padding:7px 14px;border-radius:8px;border:none;background:#1D6F42;color:white;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">📊 Excel</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="reportPreview" style="background:var(--card);border:1px solid var(--border);border-radius:11px;overflow:hidden">
+            <div style="background:#E30613;padding:18px 24px;color:white">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <div>
+                  <div style="font-size:10px;opacity:.8;letter-spacing:.1em;text-transform:uppercase">VietJet Air · Quality Assurance AMO</div>
+                  <div style="font-size:18px;font-weight:700;margin-top:3px" id="rptTitle">QA AMO — Báo Cáo Tổng Hợp</div>
+                  <div style="font-size:12px;opacity:.8;margin-top:2px" id="rptSubtitle">—</div>
+                </div>
+                <div style="text-align:right;font-size:11px;opacity:.8">
+                  <div>Ngày xuất: <span id="rptDate">—</span></div>
+                  <div>Tổng: <span id="rptTotal">—</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div style="padding:14px 20px;border-bottom:1px solid var(--border)">
+              <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">KPI Summary</div>
+              <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px" id="rptKPIs"></div>
+            </div>
+
+            <div style="padding:14px 20px;border-bottom:1px solid var(--border)">
+              <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Biểu Đồ</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+                <div class="chart-card"><div style="font-size:12px;font-weight:600;margin-bottom:6px">Theo trạng thái</div><div style="height:150px;position:relative"><canvas id="rptCStatus"></canvas></div></div>
+                <div class="chart-card"><div style="font-size:12px;font-weight:600;margin-bottom:6px">Top Form Types</div><div style="height:150px;position:relative"><canvas id="rptCForm"></canvas></div></div>
+                <div class="chart-card"><div style="font-size:12px;font-weight:600;margin-bottom:6px">Findings by Month</div><div style="height:150px;position:relative"><canvas id="rptCMonth"></canvas></div></div>
+              </div>
+            </div>
+
+            <div style="padding:14px 20px;border-bottom:1px solid var(--border)">
+              <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Overdue Analysis</div>
+              <div style="display:grid;grid-template-columns:200px 1fr;gap:10px;align-items:start">
+                <div class="chart-card"><div style="height:120px;position:relative"><canvas id="rptCCat"></canvas></div></div>
+                <table class="stat-tbl"><thead><tr><th>CAT</th><th>Số lượng</th><th>Tỷ lệ</th><th>Mô tả</th></tr></thead><tbody id="rptCatTable"></tbody></table>
+              </div>
+            </div>
+
+            <div style="padding:14px 20px;border-bottom:1px solid var(--border)">
+              <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Tổng Hợp Theo Form</div>
+              <table style="width:100%;border-collapse:collapse;font-size:12px">
+                <thead><tr style="background:rgba(255,255,255,0.04)">
+                  <th style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px">Form</th>
+                  <th style="padding:7px 10px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px">Open</th>
+                  <th style="padding:7px 10px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px">Overdue</th>
+                  <th style="padding:7px 10px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px">On-time</th>
+                  <th style="padding:7px 10px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px">Lately</th>
+                  <th style="padding:7px 10px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px">Closed</th>
+                  <th style="padding:7px 10px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px">Total</th>
+                  <th style="padding:7px 10px;text-align:center;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px">%</th>
+                </tr></thead>
+                <tbody id="rptFormTable"></tbody>
+              </table>
+            </div>
+
+            <div style="padding:14px 20px">
+              <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Chi Tiết <span id="rptDetailCount" style="color:var(--blue);font-weight:400;text-transform:none"></span></div>
+              <div style="max-height:360px;overflow-y:auto">
+                <table style="width:100%;border-collapse:collapse;font-size:12px">
+                  <thead style="position:sticky;top:0;background:var(--card);z-index:1">
+                    <tr style="background:rgba(255,255,255,0.04)">
+                      <th style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;white-space:nowrap">Report No</th>
+                      <th style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;white-space:nowrap">Form</th>
+                      <th style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;white-space:nowrap">Status</th>
+                      <th style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;white-space:nowrap">Raised</th>
+                      <th style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;white-space:nowrap">Target</th>
+                      <th style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;white-space:nowrap">Days</th>
+                      <th style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;white-space:nowrap">CAT</th>
+                      <th style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;white-space:nowrap">Audit</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rptDetailTable"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- ADMIN -->
         <div class="page" id="page-admin">
           <div class="tbl-card">
@@ -640,7 +766,7 @@ tr:last-child td{border-bottom:none}
 const SUPA_URL  = 'https://czftzgdcnpnspbbegwjt.supabase.co';
 const SUPA_KEY  = 'sb_publishable_eGdEXBCSD_19tu4sOV8NWQ_8mZmUqqq';
 const G_URL     = 'https://galileo-proxy.thaibahoa2308.workers.dev/proxy/';
-const G_KEY     = 'ZTIyZWM0MzMtMGNkMC00YzgyLTgwMDgtZDk5YTU5ZTIzMTY5';
+// G_KEY removed — stored securely in Cloudflare Worker environment
 const ORG_UNIT  = 'QA AMO';
 // Danh sách auditor QA AMO — dùng để filter audit plan
 // Thêm tên mới vào đây khi có auditor mới
@@ -947,7 +1073,7 @@ async function fetchAll(url) {
   while(next) {
     p++;
     setOv(true,g('ovText').textContent,`Trang ${p} · ${res.length} records`);
-    const r=await fetch(next,{headers:{'X-IdeagenDataAPIKey':G_KEY}});
+    const r=await fetch(next);
     if(!r.ok) throw new Error('HTTP '+r.status+' '+r.statusText);
     const j=await r.json();
     res=res.concat(j.value||[]);
@@ -999,9 +1125,8 @@ function catCalc(ag, sm) {
 // ── RENDER ALL ────────────────────────────────────────────────
 function renderAll() {
   populateFilters();
-  renderKPIs();
-  buildCharts();
-  renderStatTbls();
+  // Apply year filter for overview (default current year)
+  filterOverviewYear();
   renderOpen();
   renderOv();
   renderAF();
@@ -1020,17 +1145,121 @@ function populateFilters() {
   const yOpts='<option value="">Tất cả năm</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
   ['openYearF','afYearF','pavoiYearF'].forEach(id=>{const el=g(id);if(el)el.innerHTML=yOpts;});
 
-  // Audit year filter from audit data
+  // Overview year filter — default to current year
+  const curYear = new Date().getFullYear();
+  const ovYOpts='<option value="all">Tất cả năm</option>'+years.map(y=>`<option value="${y}" ${y===curYear?'selected':''}>${y}</option>`).join('');
+  const ovYEl=g('ovYearFilter'); if(ovYEl) ovYEl.innerHTML=ovYOpts;
+
+  // Audit year filter
   const auYears=[...new Set(auditData.map(a=>a.sched_year).filter(Boolean))].sort((a,b)=>b-a);
   const auYOpts='<option value="">Tất cả năm</option>'+auYears.map(y=>`<option value="${y}">${y}</option>`).join('');
   const auYEl=g('auditYearF'); if(auYEl) auYEl.innerHTML=auYOpts;
-
-  // Month chart year options
-  const el=g('monthYr');
-  if(el) el.innerHTML='<option value="all">Tất cả năm</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
 }
 
-// ── KPIs ─────────────────────────────────────────────────────
+function filterOverviewYear() {
+  const yr = g('ovYearFilter')?.value || 'all';
+  const d = yr==='all' ? allData : allData.filter(r=>String(r.raised_year)===yr);
+  renderOverview(d);
+}
+
+function renderOverview(d) {
+  const tot=d.length, open=d.filter(r=>r.semantic_status==='Open').length;
+  const ov=d.filter(r=>r.semantic_status==='Overdue').length;
+  const on=d.filter(r=>r.semantic_status==='On-time Closed').length;
+  const late=d.filter(r=>r.semantic_status==='Lately Closed').length;
+  const cls=d.filter(r=>r.semantic_status==='Closed').length;
+  const withTgt=on+late;
+  const c1=d.filter(r=>r.overdue_cat==='CAT I').length;
+  const c2=d.filter(r=>r.overdue_cat==='CAT II').length;
+  const c3=d.filter(r=>r.overdue_cat==='CAT III').length;
+  s('k-total',tot); s('k-open',open);
+  s('k-over',ov); s('k-over-r',pct(ov/(open+ov||1))+' của Open+Overdue');
+  s('k-on',on); s('k-on-r','On-time: '+pct(on/(withTgt||1))+' (form có target)');
+  s('k-late',late); s('k-cls',cls);
+  s('k-c1',c1); s('k-c2',c2); s('k-c3',c3);
+  buildChartsFor(d);
+  renderStatTblsFor(d);
+}
+
+function buildChartsFor(d) {
+  const SC={'Open':'#58A6FF','Overdue':'#ff6b6b','On-time Closed':'#3FB950','Lately Closed':'#D29922','Closed':'#6E7681'};
+  const VALID=new Set(['Open','Overdue','On-time Closed','Lately Closed','Closed']);
+  dc('cStatus');
+  const sc={};
+  d.filter(r=>VALID.has(r.semantic_status)).forEach(r=>{sc[r.semantic_status]=(sc[r.semantic_status]||0)+1});
+  charts['cStatus']=new Chart(g('cStatus'),{type:'doughnut',
+    data:{labels:Object.keys(sc),datasets:[{data:Object.values(sc),backgroundColor:Object.keys(sc).map(k=>SC[k]||'#555'),borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#8B949E',font:{size:10},boxWidth:8}}}}});
+  dc('cForm');
+  const filter=g('chartFormFilter')?.value||'all';
+  const src=filter==='all'?d:d.filter(r=>r.semantic_status===filter);
+  const fc={};
+  src.forEach(r=>{const f=r.report_title||'?';fc[f]=(fc[f]||0)+1});
+  const sf=Object.entries(fc).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const colors={all:'#E30613',Open:'#58A6FF',Overdue:'#ff6b6b'};
+  charts['cForm']=new Chart(g('cForm'),{type:'bar',
+    data:{labels:sf.map(f=>f[0]),datasets:[{data:sf.map(f=>f[1]),backgroundColor:colors[filter]||'#E30613',borderRadius:4}]},
+    options:{...CO,indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>' '+ctx.raw+' reports'}}},
+      scales:{x:{ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{ticks:{color:'#E6EDF3',font:{size:11},maxRotation:0,callback:function(val,idx){const lbl=this.getLabelForValue(val);return lbl.length>22?lbl.substring(0,20)+'…':lbl;}},grid:{color:'rgba(255,255,255,0.04)'}}}}});
+  dc('cMonth');
+  const yr=g('monthYr')?.value||'all';
+  const msrc=yr==='all'?d:d.filter(r=>String(r.raised_year)===yr);
+  const m={};
+  msrc.forEach(r=>{if(!r.raised_ym)return;if(!m[r.raised_ym])m[r.raised_ym]={o:0,c:0,ov:0};
+    if(r.semantic_status==='Open')m[r.raised_ym].o++;
+    else if(r.semantic_status==='Overdue')m[r.raised_ym].ov++;
+    else m[r.raised_ym].c++;});
+  const keys=Object.keys(m).sort();
+  charts['cMonth']=new Chart(g('cMonth'),{type:'bar',
+    data:{labels:keys,datasets:[
+      {label:'Closed',data:keys.map(k=>m[k].c),backgroundColor:'#3FB950',borderRadius:3,stack:'s'},
+      {label:'Open',data:keys.map(k=>m[k].o),backgroundColor:'#58A6FF',borderRadius:3,stack:'s'},
+      {label:'Overdue',data:keys.map(k=>m[k].ov),backgroundColor:'#ff6b6b',borderRadius:3,stack:'s'}]},
+    options:{...CO,scales:{
+      x:{stacked:true,ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
+      y:{stacked:true,ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}}}}});
+}
+
+function renderStatTblsFor(d) {
+  const CLOSED_S=['On-time Closed','Lately Closed','Closed'];
+  const total=d.length;
+  const formCounts={};
+  d.forEach(r=>{if(r.report_title)formCounts[r.report_title]=(formCounts[r.report_title]||0)+1;});
+  const forms=Object.keys(formCounts).sort((a,b)=>formCounts[b]-formCounts[a]);
+  g('statForm').innerHTML=forms.map(f=>{
+    const rows=d.filter(r=>r.report_title===f);
+    const op=rows.filter(r=>r.semantic_status==='Open').length;
+    const ov2=rows.filter(r=>r.semantic_status==='Overdue').length;
+    const cl=rows.filter(r=>CLOSED_S.includes(r.semantic_status)).length;
+    return `<tr>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${f}</td>
+      <td style="text-align:center;color:var(--blue)">${op||'—'}</td>
+      <td style="text-align:center;color:#ff6b6b">${ov2||'—'}</td>
+      <td style="text-align:center;color:var(--green)">${cl}</td>
+      <td style="text-align:center"><b>${rows.length}</b></td>
+      <td style="text-align:center;color:var(--muted)">${Math.round(rows.length/total*100)}%</td>
+    </tr>`;
+  }).join('');
+  const fc=g('statFormCount'); if(fc)fc.textContent=forms.length+' loại form';
+  const ontime=d.filter(r=>r.semantic_status==='On-time Closed').length;
+  const lately=d.filter(r=>r.semantic_status==='Lately Closed').length;
+  const ov3=d.filter(r=>r.semantic_status==='Overdue').length;
+  const openCnt=d.filter(r=>r.semantic_status==='Open').length;
+  const withTgt=ontime+lately;
+  const cat3=d.filter(r=>r.overdue_cat==='CAT III').length;
+  const rep=d.filter(r=>r.is_rep).length;
+  s('mc-open-ov',openCnt+ov3);
+  s('mc-open-ov-r',pct((openCnt+ov3)/total)+' của tổng');
+  s('mc-ontime-r',pct(ontime/(withTgt||1)));
+  s('mc-ontime-v',ontime+' / '+withTgt+' form có target');
+  s('mc-cat3',cat3);
+  s('mc-rep',rep);
+  s('mc-rep-r',pct(rep/total)+' tỷ lệ lặp');
+  g('statMeta').innerHTML='';
+}
+
+
 function renderKPIs() {
   const d=allData;
   const tot  = d.length;
@@ -1518,6 +1747,178 @@ function fdYM(d){
   }catch{return d}
 }
 
+
+// ── REPORTS ──────────────────────────────────────────────────
+let rptCharts={}, rptData=[];
+
+function updateReportFilters(){
+  const type=g('rptFilterType').value;
+  const pw=g('rptPeriodWrap'), pl=g('rptPeriodLabel'), ps=g('rptPeriod');
+  if(type==='month'){
+    pw.style.display=''; pl.textContent='Tháng';
+    ps.innerHTML='<option value="all">Tất cả tháng</option>'+Array.from({length:12},(_,i)=>`<option value="${i+1}">Tháng ${i+1}</option>`).join('');
+  } else if(type==='quarter'){
+    pw.style.display=''; pl.textContent='Quý';
+    ps.innerHTML='<option value="all">Tất cả quý</option>'+['Q1 (T1-T3)','Q2 (T4-T6)','Q3 (T7-T9)','Q4 (T10-T12)'].map((q,i)=>`<option value="${i+1}">${q}</option>`).join('');
+  } else { pw.style.display='none'; }
+  generateReport();
+}
+
+function initReportFilters(){
+  const years=[...new Set(allData.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
+  g('rptYear').innerHTML='<option value="all">Tất cả năm</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  const forms=[...new Set(allData.map(r=>r.report_title).filter(Boolean))].sort();
+  g('rptForm').innerHTML='<option value="all">Tất cả form</option>'+forms.map(f=>`<option value="${f}">${f}</option>`).join('');
+  updateReportFilters();
+}
+
+function getRptData(){
+  const type=g('rptFilterType').value, year=g('rptYear').value;
+  const period=g('rptPeriod')?.value||'all', form=g('rptForm').value;
+  return allData.filter(r=>{
+    if(form!=='all'&&r.report_title!==form)return false;
+    if(year!=='all'&&String(r.raised_year)!==year)return false;
+    if(type==='month'&&period!=='all'){const m=r.raised_date?new Date(r.raised_date).getMonth()+1:null;if(m!==parseInt(period))return false;}
+    if(type==='quarter'&&period!=='all'){const m=r.raised_date?new Date(r.raised_date).getMonth()+1:null;const q=Math.ceil(m/3);if(q!==parseInt(period))return false;}
+    return true;
+  });
+}
+
+function getRptTitle(){
+  const type=g('rptFilterType').value, year=g('rptYear').value;
+  const period=g('rptPeriod')?.value||'all', form=g('rptForm').value;
+  let t='QA AMO';
+  if(form!=='all')t+=` — ${form}`;
+  if(type==='month'&&period!=='all')t+=` Tháng ${period}`;
+  else if(type==='quarter'&&period!=='all')t+=` Q${period}`;
+  if(year!=='all')t+=` ${year}`;
+  return t;
+}
+
+function generateReport(){
+  if(!allData.length)return;
+  rptData=getRptData();
+  const d=rptData, total=d.length;
+  s('rptTitle',getRptTitle());
+  s('rptDate',new Date().toLocaleDateString('vi-VN'));
+  s('rptTotal',total+' records');
+  // subtitle
+  const type=g('rptFilterType').value, year=g('rptYear').value;
+  const period=g('rptPeriod')?.value||'all', form=g('rptForm').value;
+  let sub='';
+  if(type==='month')sub=period==='all'?`Năm ${year==='all'?'Tất cả':year}`:`Tháng ${period}/${year==='all'?'Tất cả':year}`;
+  else if(type==='quarter')sub=period==='all'?`Năm ${year==='all'?'Tất cả':year}`:`Q${period} — ${year==='all'?'Tất cả':year}`;
+  else if(type==='form')sub=form==='all'?'Tất cả form':form;
+  else sub='Toàn bộ QA AMO';
+  s('rptSubtitle',sub);
+
+  // KPIs
+  const open=d.filter(r=>r.semantic_status==='Open').length;
+  const ov=d.filter(r=>r.semantic_status==='Overdue').length;
+  const on=d.filter(r=>r.semantic_status==='On-time Closed').length;
+  const late=d.filter(r=>r.semantic_status==='Lately Closed').length;
+  const cls=d.filter(r=>r.semantic_status==='Closed').length;
+  const rep=d.filter(r=>r.is_rep).length;
+  const withTgt=on+late;
+  g('rptKPIs').innerHTML=[
+    {l:'Total',v:total,c:'var(--blue)'},
+    {l:'Open',v:open,c:'var(--blue)'},
+    {l:'Overdue',v:ov,c:'#ff6b6b'},
+    {l:'On-time',v:on,c:'var(--green)',s:pct(on/(withTgt||1))},
+    {l:'Lately',v:late,c:'var(--yellow)'},
+    {l:'Repetitive',v:rep,c:'var(--orange)',s:pct(rep/(total||1))},
+  ].map(k=>`<div class="kpi" style="--accent:${k.c}"><div class="kpi-lbl">${k.l}</div><div class="kpi-val">${k.v}</div>${k.s?`<div class="kpi-sub">${k.s}</div>`:''}</div>`).join('');
+
+  // Charts
+  ['rptCStatus','rptCForm','rptCMonth','rptCCat'].forEach(id=>{if(rptCharts[id]){rptCharts[id].destroy();delete rptCharts[id];}});
+  const CO2={responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8B949E',font:{size:10},boxWidth:8}}},scales:{x:{ticks:{color:'#8B949E',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#8B949E',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}}}};
+  const SC={'Open':'#58A6FF','Overdue':'#ff6b6b','On-time Closed':'#3FB950','Lately Closed':'#D29922','Closed':'#6E7681'};
+  const sc={};
+  d.filter(r=>SC[r.semantic_status]).forEach(r=>{sc[r.semantic_status]=(sc[r.semantic_status]||0)+1});
+  rptCharts['rptCStatus']=new Chart(g('rptCStatus'),{type:'doughnut',data:{labels:Object.keys(sc),datasets:[{data:Object.values(sc),backgroundColor:Object.keys(sc).map(k=>SC[k]),borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#8B949E',font:{size:10},boxWidth:8}}}}});
+  const fc={};d.forEach(r=>{const f=r.report_title||'?';fc[f]=(fc[f]||0)+1});
+  const sf=Object.entries(fc).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  rptCharts['rptCForm']=new Chart(g('rptCForm'),{type:'bar',data:{labels:sf.map(f=>f[0]),datasets:[{data:sf.map(f=>f[1]),backgroundColor:'#E30613',borderRadius:3}]},options:{...CO2,indexAxis:'y',plugins:{legend:{display:false}}}});
+  const m={};d.forEach(r=>{if(!r.raised_ym)return;if(!m[r.raised_ym])m[r.raised_ym]={o:0,c:0,ov:0};if(r.semantic_status==='Open')m[r.raised_ym].o++;else if(r.semantic_status==='Overdue')m[r.raised_ym].ov++;else m[r.raised_ym].c++;});
+  const keys=Object.keys(m).sort();
+  rptCharts['rptCMonth']=new Chart(g('rptCMonth'),{type:'bar',data:{labels:keys,datasets:[{label:'Closed',data:keys.map(k=>m[k].c),backgroundColor:'#3FB950',borderRadius:2,stack:'s'},{label:'Open',data:keys.map(k=>m[k].o),backgroundColor:'#58A6FF',borderRadius:2,stack:'s'},{label:'Overdue',data:keys.map(k=>m[k].ov),backgroundColor:'#ff6b6b',borderRadius:2,stack:'s'}]},options:{...CO2,scales:{x:{stacked:true,ticks:{color:'#8B949E',font:{size:8},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},y:{stacked:true,ticks:{color:'#8B949E',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}}}}});
+  const cats={'CAT I':0,'CAT II':0,'CAT III':0};
+  d.filter(r=>r.semantic_status==='Overdue').forEach(r=>{if(r.overdue_cat)cats[r.overdue_cat]++;});
+  rptCharts['rptCCat']=new Chart(g('rptCCat'),{type:'doughnut',data:{labels:Object.keys(cats),datasets:[{data:Object.values(cats),backgroundColor:['#F0883E','#ff6b6b','#cc0000'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#8B949E',font:{size:10},boxWidth:8}}}}});
+
+  // CAT table
+  const c1=d.filter(r=>r.overdue_cat==='CAT I').length, c2=d.filter(r=>r.overdue_cat==='CAT II').length, c3=d.filter(r=>r.overdue_cat==='CAT III').length;
+  const ovTot=c1+c2+c3;
+  g('rptCatTable').innerHTML=[{cat:'CAT I',n:c1,col:'var(--orange)',desc:'≤30 ngày'},{cat:'CAT II',n:c2,col:'#ff6b6b',desc:'30-60 ngày'},{cat:'CAT III',n:c3,col:'#ff3333',desc:'>60 ngày'}]
+    .map(r=>`<tr><td><b style="color:${r.col}">${r.cat}</b></td><td>${r.n}</td><td style="color:var(--muted)">${pct(r.n/(ovTot||1))}</td><td style="color:var(--muted);font-size:11px">${r.desc}</td></tr>`).join('')
+    +`<tr><td><b>Total</b></td><td><b>${ovTot}</b></td><td>${pct(ovTot/(total||1))}</td><td></td></tr>`;
+
+  // Form table
+  const forms=[...new Set(d.map(r=>r.report_title).filter(Boolean))].sort();
+  const CLOSED_S=['On-time Closed','Lately Closed','Closed'];
+  g('rptFormTable').innerHTML=forms.map(f=>{
+    const rows=d.filter(r=>r.report_title===f);
+    const op=rows.filter(r=>r.semantic_status==='Open').length, ov2=rows.filter(r=>r.semantic_status==='Overdue').length;
+    const on2=rows.filter(r=>r.semantic_status==='On-time Closed').length, la=rows.filter(r=>r.semantic_status==='Lately Closed').length, cl=rows.filter(r=>r.semantic_status==='Closed').length;
+    return`<tr><td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04)">${f}</td><td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);text-align:center;color:var(--blue)">${op||'—'}</td><td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);text-align:center;color:#ff6b6b">${ov2||'—'}</td><td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);text-align:center;color:var(--green)">${on2||'—'}</td><td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);text-align:center;color:var(--yellow)">${la||'—'}</td><td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);text-align:center;color:var(--muted)">${cl||'—'}</td><td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);text-align:center"><b>${rows.length}</b></td><td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);text-align:center;color:var(--muted)">${Math.round(rows.length/total*100)}%</td></tr>`;
+  }).join('')+`<tr style="background:rgba(255,255,255,0.03)"><td style="padding:6px 10px"><b>Total</b></td><td style="padding:6px 10px;text-align:center;color:var(--blue)"><b>${open}</b></td><td style="padding:6px 10px;text-align:center;color:#ff6b6b"><b>${ov}</b></td><td style="padding:6px 10px;text-align:center;color:var(--green)"><b>${on}</b></td><td style="padding:6px 10px;text-align:center;color:var(--yellow)"><b>${late}</b></td><td style="padding:6px 10px;text-align:center;color:var(--muted)"><b>${cls}</b></td><td style="padding:6px 10px;text-align:center"><b>${total}</b></td><td style="padding:6px 10px;text-align:center">100%</td></tr>`;
+
+  // Detail
+  const det=d.slice(0,200);
+  s('rptDetailCount',`(${d.length} records${d.length>200?' — 200 đầu':''})`);
+  g('rptDetailTable').innerHTML=det.map(r=>`<tr>
+    <td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);white-space:nowrap"><b>${r.report_number||'—'}</b></td>
+    <td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;color:var(--muted)">${r.report_title||'—'}</td>
+    <td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04)">${sBadge(r.semantic_status)}</td>
+    <td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;white-space:nowrap">${fd(r.raised_date)}</td>
+    <td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;white-space:nowrap">${fd(r.Target_date)}</td>
+    <td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04)">${ageDis(r.report_ageing,r.semantic_status)}</td>
+    <td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04)">${cBadge(r.overdue_cat)}</td>
+    <td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.audit_title||'—'}</td>
+  </tr>`).join('');
+}
+
+async function exportPDF(){
+  const {jsPDF}=window.jspdf;
+  setOv(true,'Đang tạo PDF...','Vui lòng chờ');
+  try{
+    const canvas=await html2canvas(g('reportPreview'),{scale:1.5,backgroundColor:'#161B22',useCORS:true,logging:false});
+    const img=canvas.toDataURL('image/png');
+    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+    const W=pdf.internal.pageSize.getWidth(), H=pdf.internal.pageSize.getHeight();
+    const ratio=W/canvas.width, sH=canvas.height*ratio;
+    let y=0;
+    while(y<sH){if(y>0)pdf.addPage();pdf.addImage(img,'PNG',0,-y,W,sH);y+=H;}
+    pdf.save(`QA_AMO_${getRptTitle().replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`);
+    toast('✓ PDF đã xuất!','ok');
+  }catch(e){toast('Lỗi PDF: '+e.message,'err');}
+  finally{setOv(false);}
+}
+
+function exportExcel(){
+  if(!rptData.length){toast('Không có data','err');return;}
+  setOv(true,'Đang tạo Excel...','');
+  try{
+    const wb=XLSX.utils.book_new(), d=rptData, total=d.length;
+    const open=d.filter(r=>r.semantic_status==='Open').length, ov=d.filter(r=>r.semantic_status==='Overdue').length;
+    const on=d.filter(r=>r.semantic_status==='On-time Closed').length, late=d.filter(r=>r.semantic_status==='Lately Closed').length;
+    const cls=d.filter(r=>r.semantic_status==='Closed').length, rep=d.filter(r=>r.is_rep).length;
+    const c1=d.filter(r=>r.overdue_cat==='CAT I').length, c2=d.filter(r=>r.overdue_cat==='CAT II').length, c3=d.filter(r=>r.overdue_cat==='CAT III').length;
+    const ws1=XLSX.utils.aoa_to_sheet([['QA AMO — '+getRptTitle()],['Ngày xuất:',new Date().toLocaleDateString('vi-VN')],[''],['KPI SUMMARY'],['Metric','Value','Rate'],['Total',total,'100%'],['Open',open,pct(open/total)],['Overdue',ov,pct(ov/total)],['On-time Closed',on,pct(on/(on+late||1))],['Lately Closed',late,pct(late/(on+late||1))],['Closed (no target)',cls,pct(cls/total)],['Repetitive',rep,pct(rep/total)],[''],['OVERDUE'],['CAT','Count','Rate','Desc'],['CAT I',c1,pct(c1/(c1+c2+c3||1)),'≤30 ngày'],['CAT II',c2,pct(c2/(c1+c2+c3||1)),'30-60 ngày'],['CAT III',c3,pct(c3/(c1+c2+c3||1)),'>60 ngày']]);
+    ws1['!cols']=[{wch:25},{wch:12},{wch:12},{wch:20}];
+    XLSX.utils.book_append_sheet(wb,ws1,'KPI Summary');
+    const forms=[...new Set(d.map(r=>r.report_title).filter(Boolean))].sort();
+    const ws2=XLSX.utils.aoa_to_sheet([['Form','Open','Overdue','On-time','Lately','Closed','Total','%'],...forms.map(f=>{const rows=d.filter(r=>r.report_title===f);return[f,rows.filter(r=>r.semantic_status==='Open').length,rows.filter(r=>r.semantic_status==='Overdue').length,rows.filter(r=>r.semantic_status==='On-time Closed').length,rows.filter(r=>r.semantic_status==='Lately Closed').length,rows.filter(r=>r.semantic_status==='Closed').length,rows.length,Math.round(rows.length/total*100)+'%'];}),['TOTAL',open,ov,on,late,cls,total,'100%']]);
+    ws2['!cols']=[{wch:35},{wch:8},{wch:10},{wch:12},{wch:12},{wch:10},{wch:8},{wch:6}];
+    XLSX.utils.book_append_sheet(wb,ws2,'Form Summary');
+    const ws3=XLSX.utils.aoa_to_sheet([['Report No','Form','Status','Raised','Target','Days','CAT','Finding Level','Repetitive','MNT No','Audit Title'],...d.map(r=>[r.report_number||'',r.report_title||'',r.semantic_status||'',r.raised_date?new Date(r.raised_date).toLocaleDateString('vi-VN'):'',r.Target_date?new Date(r.Target_date).toLocaleDateString('vi-VN'):'',r.report_ageing??'',r.overdue_cat||'',r.finding_level||'',r.is_rep?'Yes':'No',r.audit_number||'',r.audit_title||''])]);
+    ws3['!cols']=[{wch:15},{wch:30},{wch:16},{wch:12},{wch:12},{wch:10},{wch:8},{wch:15},{wch:10},{wch:12},{wch:40}];
+    XLSX.utils.book_append_sheet(wb,ws3,'Detail Data');
+    XLSX.writeFile(wb,`QA_AMO_${getRptTitle().replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`);
+    toast('✓ Excel đã xuất!','ok');
+  }catch(e){toast('Lỗi Excel: '+e.message,'err');}
+  finally{setOv(false);}
+}
 // ── ADMIN ─────────────────────────────────────────────────────
 function setUF(f,btn){
   userFilter=f;
@@ -1564,7 +1965,7 @@ async function makeAdmin(id){
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────
-const PT={overview:'Overview',openrfi:'Open RFI',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',auditplan:'Audit Plan',admin:'Quản lý Users'};
+const PT={overview:'Overview',openrfi:'Open RFI',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',auditplan:'Audit Plan',reports:'Xuất Báo Cáo',admin:'Quản lý Users'};
 function showPage(name,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -1573,6 +1974,7 @@ function showPage(name,btn){
   if(btn)btn.classList.add('active');
   s('pageTitle',PT[name]||name);
   if(name==='admin')loadUsers();
+  if(name==='reports'){initReportFilters();generateReport();}
   // Trigger chart resize for overview
   if(name==='overview'){
     setTimeout(()=>{
