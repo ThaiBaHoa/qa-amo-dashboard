@@ -261,6 +261,7 @@ tr:last-child td{border-bottom:none}
         <button class="nav-item" onclick="showPage('pavoi',this)"><span class="nav-icon">🔍</span>PAVOI Detail</button>
         <button class="nav-item" onclick="showPage('auditplan',this)"><span class="nav-icon">📅</span>Audit Plan</button>
         <button class="nav-item" onclick="showPage('reports',this)"><span class="nav-icon">📊</span>Xuất Báo Cáo</button>
+        <button class="nav-item" onclick="showPage('help',this)"><span class="nav-icon">❓</span>Hướng Dẫn</button>
         <div id="adminNav" style="display:none">
           <div class="nav-sec" style="margin-top:6px">Admin</div>
           <button class="nav-item" onclick="showPage('admin',this)"><span class="nav-icon">👤</span>Quản lý Users</button>
@@ -728,6 +729,317 @@ tr:last-child td{border-bottom:none}
                 </table>
               </div>
             </div>
+          </div>
+        </div>
+
+
+        <!-- HELP PAGE -->
+        <div class="page" id="page-help">
+          <div style="max-width:900px;margin:0 auto">
+
+            <!-- Header -->
+            <div style="background:linear-gradient(135deg,#E30613,#a00010);border-radius:12px;padding:28px 32px;margin-bottom:16px;color:white">
+              <div style="font-size:11px;opacity:.7;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">VietJet Air · Quality Assurance AMO</div>
+              <div style="font-size:24px;font-weight:700;margin-bottom:6px">Hướng Dẫn Sử Dụng</div>
+              <div style="font-size:13px;opacity:.85">QA AMO Dashboard v7 · Tài liệu hướng dẫn đầy đủ</div>
+            </div>
+
+            <!-- Quick Nav -->
+            <div class="chart-card" style="margin-bottom:14px">
+              <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Nội dung</div>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+                <a href="#sec-glossary" style="text-decoration:none"><div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border)'">
+                  <div style="font-size:18px;margin-bottom:4px">📖</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text)">Định nghĩa</div>
+                  <div style="font-size:10px;color:var(--muted)">Thuật ngữ & Status</div>
+                </div></a>
+                <a href="#sec-pages" style="text-decoration:none"><div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border)'">
+                  <div style="font-size:18px;margin-bottom:4px">📊</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text)">Các trang</div>
+                  <div style="font-size:10px;color:var(--muted)">Hướng dẫn từng trang</div>
+                </div></a>
+                <a href="#sec-export" style="text-decoration:none"><div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border)'">
+                  <div style="font-size:18px;margin-bottom:4px">📄</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text)">Xuất báo cáo</div>
+                  <div style="font-size:10px;color:var(--muted)">PDF & Excel</div>
+                </div></a>
+                <a href="#sec-faq" style="text-decoration:none"><div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border)'">
+                  <div style="font-size:18px;margin-bottom:4px">💡</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text)">FAQ</div>
+                  <div style="font-size:10px;color:var(--muted)">Câu hỏi thường gặp</div>
+                </div></a>
+              </div>
+            </div>
+
+            <!-- SECTION 1: GLOSSARY -->
+            <div class="chart-card" style="margin-bottom:14px" id="sec-glossary">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+                <span style="font-size:18px">📖</span>
+                <div style="font-size:15px;font-weight:700">Định Nghĩa & Thuật Ngữ</div>
+              </div>
+
+              <!-- Status definitions -->
+              <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Trạng thái Report (Status)</div>
+              <div style="display:grid;gap:6px;margin-bottom:16px">
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:12px;align-items:start;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--blue)">
+                  <div><span class="badge b-open">Open</span></div>
+                  <div style="font-size:12px;color:var(--muted)">Report đang được xử lý, chưa đến hạn hoặc chưa có target date. Người được giao cần thực hiện hành động khắc phục.</div>
+                </div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:12px;align-items:start;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid #ff6b6b">
+                  <div><span class="badge b-over">Overdue</span></div>
+                  <div style="font-size:12px;color:var(--muted)">Report đã quá hạn target date nhưng chưa được đóng. Cần ưu tiên xử lý ngay. Phân loại thêm theo CAT I/II/III.</div>
+                </div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:12px;align-items:start;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--green)">
+                  <div><span class="badge b-on">On-time Closed</span></div>
+                  <div style="font-size:12px;color:var(--muted)">Report đã đóng đúng hạn hoặc trước target date. Chỉ tính cho form có target date (CAR, MCAR, PAVOI...).</div>
+                </div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:12px;align-items:start;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--yellow)">
+                  <div><span class="badge b-late">Lately Closed</span></div>
+                  <div style="font-size:12px;color:var(--muted)">Report đã đóng nhưng sau target date. Cần phân tích nguyên nhân để cải thiện tỷ lệ On-time.</div>
+                </div>
+                <div style="display:grid;grid-template-columns:140px 1fr;gap:12px;align-items:start;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--muted)">
+                  <div><span class="badge b-with">Closed</span></div>
+                  <div style="font-size:12px;color:var(--muted)">Report đã đóng nhưng không có target date (Surveillance Report, Aircraft Inspection...). Không tính vào On-time rate.</div>
+                </div>
+              </div>
+
+              <!-- CAT definitions -->
+              <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Phân Loại Overdue (CAT)</div>
+              <div style="display:grid;gap:6px;margin-bottom:16px">
+                <div style="display:grid;grid-template-columns:100px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--orange)">
+                  <div><span class="badge b-c1">CAT I</span></div>
+                  <div style="font-size:12px;color:var(--muted)"><b>Quá hạn ≤ 30 ngày</b> — Cần theo dõi và đôn đốc xử lý trong tuần.</div>
+                </div>
+                <div style="display:grid;grid-template-columns:100px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid #ff6b6b">
+                  <div><span class="badge b-c2">CAT II</span></div>
+                  <div style="font-size:12px;color:var(--muted)"><b>Quá hạn 30–60 ngày</b> — Cần leo thang lên quản lý cấp trên và yêu cầu kế hoạch khắc phục.</div>
+                </div>
+                <div style="display:grid;grid-template-columns:100px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid #ff3333">
+                  <div><span class="badge b-c3">CAT III</span></div>
+                  <div style="font-size:12px;color:var(--muted)"><b>Quá hạn > 60 ngày</b> — Nghiêm trọng. Cần báo cáo ngay lên Ban lãnh đạo và có hành động xử lý khẩn cấp.</div>
+                </div>
+              </div>
+
+              <!-- Form types -->
+              <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Các Loại Form QA AMO</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px">
+                ${[
+                  ['Surveillance Report (SR)','Báo cáo giám sát định kỳ. Không có target date. Được tạo từ các cuộc Inspection.'],
+                  ['Aircraft Inspection/Spot Check (AISC)','Kiểm tra tàu bay ngẫu nhiên hoặc định kỳ tại sân đỗ.'],
+                  ['MCAR','Mandatory Corrective Action Report — Báo cáo hành động khắc phục bắt buộc từ audit nội bộ.'],
+                  ['PAVOI','Post Audit Verification of Implementation — Theo dõi việc thực hiện các hành động khắc phục.'],
+                  ['CAR','Corrective Action Report — Báo cáo hành động khắc phục từ audit bên ngoài hoặc CAAV.'],
+                  ['MOR','Mandatory Occurrence Report — Báo cáo sự cố bắt buộc theo quy định CAAV.'],
+                  ['AMO ECAR','Electronic Corrective Action Report nội bộ AMO.'],
+                  ['Battery Workshop Inspection (BWI)','Kiểm tra định kỳ xưởng bảo dưỡng ắc quy — 1 lần/tháng.'],
+                ].map(([name,desc])=>`<div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">${name}</div>
+                  <div style="font-size:11px;color:var(--muted)">${desc}</div>
+                </div>`).join('')}
+              </div>
+
+              <!-- KPI definitions -->
+              <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Định Nghĩa KPI</div>
+              <div style="display:grid;gap:6px">
+                <div style="padding:10px 12px;background:var(--card2);border-radius:8px">
+                  <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:3px">On-time Rate</div>
+                  <div style="font-size:11px;color:var(--muted)">= On-time Closed ÷ (On-time Closed + Lately Closed) × 100%. <b>Chỉ tính trên form có Target date.</b> Target: ≥ 70%.</div>
+                </div>
+                <div style="padding:10px 12px;background:var(--card2);border-radius:8px">
+                  <div style="font-size:12px;font-weight:600;color:var(--yellow);margin-bottom:3px">Repetitive Rate</div>
+                  <div style="font-size:11px;color:var(--muted)">= Số finding bị lặp lại ÷ Tổng finding × 100%. Finding được đánh dấu "Repetitive = Yes" trong form. Target: ≤ 10%.</div>
+                </div>
+                <div style="padding:10px 12px;background:var(--card2);border-radius:8px">
+                  <div style="font-size:12px;font-weight:600;color:var(--blue);margin-bottom:3px">Days to Due</div>
+                  <div style="font-size:11px;color:var(--muted)">Số ngày còn lại đến target date (dương = còn hạn, âm = đã quá hạn). Tính từ ngày hiện tại.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SECTION 2: PAGES -->
+            <div class="chart-card" style="margin-bottom:14px" id="sec-pages">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+                <span style="font-size:18px">📊</span>
+                <div style="font-size:15px;font-weight:700">Hướng Dẫn Từng Trang</div>
+              </div>
+
+              <div style="display:grid;gap:10px">
+
+                <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+                  <div style="background:rgba(88,166,255,0.1);padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+                    <span>📊</span><span style="font-size:13px;font-weight:600">Overview</span>
+                  </div>
+                  <div style="padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7">
+                    Trang tổng quan toàn bộ QA AMO. <b style="color:var(--text)">Bộ lọc năm</b> ở đầu trang giúp xem số liệu theo từng năm (mặc định năm hiện tại).<br>
+                    • <b style="color:var(--text)">6 KPI cards:</b> Total / Open / Overdue / On-time / Lately / Closed<br>
+                    • <b style="color:var(--text)">Donut chart:</b> Phân bổ theo trạng thái<br>
+                    • <b style="color:var(--text)">Findings by Month:</b> Xu hướng theo tháng — lọc thêm theo năm bằng dropdown góc phải<br>
+                    • <b style="color:var(--text)">Top Forms:</b> Form nào có nhiều finding nhất — lọc theo All/Open/Overdue<br>
+                    • <b style="color:var(--text)">Form table:</b> Tổng hợp Open/Overdue/Closed cho từng loại form<br>
+                    • <b style="color:var(--text)">4 metric cards:</b> Open+Overdue / On-time Rate / CAT III / Repetitive
+                  </div>
+                </div>
+
+                <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+                  <div style="background:rgba(88,166,255,0.08);padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+                    <span>📋</span><span style="font-size:13px;font-weight:600">Open RFI</span>
+                  </div>
+                  <div style="padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7">
+                    Danh sách tất cả report đang ở trạng thái <b style="color:var(--blue)">Open</b> hoặc <b style="color:#ff6b6b">Overdue</b>.<br>
+                    • Filter theo Status (All/Open/Overdue), Form Type, Năm, hoặc tìm kiếm tự do<br>
+                    • Cột <b style="color:var(--text)">Days to Due:</b> màu xanh = còn nhiều thời gian, cam = gần hạn, đỏ = đã quá hạn<br>
+                    • Click vào tiêu đề cột để sort tăng/giảm dần<br>
+                    • <b style="color:var(--yellow)">⚠ Yes</b> trong cột Repetitive = finding đã từng xảy ra trước đây
+                  </div>
+                </div>
+
+                <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+                  <div style="background:rgba(255,107,107,0.08);padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+                    <span>⚠️</span><span style="font-size:13px;font-weight:600">Overdue</span>
+                  </div>
+                  <div style="padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7">
+                    Chỉ hiển thị report đã <b style="color:#ff6b6b">quá hạn</b>, phân tích theo CAT.<br>
+                    • <b style="color:var(--text)">3 KPI cards:</b> CAT I / CAT II / CAT III với số lượng cụ thể<br>
+                    • <b style="color:var(--text)">Biểu đồ By CAT:</b> Tỷ lệ phân bổ overdue theo mức độ nghiêm trọng<br>
+                    • <b style="color:var(--text)">Biểu đồ By Form:</b> Form nào đang overdue nhiều nhất<br>
+                    • Filter theo Form Type và CAT level
+                  </div>
+                </div>
+
+                <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+                  <div style="background:rgba(63,185,80,0.08);padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+                    <span>📈</span><span style="font-size:13px;font-weight:600">KPI Charts</span>
+                  </div>
+                  <div style="padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7">
+                    Phân tích xu hướng KPI theo thời gian.<br>
+                    • <b style="color:var(--text)">On-time Rate by Month:</b> Đường target 70% — theo dõi tháng nào đạt/không đạt<br>
+                    • <b style="color:var(--text)">Repetitive Rate by Month:</b> Xu hướng finding lặp<br>
+                    • <b style="color:var(--text)">Cumulative YTD:</b> Tổng lũy kế finding từ đầu năm<br>
+                    • <b style="color:var(--text)">On-time Rate by Year:</b> So sánh hiệu suất theo năm<br>
+                    • <b style="color:var(--text)">Repetitive Rate by Year:</b> Xu hướng finding lặp theo năm
+                  </div>
+                </div>
+
+                <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+                  <div style="background:rgba(255,255,255,0.04);padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+                    <span>📄</span><span style="font-size:13px;font-weight:600">All Forms</span>
+                  </div>
+                  <div style="padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7">
+                    Danh sách đầy đủ <b>tất cả</b> report của QA AMO ở mọi trạng thái.<br>
+                    • Filter theo Status, Form Type, Năm, hoặc tìm kiếm<br>
+                    • Cột <b style="color:var(--text)">MNT No:</b> Số audit mà report này thuộc về<br>
+                    • Cột <b style="color:var(--text)">Audit Ref:</b> Số tham chiếu audit (Audit Ref. No)<br>
+                    • Cột <b style="color:var(--text)">Audit Title:</b> Tên cuộc audit — click cột để sort
+                  </div>
+                </div>
+
+                <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+                  <div style="background:rgba(88,166,255,0.06);padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+                    <span>🔍</span><span style="font-size:13px;font-weight:600">PAVOI Detail</span>
+                  </div>
+                  <div style="padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7">
+                    Chỉ hiển thị form <b>PAVOI</b> với đầy đủ thông tin xác minh.<br>
+                    • <b style="color:var(--text)">Request For Verification:</b> Nội dung yêu cầu xác minh việc thực hiện<br>
+                    • <b style="color:var(--text)">Report Reference:</b> Số report gốc mà PAVOI theo dõi (VD: MCAR-0086)<br>
+                    • <b style="color:var(--text)">Verification Result:</b> <span style="color:var(--green)">Satisfactory</span> = đạt / <span style="color:#ff6b6b">Not Satisfactory</span> = chưa đạt<br>
+                    • <b style="color:var(--text)">Department:</b> Phòng ban chịu trách nhiệm thực hiện
+                  </div>
+                </div>
+
+                <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+                  <div style="background:rgba(188,140,255,0.08);padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+                    <span>📅</span><span style="font-size:13px;font-weight:600">Audit Plan</span>
+                  </div>
+                  <div style="padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7">
+                    Kế hoạch và lịch sử audit của QA AMO từ Galileo Planner.<br>
+                    • <b style="color:var(--text)">6 KPI cards:</b> Total / Internal Audit / Inspection / Closed / In Progress / Scheduled<br>
+                    • Filter theo Type (📋 Internal Audit / 🔍 Inspection), Status, Năm<br>
+                    • Cột <b style="color:var(--text)">Findings:</b> Số report được tạo từ audit đó<br>
+                    • Cột <b style="color:var(--text)">Open/Overdue:</b> Số finding đang mở/quá hạn của audit<br>
+                    • Audit <b style="color:var(--blue)">Scheduled</b> = chưa thực hiện (kế hoạch tương lai)
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- SECTION 3: EXPORT -->
+            <div class="chart-card" style="margin-bottom:14px" id="sec-export">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+                <span style="font-size:18px">📄</span>
+                <div style="font-size:15px;font-weight:700">Xuất Báo Cáo</div>
+              </div>
+
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+                <div style="background:rgba(227,6,19,0.08);border:1px solid rgba(227,6,19,0.2);border-radius:10px;padding:14px">
+                  <div style="font-size:13px;font-weight:600;color:#ff6b6b;margin-bottom:8px">📄 Xuất PDF</div>
+                  <div style="font-size:12px;color:var(--muted);line-height:1.7">
+                    Xuất báo cáo dạng PDF để in hoặc gửi email.<br><br>
+                    <b style="color:var(--text)">Nội dung PDF bao gồm:</b><br>
+                    • Header đỏ VietJet với tiêu đề báo cáo<br>
+                    • 6 KPI cards<br>
+                    • 3 biểu đồ (Status, Top Forms, Monthly)<br>
+                    • Bảng phân tích Overdue by CAT<br>
+                    • Bảng tổng hợp theo Form<br>
+                    • Chi tiết finding (tối đa 200 records)<br><br>
+                    PDF tự động chia trang A4.
+                  </div>
+                </div>
+                <div style="background:rgba(29,111,66,0.1);border:1px solid rgba(29,111,66,0.3);border-radius:10px;padding:14px">
+                  <div style="font-size:13px;font-weight:600;color:var(--green);margin-bottom:8px">📊 Xuất Excel</div>
+                  <div style="font-size:12px;color:var(--muted);line-height:1.7">
+                    Xuất file .xlsx để phân tích thêm trong Excel.<br><br>
+                    <b style="color:var(--text)">File Excel có 3 sheets:</b><br>
+                    • <b>Sheet 1 — KPI Summary:</b> Tổng hợp số liệu KPI và Overdue CAT<br>
+                    • <b>Sheet 2 — Form Summary:</b> Bảng Open/Overdue/On-time/Lately/Closed theo từng loại form<br>
+                    • <b>Sheet 3 — Detail Data:</b> Toàn bộ finding với đầy đủ thông tin<br><br>
+                    Tên file tự động gồm tiêu đề báo cáo và ngày xuất.
+                  </div>
+                </div>
+              </div>
+
+              <div style="background:var(--card2);border-radius:8px;padding:12px 14px">
+                <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">🔧 Cách sử dụng trang Xuất Báo Cáo:</div>
+                <div style="font-size:12px;color:var(--muted);line-height:1.8">
+                  <b>Bước 1:</b> Vào menu <b style="color:var(--text)">Xuất Báo Cáo</b> từ sidebar trái<br>
+                  <b>Bước 2:</b> Chọn loại lọc từ dropdown <b style="color:var(--text)">"Lọc theo"</b>:<br>
+                  &nbsp;&nbsp;• <b>Theo Tháng/Năm</b> → chọn Năm và Tháng cụ thể<br>
+                  &nbsp;&nbsp;• <b>Theo Quý/Năm</b> → chọn Năm và Quý (Q1-Q4)<br>
+                  &nbsp;&nbsp;• <b>Theo Form Type</b> → chọn form cụ thể (MCAR, PAVOI...)<br>
+                  &nbsp;&nbsp;• <b>Tất cả</b> → không lọc, lấy toàn bộ data<br>
+                  <b>Bước 3:</b> Xem preview báo cáo trong trang<br>
+                  <b>Bước 4:</b> Click <span style="background:#E30613;color:white;padding:2px 8px;border-radius:4px;font-size:11px">📄 PDF</span> hoặc <span style="background:#1D6F42;color:white;padding:2px 8px;border-radius:4px;font-size:11px">📊 Excel</span> để tải về
+                </div>
+              </div>
+            </div>
+
+            <!-- SECTION 4: FAQ -->
+            <div class="chart-card" style="margin-bottom:14px" id="sec-faq">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+                <span style="font-size:18px">💡</span>
+                <div style="font-size:15px;font-weight:700">Câu Hỏi Thường Gặp</div>
+              </div>
+
+              <div style="display:grid;gap:8px">
+                ${[
+                  ['Tại sao tổng số report là 3000+?', 'Dashboard load toàn bộ lịch sử QA AMO từ khi hệ thống Galileo hoạt động. Sử dụng bộ lọc năm trên trang Overview để xem số liệu theo từng năm cụ thể.'],
+                  ['On-time rate 12% có nghĩa là gì?', 'Chỉ 12% số form có target date được đóng đúng hạn. Con số này chỉ tính trên form có target date (CAR, MCAR, PAVOI). Form không có target (Surveillance, AISC) không được tính vào on-time rate.'],
+                  ['Tại sao Repetitive = 0?', 'Field "Repetitive" trong Galileo cần được điền "Yes" khi tạo finding. Nếu không điền, dashboard không nhận diện được. Cần nhắc nhở auditor điền đầy đủ.'],
+                  ['Data được cập nhật khi nào?', 'Click nút "↻ Refresh" trên topbar để tải lại data mới nhất từ Galileo. Dashboard không tự động refresh. Quá trình tải mất khoảng 30-60 giây.'],
+                  ['Tại sao Audit Plan có 963 records?', 'Dashboard load tất cả audit của QA AMO auditors (Vo Vinh Hien, Le Hong Chuong, Thai Ba Hoa...) từ trước đến nay, bao gồm cả Scheduled tương lai. Dùng filter Năm để xem kế hoạch năm cụ thể.'],
+                  ['Làm sao thêm user mới?', 'User tự đăng ký tại trang đăng nhập → Admin vào trang "Quản lý Users" → Approve tài khoản. Admin có thể Approve/Reject/cấp quyền Admin cho user khác.'],
+                ].map(([q,a])=>`<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
+                  <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ ${q}</div>
+                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">${a}</div>
+                </div>`).join('')}
+              </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="text-align:center;padding:16px;color:var(--muted);font-size:11px;border-top:1px solid var(--border)">
+              QA AMO Dashboard v7 · VietJet Air · Dữ liệu từ Galileo GRC · Phát triển bởi QA AMO Team
+            </div>
+
           </div>
         </div>
 
@@ -1971,7 +2283,7 @@ async function makeAdmin(id){
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────
-const PT={overview:'Overview',openrfi:'Open RFI',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',auditplan:'Audit Plan',reports:'Xuất Báo Cáo',admin:'Quản lý Users'};
+const PT={overview:'Overview',openrfi:'Open RFI',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',auditplan:'Audit Plan',reports:'Xuất Báo Cáo',help:'Hướng Dẫn Sử Dụng',admin:'Quản lý Users'};
 function showPage(name,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
