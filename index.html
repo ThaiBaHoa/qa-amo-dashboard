@@ -2049,6 +2049,16 @@ function getRptTitle(){
   if(year!=='all')t+=` ${year}`;
   return t;
 }
+function getRptTitleEn(){
+  const type=g('rptFilterType').value, year=g('rptYear').value;
+  const period=g('rptPeriod')?.value||'all', form=g('rptForm').value;
+  let t='QA AMO';
+  if(form!=='all')t+=` - ${form}`;
+  if(type==='month'&&period!=='all')t+=` Month ${period}`;
+  else if(type==='quarter'&&period!=='all')t+=` Q${period}`;
+  if(year!=='all')t+=` ${year}`;
+  return t;
+}
 
 function generateReport(){
   if(!allData.length)return;
@@ -2134,26 +2144,42 @@ function generateReport(){
 }
 
 function exportPDF(){
-  if(!rptData.length){toast('Không có data','err');return;}
+  if(!rptData.length){toast('No data to export','err');return;}
   const {jsPDF}=window.jspdf;
-  setOv(true,'Đang tạo PDF...','Vui lòng chờ');
+  setOv(true,'Generating PDF...','Please wait');
   try{
     const d=rptData, total=d.length;
-    const title=getRptTitle();
-    const dateStr=new Date().toLocaleDateString('vi-VN');
+    const title=getRptTitleEn();
+    const dateStr=new Date().toLocaleDateString('en-GB');
     const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-    const W=pdf.internal.pageSize.getWidth();
+    const W=pdf.internal.pageSize.getWidth(), H=pdf.internal.pageSize.getHeight();
+    const BG=[22,27,34], BG2=[28,33,40], HEAD=[16,20,26];
 
-    // ── Header ──
-    pdf.setFillColor(227,6,19); pdf.rect(0,0,W,18,'F');
-    pdf.setTextColor(255,255,255); pdf.setFontSize(10); pdf.setFont(undefined,'normal');
-    pdf.text('VietJet Air · Quality Assurance AMO',10,7);
-    pdf.setFontSize(14); pdf.setFont(undefined,'bold');
-    pdf.text(title,10,14);
-    pdf.setFontSize(9); pdf.setFont(undefined,'normal');
-    pdf.text(`Ngày xuất: ${dateStr}    Tổng: ${total} records`,W-10,14,{align:'right'});
+    // helper: composite chart canvas onto dark bg → data URL
+    function chartImg(id){
+      const c=g(id); if(!c||!c.width||!c.height)return null;
+      const t=document.createElement('canvas'); t.width=c.width; t.height=c.height;
+      const ctx=t.getContext('2d');
+      ctx.fillStyle='#1C2128'; ctx.fillRect(0,0,t.width,t.height);
+      ctx.drawImage(c,0,0);
+      return t.toDataURL('image/png');
+    }
 
-    // ── KPI summary row ──
+    // ── shared page header ──
+    function drawHeader(label){
+      pdf.setFillColor(227,6,19); pdf.rect(0,0,W,16,'F');
+      pdf.setTextColor(255,255,255);
+      pdf.setFontSize(8); pdf.setFont(undefined,'normal');
+      pdf.text('VietJet Air - Quality Assurance AMO',10,6);
+      pdf.setFontSize(12); pdf.setFont(undefined,'bold');
+      pdf.text(label,10,13);
+      pdf.setFontSize(8); pdf.setFont(undefined,'normal');
+      pdf.text(`Date: ${dateStr}  |  Total: ${total} records`,W-10,13,{align:'right'});
+    }
+
+    // ─── PAGE 1: KPI + Charts ────────────────────────────────
+    drawHeader(title);
+
     const open=d.filter(r=>r.semantic_status==='Open').length;
     const ov=d.filter(r=>r.semantic_status==='Overdue').length;
     const on=d.filter(r=>r.semantic_status==='On-time Closed').length;
@@ -2163,114 +2189,151 @@ function exportPDF(){
     const c1=d.filter(r=>r.overdue_cat==='CAT I').length;
     const c2=d.filter(r=>r.overdue_cat==='CAT II').length;
     const c3=d.filter(r=>r.overdue_cat==='CAT III').length;
-    let y=22;
+
     pdf.autoTable({
-      startY:y,
-      head:[['Total','Open','Overdue','On-time Closed','Lately Closed','Closed','Repetitive','CAT I','CAT II','CAT III']],
+      startY:19,
+      head:[['Total','Open','Overdue','On-time','Lately Closed','Closed','Repetitive','CAT I','CAT II','CAT III']],
       body:[[total,open,ov,on,late,cls,rep,c1,c2,c3]],
       theme:'grid',
-      headStyles:{fillColor:[40,40,50],textColor:255,fontSize:8,fontStyle:'bold',halign:'center'},
-      bodyStyles:{fontSize:9,halign:'center',fontStyle:'bold'},
-      columnStyles:{1:{textColor:[88,166,255]},2:{textColor:[255,107,107]},3:{textColor:[63,185,80]},4:{textColor:[210,153,34]},6:{textColor:[240,136,62]},7:{textColor:[240,136,62]},8:{textColor:[255,107,107]},9:{textColor:[204,0,0]}},
+      headStyles:{fillColor:HEAD,textColor:[160,160,170],fontSize:8,fontStyle:'bold',halign:'center'},
+      bodyStyles:{fontSize:12,halign:'center',fontStyle:'bold',fillColor:BG2,textColor:[220,220,220]},
+      columnStyles:{
+        1:{textColor:[88,166,255]},2:{textColor:[255,100,100]},
+        3:{textColor:[63,185,80]},4:{textColor:[210,153,34]},
+        5:{textColor:[110,118,129]},6:{textColor:[240,136,62]},
+        7:{textColor:[240,136,62]},8:{textColor:[255,100,100]},9:{textColor:[200,0,0]},
+      },
       margin:{left:10,right:10},
     });
-    y=pdf.lastAutoTable.finalY+4;
 
-    // ── Tổng hợp theo Form ──
-    pdf.setFontSize(9); pdf.setFont(undefined,'bold'); pdf.setTextColor(180,180,180);
-    pdf.text('TỔNG HỢP THEO FORM',10,y+4); y+=7;
+    // 4 charts in 2×2 grid
+    const cy=pdf.lastAutoTable.finalY+5;
+    const chW=(W-30)/2, chH=(H-cy-14)/2;
+    [
+      {id:'rptCStatus',label:'Status Distribution',  x:10,         y:cy},
+      {id:'rptCForm',  label:'Top 10 Forms',          x:20+chW,     y:cy},
+      {id:'rptCMonth', label:'Monthly Trend',         x:10,         y:cy+chH+5},
+      {id:'rptCCat',   label:'Overdue by CAT',        x:20+chW,     y:cy+chH+5},
+    ].forEach(({id,label,x,y})=>{
+      pdf.setFillColor(...BG2); pdf.roundedRect(x,y,chW,chH,2,2,'F');
+      pdf.setFontSize(7); pdf.setFont(undefined,'bold'); pdf.setTextColor(140,140,155);
+      pdf.text(label,x+3,y+5);
+      const img=chartImg(id);
+      if(img) pdf.addImage(img,'PNG',x+2,y+7,chW-4,chH-9);
+    });
+
+    // ─── PAGE 2: Form Summary ────────────────────────────────
+    pdf.addPage();
+    drawHeader(`${title} - Form Summary`);
+
     const forms=[...new Set(d.map(r=>r.report_title).filter(Boolean))].sort();
-    const CLOSED_S=['On-time Closed','Lately Closed','Closed'];
     const formRows=forms.map(f=>{
       const rows=d.filter(r=>r.report_title===f);
-      const op=rows.filter(r=>r.semantic_status==='Open').length;
-      const ov2=rows.filter(r=>r.semantic_status==='Overdue').length;
-      const on2=rows.filter(r=>r.semantic_status==='On-time Closed').length;
-      const la=rows.filter(r=>r.semantic_status==='Lately Closed').length;
-      const cl=rows.filter(r=>r.semantic_status==='Closed').length;
-      return[f,op||'—',ov2||'—',on2||'—',la||'—',cl||'—',rows.length,Math.round(rows.length/total*100)+'%'];
+      return[f,
+        rows.filter(r=>r.semantic_status==='Open').length||'—',
+        rows.filter(r=>r.semantic_status==='Overdue').length||'—',
+        rows.filter(r=>r.semantic_status==='On-time Closed').length||'—',
+        rows.filter(r=>r.semantic_status==='Lately Closed').length||'—',
+        rows.filter(r=>r.semantic_status==='Closed').length||'—',
+        rows.length, Math.round(rows.length/total*100)+'%',
+      ];
     });
     formRows.push(['Total',open||'—',ov||'—',on||'—',late||'—',cls||'—',total,'100%']);
     pdf.autoTable({
-      startY:y,
-      head:[['Form','Open','Overdue','On-time','Lately','Closed','Total','%']],
+      startY:19,
+      head:[['Form','Open','Overdue','On-time','Lately Closed','Closed','Total','%']],
       body:formRows,
       theme:'striped',
-      headStyles:{fillColor:[30,30,40],textColor:200,fontSize:8,fontStyle:'bold'},
-      bodyStyles:{fontSize:8},
-      columnStyles:{0:{cellWidth:60},1:{halign:'center',textColor:[88,166,255]},2:{halign:'center',textColor:[255,107,107]},3:{halign:'center',textColor:[63,185,80]},4:{halign:'center',textColor:[210,153,34]},5:{halign:'center'},6:{halign:'center',fontStyle:'bold'},7:{halign:'center'}},
-      footStyles:{fillColor:[20,20,30],fontStyle:'bold'},
+      headStyles:{fillColor:HEAD,textColor:[160,160,170],fontSize:9,fontStyle:'bold'},
+      bodyStyles:{fontSize:9,textColor:[200,200,210],fillColor:BG2},
+      alternateRowStyles:{fillColor:BG},
+      columnStyles:{
+        0:{cellWidth:75},
+        1:{halign:'center',textColor:[88,166,255]},
+        2:{halign:'center',textColor:[255,100,100]},
+        3:{halign:'center',textColor:[63,185,80]},
+        4:{halign:'center',textColor:[210,153,34]},
+        5:{halign:'center',textColor:[110,118,129]},
+        6:{halign:'center',fontStyle:'bold',textColor:[220,220,220]},
+        7:{halign:'center',textColor:[140,140,155]},
+      },
       margin:{left:10,right:10},
-      didDrawRow:(data)=>{if(data.row.index===formRows.length-1){pdf.setFillColor(30,30,50);}},
+      didParseCell:(data)=>{
+        if(data.row.index===formRows.length-1&&data.section==='body'){
+          data.cell.styles.fillColor=[35,40,55]; data.cell.styles.fontStyle='bold';
+        }
+      },
     });
 
-    // ── Chi tiết — tất cả records, phân trang tự động ──
+    // ─── PAGE 3+: Detail (all records) ───────────────────────
     pdf.addPage();
-    // Re-draw header on new page
-    pdf.setFillColor(227,6,19); pdf.rect(0,0,W,12,'F');
-    pdf.setTextColor(255,255,255); pdf.setFontSize(9); pdf.setFont(undefined,'bold');
-    pdf.text(`${title} — CHI TIẾT (${total} records)`,10,8);
-    pdf.setFont(undefined,'normal'); pdf.text(dateStr,W-10,8,{align:'right'});
+    drawHeader(`${title} - Detail Records (${total})`);
+
+    const sColor=(s)=>{
+      if(s==='Overdue')return[255,100,100];
+      if(s==='Open')return[88,166,255];
+      if(s==='On-time Closed')return[63,185,80];
+      if(s==='Lately Closed')return[210,153,34];
+      return[110,118,129];
+    };
+    const sLabel=(s)=>({
+      'Open':'Open','Overdue':'Overdue',
+      'On-time Closed':'On-time','Lately Closed':'Lately','Closed':'Closed',
+    }[s]||s||'—');
 
     const detailRows=d.map(r=>[
       r.report_number||'—',
       r.report_title||'—',
-      r.semantic_status||'—',
+      sLabel(r.semantic_status),
       fd(r.raised_date),
       fd(r.Target_date),
-      r.report_ageing!=null?(r.semantic_status==='Open'||r.semantic_status==='Overdue'?`+${r.report_ageing}d`:`${r.report_ageing}d`):'—',
+      r.report_ageing!=null?((r.semantic_status==='Open'||r.semantic_status==='Overdue')?`+${r.report_ageing}d`:r.report_ageing+'d'):'—',
       r.overdue_cat||'—',
       r.audit_title||'—',
     ]);
-    const statusColor=(s)=>{
-      if(s==='Overdue')return[255,107,107];
-      if(s==='Open')return[88,166,255];
-      if(s==='On-time Closed')return[63,185,80];
-      if(s==='Lately Closed')return[210,153,34];
-      return[150,150,150];
-    };
     pdf.autoTable({
-      startY:15,
-      head:[['Report No','Form','Status','Raised','Target','Days','CAT','Audit']],
+      startY:19,
+      head:[['Report No','Form','Status','Raised','Target','Days','CAT','Audit / Activity']],
       body:detailRows,
       theme:'striped',
-      headStyles:{fillColor:[30,30,40],textColor:200,fontSize:7,fontStyle:'bold'},
-      bodyStyles:{fontSize:7,textColor:[200,200,200]},
+      headStyles:{fillColor:HEAD,textColor:[160,160,170],fontSize:7,fontStyle:'bold'},
+      bodyStyles:{fontSize:7,textColor:[200,200,210],fillColor:BG2},
+      alternateRowStyles:{fillColor:BG},
       columnStyles:{
-        0:{cellWidth:30,fontStyle:'bold',textColor:[220,220,220]},
-        1:{cellWidth:38},
-        2:{cellWidth:28,halign:'center'},
+        0:{cellWidth:28,fontStyle:'bold',textColor:[230,230,230]},
+        1:{cellWidth:36},
+        2:{cellWidth:20,halign:'center'},
         3:{cellWidth:20,halign:'center'},
         4:{cellWidth:20,halign:'center'},
-        5:{cellWidth:18,halign:'center'},
-        6:{cellWidth:16,halign:'center'},
+        5:{cellWidth:16,halign:'center'},
+        6:{cellWidth:14,halign:'center'},
         7:{cellWidth:'auto'},
       },
       margin:{left:10,right:10},
       didParseCell:(data)=>{
-        if(data.column.index===2&&data.section==='body'){
-          data.cell.styles.textColor=statusColor(data.cell.raw);
+        if(data.section!=='body')return;
+        if(data.column.index===2) data.cell.styles.textColor=sColor(d[data.row.index]?.semantic_status);
+        if(data.column.index===5){
+          const s=d[data.row.index]?.semantic_status;
+          if(s==='Overdue') data.cell.styles.textColor=[255,100,100];
+          else if(s==='Open') data.cell.styles.textColor=[63,185,80];
         }
-        if(data.column.index===5&&data.section==='body'){
-          const status=detailRows[data.row.index]?.[2];
-          if(status==='Overdue')data.cell.styles.textColor=[255,107,107];
-          else if(status==='Open')data.cell.styles.textColor=[63,185,80];
-        }
-        if(data.column.index===6&&data.section==='body'&&data.cell.raw!=='—'){
+        if(data.column.index===6&&data.cell.raw!=='—'){
           const cat=data.cell.raw;
-          data.cell.styles.textColor=cat==='CAT III'?[204,0,0]:cat==='CAT II'?[255,107,107]:[240,136,62];
+          data.cell.styles.fontStyle='bold';
+          data.cell.styles.textColor=cat==='CAT III'?[200,0,0]:cat==='CAT II'?[255,100,100]:[240,136,62];
         }
       },
-      didDrawPage:(data)=>{
-        const pageNum=pdf.internal.getCurrentPageInfo().pageNumber;
-        pdf.setFontSize(7); pdf.setTextColor(120,120,120);
-        pdf.text(`Trang ${pageNum}`,W/2,pdf.internal.pageSize.getHeight()-4,{align:'center'});
+      didDrawPage:()=>{
+        const pg=pdf.internal.getCurrentPageInfo().pageNumber;
+        pdf.setFontSize(6); pdf.setTextColor(100,100,115);
+        pdf.text(`Page ${pg}  |  QA AMO - VietJet Air`,W/2,H-3,{align:'center'});
       },
     });
 
     pdf.save(`QA_AMO_${title.replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`);
-    toast('✓ PDF đã xuất!','ok');
-  }catch(e){toast('Lỗi PDF: '+e.message,'err');console.error(e);}
+    toast('PDF exported!','ok');
+  }catch(e){toast('PDF error: '+e.message,'err');console.error(e);}
   finally{setOv(false);}
 }
 
