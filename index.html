@@ -1508,14 +1508,13 @@ async function loadData() {
       try {
         const auWfRaw = await fetchAll(G_URL + 'dwreporting_audit_workflow');
         if (auWfRaw.length) {
-          console.log('[AuditWF] Endpoint OK. Sample record keys:', Object.keys(auWfRaw[0]));
-          console.log('[AuditWF] Sample record:', auWfRaw[0]);
+          console.log('[AuditWF] OK —', auWfRaw.length, 'records. Keys:', JSON.stringify(Object.keys(auWfRaw[0])));
+          console.log('[AuditWF] Record[0]:', JSON.stringify(auWfRaw[0]));
         } else {
           console.warn('[AuditWF] Endpoint trả về 0 records');
         }
         auWfRaw.forEach(s => {
-          // Thử cả audit_id và các key thay thế phổ biến
-          const aid = s.audit_id ?? s.audit_fk ?? s.AuditId ?? s.id;
+          const aid = s.audit_id ?? s.audit_fk ?? s.AuditId ?? s.AuditID ?? s.id;
           if (!aid) return;
           if (!auditWfMap[aid]) auditWfMap[aid] = [];
           auditWfMap[aid].push(s);
@@ -1578,7 +1577,9 @@ async function fetchAll(url) {
     if(!r.ok) throw new Error('HTTP '+r.status+' '+r.statusText);
     const j=await r.json();
     res=res.concat(j.value||[]);
-    next=j['@odata.nextLink']||null;
+    // Route nextLink qua proxy (tránh CORS khi OData trả về URL gốc)
+    const rawNext = j['@odata.nextLink'] || null;
+    next = rawNext ? rawNext.replace(/^https?:\/\/[^/]+\/odata\//, G_URL) : null;
     if(p>200) break; // safety cap
   }
   return res;
