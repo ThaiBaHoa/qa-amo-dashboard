@@ -705,6 +705,7 @@ tr:last-child td{border-bottom:none}
                   <th onclick="auditSort('finding_count')">Findings ↕</th>
                   <th>Open</th>
                   <th>Overdue</th>
+                  <th>Workflow</th>
                 </tr></thead>
                 <tbody id="auditBody"></tbody>
               </table>
@@ -1165,6 +1166,34 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- AUDIT DETAIL MODAL -->
+<div class="overlay" id="auditModal" onclick="closeAuditModal(event)" style="z-index:210">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:93%;max-width:1020px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0">
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Chi tiết Audit</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text);margin-top:2px" id="adTitle">—</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px" id="adMeta">—</div>
+      </div>
+      <button onclick="closeAuditModal()" style="background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);font-size:16px;cursor:pointer;padding:3px 10px;border-radius:6px;flex-shrink:0;margin-left:12px">✕</button>
+    </div>
+    <div id="adSummary" style="padding:10px 18px;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-shrink:0;flex-wrap:wrap;align-items:center"></div>
+    <div style="overflow:auto;flex:1">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead style="position:sticky;top:0;background:var(--card);z-index:1"><tr>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap">Report No</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Form</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Trạng thái</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap">Raised</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap">Target</th>
+          <th style="padding:8px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Workflow Steps</th>
+        </tr></thead>
+        <tbody id="adBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="overlay">
   <div class="ov-box">
     <div class="spinner" id="ovSpinner"></div>
@@ -1338,25 +1367,28 @@ async function loadData() {
     });
     const summary = Object.values(sumMap);
 
-    // 2. WORKFLOW — ngày close thực tế, filter stage ReportAcceptReject
+    // 2. WORKFLOW — tải tất cả stages để hiển thị bước + lấy ngày close (ReportAcceptReject)
     setOv(true,`[2/3] ${summary.length} reports. Đang tải workflow...`,'');
     let wfMap = {};
+    let wfAllMap = {};
     try {
       const wfRaw = await fetchAll(
         G_URL + 'dwreporting_report_workflow' +
-        '?$select=report_id,stage_type,stage_status,stage_completed_date,stage_target_date' +
-        '&$filter=stage_type eq \'ReportAcceptReject\'' +
-        ' and (stage_status eq \'Completed\' or stage_status eq \'InProgress\')'
+        '?$select=report_id,stage_type,stage_status,stage_completed_date,stage_target_date'
       );
       wfRaw.forEach(w => {
+        // Tất cả stages theo report_id (để hiển thị workflow steps)
+        if (!wfAllMap[w.report_id]) wfAllMap[w.report_id] = [];
+        wfAllMap[w.report_id].push(w);
+        // Chỉ giữ ReportAcceptReject + Completed/InProgress để lấy close date
+        if (w.stage_type !== 'ReportAcceptReject') return;
+        if (w.stage_status !== 'Completed' && w.stage_status !== 'InProgress') return;
         const ex = wfMap[w.report_id];
         if (!ex) { wfMap[w.report_id]=w; return; }
-        // Ưu tiên stage Completed hơn InProgress
         const wDone  = w.stage_status === "Completed";
         const exDone = ex.stage_status === "Completed";
         if (wDone && !exDone) { wfMap[w.report_id]=w; return; }
         if (!wDone && exDone) { return; }
-        // Cùng status -> lấy completed_date mới nhất
         if (new Date(w.stage_completed_date||0) > new Date(ex.stage_completed_date||0))
           wfMap[w.report_id]=w;
       });
@@ -1422,6 +1454,7 @@ async function loadData() {
         raised_year:     r.raised_date ? new Date(r.raised_date).getFullYear() : null,
         is_rep:          (f['Repetitive']||'').toLowerCase()==='yes',
         audit_number:    null, // populated after audit load
+        wf_stages:       wfAllMap[r.report_id] || [],
       };
     });
 
@@ -2075,7 +2108,7 @@ function renderAudit() {
   };
 
   renderPaged('auditBody','auditInfo','auditPg','auditCnt',data,ts,a=>`
-    <tr>
+    <tr style="cursor:pointer" onclick="showAuditDetail('${a.audit_id}')">
       <td><b style="color:var(--blue)">${esc(a.number)||'—'}</b></td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${esc(a.title)||'—'}</td>
       <td>${a.audit_type==='Internal Audit'?'<span class="badge b-admin">Internal Audit</span>':'<span class="badge b-open">Inspection</span>'}</td>
@@ -2086,6 +2119,7 @@ function renderAudit() {
       <td style="text-align:center"><b>${a.finding_count||0}</b></td>
       <td style="text-align:center;color:var(--blue)">${a.open_count||0}</td>
       <td style="text-align:center;color:#ff6b6b">${a.overdue_count||0}</td>
+      <td style="font-size:11px">${renderAuditWfSummary(a.audit_id)}</td>
     </tr>`);
 }
 
@@ -2096,6 +2130,108 @@ function fdYM(d){
     const dt=new Date(d);
     return dt.toLocaleDateString('vi-VN',{year:'numeric',month:'2-digit'});
   }catch{return d}
+}
+
+// ── AUDIT DETAIL MODAL ────────────────────────────────────────
+const WF_STAGE_LABELS = {
+  'ReportRaised':       'Raised',
+  'RaisedDate':         'Raised',
+  'ResponseDue':        'Response',
+  'ReportAcceptReject': 'Accept/Reject',
+  'VerificationDue':    'Verification',
+  'ReportClose':        'Close',
+  'ReportClosed':       'Closed',
+};
+
+function stageLabel(t) {
+  return WF_STAGE_LABELS[t] || t.replace(/([A-Z])/g,' $1').trim();
+}
+
+function renderWfSteps(stages) {
+  if (!stages || !stages.length) return '<span style="color:var(--muted);font-size:11px">—</span>';
+  const sorted = stages.slice().sort((a,b) =>
+    (a.stage_target_date||'9').localeCompare(b.stage_target_date||'9')
+  );
+  return sorted.map((s,i) => {
+    const done = s.stage_status === 'Completed';
+    const prog = s.stage_status === 'InProgress';
+    const col  = done ? 'var(--green)' : prog ? 'var(--blue)' : 'var(--muted)';
+    const icon = done ? '✓' : prog ? '●' : '○';
+    const dateStr = s.stage_completed_date
+      ? ' ('+new Date(s.stage_completed_date).toLocaleDateString('vi-VN')+')'
+      : s.stage_target_date ? ' →'+new Date(s.stage_target_date).toLocaleDateString('vi-VN') : '';
+    const sep = i>0 ? '<span style="color:var(--border);margin:0 3px">›</span>' : '';
+    return `${sep}<span title="${s.stage_type}: ${s.stage_status}${dateStr}" style="color:${col};font-size:11px;white-space:nowrap">${icon} ${stageLabel(s.stage_type)}</span>`;
+  }).join('');
+}
+
+function renderAuditWfSummary(audit_id) {
+  const findings = allData.filter(r => r.audit_id === audit_id && r.wf_stages && r.wf_stages.length);
+  if (!findings.length) return '<span style="color:var(--muted);font-size:11px">—</span>';
+  let inProg=0, done=0, other=0;
+  findings.forEach(r => {
+    const st = r.wf_stages || [];
+    if (st.some(s=>s.stage_status==='InProgress')) inProg++;
+    else if (st.length && st.every(s=>s.stage_status==='Completed')) done++;
+    else other++;
+  });
+  const parts = [];
+  if (inProg) parts.push(`<span style="color:var(--blue);font-size:11px">● ${inProg} đang xử lý</span>`);
+  if (done)   parts.push(`<span style="color:var(--green);font-size:11px">✓ ${done} hoàn tất</span>`);
+  if (other)  parts.push(`<span style="color:var(--muted);font-size:11px">○ ${other}</span>`);
+  return parts.join(' ');
+}
+
+function showAuditDetail(auditId) {
+  const audit = auditData.find(a => a.audit_id === auditId);
+  if (!audit) return;
+  const findings = allData.filter(r => r.audit_id === auditId);
+
+  s('adTitle', `${audit.number||'—'} — ${audit.title||'—'}`);
+  s('adMeta', [
+    audit.audit_type, audit.status,
+    audit.lead_auditor_name,
+    audit.primary_scope_item_name,
+    audit.scheduled_start_date ? 'Scheduled: '+new Date(audit.scheduled_start_date).toLocaleDateString('vi-VN') : null
+  ].filter(Boolean).join(' · '));
+
+  const open = findings.filter(r=>r.semantic_status==='Open').length;
+  const ov   = findings.filter(r=>r.semantic_status==='Overdue').length;
+  const cl   = findings.filter(r=>['On-time Closed','Lately Closed','Closed'].includes(r.semantic_status)).length;
+  const chips = [
+    `<span style="font-size:12px;padding:4px 10px;border-radius:6px;background:rgba(88,166,255,.1);color:var(--blue)">Tổng findings: <b>${findings.length}</b></span>`,
+    open ? `<span style="font-size:12px;padding:4px 10px;border-radius:6px;background:rgba(88,166,255,.08);color:var(--blue)">Open: <b>${open}</b></span>` : '',
+    ov   ? `<span style="font-size:12px;padding:4px 10px;border-radius:6px;background:rgba(255,107,107,.1);color:#ff6b6b">Overdue: <b>${ov}</b></span>` : '',
+    cl   ? `<span style="font-size:12px;padding:4px 10px;border-radius:6px;background:rgba(63,185,80,.1);color:var(--green)">Closed: <b>${cl}</b></span>` : '',
+  ];
+  g('adSummary').innerHTML = chips.join('');
+
+  const SM = {
+    'Open':          '<span class="badge b-open">Open</span>',
+    'Overdue':       '<span class="badge b-late">Overdue</span>',
+    'On-time Closed':'<span class="badge b-on">On-time</span>',
+    'Lately Closed': '<span class="badge b-late">Late Closed</span>',
+    'Closed':        '<span class="badge b-on">Closed</span>',
+  };
+
+  g('adBody').innerHTML = findings.length === 0
+    ? `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--muted)">Không có finding</td></tr>`
+    : findings.sort((a,b)=>(a.report_number||'').localeCompare(b.report_number||'')).map(r=>`
+    <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+      <td style="padding:8px 12px;white-space:nowrap"><b style="color:var(--blue)">${esc(r.report_number)||'—'}</b></td>
+      <td style="padding:8px 12px;font-size:11px;color:var(--muted)">${esc(r.report_title)||'—'}</td>
+      <td style="padding:8px 12px">${SM[r.semantic_status]||`<span class="badge b-with">${esc(r.semantic_status)||'—'}</span>`}</td>
+      <td style="padding:8px 12px;font-size:11px;white-space:nowrap">${r.raised_date?new Date(r.raised_date).toLocaleDateString('vi-VN'):'—'}</td>
+      <td style="padding:8px 12px;font-size:11px;white-space:nowrap">${r.Target_date?new Date(r.Target_date).toLocaleDateString('vi-VN'):'—'}</td>
+      <td style="padding:8px 12px">${renderWfSteps(r.wf_stages)}</td>
+    </tr>`).join('');
+
+  g('auditModal').classList.add('show');
+}
+
+function closeAuditModal(e) {
+  if (e && e.target !== g('auditModal')) return;
+  g('auditModal').classList.remove('show');
 }
 
 
