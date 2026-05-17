@@ -1,0 +1,1616 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QA AMO · VietJet Air</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --red:#E30613;--dark:#0D1117;--card:#161B22;--card2:#21262D;
+  --border:#30363D;--text:#E6EDF3;--muted:#8B949E;
+  --green:#3FB950;--blue:#58A6FF;--yellow:#D29922;
+  --orange:#F0883E;--red-soft:rgba(227,6,19,0.15);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--dark);color:var(--text);min-height:100vh}
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at 60% 40%,rgba(227,6,19,.12) 0%,transparent 60%),
+             radial-gradient(ellipse at 20% 80%,rgba(88,166,255,.08) 0%,transparent 50%),var(--dark);}
+.auth-box{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:40px;width:400px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.auth-logo{display:flex;align-items:center;gap:12px;margin-bottom:28px}
+.logo-icon{width:44px;height:44px;border-radius:10px;background:var(--red);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#fff;box-shadow:0 4px 12px rgba(227,6,19,.4)}
+.auth-title{font-size:20px;font-weight:700}
+.auth-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.auth-tabs{display:flex;gap:4px;background:var(--card2);padding:4px;border-radius:8px;margin-bottom:24px}
+.auth-tab{flex:1;padding:7px;border-radius:6px;border:none;background:none;color:var(--muted);font-size:13px;cursor:pointer;transition:all .2s;font-weight:500}
+.auth-tab.active{background:var(--red);color:#fff}
+.form-group{margin-bottom:14px}
+.form-label{font-size:12px;color:var(--muted);font-weight:500;margin-bottom:5px;display:block}
+.form-input{width:100%;padding:9px 12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none;transition:border-color .2s}
+.form-input:focus{border-color:var(--red)}
+.btn-primary{width:100%;padding:11px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;box-shadow:0 4px 12px rgba(227,6,19,.3);margin-top:4px}
+.btn-primary:hover{background:#c00010;transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.auth-alert{padding:10px 12px;border-radius:8px;font-size:12px;margin-top:10px;display:none}
+.auth-alert.error{background:rgba(227,6,19,.1);border:1px solid rgba(227,6,19,.3);color:#ff6b6b}
+.auth-alert.success{background:rgba(63,185,80,.1);border:1px solid rgba(63,185,80,.3);color:var(--green)}
+.auth-alert.info{background:rgba(88,166,255,.1);border:1px solid rgba(88,166,255,.3);color:var(--blue)}
+.pending-box{text-align:center;padding:32px 20px;background:rgba(210,153,34,.08);border:1px solid rgba(210,153,34,.2);border-radius:12px}
+.pending-icon{font-size:40px;margin-bottom:12px}
+.pending-title{font-size:16px;font-weight:600;color:var(--yellow);margin-bottom:8px}
+.pending-sub{font-size:13px;color:var(--muted);line-height:1.6}
+#app{display:none}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:220px;background:var(--card);border-right:1px solid var(--border);position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;z-index:50}
+.sb-logo{padding:18px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.sb-logo-txt{font-size:13px;font-weight:700}
+.sb-logo-sub{font-size:10px;color:var(--muted)}
+.sb-nav{flex:1;padding:10px 8px;overflow-y:auto}
+.nav-sec{font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:8px 8px 4px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--muted);transition:all .15s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:rgba(255,255,255,.06);color:var(--text)}
+.nav-item.active{background:var(--red-soft);color:var(--red);font-weight:500}
+.nav-icon{font-size:15px;width:18px;text-align:center}
+.sb-footer{padding:12px;border-top:1px solid var(--border)}
+.user-card{display:flex;align-items:center;gap:9px;padding:8px;border-radius:8px;margin-bottom:8px}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.user-name{font-size:12px;font-weight:500}
+.user-role{font-size:10px;color:var(--muted)}
+.btn-logout{width:100%;padding:7px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--muted);border-radius:8px;font-size:12px;cursor:pointer;transition:all .2s}
+.btn-logout:hover{color:var(--red);border-color:rgba(227,6,19,.3)}
+.main{margin-left:220px;display:flex;flex-direction:column;min-height:100vh}
+.topbar{padding:0 20px;height:48px;background:rgba(13,17,23,.8);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40}
+.topbar-title{font-size:15px;font-weight:600}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.live-badge{font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(63,185,80,.1);color:var(--green);border:1px solid rgba(63,185,80,.2)}
+.btn-sm{padding:5px 12px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--muted);font-size:12px;cursor:pointer;transition:all .2s}
+.btn-sm:hover{color:var(--text);border-color:var(--text)}
+.content{padding:12px;flex:1;overflow-y:auto}
+.page{display:none}
+.page.active{display:block}
+.sec-title{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px}
+.kpi-3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;position:relative;overflow:hidden;transition:transform .2s}
+.kpi:hover{transform:translateY(-2px)}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent,transparent)}
+.kpi-lbl{font-size:11px;color:var(--muted);font-weight:500;margin-bottom:8px}
+.kpi-val{font-size:20px;font-weight:700;line-height:1;color:var(--accent,var(--text))}
+.kpi-sub{font-size:11px;color:var(--muted);margin-top:5px}
+.c2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px}
+.chart-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.chart-title{font-size:13px;font-weight:600}
+.chart-sub{font-size:11px;color:var(--muted)}
+.ch-wrap{position:relative}
+.tbl-card{background:var(--card);border:1px solid var(--border);border-radius:11px;overflow:hidden;margin-bottom:18px}
+.tbl-bar{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tbl-title{font-size:13px;font-weight:600}
+.tbl-count{font-size:11px;color:var(--muted)}
+.pill{padding:5px 11px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);font-size:12px;cursor:pointer;transition:all .15s;font-weight:500}
+.pill.on{background:var(--red-soft);color:var(--red);border-color:rgba(227,6,19,.3)}
+.pill:not(.on):hover{color:var(--text)}
+.sel{padding:6px 10px;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:7px;font-size:12px;cursor:pointer}
+.srch-wrap{position:relative}
+.srch-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--muted)}
+.srch{padding:6px 10px 6px 28px;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:7px;font-size:12px;width:180px;outline:none}
+.srch:focus{border-color:var(--blue)}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{padding:9px 13px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
+th:hover{color:var(--text)}
+td{padding:9px 13px;border-bottom:1px solid rgba(255,255,255,.04);white-space:nowrap}
+tr:hover td{background:rgba(255,255,255,.02)}
+tr:last-child td{border-bottom:none}
+.tbl-foot{padding:10px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted)}
+.pg-btns{display:flex;gap:3px}
+.pg-btn{padding:3px 9px;border-radius:5px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-size:12px;transition:all .15s}
+.pg-btn:hover:not(:disabled){color:var(--text);background:rgba(255,255,255,.05)}
+.pg-btn.cur{background:var(--red);color:#fff;border-color:var(--red)}
+.pg-btn:disabled{opacity:.3;cursor:not-allowed}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600}
+.badge::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
+.b-open{background:rgba(88,166,255,.12);color:var(--blue)}
+.b-over{background:rgba(227,6,19,.12);color:#ff6b6b}
+.b-on{background:rgba(63,185,80,.12);color:var(--green)}
+.b-late{background:rgba(210,153,34,.12);color:var(--yellow)}
+.b-with{background:rgba(139,148,158,.12);color:var(--muted)}
+.b-c1{background:rgba(240,136,62,.12);color:var(--orange)}
+.b-c2{background:rgba(227,6,19,.15);color:#ff6b6b}
+.b-c3{background:rgba(180,0,0,.2);color:#ff3333}
+.b-pend{background:rgba(210,153,34,.12);color:var(--yellow)}
+.b-appr{background:rgba(63,185,80,.12);color:var(--green)}
+.b-reje{background:rgba(227,6,19,.12);color:#ff6b6b}
+.b-admin{background:rgba(188,140,255,.12);color:#BC8CFF}
+.a-ok{color:var(--green);font-weight:600}
+.a-warn{color:var(--orange);font-weight:600}
+.a-bad{color:#ff6b6b;font-weight:600}
+.a-crit{color:#ff3333;font-weight:700}
+.admin-actions{display:flex;gap:6px}
+.btn-approve{padding:4px 10px;border-radius:6px;border:1px solid rgba(63,185,80,.3);background:rgba(63,185,80,.1);color:var(--green);font-size:11px;cursor:pointer;transition:all .2s;font-weight:500}
+.btn-reject{padding:4px 10px;border-radius:6px;border:1px solid rgba(227,6,19,.3);background:rgba(227,6,19,.1);color:#ff6b6b;font-size:11px;cursor:pointer;transition:all .2s;font-weight:500}
+.btn-make-admin{padding:4px 10px;border-radius:6px;border:1px solid rgba(188,140,255,.3);background:rgba(188,140,255,.1);color:#BC8CFF;font-size:11px;cursor:pointer;transition:all .2s;font-weight:500}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+.stat-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.stat-tbl th{padding:7px 11px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)}
+.stat-tbl td{padding:7px 11px;border-bottom:1px solid rgba(255,255,255,.04)}
+.stat-tbl tr:last-child td{border-bottom:none;font-weight:600;background:rgba(255,255,255,.02)}
+.overlay{position:fixed;inset:0;background:rgba(13,17,23,.85);display:none;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(4px)}
+.overlay.show{display:flex}
+.ov-box{text-align:center}
+.spinner{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ov-text{font-size:13px;color:var(--muted)}
+.ov-detail{font-size:11px;color:var(--muted);margin-top:4px;opacity:.7}
+.toast-wrap{position:fixed;bottom:20px;right:20px;z-index:300;display:flex;flex-direction:column;gap:6px}
+.toast{padding:11px 14px;border-radius:9px;font-size:13px;display:flex;align-items:center;gap:8px;min-width:260px;box-shadow:0 8px 24px rgba(0,0,0,.4);animation:slideIn .3s ease}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:none;opacity:1}}
+.t-ok{background:#1a2e1a;border:1px solid rgba(63,185,80,.3);color:var(--green)}
+.t-err{background:#2e1a1a;border:1px solid rgba(227,6,19,.3);color:#ff6b6b}
+.t-info{background:#1a1e2e;border:1px solid rgba(88,166,255,.3);color:var(--blue)}
+
+/* ── RESPONSIVE SCALING ─────────────────────────────────── */
+
+/* 1920x1080 — tăng 5% */
+@media (min-width: 1800px) {
+  .content { padding: 13px; }
+  .kpi-val { font-size: 21px !important; }
+  .kpi     { padding: 13px; }
+  .chart-card { padding: 13px; }
+  .stat-tbl td { font-size: 12.5px; }
+  table td { font-size: 12.5px; }
+  .nav-item { font-size: 13.5px; }
+}
+
+/* 2560x1440 — tăng 10% */
+@media (min-width: 2400px) {
+  .content { padding: 14px; }
+  .kpi-val { font-size: 22px !important; }
+  .kpi-lbl { font-size: 12px; }
+  .kpi-sub { font-size: 12px; }
+  .kpi     { padding: 14px; }
+  .chart-card { padding: 14px; }
+  .stat-tbl th, .stat-tbl td { font-size: 13px; }
+  table th { font-size: 12px; }
+  table td { font-size: 13px; padding: 10px 14px; }
+  .badge   { font-size: 12px; }
+  .nav-item { font-size: 14px; padding: 10px 12px; }
+  .sidebar { width: 230px; }
+  .main    { margin-left: 230px; }
+  .topbar  { height: 52px; }
+  .topbar-title { font-size: 16px; }
+  #page-overview [style*="height:180px"] { height: 200px !important; }
+  #page-overview [style*="max-height:320px"] { max-height: 360px !important; }
+  #mc-open-ov, #mc-ontime-r, #mc-cat3, #mc-rep { font-size: 24px !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="authWrap" class="auth-wrap">
+  <div class="auth-box">
+    <div class="auth-logo" style="align-items:center;gap:14px">
+      <div style="background:white;border-radius:8px;padding:8px 12px">
+        <!-- svgstack.com --><svg width="180" height="54" style="display:block" viewBox="0 0 480 320" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M141.811 159.92H118.823C118.605 165.206 120.64 169.01 126.416 169.01C130.538 169.01 134.649 167.722 136.805 166.657L137.895 174.002C134.717 175.651 129.653 177.028 123.886 177.028C114.054 177.028 108.285 171.206 108.285 161.369C108.285 155.394 110.224 148.583 113.558 143.759C117.306 138.23 123.008 134.757 130.08 134.757C138.687 134.757 143.515 140.037 143.515 149.102C143.515 151.382 142.906 156.415 141.811 159.92ZM128.714 141.642C125.475 141.642 122.731 143.986 120.84 147.972C120.065 149.722 119.928 150.199 119.405 152.354H132.962C133.273 151.157 133.561 149.192 133.561 147.902C133.561 143.818 131.819 141.642 128.714 141.642M70.3455 188.311H60.1771L55.3828 135.881H66.4987L68.5408 171.525L84.1779 135.881H95.6678L70.3455 188.311ZM166.374 143.449H160.346L156.113 164.775C155.98 165.395 155.289 169.101 158.859 169.292C159.867 169.37 161.361 169.093 162.018 168.786C162.018 168.786 160.275 177.028 152.371 177.028C146.257 177.028 143.467 172.208 144.9 164.998L152.006 129.591C152.006 129.591 156.022 124.837 163.827 126.222C162.476 132.911 161.861 135.882 161.861 135.882L167.878 135.867L166.374 143.449ZM241.151 143.449H235.118L230.876 164.775C230.741 165.395 230.061 169.101 233.634 169.292C234.634 169.37 236.128 169.093 236.783 168.786C236.783 168.786 235.044 177.028 227.14 177.028C221.035 177.028 218.245 172.209 219.69 164.998L226.773 129.592C226.773 129.592 230.806 124.837 238.613 126.222C237.252 132.911 236.63 135.882 236.63 135.882L242.674 135.867L241.151 143.449ZM216.597 159.92H193.607C193.38 165.206 195.416 169.01 201.189 169.01C205.296 169.01 209.416 167.722 211.574 166.657L212.677 174.002C209.494 175.651 204.435 177.028 198.643 177.028C188.842 177.028 183.069 171.206 183.069 161.369C183.069 155.394 184.993 148.583 188.325 143.759C192.088 138.23 197.796 134.757 204.868 134.757C213.471 134.757 218.307 140.037 218.307 149.102C218.307 151.382 217.694 156.415 216.597 159.92ZM203.494 141.642C200.25 141.642 197.494 143.986 195.624 147.972C194.823 149.722 194.697 150.199 194.185 152.354H207.725C208.046 151.157 208.334 149.192 208.334 147.902C208.334 143.818 206.601 141.642 203.494 141.642M322.084 143.602C319.418 142.531 316.51 142.453 314.649 143.291L308.075 176.637H297.003L304.661 138.169C309.316 135.501 317.974 133.938 324.754 135.188L322.084 143.602ZM267.991 188.311L268.103 176.628H252.764L246.573 188.311H235.585L265.67 135.881H277.139L279.101 188.311H267.991V188.311ZM268.355 147.534L256.8 169.063H268.111L268.355 147.534Z" fill="#ED1D24"/><path d="M155.86 194.034C145.921 194.034 140.48 187.248 141.282 180.16C146.205 186.122 155.36 186.139 160.821 181.134C162.835 179.319 164.485 176.388 165.842 169.353C168.193 157.352 172.561 135.883 172.561 135.883H183.693L175.985 174.267C173.441 186.24 165.808 194.034 155.86 194.034M100.616 176.628H89.5039L97.6555 135.883H108.786L100.616 176.628ZM291.765 176.628H280.634L288.811 135.883H299.952L291.765 176.628ZM317.216 177.029C315.372 177.029 314.088 175.646 314.088 173.879C314.088 171.491 316.271 169.192 318.687 169.192C320.527 169.192 321.857 170.539 321.857 172.346C321.857 174.726 319.611 177.029 317.216 177.029M345.036 152.414C344.485 151.971 343.359 151.393 342.019 151.393C339.811 151.393 337.83 152.694 336.338 155.467C334.918 157.999 334.008 161.931 334.008 164.852C334.008 168.572 335.468 170.539 337.781 170.539C339.29 170.539 340.887 169.98 341.699 169.371L342.395 174.757C341.006 175.995 338.529 177.01 335.182 177.01C329.55 177.01 325.514 172.518 325.514 165.366C325.514 160.919 327.136 155.572 329.55 151.971C332.453 147.702 336.544 145.557 340.729 145.557C344.008 145.557 346.767 146.796 347.716 147.799L345.036 152.414Z" fill="#ED1D24"/><path d="M366.945 170.268C364.264 174.43 360.165 177.007 354.69 177.007C347.824 177.007 344.27 172.406 344.27 165.814C344.27 161.37 345.828 155.849 348.186 152.246C350.923 148.019 355.062 145.555 360.375 145.555C367.264 145.555 370.876 150.105 370.876 156.7C370.876 161.152 369.249 166.656 366.945 170.268M359.686 151.009C357.434 151.009 355.816 152.817 354.69 155.511C353.455 158.389 352.375 163.551 352.375 166.656C352.375 169.245 353.117 171.047 355.491 171.047C357.82 171.047 359.308 169.368 360.432 166.656C361.636 163.782 362.798 158.553 362.798 155.465C362.798 152.87 361.993 151.009 359.686 151.009ZM415.281 155.484L411.096 176.735H402.64L406.928 155.201C406.974 154.806 407.037 154.474 407.037 154.081C407.037 152.314 405.995 151.056 403.501 151.056C401.984 151.056 400.48 151.736 399.438 152.657L394.669 176.735H386.209L390.499 155.136C390.549 154.747 390.61 154.419 390.61 154.081C390.61 152.196 389.303 151.056 386.759 151.056C385.383 151.056 384.246 151.289 383.167 151.68L378.232 176.735H369.788L375.534 147.827C378.99 146.345 382.967 145.556 387.829 145.556C391.69 145.556 394.82 146.917 396.19 148.621C398.133 147.028 401.823 145.556 406.646 145.556C412.569 145.556 415.493 148.728 415.493 153.27C415.493 153.997 415.437 154.747 415.281 155.484ZM422.59 175.448C422.518 175.372 422.47 175.269 422.443 175.171C422.407 175.074 422.382 174.946 422.361 174.832C422.341 174.714 422.332 174.593 422.331 174.473C422.325 174.343 422.323 174.242 422.312 174.105C422.304 173.984 422.279 173.877 422.254 173.755C422.231 173.654 422.189 173.549 422.144 173.452C422.088 173.368 422.021 173.286 421.932 173.219C421.852 173.162 421.741 173.116 421.613 173.099H421.609C421.888 173.019 422.098 172.849 422.231 172.633C422.354 172.412 422.424 172.137 422.424 171.843C422.424 171.441 422.291 171.12 422.044 170.885C421.791 170.652 421.43 170.536 420.976 170.536H418.76V175.473H419.415V173.381H420.926C421.077 173.381 421.184 173.408 421.281 173.452C421.373 173.511 421.443 173.561 421.493 173.639C421.552 173.717 421.602 173.809 421.617 173.914C421.651 174.028 421.674 174.131 421.689 174.255C421.71 174.366 421.731 174.488 421.731 174.618L421.741 174.965C421.747 175.074 421.749 175.171 421.779 175.251C421.789 175.351 421.821 175.412 421.884 175.473H422.602L422.59 175.448ZM419.415 171.12H420.953C421.233 171.12 421.443 171.204 421.567 171.345C421.697 171.505 421.768 171.7 421.768 171.948C421.768 172.116 421.741 172.269 421.682 172.368C421.617 172.475 421.541 172.57 421.453 172.633C421.354 172.692 421.241 172.75 421.113 172.763C420.976 172.792 420.844 172.799 420.705 172.799H419.415V171.12Z" fill="#ED1D24"/><path d="M420.594 177.219C418.373 177.219 416.566 175.333 416.566 173.003C416.566 170.683 418.373 168.801 420.594 168.801C422.812 168.801 424.615 170.683 424.615 173.003C424.615 175.333 422.812 177.219 420.594 177.219ZM420.594 169.418C418.699 169.418 417.171 171.032 417.171 173.003C417.171 174.99 418.699 176.587 420.594 176.587C422.483 176.587 424.012 174.99 424.012 173.003C424.012 171.032 422.483 169.418 420.594 169.418Z" fill="#ED1D24"/></svg> 
+      </div>
+      <div>
+        <div class="auth-title">QA AMO Portal</div>
+        <div class="auth-sub">VietJet Air · Quality Assurance</div>
+      </div>
+    </div>
+    <div class="auth-tabs" id="authTabs">
+      <button class="auth-tab active" onclick="switchAuth('login')">Đăng nhập</button>
+      <button class="auth-tab" onclick="switchAuth('register')">Đăng ký</button>
+    </div>
+    <div id="loginForm">
+      <div class="form-group"><label class="form-label">Email</label>
+        <input class="form-input" id="lEmail" type="email" placeholder="email@vietjetair.com" autocomplete="email"></div>
+      <div class="form-group"><label class="form-label">Mật khẩu</label>
+        <input class="form-input" id="lPass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+      <button class="btn-primary" id="btnLogin" onclick="doLogin()">Đăng nhập</button>
+      <div class="auth-alert" id="loginAlert"></div>
+    </div>
+    <div id="registerForm" style="display:none">
+      <div class="form-group"><label class="form-label">Họ và tên</label>
+        <input class="form-input" id="rName" type="text" placeholder="Nguyễn Văn A"></div>
+      <div class="form-group"><label class="form-label">Email</label>
+        <input class="form-input" id="rEmail" type="email" placeholder="email@vietjetair.com"></div>
+      <div class="form-group"><label class="form-label">Mật khẩu</label>
+        <input class="form-input" id="rPass" type="password" placeholder="Tối thiểu 8 ký tự"></div>
+      <div class="form-group"><label class="form-label">Xác nhận mật khẩu</label>
+        <input class="form-input" id="rPass2" type="password" placeholder="Nhập lại mật khẩu" onkeydown="if(event.key==='Enter')doRegister()"></div>
+      <button class="btn-primary" id="btnRegister" onclick="doRegister()">Gửi yêu cầu đăng ký</button>
+      <div class="auth-alert" id="registerAlert"></div>
+    </div>
+    <div id="pendingBox" style="display:none">
+      <div class="pending-box">
+        <div class="pending-icon">⏳</div>
+        <div class="pending-title">Đang chờ phê duyệt</div>
+        <div class="pending-sub">Tài khoản đã tạo và đang chờ Admin phê duyệt.<br>Vui lòng liên hệ Admin hoặc thử lại sau.</div>
+      </div>
+      <button class="btn-primary" style="margin-top:16px;background:var(--card2);color:var(--muted);box-shadow:none" onclick="doLogout()">← Quay lại</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="layout">
+    <div class="sidebar">
+      <div class="sb-logo" style="padding:8px 12px;background:#fff;border-bottom:1px solid var(--border);flex-direction:column;align-items:center;gap:6px">
+        <!-- svgstack.com --><svg width="120" height="36" style="display:block" viewBox="0 0 480 320" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M141.811 159.92H118.823C118.605 165.206 120.64 169.01 126.416 169.01C130.538 169.01 134.649 167.722 136.805 166.657L137.895 174.002C134.717 175.651 129.653 177.028 123.886 177.028C114.054 177.028 108.285 171.206 108.285 161.369C108.285 155.394 110.224 148.583 113.558 143.759C117.306 138.23 123.008 134.757 130.08 134.757C138.687 134.757 143.515 140.037 143.515 149.102C143.515 151.382 142.906 156.415 141.811 159.92ZM128.714 141.642C125.475 141.642 122.731 143.986 120.84 147.972C120.065 149.722 119.928 150.199 119.405 152.354H132.962C133.273 151.157 133.561 149.192 133.561 147.902C133.561 143.818 131.819 141.642 128.714 141.642M70.3455 188.311H60.1771L55.3828 135.881H66.4987L68.5408 171.525L84.1779 135.881H95.6678L70.3455 188.311ZM166.374 143.449H160.346L156.113 164.775C155.98 165.395 155.289 169.101 158.859 169.292C159.867 169.37 161.361 169.093 162.018 168.786C162.018 168.786 160.275 177.028 152.371 177.028C146.257 177.028 143.467 172.208 144.9 164.998L152.006 129.591C152.006 129.591 156.022 124.837 163.827 126.222C162.476 132.911 161.861 135.882 161.861 135.882L167.878 135.867L166.374 143.449ZM241.151 143.449H235.118L230.876 164.775C230.741 165.395 230.061 169.101 233.634 169.292C234.634 169.37 236.128 169.093 236.783 168.786C236.783 168.786 235.044 177.028 227.14 177.028C221.035 177.028 218.245 172.209 219.69 164.998L226.773 129.592C226.773 129.592 230.806 124.837 238.613 126.222C237.252 132.911 236.63 135.882 236.63 135.882L242.674 135.867L241.151 143.449ZM216.597 159.92H193.607C193.38 165.206 195.416 169.01 201.189 169.01C205.296 169.01 209.416 167.722 211.574 166.657L212.677 174.002C209.494 175.651 204.435 177.028 198.643 177.028C188.842 177.028 183.069 171.206 183.069 161.369C183.069 155.394 184.993 148.583 188.325 143.759C192.088 138.23 197.796 134.757 204.868 134.757C213.471 134.757 218.307 140.037 218.307 149.102C218.307 151.382 217.694 156.415 216.597 159.92ZM203.494 141.642C200.25 141.642 197.494 143.986 195.624 147.972C194.823 149.722 194.697 150.199 194.185 152.354H207.725C208.046 151.157 208.334 149.192 208.334 147.902C208.334 143.818 206.601 141.642 203.494 141.642M322.084 143.602C319.418 142.531 316.51 142.453 314.649 143.291L308.075 176.637H297.003L304.661 138.169C309.316 135.501 317.974 133.938 324.754 135.188L322.084 143.602ZM267.991 188.311L268.103 176.628H252.764L246.573 188.311H235.585L265.67 135.881H277.139L279.101 188.311H267.991V188.311ZM268.355 147.534L256.8 169.063H268.111L268.355 147.534Z" fill="#ED1D24"/><path d="M155.86 194.034C145.921 194.034 140.48 187.248 141.282 180.16C146.205 186.122 155.36 186.139 160.821 181.134C162.835 179.319 164.485 176.388 165.842 169.353C168.193 157.352 172.561 135.883 172.561 135.883H183.693L175.985 174.267C173.441 186.24 165.808 194.034 155.86 194.034M100.616 176.628H89.5039L97.6555 135.883H108.786L100.616 176.628ZM291.765 176.628H280.634L288.811 135.883H299.952L291.765 176.628ZM317.216 177.029C315.372 177.029 314.088 175.646 314.088 173.879C314.088 171.491 316.271 169.192 318.687 169.192C320.527 169.192 321.857 170.539 321.857 172.346C321.857 174.726 319.611 177.029 317.216 177.029M345.036 152.414C344.485 151.971 343.359 151.393 342.019 151.393C339.811 151.393 337.83 152.694 336.338 155.467C334.918 157.999 334.008 161.931 334.008 164.852C334.008 168.572 335.468 170.539 337.781 170.539C339.29 170.539 340.887 169.98 341.699 169.371L342.395 174.757C341.006 175.995 338.529 177.01 335.182 177.01C329.55 177.01 325.514 172.518 325.514 165.366C325.514 160.919 327.136 155.572 329.55 151.971C332.453 147.702 336.544 145.557 340.729 145.557C344.008 145.557 346.767 146.796 347.716 147.799L345.036 152.414Z" fill="#ED1D24"/><path d="M366.945 170.268C364.264 174.43 360.165 177.007 354.69 177.007C347.824 177.007 344.27 172.406 344.27 165.814C344.27 161.37 345.828 155.849 348.186 152.246C350.923 148.019 355.062 145.555 360.375 145.555C367.264 145.555 370.876 150.105 370.876 156.7C370.876 161.152 369.249 166.656 366.945 170.268M359.686 151.009C357.434 151.009 355.816 152.817 354.69 155.511C353.455 158.389 352.375 163.551 352.375 166.656C352.375 169.245 353.117 171.047 355.491 171.047C357.82 171.047 359.308 169.368 360.432 166.656C361.636 163.782 362.798 158.553 362.798 155.465C362.798 152.87 361.993 151.009 359.686 151.009ZM415.281 155.484L411.096 176.735H402.64L406.928 155.201C406.974 154.806 407.037 154.474 407.037 154.081C407.037 152.314 405.995 151.056 403.501 151.056C401.984 151.056 400.48 151.736 399.438 152.657L394.669 176.735H386.209L390.499 155.136C390.549 154.747 390.61 154.419 390.61 154.081C390.61 152.196 389.303 151.056 386.759 151.056C385.383 151.056 384.246 151.289 383.167 151.68L378.232 176.735H369.788L375.534 147.827C378.99 146.345 382.967 145.556 387.829 145.556C391.69 145.556 394.82 146.917 396.19 148.621C398.133 147.028 401.823 145.556 406.646 145.556C412.569 145.556 415.493 148.728 415.493 153.27C415.493 153.997 415.437 154.747 415.281 155.484ZM422.59 175.448C422.518 175.372 422.47 175.269 422.443 175.171C422.407 175.074 422.382 174.946 422.361 174.832C422.341 174.714 422.332 174.593 422.331 174.473C422.325 174.343 422.323 174.242 422.312 174.105C422.304 173.984 422.279 173.877 422.254 173.755C422.231 173.654 422.189 173.549 422.144 173.452C422.088 173.368 422.021 173.286 421.932 173.219C421.852 173.162 421.741 173.116 421.613 173.099H421.609C421.888 173.019 422.098 172.849 422.231 172.633C422.354 172.412 422.424 172.137 422.424 171.843C422.424 171.441 422.291 171.12 422.044 170.885C421.791 170.652 421.43 170.536 420.976 170.536H418.76V175.473H419.415V173.381H420.926C421.077 173.381 421.184 173.408 421.281 173.452C421.373 173.511 421.443 173.561 421.493 173.639C421.552 173.717 421.602 173.809 421.617 173.914C421.651 174.028 421.674 174.131 421.689 174.255C421.71 174.366 421.731 174.488 421.731 174.618L421.741 174.965C421.747 175.074 421.749 175.171 421.779 175.251C421.789 175.351 421.821 175.412 421.884 175.473H422.602L422.59 175.448ZM419.415 171.12H420.953C421.233 171.12 421.443 171.204 421.567 171.345C421.697 171.505 421.768 171.7 421.768 171.948C421.768 172.116 421.741 172.269 421.682 172.368C421.617 172.475 421.541 172.57 421.453 172.633C421.354 172.692 421.241 172.75 421.113 172.763C420.976 172.792 420.844 172.799 420.705 172.799H419.415V171.12Z" fill="#ED1D24"/><path d="M420.594 177.219C418.373 177.219 416.566 175.333 416.566 173.003C416.566 170.683 418.373 168.801 420.594 168.801C422.812 168.801 424.615 170.683 424.615 173.003C424.615 175.333 422.812 177.219 420.594 177.219ZM420.594 169.418C418.699 169.418 417.171 171.032 417.171 173.003C417.171 174.99 418.699 176.587 420.594 176.587C422.483 176.587 424.012 174.99 424.012 173.003C424.012 171.032 422.483 169.418 420.594 169.418Z" fill="#ED1D24"/></svg> 
+        <div style="font-size:10px;color:#888;letter-spacing:.05em;background:#f5f5f5;border-radius:4px;padding:2px 8px;width:100%;text-align:center">QA AMO · Dashboard</div>
+      </div>
+      <div class="sb-nav">
+        <div class="nav-sec">Main</div>
+        <button class="nav-item active" onclick="showPage('overview',this)"><span class="nav-icon">📊</span>Overview</button>
+        <button class="nav-item" onclick="showPage('openrfi',this)"><span class="nav-icon">📋</span>Open RFI</button>
+        <button class="nav-item" onclick="showPage('overdue',this)"><span class="nav-icon">⚠️</span>Overdue</button>
+        <button class="nav-item" onclick="showPage('kpi',this)"><span class="nav-icon">📈</span>KPI Charts</button>
+        <div class="nav-sec" style="margin-top:6px">Detail</div>
+        <button class="nav-item" onclick="showPage('allforms',this)"><span class="nav-icon">📄</span>All Forms</button>
+        <button class="nav-item" onclick="showPage('pavoi',this)"><span class="nav-icon">🔍</span>PAVOI Detail</button>
+        <button class="nav-item" onclick="showPage('auditplan',this)"><span class="nav-icon">📅</span>Audit Plan</button>
+        <div id="adminNav" style="display:none">
+          <div class="nav-sec" style="margin-top:6px">Admin</div>
+          <button class="nav-item" onclick="showPage('admin',this)"><span class="nav-icon">👤</span>Quản lý Users</button>
+        </div>
+      </div>
+      <div class="sb-footer">
+        <div class="user-card">
+          <div class="avatar" id="sideAvatar">U</div>
+          <div><div class="user-name" id="sideName">—</div><div class="user-role" id="sideRole">—</div></div>
+        </div>
+        <button class="btn-logout" onclick="doLogout()">Đăng xuất</button>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="topbar">
+        <div class="topbar-title" id="pageTitle">Overview</div>
+        <div class="topbar-right">
+          <div class="live-badge" id="liveBadge" style="display:none">● <span id="recCount">0</span> reports</div>
+          <button class="btn-sm" onclick="loadData()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div class="content">
+
+        <!-- OVERVIEW -->
+        <div class="page active" id="page-overview">
+
+          <!-- ROW 1: KPI Cards — 6 equal columns -->
+          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:8px">
+            <div class="kpi" style="--accent:var(--blue)"><div class="kpi-lbl">Total Reports</div><div class="kpi-val" id="k-total">—</div><div class="kpi-sub">Tất cả form</div></div>
+            <div class="kpi" style="--accent:var(--blue)"><div class="kpi-lbl">Open</div><div class="kpi-val" id="k-open">—</div><div class="kpi-sub">Đang xử lý</div></div>
+            <div class="kpi" style="--accent:#ff6b6b"><div class="kpi-lbl">Overdue</div><div class="kpi-val" id="k-over">—</div><div class="kpi-sub" id="k-over-r">—</div></div>
+            <div class="kpi" style="--accent:var(--green)"><div class="kpi-lbl">On-time Closed</div><div class="kpi-val" id="k-on">—</div><div class="kpi-sub" id="k-on-r">—</div></div>
+            <div class="kpi" style="--accent:var(--yellow)"><div class="kpi-lbl">Lately Closed</div><div class="kpi-val" id="k-late">—</div><div class="kpi-sub">Đóng trễ</div></div>
+            <div class="kpi" style="--accent:var(--muted)"><div class="kpi-lbl">Closed</div><div class="kpi-val" id="k-cls">—</div><div class="kpi-sub">Không có target</div></div>
+          </div>
+
+          <!-- ROW 2: 3 charts side by side — each 33% width -->
+          <div style="display:grid;grid-template-columns:1fr 2fr 1fr;gap:8px;margin-bottom:8px">
+            <div class="chart-card" style="min-width:0">
+              <div style="font-size:12px;font-weight:600;margin-bottom:6px">Theo trạng thái</div>
+              <div style="height:180px;position:relative"><canvas id="cStatus"></canvas></div>
+            </div>
+            <div class="chart-card" style="min-width:0">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <div style="font-size:12px;font-weight:600">Findings by Month</div>
+                <select class="sel" id="monthYr" onchange="buildMonthChart()" style="padding:3px 8px;font-size:11px">
+                  <option value="all">Tất cả năm</option>
+                </select>
+              </div>
+              <div style="height:180px;position:relative"><canvas id="cMonth"></canvas></div>
+            </div>
+            <div class="chart-card" style="min-width:0">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <div style="font-size:12px;font-weight:600">Top Forms</div>
+                <select class="sel" id="chartFormFilter" onchange="buildFormChart()" style="padding:3px 8px;font-size:11px">
+                  <option value="all">Tất cả</option>
+                  <option value="Open">Open</option>
+                  <option value="Overdue">Overdue</option>
+                </select>
+              </div>
+              <div style="height:180px;position:relative"><canvas id="cForm"></canvas></div>
+            </div>
+          </div>
+
+          <!-- ROW 3: Form table (left) + 4 metric cards (right) -->
+          <div style="display:grid;grid-template-columns:1fr 240px;gap:8px">
+
+            <div class="chart-card" style="min-width:0">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <div style="font-size:12px;font-weight:600">Tổng hợp theo Form</div>
+                <span style="font-size:11px;color:var(--muted)" id="statFormCount"></span>
+              </div>
+              <div style="max-height:320px;overflow-y:auto">
+                <table class="stat-tbl" style="width:100%">
+                  <thead style="position:sticky;top:0;background:var(--card);z-index:1">
+                    <tr>
+                      <th>Form</th>
+                      <th style="text-align:center;width:70px">Open</th>
+                      <th style="text-align:center;width:70px">Overdue</th>
+                      <th style="text-align:center;width:70px">Closed</th>
+                      <th style="text-align:center;width:70px">Total</th>
+                      <th style="text-align:center;width:50px">%</th>
+                    </tr>
+                  </thead>
+                  <tbody id="statForm"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 4 metric cards in 2x2 grid -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:8px">
+              <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:12px 8px">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Open + Overdue</div>
+                <div style="font-size:22px;font-weight:700;color:var(--blue)" id="mc-open-ov">—</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:2px" id="mc-open-ov-r">—</div>
+              </div>
+              <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:12px 8px">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:4px">On-time Rate</div>
+                <div style="font-size:22px;font-weight:700;color:var(--green)" id="mc-ontime-r">—</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:2px" id="mc-ontime-v">—</div>
+              </div>
+              <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:12px 8px">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Overdue CAT III</div>
+                <div style="font-size:22px;font-weight:700;color:#ff3333" id="mc-cat3">—</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:2px">&gt;60 ngày</div>
+              </div>
+              <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:12px 8px">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Repetitive</div>
+                <div style="font-size:22px;font-weight:700;color:var(--yellow)" id="mc-rep">—</div>
+                <div style="font-size:10px;color:var(--muted);margin-top:2px" id="mc-rep-r">—</div>
+              </div>
+            </div>
+          </div>
+
+          <table style="display:none"><tbody id="statMeta"></tbody></table>
+        </div>
+
+        <!-- OPEN RFI -->
+        <div class="page" id="page-openrfi">
+          <div class="tbl-card">
+            <div class="tbl-bar">
+              <div><div class="tbl-title">Open RFI — Đang xử lý</div><div class="tbl-count" id="openCnt">—</div></div>
+              <button class="pill on" onclick="setOpenF('all',this)">Tất cả Open</button>
+              <button class="pill" onclick="setOpenF('Open',this)">Open</button>
+              <button class="pill" onclick="setOpenF('Overdue',this)">Overdue</button>
+              <select class="sel" id="openFormF" onchange="renderOpen()"><option value="">Tất cả Form</option></select>
+              <select class="sel" id="openYearF" onchange="renderOpen()"><option value="">Tất cả năm</option></select>
+              <div class="srch-wrap"><span class="srch-icon">🔍</span>
+                <input class="srch" id="openSrch" placeholder="Tìm kiếm..." oninput="renderOpen()">
+              </div>
+            </div>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr>
+                  <th onclick="openSort('report_number')">Report No ↕</th>
+                  <th onclick="openSort('report_title')">Form ↕</th>
+                  <th onclick="openSort('semantic_status')">Status ↕</th>
+                  <th onclick="openSort('raised_date')">Raised Date ↕</th>
+                  <th onclick="openSort('Target_date')">Target Date ↕</th>
+                  <th onclick="openSort('report_ageing')">Days to Due ↕</th>
+                  <th onclick="openSort('overdue_cat')">CAT ↕</th>
+                  <th>Finding Level</th><th>Repetitive</th><th>Audit Title</th>
+                </tr></thead>
+                <tbody id="openBody"></tbody>
+              </table>
+            </div>
+            <div class="tbl-foot"><span id="openInfo">—</span><div class="pg-btns" id="openPg"></div></div>
+          </div>
+        </div>
+
+        <!-- OVERDUE -->
+        <div class="page" id="page-overdue">
+          <div class="kpi-3">
+            <div class="kpi" style="--accent:var(--orange)"><div class="kpi-lbl">CAT I · ≤ 30 ngày</div><div class="kpi-val" id="k-c1">—</div><div class="kpi-sub">Tất cả form</div></div>
+            <div class="kpi" style="--accent:#ff6b6b"><div class="kpi-lbl">CAT II · 30–60 ngày</div><div class="kpi-val" id="k-c2">—</div><div class="kpi-sub">Tất cả form</div></div>
+            <div class="kpi" style="--accent:#cc0000"><div class="kpi-lbl">CAT III · > 60 ngày</div><div class="kpi-val" id="k-c3">—</div><div class="kpi-sub">Tất cả form</div></div>
+          </div>
+          <div class="c2" style="margin-bottom:16px">
+            <div class="chart-card"><div class="chart-head"><div class="chart-title">By CAT</div></div><div class="ch-wrap" style="height:170px"><canvas id="cCat"></canvas></div></div>
+            <div class="chart-card"><div class="chart-head"><div class="chart-title">By Form Type</div></div><div class="ch-wrap" style="height:170px"><canvas id="cOvForm"></canvas></div></div>
+          </div>
+          <div class="tbl-card">
+            <div class="tbl-bar">
+              <div><div class="tbl-title">Overdue Detail — Tất cả form</div><div class="tbl-count" id="ovCnt">—</div></div>
+              <select class="sel" id="ovFormF" onchange="renderOv()"><option value="">Tất cả Form</option></select>
+              <select class="sel" id="ovCatF" onchange="renderOv()">
+                <option value="">Tất cả CAT</option>
+                <option value="CAT I">CAT I (≤30d)</option>
+                <option value="CAT II">CAT II (30-60d)</option>
+                <option value="CAT III">CAT III (>60d)</option>
+              </select>
+            </div>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr>
+                  <th onclick="ovSort('report_number')">Report No ↕</th>
+                  <th onclick="ovSort('report_title')">Form ↕</th>
+                  <th onclick="ovSort('raised_date')">Raised Date ↕</th>
+                  <th onclick="ovSort('Target_date')">Target Date ↕</th>
+                  <th onclick="ovSort('report_ageing')">Days to Due ↕</th>
+                  <th onclick="ovSort('overdue_cat')">CAT ↕</th>
+                  <th>Finding Level</th><th>Audit Title</th>
+                </tr></thead>
+                <tbody id="ovBody"></tbody>
+              </table>
+            </div>
+            <div class="tbl-foot"><span id="ovInfo">—</span><div class="pg-btns" id="ovPg"></div></div>
+          </div>
+        </div>
+
+        <!-- KPI -->
+        <div class="page" id="page-kpi">
+          <div class="c2">
+            <div class="chart-card">
+              <div class="chart-head"><div><div class="chart-title">On-time Close Rate by Month</div><div class="chart-sub">Target: 70%</div></div></div>
+              <div class="ch-wrap" style="height:210px"><canvas id="cOnM"></canvas></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-head"><div><div class="chart-title">Repetitive Rate by Month</div><div class="chart-sub">Chỉ form có field Repetitive</div></div></div>
+              <div class="ch-wrap" style="height:210px"><canvas id="cRepM"></canvas></div>
+            </div>
+          </div>
+          <div class="chart-card" style="margin-bottom:16px">
+            <div class="chart-head"><div class="chart-title">Cumulative Reports YTD</div></div>
+            <div class="ch-wrap" style="height:170px"><canvas id="cYTD"></canvas></div>
+          </div>
+          <div class="stat-grid">
+            <div class="chart-card">
+              <div class="chart-title" style="margin-bottom:10px">On-time Rate by Year</div>
+              <table class="stat-tbl"><thead><tr><th>Year</th><th>On-time</th><th>Total Closed</th><th>Rate</th></tr></thead><tbody id="tOnY"></tbody></table>
+            </div>
+            <div class="chart-card">
+              <div class="chart-title" style="margin-bottom:10px">Repetitive Rate by Year</div>
+              <table class="stat-tbl"><thead><tr><th>Year</th><th>Rep</th><th>Total</th><th>Rate</th></tr></thead><tbody id="tRepY"></tbody></table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ALL FORMS -->
+        <div class="page" id="page-allforms">
+          <div class="tbl-card">
+            <div class="tbl-bar">
+              <div><div class="tbl-title">All Forms Detail</div><div class="tbl-count" id="afCnt">—</div></div>
+              <button class="pill on" onclick="setAF('all',this)">Tất cả</button>
+              <button class="pill" onclick="setAF('Open',this)">Open</button>
+              <button class="pill" onclick="setAF('Overdue',this)">Overdue</button>
+              <button class="pill" onclick="setAF('On-time Closed',this)">On-time</button>
+              <button class="pill" onclick="setAF('Lately Closed',this)">Lately</button>
+              <button class="pill" onclick="setAF('Closed',this)">Closed</button>
+              <select class="sel" id="afFormF" onchange="renderAF()"><option value="">Tất cả Form</option></select>
+              <select class="sel" id="afYearF" onchange="renderAF()"><option value="">Tất cả năm</option></select>
+              <div class="srch-wrap"><span class="srch-icon">🔍</span>
+                <input class="srch" id="afSrch" placeholder="Tìm kiếm..." oninput="renderAF()">
+              </div>
+            </div>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr>
+                  <th onclick="afSort('report_number')">Report No ↕</th>
+                  <th onclick="afSort('report_title')">Form ↕</th>
+                  <th onclick="afSort('semantic_status')">Status ↕</th>
+                  <th onclick="afSort('raised_date')">Raised Date ↕</th>
+                  <th onclick="afSort('Target_date')">Target Date ↕</th>
+                  <th onclick="afSort('report_ageing')">Days to Due ↕</th>
+                  <th onclick="afSort('overdue_cat')">CAT ↕</th>
+                  <th>Finding Level</th>
+                  <th>Repetitive</th>
+                  <th>Audit Ref</th>
+                  <th>MNT No</th>
+                  <th>Audit Title</th>
+                </tr></thead>
+                <tbody id="afBody"></tbody>
+              </table>
+            </div>
+            <div class="tbl-foot"><span id="afInfo">—</span><div class="pg-btns" id="afPg"></div></div>
+          </div>
+        </div>
+
+
+        <!-- PAVOI DETAIL -->
+        <div class="page" id="page-pavoi">
+          <div class="tbl-card">
+            <div class="tbl-bar">
+              <div><div class="tbl-title">PAVOI Detail</div><div class="tbl-count" id="pavoiCnt">—</div></div>
+              <button class="pill on" onclick="setPAV('all',this)">Tất cả</button>
+              <button class="pill" onclick="setPAV('Open',this)">Open</button>
+              <button class="pill" onclick="setPAV('Overdue',this)">Overdue</button>
+              <button class="pill" onclick="setPAV('On-time Closed',this)">On-time</button>
+              <button class="pill" onclick="setPAV('Lately Closed',this)">Lately</button>
+              <select class="sel" id="pavoiYearF" onchange="renderPavoi()"><option value="">Tất cả năm</option></select>
+              <div class="srch-wrap"><span class="srch-icon">🔍</span>
+                <input class="srch" id="pavoiSrch" placeholder="Tìm kiếm..." oninput="renderPavoi()">
+              </div>
+            </div>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr>
+                  <th onclick="pavSort('report_number')">Report No ↕</th>
+                  <th onclick="pavSort('semantic_status')">Status ↕</th>
+                  <th onclick="pavSort('raised_date')">Raised Date ↕</th>
+                  <th onclick="pavSort('Target_date')">Target Date ↕</th>
+                  <th onclick="pavSort('report_ageing')">Days to Due ↕</th>
+                  <th>Report Ref</th>
+                  <th>Request For Verification</th>
+                  <th>Verification Result</th>
+                  <th>Department</th>
+                  <th>Audit Ref (MNT)</th>
+                  <th>Audit Title</th>
+                </tr></thead>
+                <tbody id="pavoiBody"></tbody>
+              </table>
+            </div>
+            <div class="tbl-foot"><span id="pavoiInfo">—</span><div class="pg-btns" id="pavoiPg"></div></div>
+          </div>
+        </div>
+
+        <!-- AUDIT PLAN -->
+        <div class="page" id="page-auditplan">
+          <div class="kpi-grid" id="auditKPIs">
+            <div class="kpi" style="--accent:var(--blue)"><div class="kpi-lbl">Total Audits</div><div class="kpi-val" id="ak-total">—</div><div class="kpi-sub">QA AMO</div></div>
+            <div class="kpi" style="--accent:#BC8CFF"><div class="kpi-lbl">Internal Audit</div><div class="kpi-val" id="ak-internal">—</div><div class="kpi-sub">MNT Internal</div></div>
+            <div class="kpi" style="--accent:var(--blue)"><div class="kpi-lbl">Inspection</div><div class="kpi-val" id="ak-inspection">—</div><div class="kpi-sub">Surveillance/Spot check</div></div>
+            <div class="kpi" style="--accent:var(--green)"><div class="kpi-lbl">Closed</div><div class="kpi-val" id="ak-closed">—</div><div class="kpi-sub">Đã đóng</div></div>
+            <div class="kpi" style="--accent:var(--orange)"><div class="kpi-lbl">In Progress</div><div class="kpi-val" id="ak-open">—</div><div class="kpi-sub">Đang thực hiện</div></div>
+            <div class="kpi" style="--accent:var(--yellow)"><div class="kpi-lbl">Scheduled</div><div class="kpi-val" id="ak-sched">—</div><div class="kpi-sub">Chưa thực hiện</div></div>
+          </div>
+          <div class="tbl-card">
+            <div class="tbl-bar">
+              <div><div class="tbl-title">Audit Plan — QA AMO</div><div class="tbl-count" id="auditCnt">—</div></div>
+              <button class="pill on" onclick="setAuditF('all','status',this)">Tất cả</button>
+              <button class="pill" onclick="setAuditF('Internal Audit','type',this)">📋 Internal Audit</button>
+              <button class="pill" onclick="setAuditF('Inspection','type',this)">🔍 Inspection</button>
+              <button class="pill" onclick="setAuditF('Closed','status',this)">Closed</button>
+              <button class="pill" onclick="setAuditF('Performed','status',this)">Performed</button>
+              <button class="pill" onclick="setAuditF('Scheduled','status',this)">Scheduled</button>
+              <button class="pill" onclick="setAuditF('InProgress','status',this)">In Progress</button>
+              <select class="sel" id="auditYearF" onchange="renderAudit()"><option value="">Tất cả năm</option></select>
+              <div class="srch-wrap"><span class="srch-icon">🔍</span>
+                <input class="srch" id="auditSrch" placeholder="Tìm kiếm..." oninput="renderAudit()">
+              </div>
+            </div>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr>
+                  <th onclick="auditSort('number')">MNT No ↕</th>
+                  <th onclick="auditSort('title')">Audit Title ↕</th>
+                  <th onclick="auditSort('audit_type')">Type ↕</th>
+                  <th onclick="auditSort('status')">Status ↕</th>
+                  <th onclick="auditSort('scheduled_start_date')">Scheduled ↕</th>
+                  <th>Lead Auditor</th>
+                  <th>Scope</th>
+                  <th onclick="auditSort('finding_count')">Findings ↕</th>
+                  <th>Open</th>
+                  <th>Overdue</th>
+                </tr></thead>
+                <tbody id="auditBody"></tbody>
+              </table>
+            </div>
+            <div class="tbl-foot"><span id="auditInfo">—</span><div class="pg-btns" id="auditPg"></div></div>
+          </div>
+        </div>
+
+        <!-- ADMIN -->
+        <div class="page" id="page-admin">
+          <div class="tbl-card">
+            <div class="tbl-bar">
+              <div><div class="tbl-title">Quản lý Users</div><div class="tbl-count" id="userCnt">—</div></div>
+              <button class="pill on" onclick="setUF('all',this)">Tất cả</button>
+              <button class="pill" onclick="setUF('pending',this)">⏳ Pending</button>
+              <button class="pill" onclick="setUF('approved',this)">✅ Approved</button>
+              <button class="pill" onclick="setUF('rejected',this)">❌ Rejected</button>
+              <button class="btn-sm" onclick="loadUsers()" style="margin-left:auto">↻ Refresh</button>
+            </div>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr><th>Họ tên</th><th>Email</th><th>Role</th><th>Ngày đăng ký</th><th>Approved by</th><th>Actions</th></tr></thead>
+                <tbody id="userBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="ov-box">
+    <div class="spinner"></div>
+    <div class="ov-text" id="ovText">Đang tải...</div>
+    <div class="ov-detail" id="ovDetail"></div>
+  </div>
+</div>
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────
+const SUPA_URL  = 'https://czftzgdcnpnspbbegwjt.supabase.co';
+const SUPA_KEY  = 'sb_publishable_eGdEXBCSD_19tu4sOV8NWQ_8mZmUqqq';
+const G_URL     = 'https://galileo-proxy.thaibahoa2308.workers.dev/proxy/';
+const G_KEY     = 'ZTIyZWM0MzMtMGNkMC00YzgyLTgwMDgtZDk5YTU5ZTIzMTY5';
+const ORG_UNIT  = 'QA AMO';
+// Danh sách auditor QA AMO — dùng để filter audit plan
+// Thêm tên mới vào đây khi có auditor mới
+const QA_AMO_AUDITORS = new Set([
+  'Thai Ba Hoa',
+  'Le Hong Chuong',
+  'Dao Trieu Phu',
+  'Nguyen Van Quyet',
+  'Vo Vinh Hien',
+  'Phu Le Huynh Thuan',
+  'Nguyen Nguyen Duc Thanh',
+  'Nguyen Hung Son',
+  'Tong The Ngoc',
+  'Tống Thế Ngọc',
+  'Nguyen Thanh Tan',
+  'Le Lam Binh',
+  'Lê Lâm Bình',
+  'Tran Viet Hoang',
+  'Kien Tran Duc',
+  'Nhan Vo Trong',
+  'Nguyen Huu Tho',
+  'Nguyen Quoc Huy (QC Inspector)',
+  'Nguyen Thanh Dong',
+  'Do Viet Anh',
+  'Tran Ngoc Son',
+]);
+
+const { createClient } = supabase;
+const sb = createClient(SUPA_URL, SUPA_KEY);
+
+// ── STATE ────────────────────────────────────────────────────
+let curUser = null, allData = [], auditData = [], charts = {}, userFilter = 'all';
+const PS = 25; // page size
+
+// Table states — mỗi table có state riêng
+const TS = {
+  open:   { page:1, sort:'report_ageing', asc:true, sf:'all', ff:'', yr:'', srch:'' },
+  ov:     { page:1, sort:'report_ageing', asc:true, ff:'', cat:'' },
+  af:     { page:1, sort:'report_ageing', asc:true, sf:'all', ff:'', yr:'', srch:'' },
+  pavoi:  { page:1, sort:'report_ageing', asc:true, sf:'all', yr:'', srch:'' },
+  audit:  { page:1, sort:'scheduled_start_date', asc:false, sf:'all', typeF:'all', yr:'', srch:'' },
+};
+
+// ── AUTH ─────────────────────────────────────────────────────
+function switchAuth(tab) {
+  const login = tab==='login';
+  g('loginForm').style.display    = login?'':'none';
+  g('registerForm').style.display = login?'none':'';
+  g('pendingBox').style.display   = 'none';
+  document.querySelectorAll('.auth-tab').forEach((t,i)=>t.classList.toggle('active',(i===0)===login));
+}
+
+async function doLogin() {
+  const email=g('lEmail').value.trim().toLowerCase(), pass=g('lPass').value;
+  const al=g('loginAlert'); showAl(al,'',''); g('btnLogin').disabled=true;
+  try {
+    const {data,error} = await sb.from('users').select('*').eq('email',email).single();
+    if(error||!data){showAl(al,'error','Email không tồn tại.');return;}
+    if(data.password!==pass){showAl(al,'error','Mật khẩu không đúng.');return;}
+    if(data.role==='pending'){g('loginForm').style.display='none';g('authTabs').style.display='none';g('pendingBox').style.display='';return;}
+    if(data.role==='rejected'){showAl(al,'error','Tài khoản đã bị từ chối.');return;}
+    curUser=data; sessionStorage.setItem('qaUser',JSON.stringify(data)); initApp();
+  } catch(e){showAl(al,'error','Lỗi: '+e.message);}
+  finally{g('btnLogin').disabled=false;}
+}
+
+async function doRegister() {
+  const name=g('rName').value.trim(), email=g('rEmail').value.trim().toLowerCase();
+  const pass=g('rPass').value, pass2=g('rPass2').value;
+  const al=g('registerAlert');
+  if(!name||!email||!pass){showAl(al,'error','Vui lòng điền đầy đủ.');return;}
+  if(pass.length<8){showAl(al,'error','Mật khẩu tối thiểu 8 ký tự.');return;}
+  if(pass!==pass2){showAl(al,'error','Mật khẩu không khớp.');return;}
+  g('btnRegister').disabled=true; showAl(al,'info','Đang gửi...');
+  try {
+    const {data:ex}=await sb.from('users').select('id').eq('email',email).single();
+    if(ex){showAl(al,'error','Email đã được đăng ký.');return;}
+    const {error}=await sb.from('users').insert({email,password:pass,full_name:name,role:'pending'});
+    if(error)throw error;
+    showAl(al,'success','✓ Đăng ký thành công! Chờ Admin phê duyệt.');
+    g('rName').value=g('rEmail').value=g('rPass').value=g('rPass2').value='';
+    setTimeout(()=>{g('registerForm').style.display='none';g('authTabs').style.display='none';g('pendingBox').style.display='';},2000);
+  } catch(e){showAl(al,'error','Lỗi: '+e.message);}
+  finally{g('btnRegister').disabled=false;}
+}
+
+function doLogout() {
+  sessionStorage.removeItem('qaUser'); curUser=null; allData=[];
+  g('authWrap').style.display='flex'; g('app').style.display='none';
+  g('loginForm').style.display=''; g('registerForm').style.display='none';
+  g('pendingBox').style.display=''; g('authTabs').style.display='';
+  switchAuth('login'); g('lEmail').value=g('lPass').value=''; showAl(g('loginAlert'),'','');
+  g('pendingBox').style.display='none';
+}
+
+function initApp() {
+  g('authWrap').style.display='none'; g('app').style.display='block';
+  g('sideAvatar').textContent=curUser.full_name[0].toUpperCase();
+  g('sideName').textContent=curUser.full_name;
+  g('sideRole').textContent=curUser.role==='admin'?'🔑 Administrator':'👤 Viewer';
+  if(curUser.role==='admin') g('adminNav').style.display='';
+  loadData();
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  const s=sessionStorage.getItem('qaUser');
+  if(s){curUser=JSON.parse(s);initApp();}
+});
+
+// ── DATA LOADING ─────────────────────────────────────────────
+async function loadData() {
+  setOv(true,'Đang kết nối Galileo...','');
+  try {
+
+    // 1. SUMMARY — lấy toàn bộ QA AMO, không filter year
+    setOv(true,'[1/3] Đang tải report summary...','');
+    const sumRaw = await fetchAll(
+      G_URL + 'dwreporting_report_summary' +
+      '?$select=report_id,report_title,report_number,report_status,' +
+      'org_unit_name,raised_date,audit_title,audit_id,modified_date,valid_from,valid_to' +
+      '&$filter=org_unit_name eq \'' + ORG_UNIT + '\''
+    );
+    setOv(true,`[1/3] ${sumRaw.length} rows thô. Đang dedup...`,'');
+
+    // DEDUP đúng:
+    // - Key = report_id (mỗi report có 1 report_id duy nhất)
+    // - Giữ row có modified_date MỚI NHẤT (đây là version hiện tại)
+    // - Bỏ rows không có report_number (draft chưa được đánh số)
+    // NOTE: valid_from/valid_to không dùng được vì tất cả rows đều valid_to=null
+    const sumMap = {};
+    sumRaw.forEach(r => {
+      if (!r.report_number || !r.report_number.trim()) return;
+      const ex = sumMap[r.report_id];
+      if (!ex) { sumMap[r.report_id]=r; return; }
+      if (new Date(r.modified_date) > new Date(ex.modified_date)) {
+        sumMap[r.report_id] = r;
+      }
+    });
+    const summary = Object.values(sumMap);
+
+    // 2. WORKFLOW — ngày close thực tế, filter stage ReportAcceptReject
+    setOv(true,`[2/3] ${summary.length} reports. Đang tải workflow...`,'');
+    let wfMap = {};
+    try {
+      const wfRaw = await fetchAll(
+        G_URL + 'dwreporting_report_workflow' +
+        '?$select=report_id,stage_type,stage_status,stage_completed_date,stage_target_date' +
+        '&$filter=stage_type eq \'ReportAcceptReject\'' +
+        ' and (stage_status eq \'Completed\' or stage_status eq \'InProgress\')'
+      );
+      wfRaw.forEach(w => {
+        const ex = wfMap[w.report_id];
+        if (!ex) { wfMap[w.report_id]=w; return; }
+        // Ưu tiên stage Completed hơn InProgress
+        const wDone  = w.stage_status === "Completed";
+        const exDone = ex.stage_status === "Completed";
+        if (wDone && !exDone) { wfMap[w.report_id]=w; return; }
+        if (!wDone && exDone) { return; }
+        // Cùng status -> lấy completed_date mới nhất
+        if (new Date(w.stage_completed_date||0) > new Date(ex.stage_completed_date||0))
+          wfMap[w.report_id]=w;
+      });
+    } catch(e) { console.warn('Workflow load error:',e); }
+
+    // 3. CUSTOM FIELDS — Target date, Finding level, Repetitive, v.v.
+    setOv(true,'[3/3] Đang tải custom fields...','');
+    let fMap = {};
+    try {
+      const fRaw = await fetchAll(
+        G_URL + 'dwanalytics_report_form_section_field' +
+        '?$select=report_id,field_name,text_value' +
+        '&$filter=' + encodeURIComponent(
+          "field_name eq 'Target date' or field_name eq 'Issue Date' or " +
+          "field_name eq 'Finding level' or field_name eq 'Repetitive' or " +
+          "field_name eq 'First extension agreed date' or " +
+          "field_name eq 'Second extension agreed date' or field_name eq 'Audit Ref. No' or " +
+          "field_name eq 'Request For Verification' or field_name eq 'Report Reference' or " +
+          "field_name eq 'Verification Result' or field_name eq 'Department'"
+        )
+      );
+      fRaw.forEach(f => {
+        if (!fMap[f.report_id]) fMap[f.report_id]={};
+        // Giữ giá trị đầu tiên (không ghi đè) để tránh duplicate field
+        if (!fMap[f.report_id][f.field_name])
+          fMap[f.report_id][f.field_name] = f.text_value;
+      });
+    } catch(e) { console.warn('Fields load error:',e); }
+
+    // BUILD FINAL DATASET
+    setOv(true,'Đang xử lý data...','');
+    allData = summary.map(r => {
+      const f  = fMap[r.report_id] || {};
+      const wf = wfMap[r.report_id] || null;
+
+      // Target date: ưu tiên custom field, fallback workflow target
+      const td = f['Target date'] || wf?.stage_target_date || null;
+      // Close date: từ workflow stage_completed_date
+      const cd = wf?.stage_completed_date || null;
+
+      const ag = ageCalc(td);
+      const sm = semCalc(r.report_status, cd, td);
+
+      return {
+        ...r,
+        Target_date:   td,
+        close_date:    cd,
+        issue_date:    f['Issue Date']                || null,
+        finding_level: f['Finding level']             || null,
+        repetitive:    f['Repetitive']                || null,
+        ext1_date:     f['First extension agreed date']  || null,
+        ext2_date:     f['Second extension agreed date'] || null,
+        audit_ref:     f['Audit Ref. No']             || null,
+        // PAVOI-specific fields
+        rfv:           f['Request For Verification']  || null,
+        report_ref:    f['Report Reference']          || null,
+        verif_result:  f['Verification Result']       || null,
+        dept:          f['Department']                || null,
+        semantic_status: sm,
+        report_ageing:   ag,
+        overdue_cat:     catCalc(ag, sm),
+        raised_ym:       r.raised_date?.substring(0,7) || null,
+        raised_year:     r.raised_date ? new Date(r.raised_date).getFullYear() : null,
+        is_rep:          (f['Repetitive']||'').toLowerCase()==='yes',
+        audit_number:    null, // populated after audit load
+      };
+    });
+
+    // 4. LOAD AUDIT SUMMARY — lấy audit_id từ allData rồi fetch audit info
+    setOv(true,'[4/4] Đang tải audit plan...','');
+    try {
+      // Lấy danh sách audit_id có trong QA AMO reports
+      const auditIdSet = new Set(allData.map(r=>r.audit_id).filter(Boolean));
+
+      // Load TẤT CẢ audit — không filter, chỉ 86 records
+      const auRaw = await fetchAll(
+        G_URL + 'dwreporting_audit_summary' +
+        '?$select=audit_id,number,title,audit_type,status,scheduled_start_date,' +
+        'actual_start_date,closed_date,lead_auditor_name,primary_scope_item_name'
+      );
+
+      // Dedup audit by audit_id — giữ bản đầu tiên (audit không có versioning)
+      const auMap = {};
+      auRaw.forEach(a => {
+        if (!auMap[a.audit_id]) auMap[a.audit_id] = a;
+      });
+
+      // Giữ audit liên quan QA AMO:
+      // 1. Audit đã có report từ QA AMO (auditIdSet)
+      // 2. Audit type = Internal Audit hoặc Inspection
+      //    VÀ có lead auditor là người QA AMO
+      // → Load hết rồi filter: chỉ lấy Internal Audit + Inspection
+      //   (các loại khác như CMR, MPS không liên quan QA AMO)
+      // Chỉ lấy 2 loại: Internal Audit và Inspection
+      const RELEVANT_TYPES = new Set(['Internal Audit', 'Inspection']);
+
+      const allAudits = Object.values(auMap).filter(a =>
+        auditIdSet.has(a.audit_id) ||    // có report QA AMO
+        (                                // hoặc là audit của QA AMO auditor
+          RELEVANT_TYPES.has(a.audit_type) &&
+          QA_AMO_AUDITORS.has(a.lead_auditor_name)
+        )
+      );
+
+      // Enrich audit với finding counts từ allData
+      auditData = allAudits.map(a => {
+        const findings = allData.filter(r => r.audit_id === a.audit_id);
+        const open     = findings.filter(r => r.semantic_status === 'Open').length;
+        const overdue  = findings.filter(r => r.semantic_status === 'Overdue').length;
+        const closed   = findings.filter(r => ['On-time Closed','Lately Closed','Closed'].includes(r.semantic_status)).length;
+        return {
+          ...a,
+          finding_count: findings.length,
+          open_count:    open,
+          overdue_count: overdue,
+          closed_count:  closed,
+          sched_year:    a.scheduled_start_date ? new Date(a.scheduled_start_date).getFullYear() : null,
+          sched_ym:      a.scheduled_start_date ? a.scheduled_start_date.substring(0,7) : null,
+        };
+      });
+
+      // Also update allData with audit number
+      const auNumMap = {};
+      auditData.forEach(a => { auNumMap[a.audit_id] = a.number; });
+      allData = allData.map(r => ({
+        ...r,
+        audit_number: auNumMap[r.audit_id] || null,
+      }));
+
+    } catch(e) { console.warn('Audit load error:', e); }
+
+    renderAll();
+    g('liveBadge').style.display='';
+    g('recCount').textContent=allData.length;
+    toast(`✓ Đã load ${allData.length} reports, ${auditData.length} audits từ QA AMO`,'ok');
+
+  } catch(e) {
+    toast('Lỗi load data: '+e.message,'err');
+    console.error(e);
+  } finally { setOv(false); }
+}
+
+async function fetchAll(url) {
+  let res=[],next=url,p=0;
+  while(next) {
+    p++;
+    setOv(true,g('ovText').textContent,`Trang ${p} · ${res.length} records`);
+    const r=await fetch(next,{headers:{'X-IdeagenDataAPIKey':G_KEY}});
+    if(!r.ok) throw new Error('HTTP '+r.status+' '+r.statusText);
+    const j=await r.json();
+    res=res.concat(j.value||[]);
+    next=j['@odata.nextLink']||null;
+    if(p>200) break; // safety cap
+  }
+  return res;
+}
+
+// ── CALCULATIONS ─────────────────────────────────────────────
+function ageCalc(t) {
+  if(!t) return null;
+  const td=new Date(t), now=new Date(); now.setHours(0,0,0,0);
+  return Math.floor((td-now)/86400000);
+}
+
+function semCalc(status, closeDate, targetDate) {
+  const now=new Date(); now.setHours(0,0,0,0);
+  const t = targetDate ? new Date(targetDate) : null;
+  const c = closeDate  ? new Date(closeDate)  : null;
+
+  if (status==='Closed') {
+    if (!t) return 'Closed';           // Không có target → chỉ biết Closed
+    if (!c) return 'Closed';           // Không có close date → không tính được
+    return c<=t ? 'On-time Closed' : 'Lately Closed';
+  }
+
+  if (status==='Open' || status==='Submitted') {
+    if (!c) {
+      // Chưa đóng — tính theo target date
+      if (!t) return 'Open';           // Không có target → Open
+      return now<=t ? 'Open' : 'Overdue';
+    }
+    // Có close date — report đã được đóng dù status vẫn là Open
+    if (!t) return 'Closed';           // Có close nhưng không có target → Closed
+    return c<=t ? 'On-time Closed' : 'Lately Closed';
+  }
+
+  return status; // New, Draft...
+}
+
+function catCalc(ag, sm) {
+  if (sm!=='Overdue') return null;
+  if (ag>=-30) return 'CAT I';
+  if (ag>=-60) return 'CAT II';
+  return 'CAT III';
+}
+
+// ── RENDER ALL ────────────────────────────────────────────────
+function renderAll() {
+  populateFilters();
+  renderKPIs();
+  buildCharts();
+  renderStatTbls();
+  renderOpen();
+  renderOv();
+  renderAF();
+  renderPavoi();
+  renderAudit();
+  buildKPICharts();
+}
+
+// ── POPULATE FILTERS ─────────────────────────────────────────
+function populateFilters() {
+  const forms=[...new Set(allData.map(r=>r.report_title).filter(Boolean))].sort();
+  const fOpts='<option value="">Tất cả Form</option>'+forms.map(f=>`<option>${f}</option>`).join('');
+  ['openFormF','ovFormF','afFormF'].forEach(id=>{const el=g(id);if(el)el.innerHTML=fOpts;});
+
+  const years=[...new Set(allData.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
+  const yOpts='<option value="">Tất cả năm</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  ['openYearF','afYearF','pavoiYearF'].forEach(id=>{const el=g(id);if(el)el.innerHTML=yOpts;});
+
+  // Audit year filter from audit data
+  const auYears=[...new Set(auditData.map(a=>a.sched_year).filter(Boolean))].sort((a,b)=>b-a);
+  const auYOpts='<option value="">Tất cả năm</option>'+auYears.map(y=>`<option value="${y}">${y}</option>`).join('');
+  const auYEl=g('auditYearF'); if(auYEl) auYEl.innerHTML=auYOpts;
+
+  // Month chart year options
+  const el=g('monthYr');
+  if(el) el.innerHTML='<option value="all">Tất cả năm</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+}
+
+// ── KPIs ─────────────────────────────────────────────────────
+function renderKPIs() {
+  const d=allData;
+  const tot  = d.length;
+  const open = d.filter(r=>r.semantic_status==='Open').length;
+  const ov   = d.filter(r=>r.semantic_status==='Overdue').length;
+  const on   = d.filter(r=>r.semantic_status==='On-time Closed').length;
+  const late = d.filter(r=>r.semantic_status==='Lately Closed').length;
+  const cls  = d.filter(r=>r.semantic_status==='Closed').length;
+  // On-time rate chỉ tính trên form có Target date (CAR, MCAR, PAVOI...)
+  const totalWithTgt = on + late;
+  const c1 = d.filter(r=>r.overdue_cat==='CAT I').length;
+  const c2 = d.filter(r=>r.overdue_cat==='CAT II').length;
+  const c3 = d.filter(r=>r.overdue_cat==='CAT III').length;
+
+  s('k-total',tot); s('k-open',open);
+  s('k-over',ov);
+  s('k-over-r', pct(ov/(open+ov||1))+' của Open+Overdue');
+  s('k-on',on);
+  s('k-on-r','On-time: '+pct(on/(totalWithTgt||1))+' (form có target)');
+  s('k-late',late);
+  s('k-cls',cls);
+  s('k-c1',c1); s('k-c2',c2); s('k-c3',c3);
+}
+
+// ── STAT TABLES ───────────────────────────────────────────────
+function renderStatTbls() {
+  const CLOSED_S = ['On-time Closed','Lately Closed','Closed'];
+  const total = allData.length;
+
+  // Sort forms by total count desc
+  const formCounts = {};
+  allData.forEach(r=>{ if(r.report_title) formCounts[r.report_title]=(formCounts[r.report_title]||0)+1; });
+  const forms = Object.keys(formCounts).sort((a,b)=>formCounts[b]-formCounts[a]);
+
+  g('statForm').innerHTML = forms.map(f=>{
+    const rows = allData.filter(r=>r.report_title===f);
+    const op = rows.filter(r=>r.semantic_status==='Open').length;
+    const ov = rows.filter(r=>r.semantic_status==='Overdue').length;
+    const cl = rows.filter(r=>CLOSED_S.includes(r.semantic_status)).length;
+    const pctTot = Math.round(rows.length/total*100);
+    return `<tr>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${f}</td>
+      <td style="text-align:center;color:var(--blue)">${op||'—'}</td>
+      <td style="text-align:center;color:#ff6b6b">${ov||'—'}</td>
+      <td style="text-align:center;color:var(--green)">${cl}</td>
+      <td style="text-align:center"><b>${rows.length}</b></td>
+      <td style="text-align:center;color:var(--muted)">${pctTot}%</td>
+    </tr>`;
+  }).join('');
+
+  const fc = g('statFormCount');
+  if(fc) fc.textContent = forms.length + ' loại form';
+
+  // Metrics
+  const ontime  = allData.filter(r=>r.semantic_status==='On-time Closed').length;
+  const lately  = allData.filter(r=>r.semantic_status==='Lately Closed').length;
+  const ov2     = allData.filter(r=>r.semantic_status==='Overdue').length;
+  const openCnt = allData.filter(r=>r.semantic_status==='Open').length;
+  const withTgt = ontime + lately;
+  const cat3    = allData.filter(r=>r.overdue_cat==='CAT III').length;
+  const rep     = allData.filter(r=>r.is_rep).length;
+
+  s('mc-open-ov',   openCnt + ov2);
+  s('mc-open-ov-r', pct((openCnt+ov2)/total) + ' của tổng');
+  s('mc-ontime-r',  pct(ontime/(withTgt||1)));
+  s('mc-ontime-v',  ontime + ' / ' + withTgt + ' form có target');
+  s('mc-cat3',      cat3);
+  s('mc-rep',       rep);
+  s('mc-rep-r',     pct(rep/total) + ' tỷ lệ lặp');
+
+  g('statMeta').innerHTML='';
+}
+
+// ── CHARTS ────────────────────────────────────────────────────
+const CO={responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{labels:{color:'#8B949E',font:{size:10},boxWidth:10}}},
+  scales:{x:{ticks:{color:'#8B949E',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},
+          y:{ticks:{color:'#8B949E',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}}}};
+function dc(id){if(charts[id]){charts[id].destroy();delete charts[id]}}
+
+function buildCharts() {
+  // Status donut
+  dc('cStatus');
+  const SC_COLOR={'Open':'#58A6FF','Overdue':'#ff6b6b','On-time Closed':'#3FB950','Lately Closed':'#D29922','Closed':'#6E7681'};
+  const VALID_STATUS=new Set(['Open','Overdue','On-time Closed','Lately Closed','Closed']);
+  const sc={};
+  allData.filter(r=>VALID_STATUS.has(r.semantic_status)).forEach(r=>{sc[r.semantic_status]=(sc[r.semantic_status]||0)+1});
+  charts['cStatus']=new Chart(g('cStatus'),{type:'doughnut',
+    data:{labels:Object.keys(sc),datasets:[{data:Object.values(sc),backgroundColor:Object.keys(sc).map(k=>SC_COLOR[k]||'#555'),borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#8B949E',font:{size:10},boxWidth:8}}}}});
+
+  buildFormChart();
+  buildMonthChart();
+
+  // Overdue CAT donut
+  dc('cCat');
+  const cats={'CAT I':0,'CAT II':0,'CAT III':0};
+  allData.filter(r=>r.semantic_status==='Overdue').forEach(r=>{if(r.overdue_cat)cats[r.overdue_cat]++});
+  charts['cCat']=new Chart(g('cCat'),{type:'doughnut',
+    data:{labels:Object.keys(cats),datasets:[{data:Object.values(cats),backgroundColor:['#F0883E','#ff6b6b','#cc0000'],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#8B949E',font:{size:10},boxWidth:8}}}}});
+
+  // Overdue by form
+  dc('cOvForm');
+  const of={};
+  allData.filter(r=>r.semantic_status==='Overdue').forEach(r=>{const f=r.report_title||'?';of[f]=(of[f]||0)+1});
+  const sof=Object.entries(of).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  charts['cOvForm']=new Chart(g('cOvForm'),{type:'bar',
+    data:{labels:sof.map(f=>f[0]),datasets:[{data:sof.map(f=>f[1]),backgroundColor:'#ff6b6b',borderRadius:4}]},
+    options:{...CO,indexAxis:'y',plugins:{legend:{display:false}}}});
+}
+
+function buildFormChart() {
+  dc('cForm');
+  const filter=g('chartFormFilter')?.value||'all';
+  const src = filter==='all' ? allData : allData.filter(r=>r.semantic_status===filter);
+  const fc={};
+  src.forEach(r=>{const f=r.report_title||'?';fc[f]=(fc[f]||0)+1});
+  const sf=Object.entries(fc).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const colors={all:'#E30613',Open:'#58A6FF',Overdue:'#ff6b6b'};
+  charts['cForm']=new Chart(g('cForm'),{type:'bar',
+    data:{labels:sf.map(f=>f[0]),datasets:[{data:sf.map(f=>f[1]),backgroundColor:colors[filter]||'#E30613',borderRadius:4}]},
+    options:{
+      ...CO,
+      indexAxis:'y',
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          callbacks:{
+            label: ctx => ' ' + ctx.raw + ' reports'
+          }
+        }
+      },
+      scales:{
+        x:{ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{ticks:{
+          color:'#E6EDF3',
+          font:{size:11},
+          maxRotation:0,
+          callback: function(val, idx) {
+            const lbl = this.getLabelForValue(val);
+            return lbl.length > 22 ? lbl.substring(0,20)+'…' : lbl;
+          }
+        },grid:{color:'rgba(255,255,255,0.04)'}}
+      }
+    }});
+}
+
+function buildMonthChart() {
+  dc('cMonth');
+  const yr=g('monthYr')?.value||'all';
+  const src=yr==='all'?allData:allData.filter(r=>String(r.raised_year)===yr);
+  const m={};
+  src.forEach(r=>{
+    if(!r.raised_ym)return;
+    if(!m[r.raised_ym])m[r.raised_ym]={o:0,c:0,ov:0};
+    if(r.semantic_status==='Open')m[r.raised_ym].o++;
+    else if(r.semantic_status==='Overdue')m[r.raised_ym].ov++;
+    else m[r.raised_ym].c++;
+  });
+  const keys=Object.keys(m).sort();
+  charts['cMonth']=new Chart(g('cMonth'),{type:'bar',
+    data:{labels:keys,datasets:[
+      {label:'Closed',data:keys.map(k=>m[k].c),backgroundColor:'#3FB950',borderRadius:3,stack:'s'},
+      {label:'Open',  data:keys.map(k=>m[k].o),backgroundColor:'#58A6FF',borderRadius:3,stack:'s'},
+      {label:'Overdue',data:keys.map(k=>m[k].ov),backgroundColor:'#ff6b6b',borderRadius:3,stack:'s'}]},
+    options:{...CO,scales:{
+      x:{stacked:true,ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
+      y:{stacked:true,ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}}}}});
+}
+
+function buildKPICharts() {
+  // On-time rate chỉ tính form có Target date (On-time Closed + Lately Closed)
+  // Không tính Closed (form không có target)
+  const CLOSED_S=['On-time Closed','Lately Closed'];
+  const mm={},am={};
+  allData.forEach(r=>{
+    if(!r.raised_ym)return;
+    if(!mm[r.raised_ym])mm[r.raised_ym]={tot:0,on:0};
+    if(!am[r.raised_ym])am[r.raised_ym]={tot:0,rep:0};
+    // Chỉ đếm vào on-time calc nếu có target date
+    if(CLOSED_S.includes(r.semantic_status)){
+      mm[r.raised_ym].tot++;
+      if(r.semantic_status==='On-time Closed')mm[r.raised_ym].on++;
+    }
+    am[r.raised_ym].tot++;
+    if(r.is_rep)am[r.raised_ym].rep++;
+  });
+  const keys=Object.keys(mm).sort();
+
+  dc('cOnM');
+  charts['cOnM']=new Chart(g('cOnM'),{type:'line',
+    data:{labels:keys,datasets:[
+      {label:'On-time %',data:keys.map(k=>mm[k].tot>0?Math.round(mm[k].on/mm[k].tot*100):null),borderColor:'#3FB950',backgroundColor:'rgba(63,185,80,0.1)',tension:.4,fill:true,pointRadius:4,spanGaps:true},
+      {label:'Target 70%',data:keys.map(()=>70),borderColor:'rgba(255,255,255,0.15)',borderDash:[5,5],pointRadius:0,borderWidth:1}]},
+    options:{...CO,scales:{
+      x:{ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
+      y:{min:0,max:100,ticks:{color:'#8B949E',font:{size:10},callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.04)'}}}}});
+
+  dc('cRepM');
+  charts['cRepM']=new Chart(g('cRepM'),{type:'line',
+    data:{labels:keys,datasets:[{label:'Repetitive %',data:keys.map(k=>am[k]?.tot>0?Math.round(am[k].rep/am[k].tot*100):null),borderColor:'#D29922',backgroundColor:'rgba(210,153,34,0.1)',tension:.4,fill:true,pointRadius:4,spanGaps:true}]},
+    options:{...CO,plugins:{legend:{display:false}},scales:{
+      x:{ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
+      y:{min:0,ticks:{color:'#8B949E',font:{size:10},callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.04)'}}}}});
+
+  dc('cYTD');
+  let cum=0;
+  const ytd=keys.map(k=>{cum+=allData.filter(r=>r.raised_ym===k).length;return cum});
+  charts['cYTD']=new Chart(g('cYTD'),{type:'line',
+    data:{labels:keys,datasets:[{label:'Cumulative',data:ytd,borderColor:'#58A6FF',backgroundColor:'rgba(88,166,255,0.08)',tension:.3,fill:true,pointRadius:3}]},
+    options:{...CO,plugins:{legend:{display:false}}}});
+
+  const years=[...new Set(allData.map(r=>r.raised_year).filter(Boolean))].sort();
+  g('tOnY').innerHTML=years.map(y=>{
+    const rows=allData.filter(r=>r.raised_year===y);
+    const cl=rows.filter(r=>CLOSED_S.includes(r.semantic_status)).length;
+    const on=rows.filter(r=>r.semantic_status==='On-time Closed').length;
+    return`<tr><td>${y}</td><td style="color:var(--green)">${on}</td><td>${cl}</td><td><b>${pct(on/(cl||1))}</b></td></tr>`;
+  }).join('');
+  g('tRepY').innerHTML=years.map(y=>{
+    const rows=allData.filter(r=>r.raised_year===y);
+    const rep=rows.filter(r=>r.is_rep).length;
+    return`<tr><td>${y}</td><td style="color:var(--yellow)">${rep}</td><td>${rows.length}</td><td><b>${pct(rep/(rows.length||1))}</b></td></tr>`;
+  }).join('');
+}
+
+// ── TABLE: OPEN RFI ──────────────────────────────────────────
+// Chỉ hiển thị Open + Overdue (đang xử lý)
+function setOpenF(sf,btn){
+  TS.open.sf=sf; TS.open.page=1;
+  document.querySelectorAll('#page-openrfi .pill').forEach(p=>p.classList.remove('on'));
+  btn.classList.add('on'); renderOpen();
+}
+function openSort(col){TS.open.asc=TS.open.sort===col?!TS.open.asc:true;TS.open.sort=col;TS.open.page=1;renderOpen();}
+
+function renderOpen() {
+  const ff=g('openFormF')?.value||'', yr=g('openYearF')?.value||'';
+  const srch=(g('openSrch')?.value||'').toLowerCase();
+  const ts=TS.open;
+
+  let data=allData.filter(r=>{
+    // Open RFI chỉ hiển thị Open + Overdue
+    const isOpen=['Open','Overdue'].includes(r.semantic_status);
+    if(!isOpen) return false;
+    if(ts.sf!=='all' && r.semantic_status!==ts.sf) return false;
+    if(ff && r.report_title!==ff) return false;
+    if(yr && String(r.raised_year)!==yr) return false;
+    if(srch){
+      const t=[r.report_number,r.report_title,r.audit_title,r.semantic_status,r.finding_level].join(' ').toLowerCase();
+      if(!t.includes(srch))return false;
+    }
+    return true;
+  });
+
+  data=sortD(data,ts.sort,ts.asc);
+  renderPaged('openBody','openInfo','openPg','openCnt',data,ts,r=>`
+    <tr>
+      <td><b>${r.report_number||'—'}</b></td>
+      <td><span style="font-size:11px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">${r.report_title||'—'}</span></td>
+      <td>${sBadge(r.semantic_status)}</td>
+      <td style="font-size:11px;color:var(--muted)">${fd(r.raised_date)}</td>
+      <td>${fd(r.Target_date)}</td>
+      <td>${ageDis(r.report_ageing,r.semantic_status)}</td>
+      <td>${cBadge(r.overdue_cat)}</td>
+      <td>${r.finding_level||'—'}</td>
+      <td>${r.is_rep?'<span style="color:var(--yellow)">⚠ Yes</span>':'—'}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)">${r.audit_title||'—'}</td>
+    </tr>`);
+}
+
+// ── TABLE: OVERDUE ────────────────────────────────────────────
+function ovSort(col){TS.ov.asc=TS.ov.sort===col?!TS.ov.asc:true;TS.ov.sort=col;TS.ov.page=1;renderOv();}
+
+function renderOv() {
+  const ff=g('ovFormF')?.value||'', cat=g('ovCatF')?.value||'';
+  const ts=TS.ov;
+
+  let data=allData.filter(r=>{
+    if(r.semantic_status!=='Overdue') return false;
+    if(ff && r.report_title!==ff) return false;
+    if(cat && r.overdue_cat!==cat) return false;
+    return true;
+  });
+
+  data=sortD(data,ts.sort,ts.asc);
+  renderPaged('ovBody','ovInfo','ovPg','ovCnt',data,ts,r=>`
+    <tr>
+      <td><b>${r.report_number||'—'}</b></td>
+      <td><span style="font-size:11px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">${r.report_title||'—'}</span></td>
+      <td style="font-size:11px;color:var(--muted)">${fd(r.raised_date)}</td>
+      <td>${fd(r.Target_date)}</td>
+      <td>${ageDis(r.report_ageing,r.semantic_status)}</td>
+      <td>${cBadge(r.overdue_cat)}</td>
+      <td>${r.finding_level||'—'}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)">${r.audit_title||'—'}</td>
+    </tr>`);
+}
+
+// ── TABLE: ALL FORMS ──────────────────────────────────────────
+function setAF(sf,btn){
+  TS.af.sf=sf;TS.af.page=1;
+  document.querySelectorAll('#page-allforms .pill').forEach(p=>p.classList.remove('on'));
+  btn.classList.add('on');renderAF();
+}
+function afSort(col){TS.af.asc=TS.af.sort===col?!TS.af.asc:true;TS.af.sort=col;TS.af.page=1;renderAF();}
+
+function renderAF() {
+  const ff=g('afFormF')?.value||'', yr=g('afYearF')?.value||'';
+  const srch=(g('afSrch')?.value||'').toLowerCase();
+  const ts=TS.af;
+
+  let data=allData.filter(r=>{
+    if(ts.sf!=='all' && r.semantic_status!==ts.sf) return false;
+    if(ff && r.report_title!==ff) return false;
+    if(yr && String(r.raised_year)!==yr) return false;
+    if(srch){
+      const t=[r.report_number,r.report_title,r.audit_title,r.semantic_status,r.finding_level,r.audit_ref].join(' ').toLowerCase();
+      if(!t.includes(srch))return false;
+    }
+    return true;
+  });
+
+  data=sortD(data,ts.sort,ts.asc);
+  renderPaged('afBody','afInfo','afPg','afCnt',data,ts,r=>`
+    <tr>
+      <td><b>${r.report_number||'—'}</b></td>
+      <td><span style="font-size:11px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">${r.report_title||'—'}</span></td>
+      <td>${sBadge(r.semantic_status)}</td>
+      <td style="font-size:11px;color:var(--muted)">${fd(r.raised_date)}</td>
+      <td>${fd(r.Target_date)}</td>
+      <td>${ageDis(r.report_ageing,r.semantic_status)}</td>
+      <td>${cBadge(r.overdue_cat)}</td>
+      <td>${r.finding_level||'—'}</td>
+      <td>${r.is_rep?'<span style="color:var(--yellow)">⚠ Yes</span>':'—'}</td>
+      <td style="font-size:11px;color:var(--muted)">${r.audit_ref||'—'}</td>
+      <td style="font-size:11px;color:var(--blue)">${r.audit_number||'—'}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)">${r.audit_title||'—'}</td>
+    </tr>`);
+}
+
+// ── PAGINATION ────────────────────────────────────────────────
+function renderPaged(bodyId,infoId,pgId,cntId,data,ts,rowFn) {
+  const total=data.length, pages=Math.max(1,Math.ceil(total/PS));
+  if(ts.page>pages)ts.page=pages;
+  const start=(ts.page-1)*PS, slice=data.slice(start,start+PS);
+  if(cntId)s(cntId,total+' records');
+  s(infoId,`${Math.min(start+1,total)}–${Math.min(start+PS,total)} / ${total}`);
+  g(bodyId).innerHTML=slice.length===0
+    ?`<tr><td colspan="20" style="text-align:center;padding:40px;color:var(--muted)">Không có data</td></tr>`
+    :slice.map(rowFn).join('');
+  const pDiv=g(pgId); if(!pDiv)return;
+  let btns=`<button class="pg-btn" onclick="goPg('${bodyId}',${ts.page-1})" ${ts.page===1?'disabled':''}>‹</button>`;
+  for(let i=1;i<=pages;i++){
+    if(i===1||i===pages||Math.abs(i-ts.page)<=1)
+      btns+=`<button class="pg-btn ${i===ts.page?'cur':''}" onclick="goPg('${bodyId}',${i})">${i}</button>`;
+    else if(Math.abs(i-ts.page)===2)btns+='<span style="color:var(--muted);padding:0 2px">…</span>';
+  }
+  btns+=`<button class="pg-btn" onclick="goPg('${bodyId}',${ts.page+1})" ${ts.page===pages?'disabled':''}>›</button>`;
+  pDiv.innerHTML=btns;
+}
+
+function goPg(bodyId,p) {
+  const map={
+    'openBody':[TS.open,renderOpen],
+    'ovBody':[TS.ov,renderOv],
+    'afBody':[TS.af,renderAF],
+    'pavoiBody':[TS.pavoi,renderPavoi],
+    'auditBody':[TS.audit,renderAudit],
+  };
+  const [ts,fn]=map[bodyId]||[null,null]; if(!fn||p<1)return;
+  ts.page=p; fn();
+}
+
+
+// ── TABLE: PAVOI DETAIL ───────────────────────────────────────
+function setPAV(sf,btn){
+  TS.pavoi.sf=sf; TS.pavoi.page=1;
+  document.querySelectorAll('#page-pavoi .pill').forEach(p=>p.classList.remove('on'));
+  btn.classList.add('on'); renderPavoi();
+}
+function pavSort(col){TS.pavoi.asc=TS.pavoi.sort===col?!TS.pavoi.asc:true;TS.pavoi.sort=col;TS.pavoi.page=1;renderPavoi();}
+
+function renderPavoi() {
+  const yr=(g('pavoiYearF')?.value||'');
+  const srch=(g('pavoiSrch')?.value||'').toLowerCase();
+  const ts=TS.pavoi;
+
+  let data=allData.filter(r=>{
+    if(r.report_title!=='PAVOI') return false;
+    if(ts.sf!=='all' && r.semantic_status!==ts.sf) return false;
+    if(yr && String(r.raised_year)!==yr) return false;
+    if(srch){
+      const t=[r.report_number,r.semantic_status,r.audit_title,
+               r.audit_number,r.rfv,r.report_ref,r.verif_result,r.dept].join(' ').toLowerCase();
+      if(!t.includes(srch))return false;
+    }
+    return true;
+  });
+
+  data=sortD(data,ts.sort,ts.asc);
+  renderPaged('pavoiBody','pavoiInfo','pavoiPg','pavoiCnt',data,ts,r=>`
+    <tr>
+      <td><b>${r.report_number||'—'}</b></td>
+      <td>${sBadge(r.semantic_status)}</td>
+      <td style="font-size:11px;color:var(--muted)">${fd(r.raised_date)}</td>
+      <td>${fd(r.Target_date)}</td>
+      <td>${ageDis(r.report_ageing,r.semantic_status)}</td>
+      <td style="font-size:11px;color:var(--blue)">${r.report_ref||'—'}</td>
+      <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;font-size:11px">${r.rfv||'—'}</td>
+      <td>${r.verif_result?`<span style="color:${r.verif_result==='Satisfactory'?'var(--green)':'#ff6b6b'}">${r.verif_result}</span>`:'—'}</td>
+      <td style="font-size:11px">${r.dept||'—'}</td>
+      <td style="font-size:11px;color:var(--blue)">${r.audit_number||'—'}</td>
+      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)">${r.audit_title||'—'}</td>
+    </tr>`);
+}
+
+// ── TABLE: AUDIT PLAN ─────────────────────────────────────────
+function setAuditF(val,filterType,btn){
+  if(filterType==='type'){
+    TS.audit.typeF = TS.audit.typeF===val ? 'all' : val;
+    TS.audit.sf = 'all';
+  } else {
+    TS.audit.sf = val;
+    TS.audit.typeF = 'all';
+  }
+  TS.audit.page=1;
+  document.querySelectorAll('#page-auditplan .pill').forEach(p=>p.classList.remove('on'));
+  btn.classList.add('on'); renderAudit();
+}
+function auditSort(col){TS.audit.asc=TS.audit.sort===col?!TS.audit.asc:true;TS.audit.sort=col;TS.audit.page=1;renderAudit();}
+
+function renderAudit() {
+  const yr=(g('auditYearF')?.value||'');
+  const srch=(g('auditSrch')?.value||'').toLowerCase();
+  const ts=TS.audit;
+
+  let data=auditData.filter(a=>{
+    if(ts.sf!=='all' && a.status!==ts.sf) return false;
+    if(ts.typeF!=='all' && a.audit_type!==ts.typeF) return false;
+    if(yr && String(a.sched_year)!==yr) return false;
+    if(srch){
+      const t=[a.number,a.title,a.audit_type,a.status,a.lead_auditor_name,a.primary_scope_item_name].join(' ').toLowerCase();
+      if(!t.includes(srch))return false;
+    }
+    return true;
+  });
+
+  data=sortD(data,ts.sort,ts.asc);
+
+  // KPIs — từ toàn bộ auditData (không filter)
+  s('ak-total',     auditData.length);
+  s('ak-internal',  auditData.filter(a=>a.audit_type==='Internal Audit').length);
+  s('ak-inspection',auditData.filter(a=>a.audit_type==='Inspection').length);
+  s('ak-closed',    auditData.filter(a=>a.status==='Closed').length);
+  s('ak-open',      auditData.filter(a=>['InProgress','Performed'].includes(a.status)).length);
+  s('ak-sched',     auditData.filter(a=>a.status==='Scheduled').length);
+
+  const STATUS_COLOR={
+    'Closed':'b-on','Performed':'b-late','Scheduled':'b-open',
+    'InProgress':'b-open','Cancelled':'b-with'
+  };
+
+  renderPaged('auditBody','auditInfo','auditPg','auditCnt',data,ts,a=>`
+    <tr>
+      <td><b style="color:var(--blue)">${a.number||'—'}</b></td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${a.title||'—'}</td>
+      <td>${a.audit_type==='Internal Audit'?'<span class="badge b-admin">Internal Audit</span>':'<span class="badge b-open">Inspection</span>'}</td>
+      <td><span class="badge ${STATUS_COLOR[a.status]||'b-with'}">${a.status||'—'}</span></td>
+      <td style="font-size:11px">${fdYM(a.scheduled_start_date)}</td>
+      <td style="font-size:11px;color:var(--muted)">${a.lead_auditor_name||'—'}</td>
+      <td style="font-size:11px;color:var(--muted)">${a.primary_scope_item_name||'—'}</td>
+      <td style="text-align:center"><b>${a.finding_count||0}</b></td>
+      <td style="text-align:center;color:var(--blue)">${a.open_count||0}</td>
+      <td style="text-align:center;color:#ff6b6b">${a.overdue_count||0}</td>
+    </tr>`);
+}
+
+// Format Year-Month
+function fdYM(d){
+  if(!d) return '—';
+  try{
+    const dt=new Date(d);
+    return dt.toLocaleDateString('vi-VN',{year:'numeric',month:'2-digit'});
+  }catch{return d}
+}
+
+// ── ADMIN ─────────────────────────────────────────────────────
+function setUF(f,btn){
+  userFilter=f;
+  document.querySelectorAll('#page-admin .pill').forEach(p=>p.classList.remove('on'));
+  btn.classList.add('on'); loadUsers();
+}
+
+async function loadUsers() {
+  if(!curUser||curUser.role!=='admin')return;
+  try {
+    let q=sb.from('users').select('*').order('created_at',{ascending:false});
+    if(userFilter!=='all')q=q.eq('role',userFilter);
+    const {data,error}=await q; if(error)throw error;
+    s('userCnt',(data||[]).length+' users');
+    g('userBody').innerHTML=(data||[]).length===0
+      ?'<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">Không có user</td></tr>'
+      :data.map(u=>`<tr>
+        <td><b>${u.full_name}</b></td>
+        <td style="color:var(--muted)">${u.email}</td>
+        <td>${rBadge(u.role)}</td>
+        <td style="font-size:11px;color:var(--muted)">${fd(u.created_at)}</td>
+        <td style="font-size:11px;color:var(--muted)">${u.approved_by||'—'}</td>
+        <td><div class="admin-actions">
+          ${u.role==='pending'?`<button class="btn-approve" onclick="approveUser('${u.id}','${u.email}')">✓ Approve</button><button class="btn-reject" onclick="rejectUser('${u.id}')">✗ Reject</button>`:''}
+          ${u.role==='approved'&&u.email!==curUser.email?`<button class="btn-make-admin" onclick="makeAdmin('${u.id}')">★ Admin</button><button class="btn-reject" onclick="rejectUser('${u.id}')">✗ Revoke</button>`:''}
+          ${u.role==='rejected'?`<button class="btn-approve" onclick="approveUser('${u.id}','${u.email}')">✓ Re-approve</button>`:''}
+          ${u.role==='admin'?'<span style="font-size:11px;color:var(--muted)">—</span>':''}
+        </div></td></tr>`).join('');
+  } catch(e){toast('Lỗi load users: '+e.message,'err');}
+}
+
+async function approveUser(id,email){
+  try{const{error}=await sb.from('users').update({role:'approved',approved_by:curUser.email,approved_at:new Date().toISOString()}).eq('id',id);if(error)throw error;toast('✓ Đã approve: '+email,'ok');loadUsers();}
+  catch(e){toast('Lỗi: '+e.message,'err');}
+}
+async function rejectUser(id){
+  try{const{error}=await sb.from('users').update({role:'rejected'}).eq('id',id);if(error)throw error;toast('User đã bị reject','info');loadUsers();}
+  catch(e){toast('Lỗi: '+e.message,'err');}
+}
+async function makeAdmin(id){
+  if(!confirm('Cấp quyền Admin cho user này?'))return;
+  try{const{error}=await sb.from('users').update({role:'admin'}).eq('id',id);if(error)throw error;toast('✓ Đã cấp quyền Admin','ok');loadUsers();}
+  catch(e){toast('Lỗi: '+e.message,'err');}
+}
+
+// ── NAVIGATION ────────────────────────────────────────────────
+const PT={overview:'Overview',openrfi:'Open RFI',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',auditplan:'Audit Plan',admin:'Quản lý Users'};
+function showPage(name,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const pg = g('page-'+name);
+  if(pg) pg.classList.add('active');
+  if(btn)btn.classList.add('active');
+  s('pageTitle',PT[name]||name);
+  if(name==='admin')loadUsers();
+  // Trigger chart resize for overview
+  if(name==='overview'){
+    setTimeout(()=>{
+      Object.values(charts).forEach(c=>{ try{c.resize()}catch(e){} });
+    },50);
+  }
+}
+
+// ── HELPERS ───────────────────────────────────────────────────
+function fd(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('vi-VN')}catch{return d}}
+function pct(v){return isNaN(v)||!isFinite(v)?'—':Math.round(v*100)+'%'}
+
+function ageDis(ageing,status){
+  if(ageing===null||ageing===undefined)return'—';
+  const DONE=['On-time Closed','Lately Closed','Closed'];
+  if(DONE.includes(status))return'<span style="color:var(--muted);font-size:11px">Closed</span>';
+  if(ageing>30) return`<span class="a-ok">+${ageing}d còn lại</span>`;
+  if(ageing>0)  return`<span class="a-warn">+${ageing}d còn lại</span>`;
+  if(ageing===0)return`<span class="a-warn">Hôm nay</span>`;
+  if(ageing>=-30)return`<span class="a-warn">${ageing}d quá hạn</span>`;
+  if(ageing>=-60)return`<span class="a-bad">${ageing}d quá hạn</span>`;
+  return`<span class="a-crit">${ageing}d quá hạn</span>`;
+}
+
+function sBadge(s_){
+  const m={'Open':'b-open','Overdue':'b-over','On-time Closed':'b-on','Lately Closed':'b-late','Closed':'b-with','Submitted':'b-open'};
+  return`<span class="badge ${m[s_]||'b-with'}">${s_||'—'}</span>`;
+}
+function cBadge(c){if(!c)return'—';const m={'CAT I':'b-c1','CAT II':'b-c2','CAT III':'b-c3'};return`<span class="badge ${m[c]||''}">${c}</span>`}
+function rBadge(r){const m={pending:'b-pend',approved:'b-appr',rejected:'b-reje',admin:'b-admin'};return`<span class="badge ${m[r]||''}">${r}</span>`}
+function sortD(data,col,asc){return[...data].sort((a,b)=>{let va=a[col],vb=b[col];if(va==null)va=asc?Infinity:-Infinity;if(vb==null)vb=asc?Infinity:-Infinity;if(typeof va==='string')return asc?va.localeCompare(vb):vb.localeCompare(va);return asc?va-vb:vb-va})}
+function g(id){return document.getElementById(id)}
+function s(id,v){const el=g(id);if(el)el.textContent=v}
+function setOv(show,txt='',detail=''){g('overlay').classList.toggle('show',show);if(txt)s('ovText',txt);if(detail!==undefined)s('ovDetail',detail)}
+function showAl(el,type,msg){el.className='auth-alert'+(type?' '+type:'');el.textContent=msg;el.style.display=type?'block':'none'}
+function toast(msg,type='info'){
+  const w=g('toastWrap'),el=document.createElement('div');
+  el.className=`toast t-${type}`;el.textContent=msg;w.appendChild(el);
+  setTimeout(()=>{el.style.opacity='0';el.style.transform='translateX(100%)';setTimeout(()=>el.remove(),300)},4500);
+}
+</script>
+</body>
+</html>
