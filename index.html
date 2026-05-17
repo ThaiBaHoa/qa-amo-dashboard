@@ -63,34 +63,34 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--dark);color:va
 .user-role{font-size:10px;color:var(--muted)}
 .btn-logout{width:100%;padding:7px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--muted);border-radius:8px;font-size:12px;cursor:pointer;transition:all .2s}
 .btn-logout:hover{color:var(--red);border-color:rgba(227,6,19,.3)}
-.main{margin-left:220px;display:flex;flex-direction:column;min-height:100vh}
+.main{margin-left:220px;display:flex;flex-direction:column;height:100vh;overflow:hidden}
 .topbar{padding:0 20px;height:48px;background:rgba(13,17,23,.8);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40}
 .topbar-title{font-size:15px;font-weight:600}
 .topbar-right{display:flex;align-items:center;gap:10px}
 .live-badge{font-size:11px;padding:3px 9px;border-radius:20px;background:rgba(63,185,80,.1);color:var(--green);border:1px solid rgba(63,185,80,.2)}
 .btn-sm{padding:5px 12px;border-radius:7px;border:1px solid var(--border);background:none;color:var(--muted);font-size:12px;cursor:pointer;transition:all .2s}
 .btn-sm:hover{color:var(--text);border-color:var(--text)}
-.content{padding:12px;flex:1;overflow-y:auto}
-.page{display:none}
-.page.active{display:block}
+.content{padding:12px;flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.page{display:none;flex:1;min-height:0;flex-direction:column;overflow:auto}
+.page.active{display:flex}
 .sec-title{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;display:flex;align-items:center;gap:8px}
 .sec-title::after{content:'';flex:1;height:1px;background:var(--border)}
-.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:12px}
-.kpi-3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:8px;flex-shrink:0}
+.kpi-3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px;flex-shrink:0}
 .kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;position:relative;overflow:hidden;transition:transform .2s}
 .kpi:hover{transform:translateY(-2px)}
 .kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent,transparent)}
 .kpi-lbl{font-size:11px;color:var(--muted);font-weight:500;margin-bottom:8px}
 .kpi-val{font-size:20px;font-weight:700;line-height:1;color:var(--accent,var(--text))}
 .kpi-sub{font-size:11px;color:var(--muted);margin-top:5px}
-.c2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.c2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;flex-shrink:0}
 .chart-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px}
 .chart-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .chart-title{font-size:13px;font-weight:600}
 .chart-sub{font-size:11px;color:var(--muted)}
 .ch-wrap{position:relative}
-.tbl-card{background:var(--card);border:1px solid var(--border);border-radius:11px;overflow:hidden;margin-bottom:18px}
-.tbl-bar{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tbl-card{background:var(--card);border:1px solid var(--border);border-radius:11px;overflow:hidden;flex:1;display:flex;flex-direction:column;min-height:0}
+.tbl-bar{padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0}
 .tbl-title{font-size:13px;font-weight:600}
 .tbl-count{font-size:11px;color:var(--muted)}
 .pill{padding:5px 11px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--muted);font-size:12px;cursor:pointer;transition:all .15s;font-weight:500}
@@ -101,14 +101,14 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--dark);color:va
 .srch-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--muted)}
 .srch{padding:6px 10px 6px 28px;background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:7px;font-size:12px;width:180px;outline:none}
 .srch:focus{border-color:var(--blue)}
-.tbl-wrap{overflow-x:auto}
+.tbl-wrap{overflow-x:auto;flex:1;overflow-y:auto;min-height:0}
 table{width:100%;border-collapse:collapse;font-size:12px}
 th{padding:9px 13px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
 th:hover{color:var(--text)}
 td{padding:9px 13px;border-bottom:1px solid rgba(255,255,255,.04);white-space:nowrap}
 tr:hover td{background:rgba(255,255,255,.02)}
 tr:last-child td{border-bottom:none}
-.tbl-foot{padding:10px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted)}
+.tbl-foot{padding:8px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted);flex-shrink:0}
 .pg-btns{display:flex;gap:3px}
 .pg-btn{padding:3px 9px;border-radius:5px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;font-size:12px;transition:all .15s}
 .pg-btn:hover:not(:disabled){color:var(--text);background:rgba(255,255,255,.05)}
@@ -136,7 +136,7 @@ tr:last-child td{border-bottom:none}
 .btn-approve{padding:4px 10px;border-radius:6px;border:1px solid rgba(63,185,80,.3);background:rgba(63,185,80,.1);color:var(--green);font-size:11px;cursor:pointer;transition:all .2s;font-weight:500}
 .btn-reject{padding:4px 10px;border-radius:6px;border:1px solid rgba(227,6,19,.3);background:rgba(227,6,19,.1);color:#ff6b6b;font-size:11px;cursor:pointer;transition:all .2s;font-weight:500}
 .btn-make-admin{padding:4px 10px;border-radius:6px;border:1px solid rgba(188,140,255,.3);background:rgba(188,140,255,.1);color:#BC8CFF;font-size:11px;cursor:pointer;transition:all .2s;font-weight:500}
-.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;flex-shrink:0}
 .stat-tbl{width:100%;border-collapse:collapse;font-size:12px}
 .stat-tbl th{padding:7px 11px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)}
 .stat-tbl td{padding:7px 11px;border-bottom:1px solid rgba(255,255,255,.04)}
@@ -187,8 +187,7 @@ tr:last-child td{border-bottom:none}
   .main    { margin-left: 230px; }
   .topbar  { height: 52px; }
   .topbar-title { font-size: 16px; }
-  #page-overview [style*="height:180px"] { height: 200px !important; }
-  #page-overview [style*="max-height:320px"] { max-height: 360px !important; }
+
   #mc-open-ov, #mc-ontime-r, #mc-cat3, #mc-rep { font-size: 24px !important; }
 }
 </style>
@@ -313,10 +312,10 @@ tr:last-child td{border-bottom:none}
           </div>
 
           <!-- ROW 2: 3 charts side by side — each 33% width -->
-          <div style="display:grid;grid-template-columns:1fr 2fr 1fr;gap:8px;margin-bottom:8px">
+          <div style="display:grid;grid-template-columns:1fr 2fr 1fr;gap:8px;margin-bottom:8px;flex-shrink:0">
             <div class="chart-card" style="min-width:0">
               <div style="font-size:12px;font-weight:600;margin-bottom:6px">Theo trạng thái</div>
-              <div style="height:180px;position:relative"><canvas id="cStatus"></canvas></div>
+              <div style="height:clamp(120px,calc(26vh - 44px),260px);position:relative"><canvas id="cStatus"></canvas></div>
             </div>
             <div class="chart-card" style="min-width:0">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
@@ -325,7 +324,7 @@ tr:last-child td{border-bottom:none}
                   <option value="all">Tất cả năm</option>
                 </select>
               </div>
-              <div style="height:180px;position:relative"><canvas id="cMonth"></canvas></div>
+              <div style="height:clamp(120px,calc(26vh - 44px),260px);position:relative"><canvas id="cMonth"></canvas></div>
             </div>
             <div class="chart-card" style="min-width:0">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
@@ -336,19 +335,19 @@ tr:last-child td{border-bottom:none}
                   <option value="Overdue">Overdue</option>
                 </select>
               </div>
-              <div style="height:180px;position:relative"><canvas id="cForm"></canvas></div>
+              <div style="height:clamp(120px,calc(26vh - 44px),260px);position:relative"><canvas id="cForm"></canvas></div>
             </div>
           </div>
 
           <!-- ROW 3: Form table (left) + 4 metric cards (right) -->
-          <div style="display:grid;grid-template-columns:1fr 240px;gap:8px">
+          <div style="display:grid;grid-template-columns:1fr 240px;gap:8px;flex:1;min-height:0">
 
-            <div class="chart-card" style="min-width:0">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <div class="chart-card" style="min-width:0;display:flex;flex-direction:column;min-height:0">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-shrink:0">
                 <div style="font-size:12px;font-weight:600">Tổng hợp theo Form</div>
                 <span style="font-size:11px;color:var(--muted)" id="statFormCount"></span>
               </div>
-              <div style="max-height:320px;overflow-y:auto">
+              <div style="flex:1;min-height:0;overflow-y:auto">
                 <table class="stat-tbl" style="width:100%">
                   <thead style="position:sticky;top:0;background:var(--card);z-index:1">
                     <tr>
@@ -433,9 +432,9 @@ tr:last-child td{border-bottom:none}
             <div class="kpi" style="--accent:#ff6b6b"><div class="kpi-lbl">CAT II · 30–60 ngày</div><div class="kpi-val" id="k-c2">—</div><div class="kpi-sub">Tất cả form</div></div>
             <div class="kpi" style="--accent:#cc0000"><div class="kpi-lbl">CAT III · > 60 ngày</div><div class="kpi-val" id="k-c3">—</div><div class="kpi-sub">Tất cả form</div></div>
           </div>
-          <div class="c2" style="margin-bottom:16px">
-            <div class="chart-card"><div class="chart-head"><div class="chart-title">By CAT</div></div><div class="ch-wrap" style="height:170px"><canvas id="cCat"></canvas></div></div>
-            <div class="chart-card"><div class="chart-head"><div class="chart-title">By Form Type</div></div><div class="ch-wrap" style="height:170px"><canvas id="cOvForm"></canvas></div></div>
+          <div class="c2" style="margin-bottom:8px;flex-shrink:0">
+            <div class="chart-card"><div class="chart-head"><div class="chart-title">By CAT</div></div><div class="ch-wrap" style="height:clamp(110px,calc(20vh - 40px),200px)"><canvas id="cCat"></canvas></div></div>
+            <div class="chart-card"><div class="chart-head"><div class="chart-title">By Form Type</div></div><div class="ch-wrap" style="height:clamp(110px,calc(20vh - 40px),200px)"><canvas id="cOvForm"></canvas></div></div>
           </div>
           <div class="tbl-card">
             <div class="tbl-bar">
@@ -471,16 +470,16 @@ tr:last-child td{border-bottom:none}
           <div class="c2">
             <div class="chart-card">
               <div class="chart-head"><div><div class="chart-title">On-time Close Rate by Month</div><div class="chart-sub">Target: 70%</div></div></div>
-              <div class="ch-wrap" style="height:210px"><canvas id="cOnM"></canvas></div>
+              <div class="ch-wrap" style="height:clamp(120px,calc(24vh - 44px),240px)"><canvas id="cOnM"></canvas></div>
             </div>
             <div class="chart-card">
               <div class="chart-head"><div><div class="chart-title">Repetitive Rate by Month</div><div class="chart-sub">Chỉ form có field Repetitive</div></div></div>
-              <div class="ch-wrap" style="height:210px"><canvas id="cRepM"></canvas></div>
+              <div class="ch-wrap" style="height:clamp(120px,calc(24vh - 44px),240px)"><canvas id="cRepM"></canvas></div>
             </div>
           </div>
-          <div class="chart-card" style="margin-bottom:16px">
+          <div class="chart-card" style="margin-bottom:8px;flex-shrink:0">
             <div class="chart-head"><div class="chart-title">Cumulative Reports YTD</div></div>
-            <div class="ch-wrap" style="height:170px"><canvas id="cYTD"></canvas></div>
+            <div class="ch-wrap" style="height:clamp(90px,calc(16vh - 36px),180px)"><canvas id="cYTD"></canvas></div>
           </div>
           <div class="stat-grid">
             <div class="chart-card">
@@ -657,7 +656,7 @@ tr:last-child td{border-bottom:none}
             </div>
           </div>
 
-          <div id="reportPreview" style="background:var(--card);border:1px solid var(--border);border-radius:11px;overflow:hidden">
+          <div id="reportPreview" style="background:var(--card);border:1px solid var(--border);border-radius:11px;overflow:auto;flex:1;min-height:0">
             <div style="background:#E30613;padding:18px 24px;color:white">
               <div style="display:flex;align-items:center;justify-content:space-between">
                 <div>
