@@ -1503,23 +1503,44 @@ async function loadData() {
         )
       );
 
-      // Fetch audit workflow stages — không dùng $select để discover toàn bộ fields
+      // Fetch audit workflow stages — dedup theo stage_id (mỗi stage có nhiều task rows)
       let auditWfMap = {};
       try {
-        const auWfRaw = await fetchAll(G_URL + 'dwreporting_audit_workflow');
-        if (auWfRaw.length) {
-          console.log('[AuditWF] OK —', auWfRaw.length, 'records. Keys:', JSON.stringify(Object.keys(auWfRaw[0])));
-          console.log('[AuditWF] Record[0]:', JSON.stringify(auWfRaw[0]));
-        } else {
-          console.warn('[AuditWF] Endpoint trả về 0 records');
-        }
+        const auWfRaw = await fetchAll(
+          G_URL + 'dwreporting_audit_workflow' +
+          '?$select=audit_id,stage_id,stage_title,stage_status,stage_owner,' +
+          'stage_target_date,stage_started_date,stage_completed_date'
+        );
+        // Group by audit_id → dedup by stage_id (giữ record mới nhất stage_completed_date)
+        const stageMap = {}; // "audit_id|stage_id" → normalized stage
         auWfRaw.forEach(s => {
-          const aid = s.audit_id ?? s.audit_fk ?? s.AuditId ?? s.AuditID ?? s.id;
-          if (!aid) return;
+          const aid = s.audit_id;
+          const sid = s.stage_id;
+          if (!aid || !sid) return;
+          const key = aid + '|' + sid;
+          const ex = stageMap[key];
+          // Giữ bản có completed_date mới nhất, hoặc bản đầu tiên
+          if (!ex || new Date(s.stage_completed_date||0) > new Date(ex.stage_completed_date||0)) {
+            stageMap[key] = {
+              _audit_id:            aid,
+              stage_type:           s.stage_title || '?',
+              stage_status:         s.stage_status || 'NotStarted',
+              stage_owner_name:     s.stage_owner  || null,
+              stage_target_date:    s.stage_target_date    || null,
+              stage_completed_date: s.stage_completed_date || null,
+              actual_start_date:    s.stage_started_date   || null,
+              actual_end_date:      s.stage_completed_date || null,
+              scheduled_start_date: null,
+              scheduled_end_date:   null,
+            };
+          }
+        });
+        Object.values(stageMap).forEach(s => {
+          const aid = s._audit_id;
           if (!auditWfMap[aid]) auditWfMap[aid] = [];
           auditWfMap[aid].push(s);
         });
-      } catch(e) { console.warn('[AuditWF] Load error (endpoint có thể không tồn tại):',e.message); }
+      } catch(e) { console.warn('[AuditWF] Load error:',e.message); }
 
       // Enrich audit với finding counts + audit workflow stages
       auditData = allAudits.map(a => {
@@ -2165,9 +2186,10 @@ function fdYM(d){
 
 // ── AUDIT DETAIL MODAL ────────────────────────────────────────
 
-// Thứ tự chuẩn của các stage trong audit workflow
+// Thứ tự chuẩn của các stage — so sánh với stage_type (= stage_title gốc từ API)
 const AUDIT_STAGE_ORDER = [
-  'Preplanning', 'Perform',
+  'Preplanning',
+  'Perform',
   'Inspection Report', 'InspectionReport',
   'Audit Report',      'AuditReport',
   'Finding follow up', 'FindingFollowUp',
@@ -2175,15 +2197,17 @@ const AUDIT_STAGE_ORDER = [
   'Audit closure',     'AuditClosure',
 ];
 
-function auditStageIdx(stage_type) {
-  const idx = AUDIT_STAGE_ORDER.indexOf(stage_type);
+function auditStageIdx(s) {
+  const name = s.stage_type || '';
+  const idx  = AUDIT_STAGE_ORDER.indexOf(name);
   return idx === -1 ? 99 : idx;
 }
 
 function sortAuditStages(stages) {
   return stages.slice().sort((a,b) => {
-    const diff = auditStageIdx(a.stage_type) - auditStageIdx(b.stage_type);
+    const diff = auditStageIdx(a) - auditStageIdx(b);
     if (diff !== 0) return diff;
+    // Fallback: sắp xếp theo target date
     return (a.stage_target_date||'').localeCompare(b.stage_target_date||'');
   });
 }
