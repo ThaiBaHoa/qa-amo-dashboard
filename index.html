@@ -2206,25 +2206,54 @@ function exportPDF(){
       margin:{left:10,right:10},
     });
 
-    // 4 charts in 2×2 grid — fixed height for balanced proportions
-    const cy=pdf.lastAutoTable.finalY+7;
-    const chW=(W-28)/2;   // ~134mm wide
-    const chH=68;          // fixed 68mm tall  →  ~2:1 ratio, clean look
-    const chGapX=8, chGapY=6;
-    [
-      {id:'rptCStatus',label:'Status Distribution', x:10,            y:cy},
-      {id:'rptCForm',  label:'Top 10 Forms',         x:10+chW+chGapX, y:cy},
-      {id:'rptCMonth', label:'Monthly Trend',         x:10,            y:cy+chH+chGapY},
-      {id:'rptCCat',   label:'Overdue by CAT',        x:10+chW+chGapX, y:cy+chH+chGapY},
-    ].forEach(({id,label,x,y})=>{
-      pdf.setFillColor(...BG2); pdf.roundedRect(x,y,chW,chH,3,3,'F');
-      // label bar inside card
-      pdf.setFillColor(...HEAD); pdf.roundedRect(x,y,chW,9,3,3,'F');
-      pdf.rect(x,y+6,chW,3,'F'); // square bottom corners of label bar
-      pdf.setFontSize(7.5); pdf.setFont(undefined,'bold'); pdf.setTextColor(170,170,185);
-      pdf.text(label,x+4,y+6.2);
-      const img=chartImg(id);
-      if(img) pdf.addImage(img,'PNG',x+2,y+10,chW-4,chH-12);
+    // ── 4 charts: 2 left column (taller doughnuts) + 2 right column (wider bars) ──
+    const cy=pdf.lastAutoTable.finalY+5;
+    const leftW=88, rightW=W-leftW-25; // left=88mm, right=~174mm
+    const rowH=52, rowGap=5;
+    // left column: 2 doughnut charts stacked
+    [[{id:'rptCStatus',label:'Status Distribution'},{id:'rptCCat',label:'Overdue by CAT'}],
+     [{id:'rptCForm',label:'Top 10 Forms'},{id:'rptCMonth',label:'Monthly Trend'}]]
+    .forEach((col,ci)=>{
+      const x=ci===0?10:10+leftW+5;
+      const w=ci===0?leftW:rightW;
+      col.forEach((ch,ri)=>{
+        const y=cy+ri*(rowH+rowGap);
+        pdf.setFillColor(...BG2); pdf.roundedRect(x,y,w,rowH,3,3,'F');
+        pdf.setFillColor(...HEAD); pdf.roundedRect(x,y,w,8,3,3,'F');
+        pdf.rect(x,y+5,w,3,'F');
+        pdf.setFontSize(7); pdf.setFont(undefined,'bold'); pdf.setTextColor(160,165,180);
+        pdf.text(ch.label,x+3,y+5.8);
+        const img=chartImg(ch.id);
+        if(img) pdf.addImage(img,'PNG',x+1,y+9,w-2,rowH-10);
+      });
+    });
+
+    // ── Overdue breakdown table beside charts (right side, below) ──
+    const afterCharts=cy+2*(rowH+rowGap)-rowGap+3;
+    pdf.autoTable({
+      startY:afterCharts,
+      head:[['Overdue CAT','Count','Rate','Description']],
+      body:[
+        ['CAT I',c1,total?Math.round(c1/total*100)+'%':'0%','<= 30 days'],
+        ['CAT II',c2,total?Math.round(c2/total*100)+'%':'0%','31 - 60 days'],
+        ['CAT III',c3,total?Math.round(c3/total*100)+'%':'0%','> 60 days'],
+        ['Total Overdue',ov,total?Math.round(ov/total*100)+'%':'0%',''],
+      ],
+      theme:'grid',
+      headStyles:{fillColor:HEAD,textColor:[160,160,170],fontSize:8,fontStyle:'bold'},
+      bodyStyles:{fontSize:8,textColor:[200,200,210],fillColor:BG2},
+      columnStyles:{
+        0:{fontStyle:'bold',textColor:[240,136,62]},
+        1:{halign:'center',textColor:[255,100,100]},
+        2:{halign:'center'},3:{textColor:[130,130,145]},
+      },
+      margin:{left:10,right:10},
+      didParseCell:(data)=>{
+        if(data.section==='body'&&data.row.index===3){
+          data.cell.styles.fontStyle='bold';
+          data.cell.styles.textColor=[255,100,100];
+        }
+      },
     });
 
     // ─── PAGE 2: Form Summary ────────────────────────────────
