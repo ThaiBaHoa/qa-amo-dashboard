@@ -2135,8 +2135,12 @@ function generateReport(){
 async function exportPDF(){
   const {jsPDF}=window.jspdf;
   setOv(true,'Đang tạo PDF...','Vui lòng chờ');
+  const el=g('reportPreview');
+  const prevStyle={overflow:el.style.overflow,height:el.style.height,flex:el.style.flex,minHeight:el.style.minHeight};
+  el.style.overflow='visible'; el.style.height='auto'; el.style.flex='none'; el.style.minHeight='0';
   try{
-    const canvas=await html2canvas(g('reportPreview'),{scale:1.5,backgroundColor:'#161B22',useCORS:true,logging:false});
+    await new Promise(r=>setTimeout(r,80));
+    const canvas=await html2canvas(el,{scale:1.5,backgroundColor:'#161B22',useCORS:true,logging:false,scrollX:0,scrollY:0,windowWidth:el.scrollWidth,windowHeight:el.scrollHeight});
     const img=canvas.toDataURL('image/png');
     const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
     const W=pdf.internal.pageSize.getWidth(), H=pdf.internal.pageSize.getHeight();
@@ -2146,7 +2150,11 @@ async function exportPDF(){
     pdf.save(`QA_AMO_${getRptTitle().replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`);
     toast('✓ PDF đã xuất!','ok');
   }catch(e){toast('Lỗi PDF: '+e.message,'err');}
-  finally{setOv(false);}
+  finally{
+    el.style.overflow=prevStyle.overflow; el.style.height=prevStyle.height;
+    el.style.flex=prevStyle.flex; el.style.minHeight=prevStyle.minHeight;
+    setOv(false);
+  }
 }
 
 function exportExcel(){
