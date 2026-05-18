@@ -1325,15 +1325,19 @@ tr:last-child td{border-bottom:none}
     </div>
     <!-- Task table -->
     <div style="overflow:auto;flex:1;min-height:0">
-      <table class="stat-tbl" style="width:100%">
-        <thead><tr>
-          <th>Nhân Viên</th><th>Distribution Date</th>
-          <th>Due Date</th><th>Acknowledged Date</th><th>Trạng thái</th>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed">
+        <colgroup><col style="width:28%"><col style="width:16%"><col style="width:16%"><col style="width:20%"><col style="width:20%"></colgroup>
+        <thead style="position:sticky;top:0;background:var(--card);z-index:1"><tr>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Nhân Viên</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Distribution Date</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Due Date</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Acknowledged Date</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Trạng Thái</th>
         </tr></thead>
         <tbody id="docTaskBody"></tbody>
       </table>
     </div>
-    <div id="docTaskLoading" style="text-align:center;padding:24px;color:var(--muted);font-size:13px;display:none">Đang tải tasks...</div>
+    <div id="docTaskLoading" style="text-align:center;padding:24px;color:var(--muted);font-size:13px;display:none">Đang tải danh sách copyholder...</div>
   </div>
 </div>
 
@@ -3382,9 +3386,27 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
   document.body.style.overflow='hidden';
 
   try {
+    // ── Get response_time_days from document-level data ──
+    const docRecord = docData.find(d => String(d.document_revision_id) === String(revId));
+    const respDays = parseInt(
+      docRecord?.response_time_days || docRecord?.response_time ||
+      docRecord?.acknowledgement_period || docRecord?.ack_period || 0
+    ) || null;
+
+    // active date = valid_from passed in
+    const activeDate = validFrom ? new Date(validFrom) : null;
+
+    // due_date = active_date + response_time_days (same for all copyholders of this doc)
+    let dueDate = null;
+    if(activeDate && respDays) {
+      dueDate = new Date(activeDate);
+      dueDate.setDate(dueDate.getDate() + respDays);
+    }
+
+    // ── Fetch tasks ──
     let tasks = docTaskCache[revId];
     if(!tasks) {
-      // Try with string filter first (UUID), fallback to numeric
+      // Try string-quoted filter (UUID), fallback numeric
       let raw;
       try {
         raw = await fetchAll(
@@ -3392,84 +3414,62 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
           "?$filter=document_revision_id eq '" + revId + "'"
         );
       } catch(e1) {
-        // If string filter fails (e.g. revId is numeric), try without quotes
-        if(e1.message.includes('400') || e1.message.includes('HTTP')) {
-          raw = await fetchAll(
-            G_URL + 'dwreporting_document_task' +
-            '?$filter=document_revision_id eq ' + revId
-          );
-        } else throw e1;
+        raw = await fetchAll(
+          G_URL + 'dwreporting_document_task' +
+          '?$filter=document_revision_id eq ' + revId
+        );
       }
       setOv(false);
-
-      // ── DEBUG: show raw field names in modal if all values are blank ──
-      if(raw.length > 0) {
-        const keys = Object.keys(raw[0]);
-        console.log('[DocTask] Fields:', JSON.stringify(keys));
-        console.log('[DocTask] Record[0]:', JSON.stringify(raw[0]));
-        // Store field names for debug display
-        tasks = raw;
-        tasks._debugFields = keys;
-        tasks._debugSample = raw[0];
-      } else {
-        tasks = raw;
-      }
+      tasks = raw;
       docTaskCache[revId] = tasks;
+
+      // Always log to console for debugging
+      if(tasks.length > 0) {
+        console.log('[DocTask] Fields:', Object.keys(tasks[0]));
+        console.log('[DocTask] Record[0]:', tasks[0]);
+      } else {
+        console.log('[DocTask] 0 records for revId:', revId);
+      }
     }
     g('docTaskLoading').style.display='none';
 
     if(!tasks.length) {
-      g('docTaskBody').innerHTML='<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Không có task</td></tr>';
+      g('docTaskBody').innerHTML='<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Không có copyholder nào</td></tr>';
       s('dtk-total',0); s('dtk-done',0); s('dtk-late',0); s('dtk-over',0);
       return;
     }
 
     // ── Auto-detect field names from first record ──
-    const sample = tasks[0];
-    const allKeys = Object.keys(sample);
+    const keys = Object.keys(tasks[0]);
+    // Name: field có chứa 'name' nhưng không phải document/revision fields
+    const nameKey = keys.find(k => /^name$/i.test(k))
+      || keys.find(k => /copyholder_name|user_name|employee_name|assignee_name|staff_name|person_name/i.test(k))
+      || keys.find(k => /name/i.test(k) && !/document|revision|type|doc_|_id/i.test(k))
+      || keys[0];
+    // Distribution date
+    const distKey = keys.find(k => /distribution_date|distributed_date|dist_date|sent_date/i.test(k))
+      || keys.find(k => /distribut/i.test(k));
+    // Acknowledged date
+    const ackKey = keys.find(k => /acknowledged_date|acknowledge_date|ack_date|read_date|readdate/i.test(k))
+      || keys.find(k => /acknowledg/i.test(k));
 
-    // Find name field: prefer fields with 'name' in key, not 'document'/'revision'
-    const nameKey = allKeys.find(k => /\b(name|user|employee|staff|person|copyholder|recipient|assignee)\b/i.test(k) && !/document|revision|type|number/i.test(k))
-                 || allKeys.find(k => /name/i.test(k) && !/document|revision/i.test(k))
-                 || 'name';
-    // Find distribution date
-    const distKey = allKeys.find(k => /distribut/i.test(k)) || allKeys.find(k => /sent|issued|dist/i.test(k)) || null;
-    // Find acknowledged / read date
-    const ackKey  = allKeys.find(k => /acknowledg|read_date|readdate|accepted/i.test(k)) || null;
-    // Find response time (days)
-    const respKey = allKeys.find(k => /response_time|responsetime|due_days|days/i.test(k)) || null;
-    // Find due_date direct field
-    const dueDirKey = allKeys.find(k => /^due_date$|^duedate$/i.test(k)) || null;
+    console.log('[DocTask] Mapped → name:', nameKey, '| dist:', distKey, '| ack:', ackKey, '| respDays:', respDays, '| dueDate:', dueDate);
 
-    console.log('[DocTask] Mapped keys:', {nameKey, distKey, ackKey, respKey, dueDirKey});
-
-    // Compute status per task
-    const activeDate = validFrom ? new Date(validFrom) : null;
-    let onTimeCnt=0, lateCnt=0, overCnt=0;
+    // ── Build rows ──
+    let onTimeCnt=0, lateCnt=0, overCnt=0, inProgCnt=0;
+    const now = new Date(); now.setHours(0,0,0,0);
 
     const rows = tasks.map(t => {
-      const empName  = t[nameKey] || '—';
-      const distDate = distKey ? t[distKey] : null;
-      const ackDate  = ackKey  ? t[ackKey]  : null;
+      const empName  = nameKey ? (t[nameKey] || '—') : '—';
+      const distDate = distKey ? t[distKey]  : null;
+      const ackDate  = ackKey  ? t[ackKey]   : null;
 
-      // due_date: direct field first, else compute from activeDate + respDays
-      let dueDate = null;
-      if(dueDirKey && t[dueDirKey]) {
-        dueDate = new Date(t[dueDirKey]);
-      } else if(respKey) {
-        const respDays = parseInt(t[respKey]) || null;
-        if(activeDate && respDays) {
-          dueDate = new Date(activeDate);
-          dueDate.setDate(dueDate.getDate() + respDays);
-        }
-      }
-
-      // Delivery status
+      // Status logic: compare ackDate vs dueDate
       let status;
-      const now = new Date(); now.setHours(0,0,0,0);
       if(ackDate && dueDate) {
         status = new Date(ackDate) <= dueDate ? 'ontime' : 'late';
-      } else if(ackDate && !dueDate) {
+      } else if(ackDate) {
+        // Acknowledged but no due date to compare → on time
         status = 'ontime';
       } else if(dueDate && now > dueDate) {
         status = 'overdue';
@@ -3477,9 +3477,10 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
         status = 'inprogress';
       }
 
-      if(status==='ontime')   onTimeCnt++;
-      else if(status==='late')    lateCnt++;
+      if(status==='ontime')    onTimeCnt++;
+      else if(status==='late') lateCnt++;
       else if(status==='overdue') overCnt++;
+      else inProgCnt++;
 
       const badge = {
         ontime:     `<span style="background:rgba(63,185,80,.15);color:var(--green);padding:2px 8px;border-radius:4px;font-size:11px">✅ Đúng hạn</span>`,
@@ -3489,9 +3490,9 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
       }[status];
 
       return `<tr>
-        <td style="font-size:11px">${esc(empName)}</td>
+        <td style="font-size:12px;font-weight:500">${esc(empName)}</td>
         <td style="font-size:11px;color:var(--muted)">${fd(distDate)}</td>
-        <td style="font-size:11px;color:var(--muted)">${dueDate ? fd(dueDate.toISOString()) : '—'}</td>
+        <td style="font-size:11px;color:var(--muted)">${dueDate ? fd(dueDate.toISOString()) : (respDays ? `+${respDays}d (no active date)` : '—')}</td>
         <td style="font-size:11px;color:var(--muted)">${fd(ackDate)}</td>
         <td>${badge}</td>
       </tr>`;
@@ -3502,37 +3503,18 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
     s('dtk-late',  lateCnt);
     s('dtk-over',  overCnt);
 
-    // ── If all values still look blank, append debug row showing available fields ──
-    const blankCheck = tasks.slice(0,3).every(t =>
-      !t[nameKey] && !t[distKey] && !t[ackKey]
-    );
-    let debugRow = '';
-    if(blankCheck) {
-      debugRow = `<tr><td colspan="5" style="padding:10px 14px;background:rgba(210,153,34,0.08);border-top:1px solid rgba(210,153,34,0.2)">
-        <div style="font-size:11px;color:var(--yellow);font-weight:600;margin-bottom:4px">⚠️ Debug — Tên field thực tế từ API:</div>
-        <div style="font-size:10px;color:var(--muted);word-break:break-all;line-height:1.6">${allKeys.join(' · ')}</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:4px;word-break:break-all">Record[0]: ${esc(JSON.stringify(tasks[0]))}</div>
+    // ── If all rows still blank → show debug info inline ──
+    const allBlank = tasks.slice(0,5).every(t => !t[nameKey] && !t[distKey] && !t[ackKey]);
+    let debugHtml = '';
+    if(allBlank) {
+      debugHtml = `<tr><td colspan="5" style="padding:12px 16px;background:rgba(210,153,34,.08);border:1px solid rgba(210,153,34,.25);border-radius:6px">
+        <div style="font-size:11px;color:var(--yellow);font-weight:600;margin-bottom:6px">⚠️ Tên field chưa khớp — Field thực tế từ API:</div>
+        <div style="font-size:10px;color:var(--muted);word-break:break-all;margin-bottom:4px"><b>Keys:</b> ${keys.join(' · ')}</div>
+        <div style="font-size:10px;color:var(--muted);word-break:break-all"><b>Record[0]:</b> ${esc(JSON.stringify(tasks[0]))}</div>
       </td></tr>`;
     }
 
-    g('docTaskBody').innerHTML = rows.join('') + debugRow;
-
-    // Update page-level KPI cards
-    let pgOver=0, pgEarly=0;
-    Object.entries(docTaskCache).forEach(([rid, ts]) => {
-      if(!Array.isArray(ts)) return;
-      const vf = docData.find(d=>String(d.document_revision_id)===String(rid))?.valid_from||null;
-      const ad = vf ? new Date(vf) : null;
-      ts.forEach(t => {
-        const ack = ackKey ? t[ackKey] : null;
-        let due = null;
-        if(dueDirKey && t[dueDirKey]) { due = new Date(t[dueDirKey]); }
-        else if(respKey) { const rd=parseInt(t[respKey])||null; if(ad&&rd){due=new Date(ad);due.setDate(due.getDate()+rd);} }
-        if(ack&&due){ if(new Date(ack)>due) pgOver++; else pgEarly++; }
-        else if(due&&new Date()>due&&!ack) pgOver++;
-      });
-    });
-    s('dk-over', pgOver||'—'); s('dk-early', pgEarly||'—');
+    g('docTaskBody').innerHTML = rows.join('') + debugHtml;
 
   } catch(e) {
     g('docTaskLoading').style.display='none';
