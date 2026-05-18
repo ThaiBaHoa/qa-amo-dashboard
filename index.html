@@ -171,7 +171,7 @@ tr:last-child td{border-bottom:none}
 /* Overview page inline-grid overrides for responsiveness */
 .ov-kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:8px}
 .ov-chart-row{display:grid;grid-template-columns:1fr 2fr 1fr;gap:8px;margin-bottom:8px;flex-shrink:0}
-.ov-bottom-row{display:grid;grid-template-columns:1fr 240px;gap:8px;flex:1;min-height:0}
+.ov-bottom-row{display:grid;grid-template-columns:3fr 2fr;gap:8px;flex:1;min-height:0;align-items:stretch}
 
 /* 1920×1080 — tăng 5% */
 @media (min-width: 1800px) {
@@ -461,27 +461,48 @@ tr:last-child td{border-bottom:none}
               </div>
             </div>
 
-            <!-- 4 metric cards in 2x2 grid -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:8px">
-              <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:12px 8px">
-                <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Open + Overdue</div>
-                <div style="font-size:22px;font-weight:700;color:var(--blue)" id="mc-open-ov">—</div>
-                <div style="font-size:10px;color:var(--muted);margin-top:2px" id="mc-open-ov-r">—</div>
+            <!-- Right panel: 2×2 metric cards + overdue breakdown -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:8px;height:100%;min-height:0">
+              <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Open + Overdue</div>
+                <div style="font-size:28px;font-weight:700;color:var(--blue);line-height:1" id="mc-open-ov">—</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:4px" id="mc-open-ov-r">—</div>
               </div>
-              <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:12px 8px">
-                <div style="font-size:10px;color:var(--muted);margin-bottom:4px">On-time Rate</div>
-                <div style="font-size:22px;font-weight:700;color:var(--green)" id="mc-ontime-r">—</div>
-                <div style="font-size:10px;color:var(--muted);margin-top:2px" id="mc-ontime-v">—</div>
+              <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">On-time Rate</div>
+                <div style="font-size:28px;font-weight:700;color:var(--green);line-height:1" id="mc-ontime-r">—</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:4px" id="mc-ontime-v">—</div>
               </div>
-              <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:12px 8px">
-                <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Overdue CAT III</div>
-                <div style="font-size:22px;font-weight:700;color:#ff3333" id="mc-cat3">—</div>
-                <div style="font-size:10px;color:var(--muted);margin-top:2px">&gt;60 ngày</div>
+              <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Overdue CAT III</div>
+                <div style="font-size:28px;font-weight:700;color:#ff3333;line-height:1" id="mc-cat3">—</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:4px">&gt;60 ngày</div>
               </div>
-              <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:12px 8px">
-                <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Repetitive</div>
-                <div style="font-size:22px;font-weight:700;color:var(--yellow)" id="mc-rep">—</div>
-                <div style="font-size:10px;color:var(--muted);margin-top:2px" id="mc-rep-r">—</div>
+              <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
+                <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Repetitive</div>
+                <div style="font-size:28px;font-weight:700;color:var(--yellow);line-height:1" id="mc-rep">—</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:4px" id="mc-rep-r">—</div>
+              </div>
+              <!-- Overdue CAT breakdown — span 2 columns -->
+              <div class="chart-card" style="grid-column:1/-1;display:flex;flex-direction:column;min-height:0">
+                <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;flex-shrink:0">Overdue Breakdown</div>
+                <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;justify-content:center" id="mc-cat-breakdown">
+                  <div style="display:grid;grid-template-columns:90px 1fr 40px;align-items:center;gap:8px;font-size:11px">
+                    <span style="color:var(--orange)">CAT I ≤30d</span>
+                    <div style="background:rgba(255,255,255,.06);border-radius:4px;height:8px;overflow:hidden"><div id="bar-c1" style="height:100%;background:var(--orange);border-radius:4px;transition:width .4s"></div></div>
+                    <span style="color:var(--muted);text-align:right" id="mc-c1">—</span>
+                  </div>
+                  <div style="display:grid;grid-template-columns:90px 1fr 40px;align-items:center;gap:8px;font-size:11px">
+                    <span style="color:#ff6b6b">CAT II 30–60d</span>
+                    <div style="background:rgba(255,255,255,.06);border-radius:4px;height:8px;overflow:hidden"><div id="bar-c2" style="height:100%;background:#ff6b6b;border-radius:4px;transition:width .4s"></div></div>
+                    <span style="color:var(--muted);text-align:right" id="mc-c2">—</span>
+                  </div>
+                  <div style="display:grid;grid-template-columns:90px 1fr 40px;align-items:center;gap:8px;font-size:11px">
+                    <span style="color:#cc0000">CAT III >60d</span>
+                    <div style="background:rgba(255,255,255,.06);border-radius:4px;height:8px;overflow:hidden"><div id="bar-c3" style="height:100%;background:#cc0000;border-radius:4px;transition:width .4s"></div></div>
+                    <span style="color:var(--muted);text-align:right" id="mc-c3-v">—</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1828,6 +1849,16 @@ function renderStatTblsFor(d) {
   s('mc-cat3',cat3);
   s('mc-rep',rep);
   s('mc-rep-r',pct(rep/total)+' tỷ lệ lặp');
+  // CAT breakdown bars
+  const cat1=d.filter(r=>r.overdue_cat==='CAT I').length;
+  const cat2=d.filter(r=>r.overdue_cat==='CAT II').length;
+  const catMax=Math.max(cat1,cat2,cat3,1);
+  s('mc-c1',cat1); s('mc-c2',cat2); s('mc-c3-v',cat3);
+  ['c1','c2','c3'].forEach((k,i)=>{
+    const v=[cat1,cat2,cat3][i];
+    const bar=g('bar-'+k);
+    if(bar) bar.style.width=Math.round(v/catMax*100)+'%';
+  });
   g('statMeta').innerHTML='';
 }
 
