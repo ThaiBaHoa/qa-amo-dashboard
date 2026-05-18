@@ -783,8 +783,8 @@ tr:last-child td{border-bottom:none}
 
         <!-- DOCUMENTS PAGE -->
         <div class="page" id="page-docs">
-          <!-- Filter bar -->
-          <div class="tbl-card" style="padding:10px 12px;margin-bottom:8px;flex-shrink:0">
+          <!-- Filter bar — use chart-card (no flex:1) to avoid growing -->
+          <div class="chart-card" style="padding:8px 12px;margin-bottom:8px;flex-shrink:0">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
               <div class="tbl-title" style="margin-right:4px">Tài Liệu</div>
               <div class="tbl-count" id="docCnt">—</div>
@@ -814,29 +814,29 @@ tr:last-child td{border-bottom:none}
               <div class="kpi-lbl">Completed Early</div><div class="kpi-val" id="dk-early" style="color:var(--green)">—</div><div class="kpi-sub" style="font-size:10px;color:var(--muted)">từ tasks đã load</div>
             </div>
           </div>
-          <!-- Charts row -->
+          <!-- Charts row — reduced height to give table more room -->
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;flex-shrink:0">
             <div class="chart-card">
-              <div class="chart-head"><div><div class="chart-title">Documents by Type</div><div class="chart-sub">Top 10</div></div></div>
-              <div class="ch-wrap" style="height:200px"><canvas id="cDocType"></canvas></div>
+              <div class="chart-head" style="margin-bottom:8px"><div><div class="chart-title">Documents by Type</div><div class="chart-sub">Top 10</div></div></div>
+              <div class="ch-wrap" style="height:160px"><canvas id="cDocType"></canvas></div>
             </div>
             <div class="chart-card">
-              <div class="chart-head"><div><div class="chart-title">Documents by Year</div><div class="chart-sub">Theo created_date</div></div></div>
-              <div class="ch-wrap" style="height:200px"><canvas id="cDocYear"></canvas></div>
+              <div class="chart-head" style="margin-bottom:8px"><div><div class="chart-title">Documents by Year</div><div class="chart-sub">Theo created_date</div></div></div>
+              <div class="ch-wrap" style="height:160px"><canvas id="cDocYear"></canvas></div>
             </div>
           </div>
-          <!-- Table -->
-          <div class="tbl-card" style="flex:1;min-height:0;display:flex;flex-direction:column">
+          <!-- Table fills remaining space -->
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:11px;overflow:hidden">
             <div class="tbl-wrap" style="flex:1;min-height:0">
               <table>
                 <thead><tr>
                   <th onclick="docSort('document_number')" style="cursor:pointer">Doc Number ↕</th>
-                  <th onclick="docSort('document_title')" style="cursor:pointer">Tiêu Đề ↕</th>
+                  <th onclick="docSort('document_revision_title')" style="cursor:pointer">Tiêu Đề ↕</th>
                   <th onclick="docSort('document_type')" style="cursor:pointer">Loại ↕</th>
                   <th>Rev</th>
                   <th>Status</th>
-                  <th onclick="docSort('document_owner')" style="cursor:pointer">Owner ↕</th>
-                  <th onclick="docSort('scheduled_review_date')" style="cursor:pointer">Review Date ↕</th>
+                  <th onclick="docSort('owner_name')" style="cursor:pointer">Owner ↕</th>
+                  <th onclick="docSort('review_date')" style="cursor:pointer">Review Date ↕</th>
                   <th>Distributed</th>
                   <th>Action</th>
                 </tr></thead>
