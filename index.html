@@ -585,28 +585,71 @@ tr:last-child td{border-bottom:none}
 
         <!-- KPI -->
         <div class="page" id="page-kpi">
-          <div class="c2">
+          <!-- Row 0: Filter bar -->
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-shrink:0">
+            <span style="font-size:13px;font-weight:600;color:var(--text)">KPI Charts</span>
+            <label style="font-size:12px;color:var(--muted)">Năm:</label>
+            <select class="sel" id="kpiYear" onchange="filterKpiYear()" style="width:100px"></select>
+            <span id="kpiYearCount" style="font-size:11px;color:var(--muted)"></span>
+          </div>
+          <!-- Row 1: 6 KPI summary cards -->
+          <div class="kpi-grid" style="margin-bottom:8px;flex-shrink:0">
+            <div class="chart-card" style="text-align:center;padding:10px 8px">
+              <div class="kpi-lbl">Tổng Findings</div><div class="kpi-val" id="kk-total" style="color:var(--blue)">—</div>
+            </div>
+            <div class="chart-card" style="text-align:center;padding:10px 8px">
+              <div class="kpi-lbl">Open</div><div class="kpi-val" id="kk-open" style="color:var(--blue)">—</div>
+            </div>
+            <div class="chart-card" style="text-align:center;padding:10px 8px">
+              <div class="kpi-lbl">Overdue</div><div class="kpi-val" id="kk-over" style="color:#ff6b6b">—</div>
+            </div>
+            <div class="chart-card" style="text-align:center;padding:10px 8px">
+              <div class="kpi-lbl">On-time Rate</div><div class="kpi-val" id="kk-rate" style="color:var(--green)">—</div>
+            </div>
+            <div class="chart-card" style="text-align:center;padding:10px 8px">
+              <div class="kpi-lbl">CAT III</div><div class="kpi-val" id="kk-cat3" style="color:#cc0000">—</div>
+            </div>
+            <div class="chart-card" style="text-align:center;padding:10px 8px">
+              <div class="kpi-lbl">Audits</div><div class="kpi-val" id="kk-audits" style="color:var(--yellow)">—</div>
+            </div>
+          </div>
+          <!-- Row 2: 3 charts -->
+          <div style="display:grid;grid-template-columns:2fr 2fr 1.5fr;gap:8px;margin-bottom:8px;flex-shrink:0">
+            <div class="chart-card">
+              <div class="chart-head"><div><div class="chart-title">Findings by Form</div><div class="chart-sub">Stacked: Open / Overdue / Closed</div></div></div>
+              <div class="ch-wrap" style="height:200px"><canvas id="cKpiForm"></canvas></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-head"><div><div class="chart-title">Monthly Trend</div><div class="chart-sub">Stacked by status theo tháng</div></div></div>
+              <div class="ch-wrap" style="height:200px"><canvas id="cKpiMonth"></canvas></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-head"><div><div class="chart-title">Overdue Aging</div><div class="chart-sub">CAT I / II / III</div></div></div>
+              <div class="ch-wrap" style="height:200px"><canvas id="cKpiAging"></canvas></div>
+            </div>
+          </div>
+          <!-- Row 3: 2 charts -->
+          <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:8px;flex-shrink:0">
             <div class="chart-card">
               <div class="chart-head"><div><div class="chart-title">On-time Close Rate by Month</div><div class="chart-sub">Target: 70%</div></div></div>
-              <div class="ch-wrap" style="height:clamp(120px,calc(24vh - 44px),240px)"><canvas id="cOnM"></canvas></div>
+              <div class="ch-wrap" style="height:170px"><canvas id="cOnM"></canvas></div>
             </div>
             <div class="chart-card">
-              <div class="chart-head"><div><div class="chart-title">Repetitive Rate by Month</div><div class="chart-sub">Chỉ form có field Repetitive</div></div></div>
-              <div class="ch-wrap" style="height:clamp(120px,calc(24vh - 44px),240px)"><canvas id="cRepM"></canvas></div>
+              <div class="chart-head"><div><div class="chart-title">Finding Level</div><div class="chart-sub">Phân bổ cấp độ</div></div></div>
+              <div class="ch-wrap" style="height:170px"><canvas id="cKpiLevel"></canvas></div>
             </div>
           </div>
-          <div class="chart-card" style="margin-bottom:8px;flex-shrink:0">
-            <div class="chart-head"><div class="chart-title">Cumulative Reports YTD</div></div>
-            <div class="ch-wrap" style="height:clamp(90px,calc(16vh - 36px),180px)"><canvas id="cYTD"></canvas></div>
-          </div>
-          <div class="stat-grid">
-            <div class="chart-card">
-              <div class="chart-title" style="margin-bottom:10px">On-time Rate by Year</div>
-              <table class="stat-tbl"><thead><tr><th>Year</th><th>On-time</th><th>Total Closed</th><th>Rate</th></tr></thead><tbody id="tOnY"></tbody></table>
-            </div>
-            <div class="chart-card">
-              <div class="chart-title" style="margin-bottom:10px">Repetitive Rate by Year</div>
-              <table class="stat-tbl"><thead><tr><th>Year</th><th>Rep</th><th>Total</th><th>Rate</th></tr></thead><tbody id="tRepY"></tbody></table>
+          <!-- Row 4: Performance by Form table -->
+          <div class="chart-card" style="flex-shrink:0">
+            <div class="chart-title" style="margin-bottom:10px">Performance by Form</div>
+            <div style="overflow-x:auto">
+              <table class="stat-tbl" id="kk-perf-table">
+                <thead><tr>
+                  <th>Form</th><th>Total</th><th>Open</th><th>Overdue</th>
+                  <th>On-time</th><th>Lately</th><th>On-time Rate</th><th>CAT III</th>
+                </tr></thead>
+                <tbody id="kk-perf-body"></tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -1723,7 +1766,7 @@ function renderAll() {
   renderAF();
   renderPavoi();
   renderAudit();
-  buildKPICharts();
+  filterKpiYear();
 }
 
 // ── POPULATE FILTERS ─────────────────────────────────────────
@@ -1740,6 +1783,11 @@ function populateFilters() {
   const curYear = new Date().getFullYear();
   const ovYOpts='<option value="all">Tất cả năm</option>'+years.map(y=>`<option value="${y}" ${y===curYear?'selected':''}>${y}</option>`).join('');
   const ovYEl=g('ovYearFilter'); if(ovYEl) ovYEl.innerHTML=ovYOpts;
+
+  // KPI year filter — default to current year
+  const curYearKpi = new Date().getFullYear();
+  const kpiYOpts='<option value="all">Tất cả năm</option>'+years.map(y=>`<option value="${y}" ${y===curYearKpi?'selected':''}>${y}</option>`).join('');
+  const kpiYEl=g('kpiYear'); if(kpiYEl) kpiYEl.innerHTML=kpiYOpts;
 
   // Audit year filter
   const auYears=[...new Set(auditData.map(a=>a.sched_year).filter(Boolean))].sort((a,b)=>b-a);
@@ -1930,67 +1978,146 @@ function buildMonthChart() {
       y:{stacked:true,ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}}}}});
 }
 
-function buildKPICharts() {
-  // On-time rate chỉ tính form có Target date (On-time Closed + Lately Closed)
-  // Không tính Closed (form không có target)
+function filterKpiYear() {
+  const yr = g('kpiYear')?.value || 'all';
+  const data = yr==='all' ? allData : allData.filter(r=>String(r.raised_year)===yr);
+  const countEl = g('kpiYearCount');
+  if(countEl) countEl.textContent = yr==='all' ? `${allData.length} records` : `${data.length} records năm ${yr}`;
+  buildKPICharts(data);
+}
+
+function buildKPICharts(data) {
+  if(!data) data=allData;
   const CLOSED_S=['On-time Closed','Lately Closed'];
-  const mm={},am={};
-  allData.forEach(r=>{
+
+  // ── KPI summary cards ──────────────────────────────────────
+  const tot=data.length;
+  const open=data.filter(r=>r.semantic_status==='Open').length;
+  const over=data.filter(r=>r.semantic_status==='Overdue').length;
+  const onTime=data.filter(r=>r.semantic_status==='On-time Closed').length;
+  const closed=data.filter(r=>CLOSED_S.includes(r.semantic_status)).length;
+  const cat3=data.filter(r=>r.overdue_cat==='CAT III').length;
+  const audits=[...new Set(data.map(r=>r.audit_id).filter(Boolean))].length;
+  s('kk-total',tot); s('kk-open',open); s('kk-over',over);
+  s('kk-rate',closed>0?pct(onTime/closed):'—');
+  s('kk-cat3',cat3); s('kk-audits',audits);
+
+  // ── Chart 1: Findings by Form (stacked horizontal bar) ────
+  const formMap={};
+  data.forEach(r=>{
+    const f=r.report_title||'?';
+    if(!formMap[f])formMap[f]={open:0,over:0,closed:0};
+    if(r.semantic_status==='Open')formMap[f].open++;
+    else if(r.semantic_status==='Overdue')formMap[f].over++;
+    else if(CLOSED_S.includes(r.semantic_status)||r.semantic_status==='Closed')formMap[f].closed++;
+  });
+  const formEntries=Object.entries(formMap).sort((a,b)=>(b[1].open+b[1].over+b[1].closed)-(a[1].open+a[1].over+a[1].closed)).slice(0,12);
+  const fLabels=formEntries.map(e=>e[0]);
+  dc('cKpiForm');
+  charts['cKpiForm']=new Chart(g('cKpiForm'),{type:'bar',
+    data:{labels:fLabels,datasets:[
+      {label:'Open',data:formEntries.map(e=>e[1].open),backgroundColor:'#58A6FF',borderRadius:2},
+      {label:'Overdue',data:formEntries.map(e=>e[1].over),backgroundColor:'#ff6b6b',borderRadius:2},
+      {label:'Closed',data:formEntries.map(e=>e[1].closed),backgroundColor:'#3FB950',borderRadius:2}]},
+    options:{...CO,indexAxis:'y',scales:{
+      x:{stacked:true,ticks:{color:'#8B949E',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}},
+      y:{stacked:true,ticks:{color:'#8B949E',font:{size:9},callback:v=>v.length>18?v.slice(0,18)+'…':v},grid:{display:false}}}}});
+
+  // ── Chart 2: Monthly Trend (stacked bar) ──────────────────
+  const mMap={};
+  data.forEach(r=>{
+    if(!r.raised_ym)return;
+    if(!mMap[r.raised_ym])mMap[r.raised_ym]={open:0,over:0,ontime:0,late:0};
+    if(r.semantic_status==='Open')mMap[r.raised_ym].open++;
+    else if(r.semantic_status==='Overdue')mMap[r.raised_ym].over++;
+    else if(r.semantic_status==='On-time Closed')mMap[r.raised_ym].ontime++;
+    else if(r.semantic_status==='Lately Closed')mMap[r.raised_ym].late++;
+  });
+  const mKeys=Object.keys(mMap).sort();
+  dc('cKpiMonth');
+  charts['cKpiMonth']=new Chart(g('cKpiMonth'),{type:'bar',
+    data:{labels:mKeys,datasets:[
+      {label:'Open',data:mKeys.map(k=>mMap[k].open),backgroundColor:'#58A6FF',borderRadius:2},
+      {label:'Overdue',data:mKeys.map(k=>mMap[k].over),backgroundColor:'#ff6b6b',borderRadius:2},
+      {label:'On-time',data:mKeys.map(k=>mMap[k].ontime),backgroundColor:'#3FB950',borderRadius:2},
+      {label:'Lately',data:mKeys.map(k=>mMap[k].late),backgroundColor:'#D29922',borderRadius:2}]},
+    options:{...CO,scales:{
+      x:{stacked:true,ticks:{color:'#8B949E',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}},
+      y:{stacked:true,ticks:{color:'#8B949E',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}}}}});
+
+  // ── Chart 3: Overdue Aging by CAT (doughnut) ──────────────
+  const cats={'CAT I':0,'CAT II':0,'CAT III':0};
+  data.filter(r=>r.semantic_status==='Overdue').forEach(r=>{if(r.overdue_cat)cats[r.overdue_cat]++});
+  dc('cKpiAging');
+  charts['cKpiAging']=new Chart(g('cKpiAging'),{type:'doughnut',
+    data:{labels:Object.keys(cats),datasets:[{data:Object.values(cats),backgroundColor:['#F0883E','#ff6b6b','#cc0000'],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#8B949E',font:{size:10},boxWidth:8}}}}});
+
+  // ── Chart 4: On-time Rate by Month (line) ─────────────────
+  const mm={};
+  data.forEach(r=>{
     if(!r.raised_ym)return;
     if(!mm[r.raised_ym])mm[r.raised_ym]={tot:0,on:0};
-    if(!am[r.raised_ym])am[r.raised_ym]={tot:0,rep:0};
-    // Chỉ đếm vào on-time calc nếu có target date
     if(CLOSED_S.includes(r.semantic_status)){
       mm[r.raised_ym].tot++;
       if(r.semantic_status==='On-time Closed')mm[r.raised_ym].on++;
     }
-    am[r.raised_ym].tot++;
-    if(r.is_rep)am[r.raised_ym].rep++;
   });
-  const keys=Object.keys(mm).sort();
-
+  const oKeys=Object.keys(mm).sort();
   dc('cOnM');
   charts['cOnM']=new Chart(g('cOnM'),{type:'line',
-    data:{labels:keys,datasets:[
-      {label:'On-time %',data:keys.map(k=>mm[k].tot>0?Math.round(mm[k].on/mm[k].tot*100):null),borderColor:'#3FB950',backgroundColor:'rgba(63,185,80,0.1)',tension:.4,fill:true,pointRadius:4,spanGaps:true},
-      {label:'Target 70%',data:keys.map(()=>70),borderColor:'rgba(255,255,255,0.15)',borderDash:[5,5],pointRadius:0,borderWidth:1}]},
+    data:{labels:oKeys,datasets:[
+      {label:'On-time %',data:oKeys.map(k=>mm[k].tot>0?Math.round(mm[k].on/mm[k].tot*100):null),borderColor:'#3FB950',backgroundColor:'rgba(63,185,80,0.1)',tension:.4,fill:true,pointRadius:4,spanGaps:true},
+      {label:'Target 70%',data:oKeys.map(()=>70),borderColor:'rgba(255,255,255,0.15)',borderDash:[5,5],pointRadius:0,borderWidth:1}]},
     options:{...CO,scales:{
       x:{ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
       y:{min:0,max:100,ticks:{color:'#8B949E',font:{size:10},callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.04)'}}}}});
 
-  dc('cRepM');
-  charts['cRepM']=new Chart(g('cRepM'),{type:'line',
-    data:{labels:keys,datasets:[{label:'Repetitive %',data:keys.map(k=>am[k]?.tot>0?Math.round(am[k].rep/am[k].tot*100):null),borderColor:'#D29922',backgroundColor:'rgba(210,153,34,0.1)',tension:.4,fill:true,pointRadius:4,spanGaps:true}]},
-    options:{...CO,plugins:{legend:{display:false}},scales:{
-      x:{ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
-      y:{min:0,ticks:{color:'#8B949E',font:{size:10},callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.04)'}}}}});
+  // ── Chart 5: Finding Level Distribution (doughnut) ────────
+  const lvlMap={};
+  data.forEach(r=>{const l=r.finding_level||'N/A';lvlMap[l]=(lvlMap[l]||0)+1});
+  const lvlEntries=Object.entries(lvlMap).sort((a,b)=>b[1]-a[1]);
+  const lvlColors=['#cc0000','#ff6b6b','#F0883E','#D29922','#58A6FF','#3FB950','#8B949E'];
+  dc('cKpiLevel');
+  charts['cKpiLevel']=new Chart(g('cKpiLevel'),{type:'doughnut',
+    data:{labels:lvlEntries.map(e=>e[0]),datasets:[{data:lvlEntries.map(e=>e[1]),backgroundColor:lvlColors.slice(0,lvlEntries.length),borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#8B949E',font:{size:9},boxWidth:8}}}}});
 
-  dc('cYTD');
-  let cum=0;
-  const ytd=keys.map(k=>{cum+=allData.filter(r=>r.raised_ym===k).length;return cum});
-  charts['cYTD']=new Chart(g('cYTD'),{type:'line',
-    data:{labels:keys,datasets:[{label:'Cumulative',data:ytd,borderColor:'#58A6FF',backgroundColor:'rgba(88,166,255,0.08)',tension:.3,fill:true,pointRadius:3}]},
-    options:{...CO,plugins:{legend:{display:false}}}});
-
-  const years=[...new Set(allData.map(r=>r.raised_year).filter(Boolean))].sort();
-  g('tOnY').innerHTML=years.map(y=>{
-    const rows=allData.filter(r=>r.raised_year===y);
-    const cl=rows.filter(r=>CLOSED_S.includes(r.semantic_status)).length;
-    const on=rows.filter(r=>r.semantic_status==='On-time Closed').length;
-    return`<tr><td>${y}</td><td style="color:var(--green)">${on}</td><td>${cl}</td><td><b>${pct(on/(cl||1))}</b></td></tr>`;
+  // ── Row 4: Performance by Form table ─────────────────────
+  const perfMap={};
+  data.forEach(r=>{
+    const f=r.report_title||'?';
+    if(!perfMap[f])perfMap[f]={total:0,open:0,over:0,ontime:0,late:0,cat3:0};
+    perfMap[f].total++;
+    if(r.semantic_status==='Open')perfMap[f].open++;
+    else if(r.semantic_status==='Overdue')perfMap[f].over++;
+    else if(r.semantic_status==='On-time Closed')perfMap[f].ontime++;
+    else if(r.semantic_status==='Lately Closed')perfMap[f].late++;
+    if(r.overdue_cat==='CAT III')perfMap[f].cat3++;
+  });
+  const perfEntries=Object.entries(perfMap).sort((a,b)=>b[1].total-a[1].total);
+  const perfBody=g('kk-perf-body');
+  if(perfBody) perfBody.innerHTML=perfEntries.map(([f,v])=>{
+    const cl=v.ontime+v.late;
+    const rate=cl>0?pct(v.ontime/cl):'—';
+    return`<tr>
+      <td style="font-size:11px">${esc(f)}</td>
+      <td><b>${v.total}</b></td>
+      <td style="color:var(--blue)">${v.open}</td>
+      <td style="color:#ff6b6b">${v.over}</td>
+      <td style="color:var(--green)">${v.ontime}</td>
+      <td style="color:var(--yellow)">${v.late}</td>
+      <td><b>${rate}</b></td>
+      <td style="color:#cc0000">${v.cat3||'—'}</td>
+    </tr>`;
   }).join('');
-  g('tRepY').innerHTML=years.map(y=>{
-    const rows=allData.filter(r=>r.raised_year===y);
-    const rep=rows.filter(r=>r.is_rep).length;
-    return`<tr><td>${y}</td><td style="color:var(--yellow)">${rep}</td><td>${rows.length}</td><td><b>${pct(rep/(rows.length||1))}</b></td></tr>`;
-  }).join('');
 
-  // Overdue page charts — built here since buildKPICharts is called from renderAll
+  // ── Overdue page charts (always use global allData) ───────
   dc('cCat');
-  const cats={'CAT I':0,'CAT II':0,'CAT III':0};
-  allData.filter(r=>r.semantic_status==='Overdue').forEach(r=>{if(r.overdue_cat)cats[r.overdue_cat]++});
+  const catsAll={'CAT I':0,'CAT II':0,'CAT III':0};
+  allData.filter(r=>r.semantic_status==='Overdue').forEach(r=>{if(r.overdue_cat)catsAll[r.overdue_cat]++});
   charts['cCat']=new Chart(g('cCat'),{type:'doughnut',
-    data:{labels:Object.keys(cats),datasets:[{data:Object.values(cats),backgroundColor:['#F0883E','#ff6b6b','#cc0000'],borderWidth:0}]},
+    data:{labels:Object.keys(catsAll),datasets:[{data:Object.values(catsAll),backgroundColor:['#F0883E','#ff6b6b','#cc0000'],borderWidth:0}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#8B949E',font:{size:10},boxWidth:8}}}}});
   dc('cOvForm');
   const ovf={};
