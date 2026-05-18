@@ -64,7 +64,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--dark);color:va
 .user-role{font-size:10px;color:var(--muted)}
 .btn-logout{width:100%;padding:7px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--muted);border-radius:8px;font-size:12px;cursor:pointer;transition:all .2s}
 .btn-logout:hover{color:var(--red);border-color:rgba(227,6,19,.3)}
-.main{margin-left:220px;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.main{margin-left:220px;flex:1;min-width:0;display:flex;flex-direction:column;height:100vh;overflow:hidden}
 .topbar{padding:0 20px;height:48px;background:rgba(13,17,23,.8);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40}
 .topbar-title{font-size:15px;font-weight:600}
 .topbar-right{display:flex;align-items:center;gap:10px}
@@ -614,7 +614,7 @@ tr:last-child td{border-bottom:none}
             </div>
           </div>
           <!-- Row 2: 3 charts -->
-          <div style="display:grid;grid-template-columns:2fr 2fr 1.5fr;gap:8px;margin-bottom:8px;flex-shrink:0">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;flex-shrink:0">
             <div class="chart-card">
               <div class="chart-head"><div><div class="chart-title">Findings by Form</div><div class="chart-sub">Stacked: Open / Overdue / Closed</div></div></div>
               <div class="ch-wrap" style="height:200px"><canvas id="cKpiForm"></canvas></div>
@@ -629,7 +629,7 @@ tr:last-child td{border-bottom:none}
             </div>
           </div>
           <!-- Row 3: 2 charts -->
-          <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:8px;flex-shrink:0">
+          <div style="display:grid;grid-template-columns:3fr 2fr;gap:8px;margin-bottom:8px;flex-shrink:0">
             <div class="chart-card">
               <div class="chart-head"><div><div class="chart-title">On-time Close Rate by Month</div><div class="chart-sub">Target: 70%</div></div></div>
               <div class="ch-wrap" style="height:170px"><canvas id="cOnM"></canvas></div>
