@@ -3384,13 +3384,36 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
   try {
     let tasks = docTaskCache[revId];
     if(!tasks) {
-      const raw = await fetchAll(
-        G_URL + 'dwreporting_document_task' +
-        '?$filter=document_revision_id eq ' + revId
-      );
+      // Try with string filter first (UUID), fallback to numeric
+      let raw;
+      try {
+        raw = await fetchAll(
+          G_URL + 'dwreporting_document_task' +
+          "?$filter=document_revision_id eq '" + revId + "'"
+        );
+      } catch(e1) {
+        // If string filter fails (e.g. revId is numeric), try without quotes
+        if(e1.message.includes('400') || e1.message.includes('HTTP')) {
+          raw = await fetchAll(
+            G_URL + 'dwreporting_document_task' +
+            '?$filter=document_revision_id eq ' + revId
+          );
+        } else throw e1;
+      }
       setOv(false);
-      if(raw.length>0){console.log('[DocTask] Fields:',JSON.stringify(Object.keys(raw[0])));console.log('[DocTask] Record[0]:',JSON.stringify(raw[0]));}
-      tasks = raw;
+
+      // ── DEBUG: show raw field names in modal if all values are blank ──
+      if(raw.length > 0) {
+        const keys = Object.keys(raw[0]);
+        console.log('[DocTask] Fields:', JSON.stringify(keys));
+        console.log('[DocTask] Record[0]:', JSON.stringify(raw[0]));
+        // Store field names for debug display
+        tasks = raw;
+        tasks._debugFields = keys;
+        tasks._debugSample = raw[0];
+      } else {
+        tasks = raw;
+      }
       docTaskCache[revId] = tasks;
     }
     g('docTaskLoading').style.display='none';
@@ -3401,38 +3424,61 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
       return;
     }
 
-    // Compute status per task: due_date = validFrom + response_time_days
+    // ── Auto-detect field names from first record ──
+    const sample = tasks[0];
+    const allKeys = Object.keys(sample);
+
+    // Find name field: prefer fields with 'name' in key, not 'document'/'revision'
+    const nameKey = allKeys.find(k => /\b(name|user|employee|staff|person|copyholder|recipient|assignee)\b/i.test(k) && !/document|revision|type|number/i.test(k))
+                 || allKeys.find(k => /name/i.test(k) && !/document|revision/i.test(k))
+                 || 'name';
+    // Find distribution date
+    const distKey = allKeys.find(k => /distribut/i.test(k)) || allKeys.find(k => /sent|issued|dist/i.test(k)) || null;
+    // Find acknowledged / read date
+    const ackKey  = allKeys.find(k => /acknowledg|read_date|readdate|accepted/i.test(k)) || null;
+    // Find response time (days)
+    const respKey = allKeys.find(k => /response_time|responsetime|due_days|days/i.test(k)) || null;
+    // Find due_date direct field
+    const dueDirKey = allKeys.find(k => /^due_date$|^duedate$/i.test(k)) || null;
+
+    console.log('[DocTask] Mapped keys:', {nameKey, distKey, ackKey, respKey, dueDirKey});
+
+    // Compute status per task
     const activeDate = validFrom ? new Date(validFrom) : null;
     let onTimeCnt=0, lateCnt=0, overCnt=0;
 
     const rows = tasks.map(t => {
-      const empName   = t.name || t.assignee_name || t.user_name || t.copyholder_name || '—';
-      const distDate  = t.distribution_date || t.distributed_date || null;
-      const ackDate   = t.acknowledged_date || t.read_date || t.completed_date || null;
-      const respDays  = parseInt(t.response_time_days || t.response_time || 0) || null;
+      const empName  = t[nameKey] || '—';
+      const distDate = distKey ? t[distKey] : null;
+      const ackDate  = ackKey  ? t[ackKey]  : null;
 
-      // due_date = active_date + response_time_days
+      // due_date: direct field first, else compute from activeDate + respDays
       let dueDate = null;
-      if(activeDate && respDays) {
-        dueDate = new Date(activeDate);
-        dueDate.setDate(dueDate.getDate() + respDays);
+      if(dueDirKey && t[dueDirKey]) {
+        dueDate = new Date(t[dueDirKey]);
+      } else if(respKey) {
+        const respDays = parseInt(t[respKey]) || null;
+        if(activeDate && respDays) {
+          dueDate = new Date(activeDate);
+          dueDate.setDate(dueDate.getDate() + respDays);
+        }
       }
 
-      // Compute delivery status from dates
+      // Delivery status
       let status;
-      const now = new Date();
+      const now = new Date(); now.setHours(0,0,0,0);
       if(ackDate && dueDate) {
         status = new Date(ackDate) <= dueDate ? 'ontime' : 'late';
       } else if(ackDate && !dueDate) {
-        status = 'ontime'; // acknowledged but no due date to compare
+        status = 'ontime';
       } else if(dueDate && now > dueDate) {
         status = 'overdue';
       } else {
         status = 'inprogress';
       }
 
-      if(status==='ontime')  onTimeCnt++;
-      else if(status==='late') lateCnt++;
+      if(status==='ontime')   onTimeCnt++;
+      else if(status==='late')    lateCnt++;
       else if(status==='overdue') overCnt++;
 
       const badge = {
@@ -3445,7 +3491,7 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
       return `<tr>
         <td style="font-size:11px">${esc(empName)}</td>
         <td style="font-size:11px;color:var(--muted)">${fd(distDate)}</td>
-        <td style="font-size:11px;color:var(--muted)">${dueDate?fd(dueDate.toISOString()):'—'}</td>
+        <td style="font-size:11px;color:var(--muted)">${dueDate ? fd(dueDate.toISOString()) : '—'}</td>
         <td style="font-size:11px;color:var(--muted)">${fd(ackDate)}</td>
         <td>${badge}</td>
       </tr>`;
@@ -3455,17 +3501,33 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
     s('dtk-done',  onTimeCnt);
     s('dtk-late',  lateCnt);
     s('dtk-over',  overCnt);
-    g('docTaskBody').innerHTML = rows.join('');
 
-    // Update page-level overdue/early cards
+    // ── If all values still look blank, append debug row showing available fields ──
+    const blankCheck = tasks.slice(0,3).every(t =>
+      !t[nameKey] && !t[distKey] && !t[ackKey]
+    );
+    let debugRow = '';
+    if(blankCheck) {
+      debugRow = `<tr><td colspan="5" style="padding:10px 14px;background:rgba(210,153,34,0.08);border-top:1px solid rgba(210,153,34,0.2)">
+        <div style="font-size:11px;color:var(--yellow);font-weight:600;margin-bottom:4px">⚠️ Debug — Tên field thực tế từ API:</div>
+        <div style="font-size:10px;color:var(--muted);word-break:break-all;line-height:1.6">${allKeys.join(' · ')}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px;word-break:break-all">Record[0]: ${esc(JSON.stringify(tasks[0]))}</div>
+      </td></tr>`;
+    }
+
+    g('docTaskBody').innerHTML = rows.join('') + debugRow;
+
+    // Update page-level KPI cards
     let pgOver=0, pgEarly=0;
     Object.entries(docTaskCache).forEach(([rid, ts]) => {
-      const vf = docData.find(d=>d.document_revision_id===rid)?.valid_from||null;
+      if(!Array.isArray(ts)) return;
+      const vf = docData.find(d=>String(d.document_revision_id)===String(rid))?.valid_from||null;
       const ad = vf ? new Date(vf) : null;
       ts.forEach(t => {
-        const ack = t.acknowledged_date||t.read_date||t.completed_date||null;
-        const rd  = parseInt(t.response_time_days||t.response_time||0)||null;
-        let due=null; if(ad&&rd){due=new Date(ad);due.setDate(due.getDate()+rd);}
+        const ack = ackKey ? t[ackKey] : null;
+        let due = null;
+        if(dueDirKey && t[dueDirKey]) { due = new Date(t[dueDirKey]); }
+        else if(respKey) { const rd=parseInt(t[respKey])||null; if(ad&&rd){due=new Date(ad);due.setDate(due.getDate()+rd);} }
         if(ack&&due){ if(new Date(ack)>due) pgOver++; else pgEarly++; }
         else if(due&&new Date()>due&&!ack) pgOver++;
       });
@@ -3475,6 +3537,7 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
   } catch(e) {
     g('docTaskLoading').style.display='none';
     g('docTaskBody').innerHTML=`<tr><td colspan="5" style="text-align:center;padding:24px;color:#ff6b6b">Lỗi: ${esc(e.message)}</td></tr>`;
+    console.error('[DocTask] Error:', e);
   }
 }
 
