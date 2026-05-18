@@ -836,7 +836,7 @@ tr:last-child td{border-bottom:none}
                   <th>Rev</th>
                   <th>Status</th>
                   <th onclick="docSort('owner_name')" style="cursor:pointer">Owner ↕</th>
-                  <th onclick="docSort('review_date')" style="cursor:pointer">Review Date ↕</th>
+                  <th onclick="docSort('valid_from')" style="cursor:pointer">Active Date ↕</th>
                   <th>Distributed</th>
                   <th>Action</th>
                 </tr></thead>
@@ -3313,7 +3313,7 @@ function renderDocPage() {
       <td style="font-size:11px;color:var(--muted)">${esc(r.revision_number)||'—'}</td>
       <td>${docStatBadge(r.document_revision_status)}</td>
       <td style="font-size:11px;color:var(--muted)">${esc(r.owner_name)||'—'}</td>
-      <td style="font-size:11px;color:var(--muted)">${fd(r.review_date)}</td>
+      <td style="font-size:11px;color:var(--muted)">${fd(r.valid_from)}</td>
       <td style="text-align:center">${r.has_been_distributed===true?'<span style="color:var(--green)">✅</span>':'<span style="color:var(--muted)">—</span>'}</td>
       <td><button class="btn-sm" onclick="showDocDetail('${esc(r.document_revision_id)}','${esc(r.document_number||'')}','${esc((r.document_revision_title||'').replace(/'/g,''))}')">Chi tiết</button></td>
     </tr>`);
