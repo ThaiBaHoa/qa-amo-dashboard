@@ -352,6 +352,7 @@ tr:last-child td{border-bottom:none}
         <button class="nav-item" onclick="showPage('allforms',this)"><span class="nav-icon">📄</span>All Forms</button>
         <button class="nav-item" onclick="showPage('pavoi',this)"><span class="nav-icon">🔍</span>PAVOI Detail</button>
         <button class="nav-item" onclick="showPage('auditplan',this)"><span class="nav-icon">📅</span>Audit Plan</button>
+        <button class="nav-item" onclick="showPage('docs',this)"><span class="nav-icon">📁</span>Documents</button>
         <button class="nav-item" onclick="showPage('reports',this)"><span class="nav-icon">📊</span>Xuất Báo Cáo</button>
         <button class="nav-item" onclick="showPage('help',this)"><span class="nav-icon">❓</span>Hướng Dẫn</button>
         <div id="adminNav" style="display:none">
@@ -779,6 +780,72 @@ tr:last-child td{border-bottom:none}
           </div>
         </div>
 
+
+        <!-- DOCUMENTS PAGE -->
+        <div class="page" id="page-docs">
+          <!-- Filter bar -->
+          <div class="tbl-card" style="padding:10px 12px;margin-bottom:8px;flex-shrink:0">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <div class="tbl-title" style="margin-right:4px">Tài Liệu</div>
+              <div class="tbl-count" id="docCnt">—</div>
+              <select class="sel" id="docTypeF" onchange="renderDocPage()" style="min-width:160px"><option value="">Tất cả loại</option></select>
+              <select class="sel" id="docYearF" onchange="renderDocPage()"><option value="">Tất cả năm</option></select>
+              <div class="srch-wrap"><span class="srch-icon">🔍</span>
+                <input class="srch" id="docSrch" placeholder="Tìm số, tiêu đề..." oninput="dRenderDoc()">
+              </div>
+              <button class="btn-sm" id="docRefreshBtn" onclick="loadDocuments(true)" style="margin-left:auto">↻ Reload</button>
+            </div>
+          </div>
+          <!-- KPI cards -->
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:8px;flex-shrink:0">
+            <div class="chart-card" style="text-align:center;padding:10px 8px">
+              <div class="kpi-lbl">Tổng tài liệu</div><div class="kpi-val" id="dk-total" style="color:var(--blue)">—</div>
+            </div>
+            <div class="chart-card" style="text-align:center;padding:10px 8px">
+              <div class="kpi-lbl">Active</div><div class="kpi-val" id="dk-active" style="color:var(--green)">—</div>
+            </div>
+            <div class="chart-card" style="text-align:center;padding:10px 8px">
+              <div class="kpi-lbl">Đã phân phối</div><div class="kpi-val" id="dk-dist" style="color:var(--blue)">—</div>
+            </div>
+            <div class="chart-card" style="text-align:center;padding:10px 8px">
+              <div class="kpi-lbl">Overdue</div><div class="kpi-val" id="dk-over" style="color:#ff6b6b">—</div><div class="kpi-sub" style="font-size:10px;color:var(--muted)">từ tasks đã load</div>
+            </div>
+            <div class="chart-card" style="text-align:center;padding:10px 8px">
+              <div class="kpi-lbl">Completed Early</div><div class="kpi-val" id="dk-early" style="color:var(--green)">—</div><div class="kpi-sub" style="font-size:10px;color:var(--muted)">từ tasks đã load</div>
+            </div>
+          </div>
+          <!-- Charts row -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;flex-shrink:0">
+            <div class="chart-card">
+              <div class="chart-head"><div><div class="chart-title">Documents by Type</div><div class="chart-sub">Top 10</div></div></div>
+              <div class="ch-wrap" style="height:200px"><canvas id="cDocType"></canvas></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-head"><div><div class="chart-title">Documents by Year</div><div class="chart-sub">Theo created_date</div></div></div>
+              <div class="ch-wrap" style="height:200px"><canvas id="cDocYear"></canvas></div>
+            </div>
+          </div>
+          <!-- Table -->
+          <div class="tbl-card" style="flex:1;min-height:0;display:flex;flex-direction:column">
+            <div class="tbl-wrap" style="flex:1;min-height:0">
+              <table>
+                <thead><tr>
+                  <th onclick="docSort('document_number')" style="cursor:pointer">Doc Number ↕</th>
+                  <th onclick="docSort('document_title')" style="cursor:pointer">Tiêu Đề ↕</th>
+                  <th onclick="docSort('document_type')" style="cursor:pointer">Loại ↕</th>
+                  <th>Rev</th>
+                  <th>Status</th>
+                  <th onclick="docSort('document_owner')" style="cursor:pointer">Owner ↕</th>
+                  <th onclick="docSort('scheduled_review_date')" style="cursor:pointer">Review Date ↕</th>
+                  <th>Distributed</th>
+                  <th>Action</th>
+                </tr></thead>
+                <tbody id="docBody"></tbody>
+              </table>
+            </div>
+            <div class="tbl-foot"><span id="docInfo">—</span><div class="pg-btns" id="docPg"></div></div>
+          </div>
+        </div>
 
         <!-- REPORTS PAGE -->
         <div class="page" id="page-reports">
@@ -1231,6 +1298,45 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- DOCUMENT DETAIL MODAL -->
+<div class="overlay" id="docModal" onclick="closeDocModal(event)" style="z-index:220;display:none">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:94%;max-width:900px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div>
+        <div style="font-size:15px;font-weight:600" id="docModalTitle">—</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px" id="docModalSub">—</div>
+      </div>
+      <button onclick="closeDocModal()" style="background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);font-size:16px;cursor:pointer;padding:3px 10px;border-radius:6px;flex-shrink:0;margin-left:12px">✕</button>
+    </div>
+    <!-- Task KPI summary -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px 18px;flex-shrink:0;border-bottom:1px solid var(--border)">
+      <div class="chart-card" style="text-align:center;padding:8px">
+        <div class="kpi-lbl">Total Tasks</div><div class="kpi-val" id="dtk-total" style="color:var(--blue)">—</div>
+      </div>
+      <div class="chart-card" style="text-align:center;padding:8px">
+        <div class="kpi-lbl">Completed</div><div class="kpi-val" id="dtk-done" style="color:var(--green)">—</div>
+      </div>
+      <div class="chart-card" style="text-align:center;padding:8px">
+        <div class="kpi-lbl">Late</div><div class="kpi-val" id="dtk-late" style="color:var(--yellow)">—</div>
+      </div>
+      <div class="chart-card" style="text-align:center;padding:8px">
+        <div class="kpi-lbl">Overdue</div><div class="kpi-val" id="dtk-over" style="color:#ff6b6b">—</div>
+      </div>
+    </div>
+    <!-- Task table -->
+    <div style="overflow:auto;flex:1;min-height:0">
+      <table class="stat-tbl" style="width:100%">
+        <thead><tr>
+          <th>Nhân Viên</th><th>Stage</th><th>Task Status</th>
+          <th>Delivery Status</th><th>Target Date</th><th>Completed Date</th>
+        </tr></thead>
+        <tbody id="docTaskBody"></tbody>
+      </table>
+    </div>
+    <div id="docTaskLoading" style="text-align:center;padding:24px;color:var(--muted);font-size:13px;display:none">Đang tải tasks...</div>
+  </div>
+</div>
+
 <!-- AUDIT DETAIL MODAL -->
 <div class="overlay" id="auditModal" onclick="closeAuditModal(event)" style="z-index:210">
   <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:93%;max-width:1020px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
@@ -1315,7 +1421,7 @@ const { createClient } = supabase;
 const sb = createClient(SUPA_URL, SUPA_KEY);
 
 // ── STATE ────────────────────────────────────────────────────
-let curUser = null, allData = [], auditData = [], charts = {}, userFilter = 'all', isLoading = false;
+let curUser = null, allData = [], auditData = [], docData = [], docTaskCache = {}, charts = {}, userFilter = 'all', isLoading = false;
 const PS = 25; // page size
 
 // Table states — mỗi table có state riêng
@@ -1325,6 +1431,7 @@ const TS = {
   af:     { page:1, sort:'report_ageing', asc:true, sf:'all', ff:'', yr:'', srch:'' },
   pavoi:  { page:1, sort:'report_ageing', asc:true, sf:'all', yr:'', srch:'' },
   audit:  { page:1, sort:'scheduled_start_date', asc:false, sf:'all', typeF:'all', yr:'', srch:'' },
+  docs:   { page:1, sort:'modified_date', asc:false, typeF:'', yr:'', srch:'' },
 };
 
 // ── AUTH ─────────────────────────────────────────────────────
@@ -3023,7 +3130,7 @@ async function makeAdmin(id){
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────
-const PT={overview:'Overview',openrfi:'Open RFI',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',auditplan:'Audit Plan',reports:'Xuất Báo Cáo',help:'Hướng Dẫn Sử Dụng',admin:'Quản lý Users'};
+const PT={overview:'Overview',openrfi:'Open RFI',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',auditplan:'Audit Plan',docs:'Quản Lý Tài Liệu',reports:'Xuất Báo Cáo',help:'Hướng Dẫn Sử Dụng',admin:'Quản lý Users'};
 function showPage(name,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -3033,6 +3140,7 @@ function showPage(name,btn){
   s('pageTitle',PT[name]||name);
   if(name==='admin')loadUsers();
   if(name==='reports'){initReportFilters();generateReport();}
+  if(name==='docs'){ if(!docData.length) loadDocuments(); else renderDocPage(); }
   if(name==='overview'){
     setTimeout(()=>{
       Object.values(charts).forEach(c=>{ try{c.resize()}catch(e){} });
@@ -3101,6 +3209,229 @@ function closeSidebar(){
   if(!sb)return;
   sb.classList.remove('mob-open');
   ov.classList.remove('show');
+  document.body.style.overflow='';
+}
+
+// ── DOCUMENTS ─────────────────────────────────────────────────
+let docLoading = false;
+
+async function loadDocuments(force=false) {
+  if(docLoading){toast('Đang tải documents...','info');return;}
+  if(docData.length && !force){renderDocPage();return;}
+  docLoading=true;
+  const btn=g('docRefreshBtn'); if(btn)btn.disabled=true;
+  setOv(true,'Đang tải tài liệu...','');
+  try {
+    const raw = await fetchAll(
+      G_URL + 'dwreporting_document_summary' +
+      "?$filter=document_revision_status eq 'Active'" +
+      '&$select=document_revision_id,document_number,document_title,document_type,' +
+      'document_revision,document_revision_status,document_owner,scheduled_review_date,' +
+      'has_been_distributed,created_date,modified_date'
+    );
+    // Dedup by document_revision_id — keep newest modified_date
+    const dedupMap = {};
+    raw.forEach(r => {
+      const id = r.document_revision_id;
+      if(!id) return;
+      const ex = dedupMap[id];
+      if(!ex || new Date(r.modified_date||0) > new Date(ex.modified_date||0)) {
+        dedupMap[id] = r;
+      }
+    });
+    docData = Object.values(dedupMap);
+    toast(`✓ Đã load ${docData.length} tài liệu`,'ok');
+    renderDocPage();
+  } catch(e) {
+    toast('Lỗi load documents: '+e.message,'err');
+  } finally {
+    docLoading=false;
+    if(btn)btn.disabled=false;
+    setOv(false);
+  }
+}
+
+function renderDocPage() {
+  if(!docData.length) return;
+  const ts = TS.docs;
+  const typeF = g('docTypeF')?.value||'';
+  const yearF = g('docYearF')?.value||'';
+  const srch  = (g('docSrch')?.value||'').toLowerCase();
+
+  // Populate filters (once)
+  const types = [...new Set(docData.map(r=>r.document_type).filter(Boolean))].sort();
+  const typeEl = g('docTypeF');
+  if(typeEl && typeEl.options.length <= 1) {
+    typeEl.innerHTML = '<option value="">Tất cả loại</option>' +
+      types.map(t=>`<option value="${t}">${esc(t)}</option>`).join('');
+    if(typeF) typeEl.value = typeF;
+  }
+  const years = [...new Set(docData.map(r=>r.created_date?new Date(r.created_date).getFullYear():null).filter(Boolean))].sort((a,b)=>b-a);
+  const yearEl = g('docYearF');
+  if(yearEl && yearEl.options.length <= 1) {
+    yearEl.innerHTML = '<option value="">Tất cả năm</option>' +
+      years.map(y=>`<option value="${y}">${y}</option>`).join('');
+    if(yearF) yearEl.value = yearF;
+  }
+
+  // Filter
+  let data = docData.filter(r => {
+    if(typeF && r.document_type !== typeF) return false;
+    if(yearF && String(new Date(r.created_date||0).getFullYear()) !== yearF) return false;
+    if(srch){
+      const t = [r.document_number, r.document_title].join(' ').toLowerCase();
+      if(!t.includes(srch)) return false;
+    }
+    return true;
+  });
+
+  // KPI cards (use full docData for aggregates, not filtered)
+  s('dk-total', docData.length);
+  s('dk-active', docData.filter(r=>r.document_revision_status==='Active').length);
+  s('dk-dist',  docData.filter(r=>r.has_been_distributed===true||r.has_been_distributed==='true').length);
+  // Overdue & Early from cached tasks
+  let overCnt=0, earlyCnt=0;
+  Object.values(docTaskCache).forEach(tasks=>{
+    tasks.forEach(t=>{
+      if(t.task_delivery_status==='overdue') overCnt++;
+      if(t.task_delivery_status==='completed early') earlyCnt++;
+    });
+  });
+  s('dk-over', overCnt||'—'); s('dk-early', earlyCnt||'—');
+
+  // Sort
+  data = sortD(data, ts.sort, ts.asc);
+  s('docCnt', data.length + ' tài liệu');
+
+  // Build charts
+  buildDocCharts(data);
+
+  // Table
+  renderPaged('docBody','docInfo','docPg','docCnt',data,ts,r=>`
+    <tr>
+      <td><b style="font-size:11px">${esc(r.document_number)||'—'}</b></td>
+      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${esc(r.document_title)||'—'}</td>
+      <td style="font-size:11px"><span style="background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px">${esc(r.document_type)||'—'}</span></td>
+      <td style="font-size:11px;color:var(--muted)">${esc(r.document_revision)||'—'}</td>
+      <td>${docStatBadge(r.document_revision_status)}</td>
+      <td style="font-size:11px;color:var(--muted)">${esc(r.document_owner)||'—'}</td>
+      <td style="font-size:11px;color:var(--muted)">${fd(r.scheduled_review_date)}</td>
+      <td style="text-align:center">${(r.has_been_distributed===true||r.has_been_distributed==='true')?'<span style="color:var(--green)">✅</span>':'<span style="color:var(--muted)">—</span>'}</td>
+      <td><button class="btn-sm" onclick="showDocDetail('${esc(r.document_revision_id)}','${esc(r.document_number||'')}','${esc((r.document_title||'').replace(/'/g,''))}')">Chi tiết</button></td>
+    </tr>`);
+}
+
+function buildDocCharts(data) {
+  // Chart 1: by type (horizontal bar, top 10)
+  const typeMap = {};
+  data.forEach(r=>{ const t=r.document_type||'?'; typeMap[t]=(typeMap[t]||0)+1; });
+  const typeEntries = Object.entries(typeMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  dc('cDocType');
+  if(g('cDocType')) charts['cDocType']=new Chart(g('cDocType'),{type:'bar',
+    data:{labels:typeEntries.map(e=>e[0]),datasets:[{data:typeEntries.map(e=>e[1]),backgroundColor:'#58A6FF',borderRadius:3}]},
+    options:{...CO,indexAxis:'y',plugins:{legend:{display:false}},scales:{
+      x:{ticks:{color:'#8B949E',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}},
+      y:{ticks:{color:'#8B949E',font:{size:9},callback:v=>v.length>22?v.slice(0,22)+'…':v},grid:{display:false}}}}});
+
+  // Chart 2: by year (vertical bar)
+  const yearMap = {};
+  data.forEach(r=>{ if(!r.created_date)return; const y=new Date(r.created_date).getFullYear(); yearMap[y]=(yearMap[y]||0)+1; });
+  const yKeys = Object.keys(yearMap).sort();
+  dc('cDocYear');
+  if(g('cDocYear')) charts['cDocYear']=new Chart(g('cDocYear'),{type:'bar',
+    data:{labels:yKeys,datasets:[{label:'Tài liệu',data:yKeys.map(k=>yearMap[k]),backgroundColor:'#3FB950',borderRadius:3}]},
+    options:{...CO,plugins:{legend:{display:false}},scales:{
+      x:{ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
+      y:{ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}}}}});
+}
+
+function docStatBadge(st) {
+  if(!st) return '<span style="color:var(--muted)">—</span>';
+  if(st==='Active') return `<span style="background:rgba(63,185,80,.15);color:var(--green);padding:2px 8px;border-radius:4px;font-size:11px">Active</span>`;
+  return `<span style="background:rgba(139,148,158,.15);color:var(--muted);padding:2px 8px;border-radius:4px;font-size:11px">${esc(st)}</span>`;
+}
+
+function docDelivBadge(ds) {
+  if(!ds) return '<span style="color:var(--muted)">—</span>';
+  const m = {
+    'completed early': `<span style="background:rgba(63,185,80,.15);color:var(--green);padding:2px 8px;border-radius:4px;font-size:11px">✅ Đúng hạn</span>`,
+    'completed late':  `<span style="background:rgba(210,153,34,.15);color:var(--yellow);padding:2px 8px;border-radius:4px;font-size:11px">⚠️ Trễ</span>`,
+    'in progress':     `<span style="background:rgba(88,166,255,.15);color:var(--blue);padding:2px 8px;border-radius:4px;font-size:11px">🔵 Đang xử lý</span>`,
+    'overdue':         `<span style="background:rgba(255,107,107,.15);color:#ff6b6b;padding:2px 8px;border-radius:4px;font-size:11px">🔴 Quá hạn</span>`,
+  };
+  return m[ds.toLowerCase()] || `<span style="color:var(--muted);font-size:11px">${esc(ds)}</span>`;
+}
+
+function docSort(col) {
+  TS.docs.asc = TS.docs.sort===col ? !TS.docs.asc : false;
+  TS.docs.sort = col; TS.docs.page=1;
+  renderDocPage();
+}
+
+let dRenderDocT;
+function dRenderDoc(){ clearTimeout(dRenderDocT); dRenderDocT=setTimeout(()=>{ TS.docs.page=1; renderDocPage(); },250); }
+
+async function showDocDetail(revId, docNum, docTitle) {
+  const modal = g('docModal');
+  s('docModalTitle', docNum||'—');
+  s('docModalSub', docTitle||'—');
+  s('dtk-total','—'); s('dtk-done','—'); s('dtk-late','—'); s('dtk-over','—');
+  g('docTaskBody').innerHTML='';
+  g('docTaskLoading').style.display='block';
+  modal.style.display='flex';
+  document.body.style.overflow='hidden';
+
+  try {
+    let tasks = docTaskCache[revId];
+    if(!tasks) {
+      const raw = await fetchAll(
+        G_URL + 'dwreporting_document_task' +
+        '?$filter=document_revision_id eq ' + revId +
+        '&$select=assignee_name,stage_name,task_status,task_delivery_status,target_date,completed_date'
+      );
+      tasks = raw;
+      docTaskCache[revId] = tasks;
+      // Update aggregate KPI cards
+      let overCnt=0, earlyCnt=0;
+      Object.values(docTaskCache).forEach(ts=>{
+        ts.forEach(t=>{
+          if(t.task_delivery_status==='overdue') overCnt++;
+          if(t.task_delivery_status==='completed early') earlyCnt++;
+        });
+      });
+      s('dk-over', overCnt||'—'); s('dk-early', earlyCnt||'—');
+    }
+    g('docTaskLoading').style.display='none';
+
+    // Summary KPIs
+    const done  = tasks.filter(t=>['completed early','completed late'].some(s=>t.task_delivery_status===s)).length;
+    const late  = tasks.filter(t=>t.task_delivery_status==='completed late').length;
+    const over  = tasks.filter(t=>t.task_delivery_status==='overdue').length;
+    s('dtk-total', tasks.length); s('dtk-done', done); s('dtk-late', late); s('dtk-over', over);
+
+    // Table rows
+    if(!tasks.length) {
+      g('docTaskBody').innerHTML='<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">Không có task</td></tr>';
+      return;
+    }
+    g('docTaskBody').innerHTML = tasks.map(t=>`
+      <tr>
+        <td style="font-size:11px">${esc(t.assignee_name)||'—'}</td>
+        <td style="font-size:11px">${esc(t.stage_name)||'—'}</td>
+        <td style="font-size:11px">${esc(t.task_status)||'—'}</td>
+        <td>${docDelivBadge(t.task_delivery_status)}</td>
+        <td style="font-size:11px;color:var(--muted)">${fd(t.target_date)}</td>
+        <td style="font-size:11px;color:var(--muted)">${fd(t.completed_date)}</td>
+      </tr>`).join('');
+  } catch(e) {
+    g('docTaskLoading').style.display='none';
+    g('docTaskBody').innerHTML=`<tr><td colspan="6" style="text-align:center;padding:24px;color:#ff6b6b">Lỗi: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function closeDocModal(e) {
+  if(e && e.target !== g('docModal')) return;
+  g('docModal').style.display='none';
   document.body.style.overflow='';
 }
 </script>
