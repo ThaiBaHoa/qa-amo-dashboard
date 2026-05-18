@@ -379,7 +379,8 @@ tr:last-child td{border-bottom:none}
         <div class="topbar-right">
 
           <div class="live-badge" id="liveBadge" style="display:none">● <span id="recCount">0</span> reports</div>
-          <button class="btn-sm" onclick="loadData()">↻ Refresh</button>
+          <span id="cacheAge" style="font-size:11px;color:var(--muted);white-space:nowrap"></span>
+          <button class="btn-sm" id="btnRefresh" onclick="loadData(true)">↻ Refresh</button>
         </div>
       </div>
 
@@ -1330,7 +1331,7 @@ function initApp() {
   g('sideName').textContent=curUser.full_name;
   g('sideRole').textContent=curUser.role==='admin'?'🔑 Administrator':'👤 Viewer';
   if(curUser.role==='admin') g('adminNav').style.display='';
-  loadData();
+  if(!cacheLoad()) loadData();
 }
 
 const dRenderOpen  = debounce(renderOpen,  300);
@@ -1343,8 +1344,53 @@ window.addEventListener('DOMContentLoaded',()=>{
   if(s){curUser=JSON.parse(s);initApp();}
 });
 
+// ── CACHE (4 giờ) ────────────────────────────────────────────
+const CACHE_KEY = 'qaAmoV4';
+const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
+
+function cacheLoad() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return false;
+    const c = JSON.parse(raw);
+    if (!c.ts || !c.a || Date.now() - c.ts > CACHE_TTL) return false;
+    allData   = c.a;
+    auditData = c.b || [];
+    renderAll();
+    g('liveBadge').style.display = '';
+    g('recCount').textContent = allData.length;
+    updateCacheAge(c.ts);
+    const age = Math.round((Date.now()-c.ts)/60000);
+    toast(`✓ Cache (${age < 60 ? age+'ph' : Math.floor(age/60)+'h'} trước) — ${allData.length} reports, ${auditData.length} audits · Bấm ↻ để load mới`,'ok');
+    return true;
+  } catch { return false; }
+}
+
+function cacheSave() {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), a:allData, b:auditData}));
+    updateCacheAge(Date.now());
+  } catch {
+    // Quota exceeded — thử lưu không có wf_stages
+    try {
+      const slim = allData.map(r=>({...r,wf_stages:[]}));
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), a:slim, b:auditData}));
+      updateCacheAge(Date.now());
+    } catch { /* bỏ qua nếu vẫn quá lớn */ }
+  }
+}
+
+function updateCacheAge(ts) {
+  const el = g('cacheAge');
+  if (!el) return;
+  const age = Math.round((Date.now()-ts)/60000);
+  const nextH = Math.ceil((CACHE_TTL - (Date.now()-ts)) / 3600000);
+  el.textContent = age < 2 ? 'Vừa load' : age < 60 ? `${age}ph trước` : `${Math.floor(age/60)}h${age%60?age%60+'ph':''} trước`;
+  el.title = `Sẽ tự động hết hạn sau ~${nextH}h — bấm ↻ Refresh để load ngay`;
+}
+
 // ── DATA LOADING ─────────────────────────────────────────────
-async function loadData() {
+async function loadData(forceRefresh=false) {
   if(isLoading){toast('Đang tải dữ liệu, vui lòng chờ...','info');return;}
   isLoading=true;
   setOv(true,'Đang kết nối Galileo...','');
@@ -1575,6 +1621,7 @@ async function loadData() {
     g('liveBadge').style.display='';
     g('recCount').textContent=allData.length;
     toast(`✓ Đã load ${allData.length} reports, ${auditData.length} audits từ QA AMO`,'ok');
+    cacheSave();
     setOv(false);
 
   } catch(e) {
