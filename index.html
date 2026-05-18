@@ -3222,25 +3222,28 @@ async function loadDocuments(force=false) {
   const btn=g('docRefreshBtn'); if(btn)btn.disabled=true;
   setOv(true,'Đang tải tài liệu...','');
   try {
-    const raw = await fetchAll(
-      G_URL + 'dwreporting_document_summary' +
-      "?$filter=document_revision_status eq 'Active'" +
-      '&$select=document_revision_id,document_number,document_title,document_type,' +
-      'document_revision,document_revision_status,document_owner,scheduled_review_date,' +
-      'has_been_distributed,created_date,modified_date'
-    );
-    // Dedup by document_revision_id — keep newest modified_date
+    const raw = await fetchAll(G_URL + 'dwreporting_document_summary');
+    if(raw.length > 0) {
+      console.log('[Docs] Fields:', JSON.stringify(Object.keys(raw[0])));
+      console.log('[Docs] Record[0]:', JSON.stringify(raw[0]));
+    }
+    // Filter Active client-side (avoid OData string filter 400 issues)
+    const active = raw.filter(r => {
+      const st = r.document_revision_status || r.revision_status || r.status || '';
+      return st === 'Active' || st === '' || !st; // include if field name unknown
+    });
+    // Dedup by document_revision_id — keep newest by modified_date
     const dedupMap = {};
-    raw.forEach(r => {
-      const id = r.document_revision_id;
+    active.forEach(r => {
+      const id = r.document_revision_id || r.id || r.revision_id;
       if(!id) return;
       const ex = dedupMap[id];
-      if(!ex || new Date(r.modified_date||0) > new Date(ex.modified_date||0)) {
-        dedupMap[id] = r;
-      }
+      const dNew = r.modified_date || r.modified || r.last_modified || '';
+      const dEx  = ex ? (ex.modified_date || ex.modified || ex.last_modified || '') : '';
+      if(!ex || dNew > dEx) dedupMap[id] = r;
     });
     docData = Object.values(dedupMap);
-    toast(`✓ Đã load ${docData.length} tài liệu`,'ok');
+    toast(`✓ Đã load ${docData.length} tài liệu (từ ${raw.length} records)`,'ok');
     renderDocPage();
   } catch(e) {
     toast('Lỗi load documents: '+e.message,'err');
