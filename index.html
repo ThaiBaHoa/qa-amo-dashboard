@@ -1431,7 +1431,7 @@ const TS = {
   af:     { page:1, sort:'report_ageing', asc:true, sf:'all', ff:'', yr:'', srch:'' },
   pavoi:  { page:1, sort:'report_ageing', asc:true, sf:'all', yr:'', srch:'' },
   audit:  { page:1, sort:'scheduled_start_date', asc:false, sf:'all', typeF:'all', yr:'', srch:'' },
-  docs:   { page:1, sort:'modified_date', asc:false, typeF:'', yr:'', srch:'' },
+  docs:   { page:1, sort:'document_number', asc:true, typeF:'', yr:'', srch:'' },
 };
 
 // ── AUTH ─────────────────────────────────────────────────────
@@ -3227,20 +3227,15 @@ async function loadDocuments(force=false) {
       console.log('[Docs] Fields:', JSON.stringify(Object.keys(raw[0])));
       console.log('[Docs] Record[0]:', JSON.stringify(raw[0]));
     }
-    // Filter Active client-side (avoid OData string filter 400 issues)
-    const active = raw.filter(r => {
-      const st = r.document_revision_status || r.revision_status || r.status || '';
-      return st === 'Active' || st === '' || !st; // include if field name unknown
-    });
+    // Filter Active client-side
+    const active = raw.filter(r => r.document_revision_status === 'Active');
     // Dedup by document_revision_id — keep newest by modified_date
     const dedupMap = {};
     active.forEach(r => {
-      const id = r.document_revision_id || r.id || r.revision_id;
+      const id = r.document_revision_id;
       if(!id) return;
       const ex = dedupMap[id];
-      const dNew = r.modified_date || r.modified || r.last_modified || '';
-      const dEx  = ex ? (ex.modified_date || ex.modified || ex.last_modified || '') : '';
-      if(!ex || dNew > dEx) dedupMap[id] = r;
+      if(!ex || (r.modified_date||'') > (ex.modified_date||'')) dedupMap[id] = r;
     });
     docData = Object.values(dedupMap);
     toast(`✓ Đã load ${docData.length} tài liệu (từ ${raw.length} records)`,'ok');
@@ -3266,7 +3261,7 @@ function renderDocPage() {
   const typeEl = g('docTypeF');
   if(typeEl && typeEl.options.length <= 1) {
     typeEl.innerHTML = '<option value="">Tất cả loại</option>' +
-      types.map(t=>`<option value="${t}">${esc(t)}</option>`).join('');
+      types.map(t=>`<option value="${t.trim()}">${esc(t.trim())}</option>`).join('');
     if(typeF) typeEl.value = typeF;
   }
   const years = [...new Set(docData.map(r=>r.created_date?new Date(r.created_date).getFullYear():null).filter(Boolean))].sort((a,b)=>b-a);
@@ -3279,19 +3274,19 @@ function renderDocPage() {
 
   // Filter
   let data = docData.filter(r => {
-    if(typeF && r.document_type !== typeF) return false;
+    if(typeF && (r.document_type||'').trim() !== typeF) return false;
     if(yearF && String(new Date(r.created_date||0).getFullYear()) !== yearF) return false;
     if(srch){
-      const t = [r.document_number, r.document_title].join(' ').toLowerCase();
+      const t = [r.document_number, r.document_revision_title].join(' ').toLowerCase();
       if(!t.includes(srch)) return false;
     }
     return true;
   });
 
-  // KPI cards (use full docData for aggregates, not filtered)
+  // KPI cards (use full docData)
   s('dk-total', docData.length);
   s('dk-active', docData.filter(r=>r.document_revision_status==='Active').length);
-  s('dk-dist',  docData.filter(r=>r.has_been_distributed===true||r.has_been_distributed==='true').length);
+  s('dk-dist',  docData.filter(r=>r.has_been_distributed===true).length);
   // Overdue & Early from cached tasks
   let overCnt=0, earlyCnt=0;
   Object.values(docTaskCache).forEach(tasks=>{
@@ -3313,14 +3308,14 @@ function renderDocPage() {
   renderPaged('docBody','docInfo','docPg','docCnt',data,ts,r=>`
     <tr>
       <td><b style="font-size:11px">${esc(r.document_number)||'—'}</b></td>
-      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${esc(r.document_title)||'—'}</td>
-      <td style="font-size:11px"><span style="background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px">${esc(r.document_type)||'—'}</span></td>
-      <td style="font-size:11px;color:var(--muted)">${esc(r.document_revision)||'—'}</td>
+      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${esc(r.document_revision_title)||'—'}</td>
+      <td style="font-size:11px"><span style="background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px">${esc((r.document_type||'').trim())||'—'}</span></td>
+      <td style="font-size:11px;color:var(--muted)">${esc(r.revision_number)||'—'}</td>
       <td>${docStatBadge(r.document_revision_status)}</td>
-      <td style="font-size:11px;color:var(--muted)">${esc(r.document_owner)||'—'}</td>
-      <td style="font-size:11px;color:var(--muted)">${fd(r.scheduled_review_date)}</td>
-      <td style="text-align:center">${(r.has_been_distributed===true||r.has_been_distributed==='true')?'<span style="color:var(--green)">✅</span>':'<span style="color:var(--muted)">—</span>'}</td>
-      <td><button class="btn-sm" onclick="showDocDetail('${esc(r.document_revision_id)}','${esc(r.document_number||'')}','${esc((r.document_title||'').replace(/'/g,''))}')">Chi tiết</button></td>
+      <td style="font-size:11px;color:var(--muted)">${esc(r.owner_name)||'—'}</td>
+      <td style="font-size:11px;color:var(--muted)">${fd(r.review_date)}</td>
+      <td style="text-align:center">${r.has_been_distributed===true?'<span style="color:var(--green)">✅</span>':'<span style="color:var(--muted)">—</span>'}</td>
+      <td><button class="btn-sm" onclick="showDocDetail('${esc(r.document_revision_id)}','${esc(r.document_number||'')}','${esc((r.document_revision_title||'').replace(/'/g,''))}')">Chi tiết</button></td>
     </tr>`);
 }
 
@@ -3331,10 +3326,12 @@ function buildDocCharts(data) {
   const typeEntries = Object.entries(typeMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
   dc('cDocType');
   if(g('cDocType')) charts['cDocType']=new Chart(g('cDocType'),{type:'bar',
-    data:{labels:typeEntries.map(e=>e[0]),datasets:[{data:typeEntries.map(e=>e[1]),backgroundColor:'#58A6FF',borderRadius:3}]},
+    data:{labels:typeEntries.map(e=>e[0].trim()),datasets:[{data:typeEntries.map(e=>e[1]),backgroundColor:'#58A6FF',borderRadius:3}]},
     options:{...CO,indexAxis:'y',plugins:{legend:{display:false}},scales:{
       x:{ticks:{color:'#8B949E',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}},
-      y:{ticks:{color:'#8B949E',font:{size:9},callback:v=>v.length>22?v.slice(0,22)+'…':v},grid:{display:false}}}}});
+      y:{ticks:{color:'#8B949E',font:{size:9},
+            callback:function(v){const l=this.getLabelForValue(v);return l&&l.length>24?l.slice(0,24)+'…':l||v;}},
+         grid:{display:false}}}}});
 
   // Chart 2: by year (vertical bar)
   const yearMap = {};
@@ -3389,9 +3386,9 @@ async function showDocDetail(revId, docNum, docTitle) {
     if(!tasks) {
       const raw = await fetchAll(
         G_URL + 'dwreporting_document_task' +
-        '?$filter=document_revision_id eq ' + revId +
-        '&$select=assignee_name,stage_name,task_status,task_delivery_status,target_date,completed_date'
+        '?$filter=document_revision_id eq ' + revId
       );
+      if(raw.length>0){console.log('[DocTask] Fields:',JSON.stringify(Object.keys(raw[0])));console.log('[DocTask] Record[0]:',JSON.stringify(raw[0]));}
       tasks = raw;
       docTaskCache[revId] = tasks;
       // Update aggregate KPI cards
