@@ -1311,24 +1311,24 @@ tr:last-child td{border-bottom:none}
     <!-- Task KPI summary -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px 18px;flex-shrink:0;border-bottom:1px solid var(--border)">
       <div class="chart-card" style="text-align:center;padding:8px">
-        <div class="kpi-lbl">Total Tasks</div><div class="kpi-val" id="dtk-total" style="color:var(--blue)">—</div>
+        <div class="kpi-lbl">Total</div><div class="kpi-val" id="dtk-total" style="color:var(--blue)">—</div>
       </div>
       <div class="chart-card" style="text-align:center;padding:8px">
-        <div class="kpi-lbl">Completed</div><div class="kpi-val" id="dtk-done" style="color:var(--green)">—</div>
+        <div class="kpi-lbl">Đúng hạn</div><div class="kpi-val" id="dtk-done" style="color:var(--green)">—</div>
       </div>
       <div class="chart-card" style="text-align:center;padding:8px">
-        <div class="kpi-lbl">Late</div><div class="kpi-val" id="dtk-late" style="color:var(--yellow)">—</div>
+        <div class="kpi-lbl">Trễ</div><div class="kpi-val" id="dtk-late" style="color:var(--yellow)">—</div>
       </div>
       <div class="chart-card" style="text-align:center;padding:8px">
-        <div class="kpi-lbl">Overdue</div><div class="kpi-val" id="dtk-over" style="color:#ff6b6b">—</div>
+        <div class="kpi-lbl">Quá hạn</div><div class="kpi-val" id="dtk-over" style="color:#ff6b6b">—</div>
       </div>
     </div>
     <!-- Task table -->
     <div style="overflow:auto;flex:1;min-height:0">
       <table class="stat-tbl" style="width:100%">
         <thead><tr>
-          <th>Nhân Viên</th><th>Stage</th><th>Task Status</th>
-          <th>Delivery Status</th><th>Target Date</th><th>Completed Date</th>
+          <th>Nhân Viên</th><th>Distribution Date</th>
+          <th>Due Date</th><th>Acknowledged Date</th><th>Trạng thái</th>
         </tr></thead>
         <tbody id="docTaskBody"></tbody>
       </table>
@@ -3315,7 +3315,7 @@ function renderDocPage() {
       <td style="font-size:11px;color:var(--muted)">${esc(r.owner_name)||'—'}</td>
       <td style="font-size:11px;color:var(--muted)">${fd(r.valid_from)}</td>
       <td style="text-align:center">${r.has_been_distributed===true?'<span style="color:var(--green)">✅</span>':'<span style="color:var(--muted)">—</span>'}</td>
-      <td><button class="btn-sm" onclick="showDocDetail('${esc(r.document_revision_id)}','${esc(r.document_number||'')}','${esc((r.document_revision_title||'').replace(/'/g,''))}')">Chi tiết</button></td>
+      <td><button class="btn-sm" onclick="showDocDetail('${esc(r.document_revision_id)}','${esc(r.document_number||'')}','${esc((r.document_revision_title||'').replace(/'/g,''))}','${r.valid_from||''}')">Chi tiết</button></td>
     </tr>`);
 }
 
@@ -3371,7 +3371,7 @@ function docSort(col) {
 let dRenderDocT;
 function dRenderDoc(){ clearTimeout(dRenderDocT); dRenderDocT=setTimeout(()=>{ TS.docs.page=1; renderDocPage(); },250); }
 
-async function showDocDetail(revId, docNum, docTitle) {
+async function showDocDetail(revId, docNum, docTitle, validFrom) {
   const modal = g('docModal');
   s('docModalTitle', docNum||'—');
   s('docModalSub', docTitle||'—');
@@ -3388,45 +3388,93 @@ async function showDocDetail(revId, docNum, docTitle) {
         G_URL + 'dwreporting_document_task' +
         '?$filter=document_revision_id eq ' + revId
       );
-      setOv(false); // fetchAll shows the loading overlay — hide it now that modal is in front
+      setOv(false);
       if(raw.length>0){console.log('[DocTask] Fields:',JSON.stringify(Object.keys(raw[0])));console.log('[DocTask] Record[0]:',JSON.stringify(raw[0]));}
       tasks = raw;
       docTaskCache[revId] = tasks;
-      // Update aggregate KPI cards
-      let overCnt=0, earlyCnt=0;
-      Object.values(docTaskCache).forEach(ts=>{
-        ts.forEach(t=>{
-          if(t.task_delivery_status==='overdue') overCnt++;
-          if(t.task_delivery_status==='completed early') earlyCnt++;
-        });
-      });
-      s('dk-over', overCnt||'—'); s('dk-early', earlyCnt||'—');
     }
     g('docTaskLoading').style.display='none';
 
-    // Summary KPIs
-    const done  = tasks.filter(t=>['completed early','completed late'].some(s=>t.task_delivery_status===s)).length;
-    const late  = tasks.filter(t=>t.task_delivery_status==='completed late').length;
-    const over  = tasks.filter(t=>t.task_delivery_status==='overdue').length;
-    s('dtk-total', tasks.length); s('dtk-done', done); s('dtk-late', late); s('dtk-over', over);
-
-    // Table rows
     if(!tasks.length) {
-      g('docTaskBody').innerHTML='<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">Không có task</td></tr>';
+      g('docTaskBody').innerHTML='<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Không có task</td></tr>';
+      s('dtk-total',0); s('dtk-done',0); s('dtk-late',0); s('dtk-over',0);
       return;
     }
-    g('docTaskBody').innerHTML = tasks.map(t=>`
-      <tr>
-        <td style="font-size:11px">${esc(t.assignee_name)||'—'}</td>
-        <td style="font-size:11px">${esc(t.stage_name)||'—'}</td>
-        <td style="font-size:11px">${esc(t.task_status)||'—'}</td>
-        <td>${docDelivBadge(t.task_delivery_status)}</td>
-        <td style="font-size:11px;color:var(--muted)">${fd(t.target_date)}</td>
-        <td style="font-size:11px;color:var(--muted)">${fd(t.completed_date)}</td>
-      </tr>`).join('');
+
+    // Compute status per task: due_date = validFrom + response_time_days
+    const activeDate = validFrom ? new Date(validFrom) : null;
+    let onTimeCnt=0, lateCnt=0, overCnt=0;
+
+    const rows = tasks.map(t => {
+      const empName   = t.name || t.assignee_name || t.user_name || t.copyholder_name || '—';
+      const distDate  = t.distribution_date || t.distributed_date || null;
+      const ackDate   = t.acknowledged_date || t.read_date || t.completed_date || null;
+      const respDays  = parseInt(t.response_time_days || t.response_time || 0) || null;
+
+      // due_date = active_date + response_time_days
+      let dueDate = null;
+      if(activeDate && respDays) {
+        dueDate = new Date(activeDate);
+        dueDate.setDate(dueDate.getDate() + respDays);
+      }
+
+      // Compute delivery status from dates
+      let status;
+      const now = new Date();
+      if(ackDate && dueDate) {
+        status = new Date(ackDate) <= dueDate ? 'ontime' : 'late';
+      } else if(ackDate && !dueDate) {
+        status = 'ontime'; // acknowledged but no due date to compare
+      } else if(dueDate && now > dueDate) {
+        status = 'overdue';
+      } else {
+        status = 'inprogress';
+      }
+
+      if(status==='ontime')  onTimeCnt++;
+      else if(status==='late') lateCnt++;
+      else if(status==='overdue') overCnt++;
+
+      const badge = {
+        ontime:     `<span style="background:rgba(63,185,80,.15);color:var(--green);padding:2px 8px;border-radius:4px;font-size:11px">✅ Đúng hạn</span>`,
+        late:       `<span style="background:rgba(210,153,34,.15);color:var(--yellow);padding:2px 8px;border-radius:4px;font-size:11px">⚠️ Trễ</span>`,
+        overdue:    `<span style="background:rgba(255,107,107,.15);color:#ff6b6b;padding:2px 8px;border-radius:4px;font-size:11px">🔴 Quá hạn</span>`,
+        inprogress: `<span style="background:rgba(88,166,255,.15);color:var(--blue);padding:2px 8px;border-radius:4px;font-size:11px">🔵 Đang xử lý</span>`,
+      }[status];
+
+      return `<tr>
+        <td style="font-size:11px">${esc(empName)}</td>
+        <td style="font-size:11px;color:var(--muted)">${fd(distDate)}</td>
+        <td style="font-size:11px;color:var(--muted)">${dueDate?fd(dueDate.toISOString()):'—'}</td>
+        <td style="font-size:11px;color:var(--muted)">${fd(ackDate)}</td>
+        <td>${badge}</td>
+      </tr>`;
+    });
+
+    s('dtk-total', tasks.length);
+    s('dtk-done',  onTimeCnt);
+    s('dtk-late',  lateCnt);
+    s('dtk-over',  overCnt);
+    g('docTaskBody').innerHTML = rows.join('');
+
+    // Update page-level overdue/early cards
+    let pgOver=0, pgEarly=0;
+    Object.entries(docTaskCache).forEach(([rid, ts]) => {
+      const vf = docData.find(d=>d.document_revision_id===rid)?.valid_from||null;
+      const ad = vf ? new Date(vf) : null;
+      ts.forEach(t => {
+        const ack = t.acknowledged_date||t.read_date||t.completed_date||null;
+        const rd  = parseInt(t.response_time_days||t.response_time||0)||null;
+        let due=null; if(ad&&rd){due=new Date(ad);due.setDate(due.getDate()+rd);}
+        if(ack&&due){ if(new Date(ack)>due) pgOver++; else pgEarly++; }
+        else if(due&&new Date()>due&&!ack) pgOver++;
+      });
+    });
+    s('dk-over', pgOver||'—'); s('dk-early', pgEarly||'—');
+
   } catch(e) {
     g('docTaskLoading').style.display='none';
-    g('docTaskBody').innerHTML=`<tr><td colspan="6" style="text-align:center;padding:24px;color:#ff6b6b">Lỗi: ${esc(e.message)}</td></tr>`;
+    g('docTaskBody').innerHTML=`<tr><td colspan="5" style="text-align:center;padding:24px;color:#ff6b6b">Lỗi: ${esc(e.message)}</td></tr>`;
   }
 }
 
