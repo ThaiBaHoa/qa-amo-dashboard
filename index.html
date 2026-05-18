@@ -3388,6 +3388,7 @@ async function showDocDetail(revId, docNum, docTitle) {
         G_URL + 'dwreporting_document_task' +
         '?$filter=document_revision_id eq ' + revId
       );
+      setOv(false); // fetchAll shows the loading overlay — hide it now that modal is in front
       if(raw.length>0){console.log('[DocTask] Fields:',JSON.stringify(Object.keys(raw[0])));console.log('[DocTask] Record[0]:',JSON.stringify(raw[0]));}
       tasks = raw;
       docTaskCache[revId] = tasks;
