@@ -1585,7 +1585,7 @@ async function loadData(forceRefresh=false) {
     const sumRaw = await fetchAll(
       G_URL + 'dwreporting_report_summary' +
       '?$select=report_id,report_title,report_number,report_status,' +
-      'org_unit_name,raised_date,audit_title,audit_id,modified_date,valid_from,valid_to' +
+      'org_unit_name,raised_date,audit_title,audit_id,modified_date,valid_from,valid_to,owner_id' +
       '&$filter=org_unit_name eq \'' + ORG_UNIT + '\''
     );
     setOv(true,`[1/3] ${sumRaw.length} rows thô. Đang dedup...`,'');
@@ -1606,18 +1606,24 @@ async function loadData(forceRefresh=false) {
     });
     const summary = Object.values(sumMap);
 
-    // 2. WORKFLOW — tải tất cả stages để hiển thị bước + lấy ngày close (ReportAcceptReject)
-    setOv(true,`[2/3] ${summary.length} reports. Đang tải workflow...`,'');
+    // 2. USERS — build userMap[user_id] = full_name for owner lookup
+    setOv(true,`[2/4] Đang tải users...`,'');
+    let userMap = {};
+    try {
+      const usersRaw = await fetchAll(G_URL + 'dwreporting_users?$select=user_id,full_name');
+      usersRaw.forEach(u => { if (u.user_id) userMap[u.user_id] = u.full_name || null; });
+    } catch(e) { console.warn('Users load error:',e); }
+
+    // 3. WORKFLOW — tải tất cả stages để hiển thị bước + lấy ngày close (ReportAcceptReject)
+    setOv(true,`[3/4] ${summary.length} reports. Đang tải workflow...`,'');
     let wfMap = {};
     let wfAllMap = {};
-    let ownerMap = {};
     try {
       const wfRaw = await fetchAll(
         G_URL + 'dwreporting_report_workflow' +
-        '?$select=report_id,stage_type,stage_status,stage_completed_date,stage_target_date,stage_owner'
+        '?$select=report_id,stage_type,stage_status,stage_completed_date,stage_target_date'
       );
       wfRaw.forEach(w => {
-        if (w.stage_owner && !ownerMap[w.report_id]) ownerMap[w.report_id] = w.stage_owner;
         // Tất cả stages theo report_id (để hiển thị workflow steps)
         if (!wfAllMap[w.report_id]) wfAllMap[w.report_id] = [];
         wfAllMap[w.report_id].push(w);
@@ -1635,8 +1641,8 @@ async function loadData(forceRefresh=false) {
       });
     } catch(e) { console.warn('Workflow load error:',e); }
 
-    // 3. CUSTOM FIELDS — Target date, Finding level, Repetitive, v.v.
-    setOv(true,'[3/3] Đang tải custom fields...','');
+    // 4. CUSTOM FIELDS — Target date, Finding level, Repetitive, v.v.
+    setOv(true,'[4/4] Đang tải custom fields...','');
     let fMap = {};
     try {
       const fRaw = await fetchAll(
@@ -1688,7 +1694,7 @@ async function loadData(forceRefresh=false) {
         report_ref:    f['Report Reference']          || null,
         verif_result:  f['Verification Result']       || null,
         dept:          f['Department']                || null,
-        owner_name:      ownerMap[r.report_id]        || null,
+        owner_name:      userMap[r.owner_id]            || null,
         semantic_status: sm,
         report_ageing:   ag,
         overdue_cat:     catCalc(ag, sm),
