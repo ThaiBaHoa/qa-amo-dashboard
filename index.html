@@ -749,23 +749,29 @@ tr:last-child td{border-bottom:none}
               <button class="pill" onclick="setCmrF('On-time Closed',this)">On-time</button>
               <button class="pill" onclick="setCmrF('Lately Closed',this)">Lately</button>
               <select class="sel" id="cmrYearF" onchange="renderCmr()"><option value="">Tất cả năm</option></select>
+              <select class="sel" id="cmrQtrF" onchange="renderCmr()">
+                <option value="">Tất cả quý</option>
+                <option value="1">Q1 (Jan–Mar)</option>
+                <option value="2">Q2 (Apr–Jun)</option>
+                <option value="3">Q3 (Jul–Sep)</option>
+                <option value="4">Q4 (Oct–Dec)</option>
+              </select>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
                 <input class="srch" id="cmrSrch" placeholder="Tìm kiếm..." oninput="dRenderCmr()">
               </div>
+              <button class="btn-sm" onclick="exportCmrPDF()" style="white-space:nowrap;flex-shrink:0">⬇ PDF</button>
             </div>
             <div class="tbl-wrap">
               <table>
                 <thead><tr>
-                  <th onclick="cmrSort('report_number')">Report No ↕</th>
+                  <th onclick="cmrSort('report_number')" style="white-space:nowrap">Report No ↕</th>
                   <th onclick="cmrSort('aircraft_reg')">Aircraft ↕</th>
                   <th onclick="cmrSort('semantic_status')">Status ↕</th>
-                  <th>Finding Level</th>
-                  <th>NC Type</th>
-                  <th>ATA Chapter</th>
+                  <th>Finding Description</th>
                   <th>Department</th>
-                  <th onclick="cmrSort('raised_date')">Raised Date ↕</th>
-                  <th onclick="cmrSort('Target_date')">Target Date ↕</th>
-                  <th onclick="cmrSort('report_ageing')">Days to Due ↕</th>
+                  <th onclick="cmrSort('raised_date')" style="white-space:nowrap">Raised Date ↕</th>
+                  <th onclick="cmrSort('Target_date')" style="white-space:nowrap">Target Date ↕</th>
+                  <th onclick="cmrSort('report_ageing')" style="white-space:nowrap">Days to Due ↕</th>
                 </tr></thead>
                 <tbody id="cmrBody"></tbody>
               </table>
@@ -1501,7 +1507,7 @@ const TS = {
   pavoi:  { page:1, sort:'report_ageing', asc:true, sf:'all', yr:'', srch:'' },
   audit:  { page:1, sort:'scheduled_start_date', asc:false, sf:'all', typeF:'all', yr:'', srch:'' },
   docs:   { page:1, sort:'document_number', asc:true, typeF:'', yr:'', srch:'' },
-  cmr:    { page:1, sort:'raised_date', asc:false, sf:'all', ac:'all', yr:'', srch:'' },
+  cmr:    { page:1, sort:'raised_date', asc:false, sf:'all', ac:'all', yr:'', qr:'', srch:'' },
 };
 
 // ── AUTH ─────────────────────────────────────────────────────
@@ -2604,11 +2610,12 @@ let _dCmr;function dRenderCmr(){clearTimeout(_dCmr);_dCmr=setTimeout(()=>{TS.cmr
 
 function renderCmr(){
   if(!cmrLoaded||!cmrData.length){
-    g('cmrBody').innerHTML='<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--muted)">Chưa có dữ liệu</td></tr>';
+    g('cmrBody').innerHTML='<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted)">Chưa có dữ liệu</td></tr>';
     return;
   }
   const ts=TS.cmr;
   const yr=(g('cmrYearF')?.value||'');
+  const qr=(g('cmrQtrF')?.value||'');
   const srch=(g('cmrSrch')?.value||'').toLowerCase();
 
   // Populate year filter once
@@ -2623,8 +2630,8 @@ function renderCmr(){
   const acList=Object.keys(acCounts).sort();
   const acBar=g('cmrAcBar');
   if(acBar){
-    acBar.innerHTML=`<button class="pill${ts.ac==='all'?' on':''}" onclick="setCmrAC('all',this)" style="font-size:11px">✈️ Tất cả (${cmrData.length})</button>`+
-      acList.map(ac=>`<button class="pill${ts.ac===ac?' on':''}" onclick="setCmrAC('${ac.replace(/'/g,"\\'")}')" style="font-size:11px">${esc(ac)} <span style="color:var(--muted)">${acCounts[ac]}</span></button>`).join('');
+    acBar.innerHTML=`<button class="pill${ts.ac==='all'?' on':''}" onclick="setCmrAC('all')" style="font-size:11px">✈️ Tất cả (${cmrData.length})</button>`+
+      acList.map(ac=>`<button class="pill${ts.ac===ac?' on':''}" onclick="setCmrAC(${JSON.stringify(ac)})" style="font-size:11px">${esc(ac)} <span style="color:var(--muted)">${acCounts[ac]}</span></button>`).join('');
   }
 
   // Filter
@@ -2632,8 +2639,9 @@ function renderCmr(){
     if(ts.ac!=='all'&&r.aircraft_reg!==ts.ac)return false;
     if(ts.sf!=='all'&&r.semantic_status!==ts.sf)return false;
     if(yr&&String(r.raised_year)!==yr)return false;
+    if(qr&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(Math.ceil(m/3)!==parseInt(qr))return false;}
     if(srch){
-      const t=[r.report_number,r.aircraft_reg,r.finding_level,r.nc_type,r.ata_chapter,r.dept,r.issued_to,r.audit_ref].join(' ').toLowerCase();
+      const t=[r.report_number,r.aircraft_reg,r.dept,r.issued_to,r.audit_ref,r.finding_desc].join(' ').toLowerCase();
       if(!t.includes(srch))return false;
     }
     return true;
@@ -2658,12 +2666,10 @@ function renderCmr(){
       <td><b style="color:var(--blue)">${esc(r.report_number)||'—'}</b></td>
       <td style="font-size:11px;font-weight:500">✈️ ${esc(r.aircraft_reg)||'—'}</td>
       <td>${sBadge(r.semantic_status)}</td>
-      <td style="font-size:11px">${r.finding_level?`<span style="color:${r.finding_level==='Level 1'?'#ff6b6b':r.finding_level==='Level 2'?'var(--orange)':'var(--muted)'}">${esc(r.finding_level)}</span>`:'—'}</td>
-      <td style="font-size:11px">${esc(r.nc_type)||'—'}</td>
-      <td style="font-size:11px;color:var(--muted)">${esc(r.ata_chapter)||'—'}</td>
+      <td style="font-size:11px;color:var(--muted);max-width:320px"><div style="overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(r.finding_desc)||'—'}</div></td>
       <td style="font-size:11px">${esc(r.dept)||'—'}</td>
-      <td style="font-size:11px;color:var(--muted)">${fd(r.raised_date)}</td>
-      <td style="font-size:11px">${fd(r.Target_date)}</td>
+      <td style="font-size:11px;color:var(--muted);white-space:nowrap">${fd(r.raised_date)}</td>
+      <td style="font-size:11px;white-space:nowrap">${fd(r.Target_date)}</td>
       <td>${ageDis(r.report_ageing,r.semantic_status)}</td>
     </tr>`);
 }
@@ -2708,6 +2714,102 @@ function showCmrDetail(report_id){
 function closeCmrModal(e){
   if(e&&e.target!==g('cmrModal'))return;
   g('cmrModal').style.display='none';
+}
+
+function exportCmrPDF(){
+  if(!cmrLoaded||!cmrData.length){toast('Chưa có dữ liệu CMR-CAR','err');return;}
+  const ts=TS.cmr;
+  const yr=g('cmrYearF')?.value||'';
+  const qr=g('cmrQtrF')?.value||'';
+
+  // Re-apply current filters (same logic as renderCmr)
+  let data=cmrData.filter(r=>{
+    if(ts.ac!=='all'&&r.aircraft_reg!==ts.ac)return false;
+    if(ts.sf!=='all'&&r.semantic_status!==ts.sf)return false;
+    if(yr&&String(r.raised_year)!==yr)return false;
+    if(qr&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(Math.ceil(m/3)!==parseInt(qr))return false;}
+    return true;
+  });
+  data=sortD(data,ts.sort,ts.asc);
+
+  // Build period label
+  let period='Toàn bộ';
+  if(yr&&qr)period=`Q${qr}/${yr}`;
+  else if(yr)period=`Năm ${yr}`;
+  else if(qr)period=`Q${qr} (tất cả năm)`;
+  const acLabel=ts.ac==='all'?'Tất cả tàu bay':ts.ac;
+
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+
+  // Header
+  doc.setFontSize(14);doc.setFont(undefined,'bold');
+  doc.text('CMR-CAR Findings Report',14,14);
+  doc.setFontSize(9);doc.setFont(undefined,'normal');
+  doc.text(`Thời gian: ${period}   |   Tàu bay: ${acLabel}   |   Tổng: ${data.length} findings`,14,21);
+  doc.text(`Xuất ngày: ${new Date().toLocaleDateString('vi-VN')}`,14,26);
+
+  // Group by aircraft
+  const acGroups={};
+  data.forEach(r=>{
+    if(!acGroups[r.aircraft_reg])acGroups[r.aircraft_reg]=[];
+    acGroups[r.aircraft_reg].push(r);
+  });
+
+  let y=32;
+  const qtrNames=['','Q1 (Jan–Mar)','Q2 (Apr–Jun)','Q3 (Jul–Sep)','Q4 (Oct–Dec)'];
+  const statusColor={
+    'Open':[88,166,255],'Overdue':[255,107,107],
+    'On-time Closed':[63,185,80],'Lately Closed':[210,153,34],'Closed':[110,118,129]
+  };
+
+  Object.entries(acGroups).forEach(([ac,rows])=>{
+    // Aircraft section header
+    doc.autoTable({
+      startY:y,
+      head:[[{content:`✈  ${ac}  (${rows.length} findings)`,colSpan:6}]],
+      headStyles:{fillColor:[30,35,45],textColor:[140,160,200],fontStyle:'bold',fontSize:9},
+      theme:'plain',margin:{left:14,right:14},
+    });
+    y=doc.lastAutoTable.finalY;
+
+    // Findings table for this aircraft
+    doc.autoTable({
+      startY:y,
+      head:[['Report No','Status','Raised Date','Target Date','Department','Finding Description']],
+      body:rows.map(r=>[
+        r.report_number||'—',
+        r.semantic_status||'—',
+        fd(r.raised_date),
+        fd(r.Target_date),
+        r.dept||'—',
+        (r.finding_desc||'—').substring(0,300),
+      ]),
+      headStyles:{fillColor:[22,27,34],textColor:[139,148,158],fontSize:8,fontStyle:'bold'},
+      bodyStyles:{fontSize:7.5,valign:'top'},
+      columnStyles:{
+        0:{cellWidth:28},1:{cellWidth:26},2:{cellWidth:22},
+        3:{cellWidth:22},4:{cellWidth:28},5:{cellWidth:'auto'},
+      },
+      didParseCell:function(d){
+        if(d.section==='body'&&d.column.index===1){
+          const sc=statusColor[d.cell.raw];
+          if(sc)d.cell.styles.textColor=sc;
+        }
+      },
+      alternateRowStyles:{fillColor:[22,27,34]},
+      styles:{fillColor:[16,20,28],textColor:[201,209,217],lineColor:[48,54,63],lineWidth:.2},
+      margin:{left:14,right:14},
+    });
+    y=doc.lastAutoTable.finalY+4;
+    if(y>185&&Object.keys(acGroups).indexOf(ac)<Object.keys(acGroups).length-1){
+      doc.addPage();y=14;
+    }
+  });
+
+  const fname=`CMR-CAR_${yr||'all'}_${qr?'Q'+qr:'allQ'}_${new Date().toISOString().slice(0,10)}.pdf`;
+  doc.save(fname);
+  toast(`✓ Đã xuất ${fname}`,'ok');
 }
 
 // ── TABLE: AUDIT PLAN ─────────────────────────────────────────
