@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -293,42 +293,42 @@ tr:last-child td{border-bottom:none}
       </div>
       <div style="padding:16px 28px 4px">
         <div class="auth-title">QA AMO Portal</div>
-        <div class="auth-sub">Đăng nhập để truy cập hệ thống báo cáo</div>
+        <div class="auth-sub">Sign in to access the reporting system</div>
       </div>
     </div>
     <div class="auth-tabs" id="authTabs">
-      <button class="auth-tab active" onclick="switchAuth('login')">Đăng nhập</button>
-      <button class="auth-tab" onclick="switchAuth('register')">Đăng ký</button>
+      <button class="auth-tab active" onclick="switchAuth('login')">Login</button>
+      <button class="auth-tab" onclick="switchAuth('register')">Register</button>
     </div>
     <div id="loginForm">
-      <div class="form-group"><label class="form-label">Tên đăng nhập</label>
-        <input class="form-input" id="lUsername" type="text" placeholder="Nhập tên đăng nhập" autocomplete="username"></div>
-      <div class="form-group"><label class="form-label">Mật khẩu</label>
+      <div class="form-group"><label class="form-label">Username</label>
+        <input class="form-input" id="lUsername" type="text" placeholder="Enter username" autocomplete="username"></div>
+      <div class="form-group"><label class="form-label">Password</label>
         <input class="form-input" id="lPass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
-      <button class="btn-primary" id="btnLogin" onclick="doLogin()">Đăng nhập</button>
+      <button class="btn-primary" id="btnLogin" onclick="doLogin()">Login</button>
       <div class="auth-alert" id="loginAlert"></div>
     </div>
     <div id="registerForm" style="display:none">
-      <div class="form-group"><label class="form-label">Họ và tên</label>
-        <input class="form-input" id="rName" type="text" placeholder="Nguyễn Văn A"></div>
-      <div class="form-group"><label class="form-label">Tên đăng nhập</label>
-        <input class="form-input" id="rUsername" type="text" placeholder="Ví dụ: nguyen.van.a" autocomplete="username"></div>
-      <div class="form-group"><label class="form-label">Email <span style="font-size:11px;color:var(--muted);font-weight:400">(chỉ để khai báo)</span></label>
+      <div class="form-group"><label class="form-label">Full Name</label>
+        <input class="form-input" id="rName" type="text" placeholder="e.g. Nguyen Van A"></div>
+      <div class="form-group"><label class="form-label">Username</label>
+        <input class="form-input" id="rUsername" type="text" placeholder="e.g. nguyen.van.a" autocomplete="username"></div>
+      <div class="form-group"><label class="form-label">Email <span style="font-size:11px;color:var(--muted);font-weight:400">(for reference only)</span></label>
         <input class="form-input" id="rEmail" type="email" placeholder="email@vietjetair.com"></div>
-      <div class="form-group"><label class="form-label">Mật khẩu</label>
-        <input class="form-input" id="rPass" type="password" placeholder="Tối thiểu 8 ký tự"></div>
-      <div class="form-group"><label class="form-label">Xác nhận mật khẩu</label>
-        <input class="form-input" id="rPass2" type="password" placeholder="Nhập lại mật khẩu" onkeydown="if(event.key==='Enter')doRegister()"></div>
-      <button class="btn-primary" id="btnRegister" onclick="doRegister()">Gửi yêu cầu đăng ký</button>
+      <div class="form-group"><label class="form-label">Password</label>
+        <input class="form-input" id="rPass" type="password" placeholder="Minimum 8 characters"></div>
+      <div class="form-group"><label class="form-label">Confirm Password</label>
+        <input class="form-input" id="rPass2" type="password" placeholder="Repeat password" onkeydown="if(event.key==='Enter')doRegister()"></div>
+      <button class="btn-primary" id="btnRegister" onclick="doRegister()">Submit Registration</button>
       <div class="auth-alert" id="registerAlert"></div>
     </div>
     <div id="pendingBox" style="display:none">
       <div class="pending-box">
         <div class="pending-icon">⏳</div>
-        <div class="pending-title">Đang chờ phê duyệt</div>
-        <div class="pending-sub">Tài khoản đã tạo và đang chờ Admin phê duyệt.<br>Vui lòng liên hệ Admin hoặc thử lại sau.</div>
+        <div class="pending-title">Pending Approval</div>
+        <div class="pending-sub">Your account has been created and is awaiting Admin approval.<br>Please contact your Admin or try again later.</div>
       </div>
-      <button class="btn-primary" style="margin-top:16px;background:var(--card2);color:var(--muted);box-shadow:none" onclick="doLogout()">← Quay lại</button>
+      <button class="btn-primary" style="margin-top:16px;background:var(--card2);color:var(--muted);box-shadow:none" onclick="doLogout()">← Back</button>
     </div>
   </div>
 </div>
@@ -354,11 +354,11 @@ tr:last-child td{border-bottom:none}
         <button class="nav-item" onclick="showPage('cmrcar',this)"><span class="nav-icon">✈️</span>CMR-CAR</button>
         <button class="nav-item" onclick="showPage('auditplan',this)"><span class="nav-icon">📅</span>Audit Plan</button>
         <button class="nav-item" onclick="showPage('docs',this)"><span class="nav-icon">📁</span>Documents</button>
-        <button class="nav-item" onclick="showPage('reports',this)"><span class="nav-icon">📊</span>Xuất Báo Cáo</button>
-        <button class="nav-item" onclick="showPage('help',this)"><span class="nav-icon">❓</span>Hướng Dẫn</button>
+        <button class="nav-item" onclick="showPage('reports',this)"><span class="nav-icon">📊</span>Export Reports</button>
+        <button class="nav-item" onclick="showPage('help',this)"><span class="nav-icon">❓</span>User Guide</button>
         <div id="adminNav" style="display:none">
           <div class="nav-sec" style="margin-top:6px">Admin</div>
-          <button class="nav-item" onclick="showPage('admin',this)"><span class="nav-icon">👤</span>Quản lý Users</button>
+          <button class="nav-item" onclick="showPage('admin',this)"><span class="nav-icon">👤</span>User Management</button>
         </div>
       </div>
       <div class="sb-footer">
@@ -366,7 +366,7 @@ tr:last-child td{border-bottom:none}
           <div class="avatar" id="sideAvatar">U</div>
           <div><div class="user-name" id="sideName">—</div><div class="user-role" id="sideRole">—</div></div>
         </div>
-        <button class="btn-logout" onclick="doLogout()">Đăng xuất</button>
+        <button class="btn-logout" onclick="doLogout()">Logout</button>
       </div>
     </div>
 
@@ -393,34 +393,34 @@ tr:last-child td{border-bottom:none}
 
           <!-- Year Filter Row -->
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-            <span style="font-size:12px;color:var(--muted);font-weight:500">📅 Lọc theo năm:</span>
+            <span style="font-size:12px;color:var(--muted);font-weight:500">📅 Filter by year:</span>
             <select class="sel" id="ovYearFilter" onchange="filterOverviewYear()" style="padding:5px 12px;font-size:12px;min-width:120px">
-              <option value="all">Tất cả năm</option>
+              <option value="all">All Years</option>
             </select>
             <span style="font-size:11px;color:var(--muted)" id="ovYearCount"></span>
           </div>
 
           <!-- ROW 1: KPI Cards — 6 equal columns -->
           <div class="ov-kpi-row">
-            <div class="kpi" style="--accent:var(--blue)"><div class="kpi-lbl">Total Reports</div><div class="kpi-val" id="k-total">—</div><div class="kpi-sub">Tất cả form</div></div>
-            <div class="kpi" style="--accent:var(--blue)"><div class="kpi-lbl">Open</div><div class="kpi-val" id="k-open">—</div><div class="kpi-sub">Đang xử lý</div></div>
+            <div class="kpi" style="--accent:var(--blue)"><div class="kpi-lbl">Total Reports</div><div class="kpi-val" id="k-total">—</div><div class="kpi-sub">All forms</div></div>
+            <div class="kpi" style="--accent:var(--blue)"><div class="kpi-lbl">Open</div><div class="kpi-val" id="k-open">—</div><div class="kpi-sub">In Progress</div></div>
             <div class="kpi" style="--accent:#ff6b6b"><div class="kpi-lbl">Overdue</div><div class="kpi-val" id="k-over">—</div><div class="kpi-sub" id="k-over-r">—</div></div>
             <div class="kpi" style="--accent:var(--green)"><div class="kpi-lbl">On-time Closed</div><div class="kpi-val" id="k-on">—</div><div class="kpi-sub" id="k-on-r">—</div></div>
-            <div class="kpi" style="--accent:var(--yellow)"><div class="kpi-lbl">Lately Closed</div><div class="kpi-val" id="k-late">—</div><div class="kpi-sub">Đóng trễ</div></div>
-            <div class="kpi" style="--accent:var(--muted)"><div class="kpi-lbl">Closed</div><div class="kpi-val" id="k-cls">—</div><div class="kpi-sub">Không có target</div></div>
+            <div class="kpi" style="--accent:var(--yellow)"><div class="kpi-lbl">Lately Closed</div><div class="kpi-val" id="k-late">—</div><div class="kpi-sub">Late closure</div></div>
+            <div class="kpi" style="--accent:var(--muted)"><div class="kpi-lbl">Closed</div><div class="kpi-val" id="k-cls">—</div><div class="kpi-sub">No target date</div></div>
           </div>
 
           <!-- ROW 2: 3 charts side by side — each 33% width -->
           <div class="ov-chart-row">
             <div class="chart-card" style="min-width:0">
-              <div style="font-size:12px;font-weight:600;margin-bottom:6px">Theo trạng thái</div>
+              <div style="font-size:12px;font-weight:600;margin-bottom:6px">By status</div>
               <div style="height:clamp(120px,calc(26vh - 44px),260px);position:relative"><canvas id="cStatus"></canvas></div>
             </div>
             <div class="chart-card" style="min-width:0">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
                 <div style="font-size:12px;font-weight:600">Findings by Month</div>
                 <select class="sel" id="monthYr" onchange="buildMonthChart()" style="padding:3px 8px;font-size:11px">
-                  <option value="all">Tất cả năm</option>
+                  <option value="all">All Years</option>
                 </select>
               </div>
               <div style="height:clamp(120px,calc(26vh - 44px),260px);position:relative"><canvas id="cMonth"></canvas></div>
@@ -429,7 +429,7 @@ tr:last-child td{border-bottom:none}
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
                 <div style="font-size:12px;font-weight:600">Top Forms</div>
                 <select class="sel" id="chartFormFilter" onchange="buildFormChart()" style="padding:3px 8px;font-size:11px">
-                  <option value="all">Tất cả</option>
+                  <option value="all">All</option>
                   <option value="Open">Open</option>
                   <option value="Overdue">Overdue</option>
                 </select>
@@ -443,7 +443,7 @@ tr:last-child td{border-bottom:none}
 
             <div class="chart-card" style="min-width:0;display:flex;flex-direction:column;min-height:0">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-shrink:0">
-                <div style="font-size:12px;font-weight:600">Tổng hợp theo Form</div>
+                <div style="font-size:12px;font-weight:600">Summary by Form</div>
                 <span style="font-size:11px;color:var(--muted)" id="statFormCount"></span>
               </div>
               <div style="flex:1;min-height:0;overflow-y:auto">
@@ -478,7 +478,7 @@ tr:last-child td{border-bottom:none}
               <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
                 <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Overdue CAT III</div>
                 <div style="font-size:28px;font-weight:700;color:#ff3333;line-height:1" id="mc-cat3">—</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:4px">&gt;60 ngày</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:4px">&gt;60 days</div>
               </div>
               <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
                 <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Repetitive</div>
@@ -516,14 +516,14 @@ tr:last-child td{border-bottom:none}
         <div class="page" id="page-openrfi">
           <div class="tbl-card">
             <div class="tbl-bar">
-              <div><div class="tbl-title">Open Reports — Đang xử lý</div><div class="tbl-count" id="openCnt">—</div></div>
-              <button class="pill on" onclick="setOpenF('all',this)">Tất cả Open</button>
+              <div><div class="tbl-title">Open Reports — In Progress</div><div class="tbl-count" id="openCnt">—</div></div>
+              <button class="pill on" onclick="setOpenF('all',this)">All Open</button>
               <button class="pill" onclick="setOpenF('Open',this)">Open</button>
               <button class="pill" onclick="setOpenF('Overdue',this)">Overdue</button>
-              <select class="sel" id="openFormF" onchange="renderOpen()"><option value="">Tất cả Form</option></select>
-              <select class="sel" id="openYearF" onchange="renderOpen()"><option value="">Tất cả năm</option></select>
+              <select class="sel" id="openFormF" onchange="renderOpen()"><option value="">All Forms</option></select>
+              <select class="sel" id="openYearF" onchange="renderOpen()"><option value="">All Years</option></select>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
-                <input class="srch" id="openSrch" placeholder="Tìm kiếm..." oninput="dRenderOpen()">
+                <input class="srch" id="openSrch" placeholder="Search..." oninput="dRenderOpen()">
               </div>
             </div>
             <div class="tbl-wrap">
@@ -549,9 +549,9 @@ tr:last-child td{border-bottom:none}
         <!-- OVERDUE -->
         <div class="page" id="page-overdue">
           <div class="kpi-3">
-            <div class="kpi" style="--accent:var(--orange)"><div class="kpi-lbl">CAT I · ≤ 30 ngày</div><div class="kpi-val" id="k-c1">—</div><div class="kpi-sub">Tất cả form</div></div>
-            <div class="kpi" style="--accent:#ff6b6b"><div class="kpi-lbl">CAT II · 30–60 ngày</div><div class="kpi-val" id="k-c2">—</div><div class="kpi-sub">Tất cả form</div></div>
-            <div class="kpi" style="--accent:#cc0000"><div class="kpi-lbl">CAT III · > 60 ngày</div><div class="kpi-val" id="k-c3">—</div><div class="kpi-sub">Tất cả form</div></div>
+            <div class="kpi" style="--accent:var(--orange)"><div class="kpi-lbl">CAT I · ≤ 30 days</div><div class="kpi-val" id="k-c1">—</div><div class="kpi-sub">All forms</div></div>
+            <div class="kpi" style="--accent:#ff6b6b"><div class="kpi-lbl">CAT II · 30–60 days</div><div class="kpi-val" id="k-c2">—</div><div class="kpi-sub">All forms</div></div>
+            <div class="kpi" style="--accent:#cc0000"><div class="kpi-lbl">CAT III · > 60 days</div><div class="kpi-val" id="k-c3">—</div><div class="kpi-sub">All forms</div></div>
           </div>
           <div class="c2" style="margin-bottom:8px;flex-shrink:0">
             <div class="chart-card"><div class="chart-head"><div class="chart-title">By CAT</div></div><div class="ch-wrap" style="height:clamp(110px,calc(20vh - 40px),200px)"><canvas id="cCat"></canvas></div></div>
@@ -559,10 +559,10 @@ tr:last-child td{border-bottom:none}
           </div>
           <div class="tbl-card">
             <div class="tbl-bar">
-              <div><div class="tbl-title">Overdue Detail — Tất cả form</div><div class="tbl-count" id="ovCnt">—</div></div>
-              <select class="sel" id="ovFormF" onchange="renderOv()"><option value="">Tất cả Form</option></select>
+              <div><div class="tbl-title">Overdue Detail — All forms</div><div class="tbl-count" id="ovCnt">—</div></div>
+              <select class="sel" id="ovFormF" onchange="renderOv()"><option value="">All Forms</option></select>
               <select class="sel" id="ovCatF" onchange="renderOv()">
-                <option value="">Tất cả CAT</option>
+                <option value="">All CAT</option>
                 <option value="CAT I">CAT I (≤30d)</option>
                 <option value="CAT II">CAT II (30-60d)</option>
                 <option value="CAT III">CAT III (>60d)</option>
@@ -591,14 +591,14 @@ tr:last-child td{border-bottom:none}
           <!-- Row 0: Filter bar -->
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-shrink:0">
             <span style="font-size:13px;font-weight:600;color:var(--text)">KPI Charts</span>
-            <label style="font-size:12px;color:var(--muted)">Năm:</label>
+            <label style="font-size:12px;color:var(--muted)">Year:</label>
             <select class="sel" id="kpiYear" onchange="filterKpiYear()" style="width:100px"></select>
             <span id="kpiYearCount" style="font-size:11px;color:var(--muted)"></span>
           </div>
           <!-- Row 1: 6 KPI summary cards -->
           <div class="kpi-grid" style="margin-bottom:8px;flex-shrink:0">
             <div class="chart-card" style="text-align:center;padding:10px 8px">
-              <div class="kpi-lbl">Tổng Findings</div><div class="kpi-val" id="kk-total" style="color:var(--blue)">—</div>
+              <div class="kpi-lbl">Total Findings</div><div class="kpi-val" id="kk-total" style="color:var(--blue)">—</div>
             </div>
             <div class="chart-card" style="text-align:center;padding:10px 8px">
               <div class="kpi-lbl">Open</div><div class="kpi-val" id="kk-open" style="color:var(--blue)">—</div>
@@ -623,7 +623,7 @@ tr:last-child td{border-bottom:none}
               <div class="ch-wrap" style="height:200px"><canvas id="cKpiForm"></canvas></div>
             </div>
             <div class="chart-card">
-              <div class="chart-head"><div><div class="chart-title">Monthly Trend</div><div class="chart-sub">Stacked by status theo tháng</div></div></div>
+              <div class="chart-head"><div><div class="chart-title">Monthly Trend</div><div class="chart-sub">Stacked by status per month</div></div></div>
               <div class="ch-wrap" style="height:200px"><canvas id="cKpiMonth"></canvas></div>
             </div>
             <div class="chart-card">
@@ -638,7 +638,7 @@ tr:last-child td{border-bottom:none}
               <div class="ch-wrap" style="height:170px"><canvas id="cOnM"></canvas></div>
             </div>
             <div class="chart-card">
-              <div class="chart-head"><div><div class="chart-title">Finding Level</div><div class="chart-sub">Phân bổ cấp độ</div></div></div>
+              <div class="chart-head"><div><div class="chart-title">Finding Level</div><div class="chart-sub">Distribution by level</div></div></div>
               <div class="ch-wrap" style="height:170px"><canvas id="cKpiLevel"></canvas></div>
             </div>
           </div>
@@ -662,16 +662,16 @@ tr:last-child td{border-bottom:none}
           <div class="tbl-card">
             <div class="tbl-bar">
               <div><div class="tbl-title">All Forms Detail</div><div class="tbl-count" id="afCnt">—</div></div>
-              <button class="pill on" onclick="setAF('all',this)">Tất cả</button>
+              <button class="pill on" onclick="setAF('all',this)">All</button>
               <button class="pill" onclick="setAF('Open',this)">Open</button>
               <button class="pill" onclick="setAF('Overdue',this)">Overdue</button>
               <button class="pill" onclick="setAF('On-time Closed',this)">On-time</button>
               <button class="pill" onclick="setAF('Lately Closed',this)">Lately</button>
               <button class="pill" onclick="setAF('Closed',this)">Closed</button>
-              <select class="sel" id="afFormF" onchange="renderAF()"><option value="">Tất cả Form</option></select>
-              <select class="sel" id="afYearF" onchange="renderAF()"><option value="">Tất cả năm</option></select>
+              <select class="sel" id="afFormF" onchange="renderAF()"><option value="">All Forms</option></select>
+              <select class="sel" id="afYearF" onchange="renderAF()"><option value="">All Years</option></select>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
-                <input class="srch" id="afSrch" placeholder="Tìm kiếm..." oninput="dRenderAF()">
+                <input class="srch" id="afSrch" placeholder="Search..." oninput="dRenderAF()">
               </div>
             </div>
             <div class="tbl-wrap">
@@ -704,14 +704,14 @@ tr:last-child td{border-bottom:none}
           <div class="tbl-card">
             <div class="tbl-bar">
               <div><div class="tbl-title">PAVOI Detail</div><div class="tbl-count" id="pavoiCnt">—</div></div>
-              <button class="pill on" onclick="setPAV('all',this)">Tất cả</button>
+              <button class="pill on" onclick="setPAV('all',this)">All</button>
               <button class="pill" onclick="setPAV('Open',this)">Open</button>
               <button class="pill" onclick="setPAV('Overdue',this)">Overdue</button>
               <button class="pill" onclick="setPAV('On-time Closed',this)">On-time</button>
               <button class="pill" onclick="setPAV('Lately Closed',this)">Lately</button>
-              <select class="sel" id="pavoiYearF" onchange="renderPavoi()"><option value="">Tất cả năm</option></select>
+              <select class="sel" id="pavoiYearF" onchange="renderPavoi()"><option value="">All Years</option></select>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
-                <input class="srch" id="pavoiSrch" placeholder="Tìm kiếm..." oninput="dRenderPavoi()">
+                <input class="srch" id="pavoiSrch" placeholder="Search..." oninput="dRenderPavoi()">
               </div>
             </div>
             <div class="tbl-wrap">
@@ -743,21 +743,21 @@ tr:last-child td{border-bottom:none}
           <div class="tbl-card">
             <div class="tbl-bar">
               <div><div class="tbl-title">CMR-CAR Findings</div><div class="tbl-count" id="cmrCnt">—</div></div>
-              <button class="pill on" onclick="setCmrF('all',this)">Tất cả</button>
+              <button class="pill on" onclick="setCmrF('all',this)">All</button>
               <button class="pill" onclick="setCmrF('Open',this)">Open</button>
               <button class="pill" onclick="setCmrF('Overdue',this)">Overdue</button>
               <button class="pill" onclick="setCmrF('On-time Closed',this)">On-time</button>
               <button class="pill" onclick="setCmrF('Lately Closed',this)">Lately</button>
-              <select class="sel" id="cmrYearF" onchange="renderCmr()"><option value="">Tất cả năm</option></select>
+              <select class="sel" id="cmrYearF" onchange="renderCmr()"><option value="">All Years</option></select>
               <select class="sel" id="cmrQtrF" onchange="renderCmr()">
-                <option value="">Tất cả quý</option>
+                <option value="">All quarters</option>
                 <option value="1">Q1 (Jan–Mar)</option>
                 <option value="2">Q2 (Apr–Jun)</option>
                 <option value="3">Q3 (Jul–Sep)</option>
                 <option value="4">Q4 (Oct–Dec)</option>
               </select>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
-                <input class="srch" id="cmrSrch" placeholder="Tìm kiếm..." oninput="dRenderCmr()">
+                <input class="srch" id="cmrSrch" placeholder="Search..." oninput="dRenderCmr()">
               </div>
               <button class="btn-sm" onclick="exportCmrPDF()" style="white-space:nowrap;flex-shrink:0">⬇ PDF</button>
             </div>
@@ -767,6 +767,7 @@ tr:last-child td{border-bottom:none}
                   <th onclick="cmrSort('report_number')" style="white-space:nowrap">Report No ↕</th>
                   <th onclick="cmrSort('aircraft_reg')">Aircraft ↕</th>
                   <th onclick="cmrSort('semantic_status')">Status ↕</th>
+                  <th onclick="cmrSort('finding_count')" style="text-align:center;white-space:nowrap">Findings ↕</th>
                   <th>Finding Description</th>
                   <th>Department</th>
                   <th onclick="cmrSort('raised_date')" style="white-space:nowrap">Raised Date ↕</th>
@@ -786,23 +787,23 @@ tr:last-child td{border-bottom:none}
             <div class="kpi" style="--accent:var(--blue)"><div class="kpi-lbl">Total Audits</div><div class="kpi-val" id="ak-total">—</div><div class="kpi-sub">QA AMO</div></div>
             <div class="kpi" style="--accent:#BC8CFF"><div class="kpi-lbl">Internal Audit</div><div class="kpi-val" id="ak-internal">—</div><div class="kpi-sub">MNT Internal</div></div>
             <div class="kpi" style="--accent:var(--blue)"><div class="kpi-lbl">Inspection</div><div class="kpi-val" id="ak-inspection">—</div><div class="kpi-sub">Surveillance/Spot check</div></div>
-            <div class="kpi" style="--accent:var(--green)"><div class="kpi-lbl">Closed</div><div class="kpi-val" id="ak-closed">—</div><div class="kpi-sub">Đã đóng</div></div>
-            <div class="kpi" style="--accent:var(--orange)"><div class="kpi-lbl">In Progress</div><div class="kpi-val" id="ak-open">—</div><div class="kpi-sub">Đang thực hiện</div></div>
-            <div class="kpi" style="--accent:var(--yellow)"><div class="kpi-lbl">Scheduled</div><div class="kpi-val" id="ak-sched">—</div><div class="kpi-sub">Chưa thực hiện</div></div>
+            <div class="kpi" style="--accent:var(--green)"><div class="kpi-lbl">Closed</div><div class="kpi-val" id="ak-closed">—</div><div class="kpi-sub">Completed</div></div>
+            <div class="kpi" style="--accent:var(--orange)"><div class="kpi-lbl">In Progress</div><div class="kpi-val" id="ak-open">—</div><div class="kpi-sub">Ongoing</div></div>
+            <div class="kpi" style="--accent:var(--yellow)"><div class="kpi-lbl">Scheduled</div><div class="kpi-val" id="ak-sched">—</div><div class="kpi-sub">Not started</div></div>
           </div>
           <div class="tbl-card">
             <div class="tbl-bar">
               <div><div class="tbl-title">Audit Plan — QA AMO</div><div class="tbl-count" id="auditCnt">—</div></div>
-              <button class="pill on" onclick="setAuditF('all','status',this)">Tất cả</button>
+              <button class="pill on" onclick="setAuditF('all','status',this)">All</button>
               <button class="pill" onclick="setAuditF('Internal Audit','type',this)">📋 Internal Audit</button>
               <button class="pill" onclick="setAuditF('Inspection','type',this)">🔍 Inspection</button>
               <button class="pill" onclick="setAuditF('Closed','status',this)">Closed</button>
               <button class="pill" onclick="setAuditF('Performed','status',this)">Performed</button>
               <button class="pill" onclick="setAuditF('Scheduled','status',this)">Scheduled</button>
               <button class="pill" onclick="setAuditF('InProgress','status',this)">In Progress</button>
-              <select class="sel" id="auditYearF" onchange="renderAudit()"><option value="">Tất cả năm</option></select>
+              <select class="sel" id="auditYearF" onchange="renderAudit()"><option value="">All Years</option></select>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
-                <input class="srch" id="auditSrch" placeholder="Tìm kiếm..." oninput="dRenderAudit()">
+                <input class="srch" id="auditSrch" placeholder="Search..." oninput="dRenderAudit()">
               </div>
             </div>
             <div class="tbl-wrap">
@@ -833,12 +834,12 @@ tr:last-child td{border-bottom:none}
           <!-- Filter bar — use chart-card (no flex:1) to avoid growing -->
           <div class="chart-card" style="padding:8px 12px;margin-bottom:8px;flex-shrink:0">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <div class="tbl-title" style="margin-right:4px">Tài Liệu</div>
+              <div class="tbl-title" style="margin-right:4px">Documents</div>
               <div class="tbl-count" id="docCnt">—</div>
-              <select class="sel" id="docTypeF" onchange="renderDocPage()" style="min-width:160px"><option value="">Tất cả loại</option></select>
-              <select class="sel" id="docYearF" onchange="renderDocPage()"><option value="">Tất cả năm</option></select>
+              <select class="sel" id="docTypeF" onchange="renderDocPage()" style="min-width:160px"><option value="">All Types</option></select>
+              <select class="sel" id="docYearF" onchange="renderDocPage()"><option value="">All Years</option></select>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
-                <input class="srch" id="docSrch" placeholder="Tìm số, tiêu đề..." oninput="dRenderDoc()">
+                <input class="srch" id="docSrch" placeholder="Search number, title..." oninput="dRenderDoc()">
               </div>
               <button class="btn-sm" id="docRefreshBtn" onclick="loadDocuments(true)" style="margin-left:auto">↻ Reload</button>
             </div>
@@ -846,19 +847,19 @@ tr:last-child td{border-bottom:none}
           <!-- KPI cards -->
           <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:8px;flex-shrink:0">
             <div class="chart-card" style="text-align:center;padding:10px 8px">
-              <div class="kpi-lbl">Tổng tài liệu</div><div class="kpi-val" id="dk-total" style="color:var(--blue)">—</div>
+              <div class="kpi-lbl">Total Docs</div><div class="kpi-val" id="dk-total" style="color:var(--blue)">—</div>
             </div>
             <div class="chart-card" style="text-align:center;padding:10px 8px">
               <div class="kpi-lbl">Active</div><div class="kpi-val" id="dk-active" style="color:var(--green)">—</div>
             </div>
             <div class="chart-card" style="text-align:center;padding:10px 8px">
-              <div class="kpi-lbl">Đã phân phối</div><div class="kpi-val" id="dk-dist" style="color:var(--blue)">—</div>
+              <div class="kpi-lbl">Distributed</div><div class="kpi-val" id="dk-dist" style="color:var(--blue)">—</div>
             </div>
             <div class="chart-card" style="text-align:center;padding:10px 8px">
-              <div class="kpi-lbl">Overdue</div><div class="kpi-val" id="dk-over" style="color:#ff6b6b">—</div><div class="kpi-sub" style="font-size:10px;color:var(--muted)">từ tasks đã load</div>
+              <div class="kpi-lbl">Overdue</div><div class="kpi-val" id="dk-over" style="color:#ff6b6b">—</div><div class="kpi-sub" style="font-size:10px;color:var(--muted)">from loaded tasks</div>
             </div>
             <div class="chart-card" style="text-align:center;padding:10px 8px">
-              <div class="kpi-lbl">Completed Early</div><div class="kpi-val" id="dk-early" style="color:var(--green)">—</div><div class="kpi-sub" style="font-size:10px;color:var(--muted)">từ tasks đã load</div>
+              <div class="kpi-lbl">Completed Early</div><div class="kpi-val" id="dk-early" style="color:var(--green)">—</div><div class="kpi-sub" style="font-size:10px;color:var(--muted)">from loaded tasks</div>
             </div>
           </div>
           <!-- Charts row — reduced height to give table more room -->
@@ -868,7 +869,7 @@ tr:last-child td{border-bottom:none}
               <div class="ch-wrap" style="height:160px"><canvas id="cDocType"></canvas></div>
             </div>
             <div class="chart-card">
-              <div class="chart-head" style="margin-bottom:8px"><div><div class="chart-title">Documents by Year</div><div class="chart-sub">Theo created_date</div></div></div>
+              <div class="chart-head" style="margin-bottom:8px"><div><div class="chart-title">Documents by Year</div><div class="chart-sub">By created date</div></div></div>
               <div class="ch-wrap" style="height:160px"><canvas id="cDocYear"></canvas></div>
             </div>
           </div>
@@ -878,8 +879,8 @@ tr:last-child td{border-bottom:none}
               <table>
                 <thead><tr>
                   <th onclick="docSort('document_number')" style="cursor:pointer">Doc Number ↕</th>
-                  <th onclick="docSort('document_revision_title')" style="cursor:pointer">Tiêu Đề ↕</th>
-                  <th onclick="docSort('document_type')" style="cursor:pointer">Loại ↕</th>
+                  <th onclick="docSort('document_revision_title')" style="cursor:pointer">Title ↕</th>
+                  <th onclick="docSort('document_type')" style="cursor:pointer">Type ↕</th>
                   <th>Rev</th>
                   <th>Status</th>
                   <th onclick="docSort('owner_name')" style="cursor:pointer">Owner ↕</th>
@@ -899,35 +900,35 @@ tr:last-child td{border-bottom:none}
           <div class="chart-card" style="margin-bottom:12px">
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end">
               <div>
-                <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500">Lọc theo</div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500">Filter by</div>
                 <select class="sel" id="rptFilterType" onchange="updateReportFilters()" style="width:100%;padding:7px 10px">
-                  <option value="month">Theo Tháng/Năm</option>
-                  <option value="quarter">Theo Quý/Năm</option>
-                  <option value="form">Theo Form Type</option>
-                  <option value="all">Tất cả</option>
+                  <option value="month">By Month/Year</option>
+                  <option value="quarter">By Quarter/Year</option>
+                  <option value="form">By Form Type</option>
+                  <option value="all">All</option>
                 </select>
               </div>
               <div>
-                <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500">Năm</div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500">Year</div>
                 <select class="sel" id="rptYear" onchange="generateReport()" style="width:100%;padding:7px 10px">
-                  <option value="all">Tất cả năm</option>
+                  <option value="all">All Years</option>
                 </select>
               </div>
               <div id="rptPeriodWrap">
-                <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500" id="rptPeriodLabel">Tháng</div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500" id="rptPeriodLabel">Month</div>
                 <select class="sel" id="rptPeriod" onchange="generateReport()" style="width:100%;padding:7px 10px">
-                  <option value="all">Tất cả</option>
+                  <option value="all">All</option>
                 </select>
               </div>
               <div style="position:relative">
                 <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500">Form Type</div>
                 <div id="rptFormBtn" onclick="toggleRptFormDrop()" style="cursor:pointer;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--card2);color:var(--text);font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:6px;user-select:none;white-space:nowrap;overflow:hidden;min-width:0">
-                  <span id="rptFormLabel" style="overflow:hidden;text-overflow:ellipsis">Tất cả form</span>
+                  <span id="rptFormLabel" style="overflow:hidden;text-overflow:ellipsis">All forms</span>
                   <span style="flex-shrink:0;font-size:10px;color:var(--muted)">▼</span>
                 </div>
                 <div id="rptFormDrop" style="display:none;position:absolute;z-index:50;top:calc(100% + 4px);left:0;min-width:220px;width:max-content;max-width:320px;background:var(--card);border:1px solid var(--border);border-radius:8px;max-height:240px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.5)">
                   <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card)">
-                    <input type="checkbox" id="rptFormAll" onchange="rptFormAllChange(this)" checked> Tất cả form
+                    <input type="checkbox" id="rptFormAll" onchange="rptFormAllChange(this)" checked> All forms
                   </label>
                   <div id="rptFormChecks"></div>
                 </div>
@@ -944,12 +945,12 @@ tr:last-child td{border-bottom:none}
               <div style="display:flex;align-items:center;justify-content:space-between">
                 <div>
                   <div style="font-size:10px;opacity:.8;letter-spacing:.1em;text-transform:uppercase">VietJet Air · Quality Assurance AMO</div>
-                  <div style="font-size:18px;font-weight:700;margin-top:3px" id="rptTitle">QA AMO — Báo Cáo Tổng Hợp</div>
+                  <div style="font-size:18px;font-weight:700;margin-top:3px" id="rptTitle">QA AMO — Summary Report</div>
                   <div style="font-size:12px;opacity:.8;margin-top:2px" id="rptSubtitle">—</div>
                 </div>
                 <div style="text-align:right;font-size:11px;opacity:.8">
-                  <div>Ngày xuất: <span id="rptDate">—</span></div>
-                  <div>Tổng: <span id="rptTotal">—</span></div>
+                  <div>Exported: <span id="rptDate">—</span></div>
+                  <div>Total: <span id="rptTotal">—</span></div>
                 </div>
               </div>
             </div>
@@ -960,9 +961,9 @@ tr:last-child td{border-bottom:none}
             </div>
 
             <div style="padding:14px 20px;border-bottom:1px solid var(--border)">
-              <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Biểu Đồ</div>
+              <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Charts</div>
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-                <div class="chart-card"><div style="font-size:12px;font-weight:600;margin-bottom:6px">Theo trạng thái</div><div style="height:150px;position:relative"><canvas id="rptCStatus"></canvas></div></div>
+                <div class="chart-card"><div style="font-size:12px;font-weight:600;margin-bottom:6px">By status</div><div style="height:150px;position:relative"><canvas id="rptCStatus"></canvas></div></div>
                 <div class="chart-card"><div style="font-size:12px;font-weight:600;margin-bottom:6px">Top Form Types</div><div style="height:150px;position:relative"><canvas id="rptCForm"></canvas></div></div>
                 <div class="chart-card"><div style="font-size:12px;font-weight:600;margin-bottom:6px">Findings by Month</div><div style="height:150px;position:relative"><canvas id="rptCMonth"></canvas></div></div>
               </div>
@@ -972,12 +973,12 @@ tr:last-child td{border-bottom:none}
               <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Overdue Analysis</div>
               <div style="display:grid;grid-template-columns:200px 1fr;gap:10px;align-items:start">
                 <div class="chart-card"><div style="height:120px;position:relative"><canvas id="rptCCat"></canvas></div></div>
-                <table class="stat-tbl"><thead><tr><th>CAT</th><th>Số lượng</th><th>Tỷ lệ</th><th>Mô tả</th></tr></thead><tbody id="rptCatTable"></tbody></table>
+                <table class="stat-tbl"><thead><tr><th>CAT</th><th>Count</th><th>Rate</th><th>Description</th></tr></thead><tbody id="rptCatTable"></tbody></table>
               </div>
             </div>
 
             <div style="padding:14px 20px;border-bottom:1px solid var(--border)">
-              <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Tổng Hợp Theo Form</div>
+              <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Summary by Form</div>
               <table style="width:100%;border-collapse:collapse;font-size:12px">
                 <thead><tr style="background:rgba(255,255,255,0.04)">
                   <th style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px">Form</th>
@@ -994,7 +995,7 @@ tr:last-child td{border-bottom:none}
             </div>
 
             <div style="padding:14px 20px">
-              <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Chi Tiết <span id="rptDetailCount" style="color:var(--blue);font-weight:400;text-transform:none"></span></div>
+              <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Detail <span id="rptDetailCount" style="color:var(--blue);font-weight:400;text-transform:none"></span></div>
               <div style="max-height:360px;overflow-y:auto">
                 <table style="width:100%;border-collapse:collapse;font-size:12px">
                   <thead style="position:sticky;top:0;background:var(--card);z-index:1">
@@ -1024,33 +1025,33 @@ tr:last-child td{border-bottom:none}
             <!-- Header -->
             <div style="background:linear-gradient(135deg,#E30613,#a00010);border-radius:12px;padding:28px 32px;margin-bottom:16px;color:white">
               <div style="font-size:11px;opacity:.7;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">VietJet Air · Quality Assurance AMO</div>
-              <div style="font-size:24px;font-weight:700;margin-bottom:6px">Hướng Dẫn Sử Dụng</div>
-              <div style="font-size:13px;opacity:.85">QA AMO Dashboard v7 · Tài liệu hướng dẫn đầy đủ</div>
+              <div style="font-size:24px;font-weight:700;margin-bottom:6px">User Guide</div>
+              <div style="font-size:13px;opacity:.85">QA AMO Dashboard v7 · Full documentation</div>
             </div>
 
             <!-- Quick Nav -->
             <div class="chart-card" style="margin-bottom:14px">
-              <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Nội dung</div>
+              <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Contents</div>
               <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
                 <a href="#sec-glossary" style="text-decoration:none"><div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border)'">
                   <div style="font-size:18px;margin-bottom:4px">📖</div>
-                  <div style="font-size:12px;font-weight:600;color:var(--text)">Định nghĩa</div>
-                  <div style="font-size:10px;color:var(--muted)">Thuật ngữ & Status</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text)">Glossary</div>
+                  <div style="font-size:10px;color:var(--muted)">Terms & Status</div>
                 </div></a>
                 <a href="#sec-pages" style="text-decoration:none"><div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border)'">
                   <div style="font-size:18px;margin-bottom:4px">📊</div>
-                  <div style="font-size:12px;font-weight:600;color:var(--text)">Các trang</div>
-                  <div style="font-size:10px;color:var(--muted)">Hướng dẫn từng trang</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text)">Pages</div>
+                  <div style="font-size:10px;color:var(--muted)">Guide per page</div>
                 </div></a>
                 <a href="#sec-export" style="text-decoration:none"><div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border)'">
                   <div style="font-size:18px;margin-bottom:4px">📄</div>
-                  <div style="font-size:12px;font-weight:600;color:var(--text)">Xuất báo cáo</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text)">Export Report</div>
                   <div style="font-size:10px;color:var(--muted)">PDF & Excel</div>
                 </div></a>
                 <a href="#sec-faq" style="text-decoration:none"><div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border)'">
                   <div style="font-size:18px;margin-bottom:4px">💡</div>
                   <div style="font-size:12px;font-weight:600;color:var(--text)">FAQ</div>
-                  <div style="font-size:10px;color:var(--muted)">Câu hỏi thường gặp</div>
+                  <div style="font-size:10px;color:var(--muted)">Common questions</div>
                 </div></a>
               </div>
             </div>
@@ -1059,63 +1060,63 @@ tr:last-child td{border-bottom:none}
             <div class="chart-card" style="margin-bottom:14px" id="sec-glossary">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
                 <span style="font-size:18px">📖</span>
-                <div style="font-size:15px;font-weight:700">Định Nghĩa & Thuật Ngữ</div>
+                <div style="font-size:15px;font-weight:700">Definitions & Terminology</div>
               </div>
 
               <!-- Status definitions -->
-              <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Trạng thái Report (Status)</div>
+              <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Report Status</div>
               <div style="display:grid;gap:6px;margin-bottom:16px">
                 <div style="display:grid;grid-template-columns:140px 1fr;gap:12px;align-items:start;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--blue)">
                   <div><span class="badge b-open">Open</span></div>
-                  <div style="font-size:12px;color:var(--muted)">Report đang được xử lý, chưa đến hạn hoặc chưa có target date. Người được giao cần thực hiện hành động khắc phục.</div>
+                  <div style="font-size:12px;color:var(--muted)">Report is being processed, not yet due or has no target date. The assignee must carry out corrective action.</div>
                 </div>
                 <div style="display:grid;grid-template-columns:140px 1fr;gap:12px;align-items:start;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid #ff6b6b">
                   <div><span class="badge b-over">Overdue</span></div>
-                  <div style="font-size:12px;color:var(--muted)">Report đã quá hạn target date nhưng chưa được đóng. Cần ưu tiên xử lý ngay. Phân loại thêm theo CAT I/II/III.</div>
+                  <div style="font-size:12px;color:var(--muted)">Report has passed its target date but has not been closed. Must be prioritised immediately. Further classified by CAT I/II/III.</div>
                 </div>
                 <div style="display:grid;grid-template-columns:140px 1fr;gap:12px;align-items:start;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--green)">
                   <div><span class="badge b-on">On-time Closed</span></div>
-                  <div style="font-size:12px;color:var(--muted)">Report đã đóng đúng hạn hoặc trước target date. Chỉ tính cho form có target date (CAR, MCAR, PAVOI...).</div>
+                  <div style="font-size:12px;color:var(--muted)">Report closed on or before its target date. Applies only to forms that have a target date (CAR, MCAR, PAVOI…).</div>
                 </div>
                 <div style="display:grid;grid-template-columns:140px 1fr;gap:12px;align-items:start;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--yellow)">
                   <div><span class="badge b-late">Lately Closed</span></div>
-                  <div style="font-size:12px;color:var(--muted)">Report đã đóng nhưng sau target date. Cần phân tích nguyên nhân để cải thiện tỷ lệ On-time.</div>
+                  <div style="font-size:12px;color:var(--muted)">Report was closed after its target date. Root-cause analysis is recommended to improve the on-time rate.</div>
                 </div>
                 <div style="display:grid;grid-template-columns:140px 1fr;gap:12px;align-items:start;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--muted)">
                   <div><span class="badge b-with">Closed</span></div>
-                  <div style="font-size:12px;color:var(--muted)">Report đã đóng nhưng không có target date (Surveillance Report, Aircraft Inspection...). Không tính vào On-time rate.</div>
+                  <div style="font-size:12px;color:var(--muted)">Report closed with no target date (Surveillance Report, Aircraft Inspection…). Not counted in the on-time rate.</div>
                 </div>
               </div>
 
               <!-- CAT definitions -->
-              <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Phân Loại Overdue (CAT)</div>
+              <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Overdue Category (CAT)</div>
               <div style="display:grid;gap:6px;margin-bottom:16px">
                 <div style="display:grid;grid-template-columns:100px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--orange)">
                   <div><span class="badge b-c1">CAT I</span></div>
-                  <div style="font-size:12px;color:var(--muted)"><b>Quá hạn ≤ 30 ngày</b> — Cần theo dõi và đôn đốc xử lý trong tuần.</div>
+                  <div style="font-size:12px;color:var(--muted)"><b>Overdue ≤ 30 days</b> — Monitor closely and follow up within the week.</div>
                 </div>
                 <div style="display:grid;grid-template-columns:100px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid #ff6b6b">
                   <div><span class="badge b-c2">CAT II</span></div>
-                  <div style="font-size:12px;color:var(--muted)"><b>Quá hạn 30–60 ngày</b> — Cần leo thang lên quản lý cấp trên và yêu cầu kế hoạch khắc phục.</div>
+                  <div style="font-size:12px;color:var(--muted)"><b>Overdue 30–60 days</b> — Escalate to senior management and request a corrective action plan.</div>
                 </div>
                 <div style="display:grid;grid-template-columns:100px 1fr;gap:12px;align-items:center;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid #ff3333">
                   <div><span class="badge b-c3">CAT III</span></div>
-                  <div style="font-size:12px;color:var(--muted)"><b>Quá hạn > 60 ngày</b> — Nghiêm trọng. Cần báo cáo ngay lên Ban lãnh đạo và có hành động xử lý khẩn cấp.</div>
+                  <div style="font-size:12px;color:var(--muted)"><b>Overdue &gt; 60 days</b> — Critical. Report immediately to senior leadership and take urgent action.</div>
                 </div>
               </div>
 
               <!-- Form types -->
-              <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Các Loại Form QA AMO</div>
+              <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">QA AMO Form Types</div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px">
                 ${[
-                  ['Surveillance Report (SR)','Báo cáo giám sát định kỳ. Không có target date. Được tạo từ các cuộc Inspection.'],
-                  ['Aircraft Inspection/Spot Check (AISC)','Kiểm tra tàu bay ngẫu nhiên hoặc định kỳ tại sân đỗ.'],
-                  ['MCAR','Mandatory Corrective Action Report — Báo cáo hành động khắc phục bắt buộc từ audit nội bộ.'],
-                  ['PAVOI','Post Audit Verification of Implementation — Theo dõi việc thực hiện các hành động khắc phục.'],
-                  ['CAR','Corrective Action Report — Báo cáo hành động khắc phục từ audit bên ngoài hoặc CAAV.'],
-                  ['MOR','Mandatory Occurrence Report — Báo cáo sự cố bắt buộc theo quy định CAAV.'],
-                  ['AMO ECAR','Electronic Corrective Action Report nội bộ AMO.'],
-                  ['Battery Workshop Inspection (BWI)','Kiểm tra định kỳ xưởng bảo dưỡng ắc quy — 1 lần/tháng.'],
+                  ['Surveillance Report (SR)','Periodic surveillance report. No target date. Generated from Inspection activities.'],
+                  ['Aircraft Inspection/Spot Check (AISC)','Random or scheduled aircraft inspection at the ramp.'],
+                  ['MCAR','Mandatory Corrective Action Report — Mandatory corrective action report from internal audits.'],
+                  ['PAVOI','Post Audit Verification of Implementation — Tracks implementation of corrective actions.'],
+                  ['CAR','Corrective Action Report — Corrective action report from external audits or CAAV.'],
+                  ['MOR','Mandatory Occurrence Report — Mandatory occurrence report as required by CAAV regulations.'],
+                  ['AMO ECAR','Internal AMO Electronic Corrective Action Report.'],
+                  ['Battery Workshop Inspection (BWI)','Periodic battery maintenance workshop inspection — once per month.'],
                 ].map(([name,desc])=>`<div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
                   <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">${name}</div>
                   <div style="font-size:11px;color:var(--muted)">${desc}</div>
@@ -1123,19 +1124,19 @@ tr:last-child td{border-bottom:none}
               </div>
 
               <!-- KPI definitions -->
-              <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Định Nghĩa KPI</div>
+              <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">KPI Definitions</div>
               <div style="display:grid;gap:6px">
                 <div style="padding:10px 12px;background:var(--card2);border-radius:8px">
                   <div style="font-size:12px;font-weight:600;color:var(--green);margin-bottom:3px">On-time Rate</div>
-                  <div style="font-size:11px;color:var(--muted)">= On-time Closed ÷ (On-time Closed + Lately Closed) × 100%. <b>Chỉ tính trên form có Target date.</b> Target: ≥ 70%.</div>
+                  <div style="font-size:11px;color:var(--muted)">= On-time Closed ÷ (On-time Closed + Lately Closed) × 100%. <b>Calculated only on forms with a target date.</b> Target: ≥ 70%.</div>
                 </div>
                 <div style="padding:10px 12px;background:var(--card2);border-radius:8px">
                   <div style="font-size:12px;font-weight:600;color:var(--yellow);margin-bottom:3px">Repetitive Rate</div>
-                  <div style="font-size:11px;color:var(--muted)">= Số finding bị lặp lại ÷ Tổng finding × 100%. Finding được đánh dấu "Repetitive = Yes" trong form. Target: ≤ 10%.</div>
+                  <div style="font-size:11px;color:var(--muted)">= Number of repeated findings ÷ Total findings × 100%. Findings marked "Repetitive = Yes" in the form. Target: ≤ 10%.</div>
                 </div>
                 <div style="padding:10px 12px;background:var(--card2);border-radius:8px">
                   <div style="font-size:12px;font-weight:600;color:var(--blue);margin-bottom:3px">Days to Due</div>
-                  <div style="font-size:11px;color:var(--muted)">Số ngày còn lại đến target date (dương = còn hạn, âm = đã quá hạn). Tính từ ngày hiện tại.</div>
+                  <div style="font-size:11px;color:var(--muted)">Days remaining until the target date (positive = within deadline, negative = overdue). Calculated from today.</div>
                 </div>
               </div>
             </div>
@@ -1144,7 +1145,7 @@ tr:last-child td{border-bottom:none}
             <div class="chart-card" style="margin-bottom:14px" id="sec-pages">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
                 <span style="font-size:18px">📊</span>
-                <div style="font-size:15px;font-weight:700">Hướng Dẫn Từng Trang</div>
+                <div style="font-size:15px;font-weight:700">Page Guide</div>
               </div>
 
               <div style="display:grid;gap:10px">
@@ -1154,12 +1155,12 @@ tr:last-child td{border-bottom:none}
                     <span>📊</span><span style="font-size:13px;font-weight:600">Overview</span>
                   </div>
                   <div style="padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7">
-                    Trang tổng quan toàn bộ QA AMO. <b style="color:var(--text)">Bộ lọc năm</b> ở đầu trang giúp xem số liệu theo từng năm (mặc định năm hiện tại).<br>
+                    Full QA AMO summary dashboard. The <b style="color:var(--text)">Year filter</b> at the top lets you view data by year (defaults to current year).<br>
                     • <b style="color:var(--text)">6 KPI cards:</b> Total / Open / Overdue / On-time / Lately / Closed<br>
-                    • <b style="color:var(--text)">Donut chart:</b> Phân bổ theo trạng thái<br>
-                    • <b style="color:var(--text)">Findings by Month:</b> Xu hướng theo tháng — lọc thêm theo năm bằng dropdown góc phải<br>
-                    • <b style="color:var(--text)">Top Forms:</b> Form nào có nhiều finding nhất — lọc theo All/Open/Overdue<br>
-                    • <b style="color:var(--text)">Form table:</b> Tổng hợp Open/Overdue/Closed cho từng loại form<br>
+                    • <b style="color:var(--text)">Donut chart:</b> Distribution by status<br>
+                    • <b style="color:var(--text)">Findings by Month:</b> Monthly trend — filter further by year using the dropdown in the top-right corner<br>
+                    • <b style="color:var(--text)">Top Forms:</b> Forms with the most findings — filter by All/Open/Overdue<br>
+                    • <b style="color:var(--text)">Form table:</b> Open/Overdue/Closed totals per form type<br>
                     • <b style="color:var(--text)">4 metric cards:</b> Open+Overdue / On-time Rate / CAT III / Repetitive
                   </div>
                 </div>
@@ -1169,11 +1170,11 @@ tr:last-child td{border-bottom:none}
                     <span>📋</span><span style="font-size:13px;font-weight:600">Open Reports</span>
                   </div>
                   <div style="padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7">
-                    Danh sách tất cả report đang ở trạng thái <b style="color:var(--blue)">Open</b> hoặc <b style="color:#ff6b6b">Overdue</b>.<br>
-                    • Filter theo Status (All/Open/Overdue), Form Type, Năm, hoặc tìm kiếm tự do<br>
-                    • Cột <b style="color:var(--text)">Days to Due:</b> màu xanh = còn nhiều thời gian, cam = gần hạn, đỏ = đã quá hạn<br>
-                    • Click vào tiêu đề cột để sort tăng/giảm dần<br>
-                    • <b style="color:var(--yellow)">⚠ Yes</b> trong cột Repetitive = finding đã từng xảy ra trước đây
+                    List of all reports currently in <b style="color:var(--blue)">Open</b> or <b style="color:#ff6b6b">Overdue</b> status.<br>
+                    • Filter by Status (All/Open/Overdue), Form Type, Year, or free-text search<br>
+                    • <b style="color:var(--text)">Days to Due</b> column: green = plenty of time, orange = approaching deadline, red = overdue<br>
+                    • Click any column header to sort ascending/descending<br>
+                    • <b style="color:var(--yellow)">⚠ Yes</b> in the Repetitive column = this finding has occurred before
                   </div>
                 </div>
 
@@ -1182,11 +1183,11 @@ tr:last-child td{border-bottom:none}
                     <span>⚠️</span><span style="font-size:13px;font-weight:600">Overdue</span>
                   </div>
                   <div style="padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7">
-                    Chỉ hiển thị report đã <b style="color:#ff6b6b">quá hạn</b>, phân tích theo CAT.<br>
-                    • <b style="color:var(--text)">3 KPI cards:</b> CAT I / CAT II / CAT III với số lượng cụ thể<br>
-                    • <b style="color:var(--text)">Biểu đồ By CAT:</b> Tỷ lệ phân bổ overdue theo mức độ nghiêm trọng<br>
-                    • <b style="color:var(--text)">Biểu đồ By Form:</b> Form nào đang overdue nhiều nhất<br>
-                    • Filter theo Form Type và CAT level
+                    Shows only <b style="color:#ff6b6b">overdue</b> reports, analysed by CAT level.<br>
+                    • <b style="color:var(--text)">3 KPI cards:</b> CAT I / CAT II / CAT III with exact counts<br>
+                    • <b style="color:var(--text)">By CAT chart:</b> Overdue distribution by severity<br>
+                    • <b style="color:var(--text)">By Form chart:</b> Which forms have the most overdue items<br>
+                    • Filter by Form Type and CAT level
                   </div>
                 </div>
 
@@ -1195,12 +1196,12 @@ tr:last-child td{border-bottom:none}
                     <span>📈</span><span style="font-size:13px;font-weight:600">KPI Charts</span>
                   </div>
                   <div style="padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7">
-                    Phân tích xu hướng KPI theo thời gian.<br>
-                    • <b style="color:var(--text)">On-time Rate by Month:</b> Đường target 70% — theo dõi tháng nào đạt/không đạt<br>
-                    • <b style="color:var(--text)">Repetitive Rate by Month:</b> Xu hướng finding lặp<br>
-                    • <b style="color:var(--text)">Cumulative YTD:</b> Tổng lũy kế finding từ đầu năm<br>
-                    • <b style="color:var(--text)">On-time Rate by Year:</b> So sánh hiệu suất theo năm<br>
-                    • <b style="color:var(--text)">Repetitive Rate by Year:</b> Xu hướng finding lặp theo năm
+                    KPI trend analysis over time.<br>
+                    • <b style="color:var(--text)">On-time Rate by Month:</b> 70% target line — track which months pass or fail<br>
+                    • <b style="color:var(--text)">Repetitive Rate by Month:</b> Trend of repeated findings<br>
+                    • <b style="color:var(--text)">Cumulative YTD:</b> Year-to-date cumulative finding count<br>
+                    • <b style="color:var(--text)">On-time Rate by Year:</b> Year-on-year performance comparison<br>
+                    • <b style="color:var(--text)">Repetitive Rate by Year:</b> Year-on-year repetitive finding trend
                   </div>
                 </div>
 
@@ -1209,11 +1210,11 @@ tr:last-child td{border-bottom:none}
                     <span>📄</span><span style="font-size:13px;font-weight:600">All Forms</span>
                   </div>
                   <div style="padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7">
-                    Danh sách đầy đủ <b>tất cả</b> report của QA AMO ở mọi trạng thái.<br>
-                    • Filter theo Status, Form Type, Năm, hoặc tìm kiếm<br>
-                    • Cột <b style="color:var(--text)">MNT No:</b> Số audit mà report này thuộc về<br>
-                    • Cột <b style="color:var(--text)">Audit Ref:</b> Số tham chiếu audit (Audit Ref. No)<br>
-                    • Cột <b style="color:var(--text)">Audit Title:</b> Tên cuộc audit — click cột để sort
+                    Complete list of <b>all</b> QA AMO reports across every status.<br>
+                    • Filter by Status, Form Type, Year, or search<br>
+                    • <b style="color:var(--text)">MNT No</b> column: Audit number that this report belongs to<br>
+                    • <b style="color:var(--text)">Audit Ref</b> column: Audit reference number (Audit Ref. No)<br>
+                    • <b style="color:var(--text)">Audit Title</b> column: Name of the audit — click the column header to sort
                   </div>
                 </div>
 
@@ -1222,11 +1223,11 @@ tr:last-child td{border-bottom:none}
                     <span>🔍</span><span style="font-size:13px;font-weight:600">PAVOI Detail</span>
                   </div>
                   <div style="padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7">
-                    Chỉ hiển thị form <b>PAVOI</b> với đầy đủ thông tin xác minh.<br>
-                    • <b style="color:var(--text)">Request For Verification:</b> Nội dung yêu cầu xác minh việc thực hiện<br>
-                    • <b style="color:var(--text)">Report Reference:</b> Số report gốc mà PAVOI theo dõi (VD: MCAR-0086)<br>
-                    • <b style="color:var(--text)">Verification Result:</b> <span style="color:var(--green)">Satisfactory</span> = đạt / <span style="color:#ff6b6b">Not Satisfactory</span> = chưa đạt<br>
-                    • <b style="color:var(--text)">Department:</b> Phòng ban chịu trách nhiệm thực hiện
+                    Shows only <b>PAVOI</b> forms with full verification details.<br>
+                    • <b style="color:var(--text)">Request For Verification:</b> Content of the verification request for implementation<br>
+                    • <b style="color:var(--text)">Report Reference:</b> Original report number that the PAVOI is tracking (e.g. MCAR-0086)<br>
+                    • <b style="color:var(--text)">Verification Result:</b> <span style="color:var(--green)">Satisfactory</span> = passed / <span style="color:#ff6b6b">Not Satisfactory</span> = not yet passed<br>
+                    • <b style="color:var(--text)">Department:</b> Department responsible for implementation
                   </div>
                 </div>
 
@@ -1235,12 +1236,12 @@ tr:last-child td{border-bottom:none}
                     <span>📅</span><span style="font-size:13px;font-weight:600">Audit Plan</span>
                   </div>
                   <div style="padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7">
-                    Kế hoạch và lịch sử audit của QA AMO từ Galileo Planner.<br>
+                    QA AMO audit schedule and history from Galileo Planner.<br>
                     • <b style="color:var(--text)">6 KPI cards:</b> Total / Internal Audit / Inspection / Closed / In Progress / Scheduled<br>
-                    • Filter theo Type (📋 Internal Audit / 🔍 Inspection), Status, Năm<br>
-                    • Cột <b style="color:var(--text)">Findings:</b> Số report được tạo từ audit đó<br>
-                    • Cột <b style="color:var(--text)">Open/Overdue:</b> Số finding đang mở/quá hạn của audit<br>
-                    • Audit <b style="color:var(--blue)">Scheduled</b> = chưa thực hiện (kế hoạch tương lai)
+                    • Filter by Type (📋 Internal Audit / 🔍 Inspection), Status, Year<br>
+                    • <b style="color:var(--text)">Findings</b> column: Number of reports generated from that audit<br>
+                    • <b style="color:var(--text)">Open/Overdue</b> column: Open/overdue finding count for that audit<br>
+                    • <b style="color:var(--blue)">Scheduled</b> audits = not yet started (future plans)
                   </div>
                 </div>
 
@@ -1251,48 +1252,48 @@ tr:last-child td{border-bottom:none}
             <div class="chart-card" style="margin-bottom:14px" id="sec-export">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
                 <span style="font-size:18px">📄</span>
-                <div style="font-size:15px;font-weight:700">Xuất Báo Cáo</div>
+                <div style="font-size:15px;font-weight:700">Export Reports</div>
               </div>
 
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
                 <div style="background:rgba(227,6,19,0.08);border:1px solid rgba(227,6,19,0.2);border-radius:10px;padding:14px">
-                  <div style="font-size:13px;font-weight:600;color:#ff6b6b;margin-bottom:8px">📄 Xuất PDF</div>
+                  <div style="font-size:13px;font-weight:600;color:#ff6b6b;margin-bottom:8px">📄 Export PDF</div>
                   <div style="font-size:12px;color:var(--muted);line-height:1.7">
-                    Xuất báo cáo dạng PDF để in hoặc gửi email.<br><br>
-                    <b style="color:var(--text)">Nội dung PDF bao gồm:</b><br>
-                    • Header đỏ VietJet với tiêu đề báo cáo<br>
+                    Export report as a PDF for printing or emailing.<br><br>
+                    <b style="color:var(--text)">PDF contents include:</b><br>
+                    • VietJet red header with report title<br>
                     • 6 KPI cards<br>
-                    • 3 biểu đồ (Status, Top Forms, Monthly)<br>
-                    • Bảng phân tích Overdue by CAT<br>
-                    • Bảng tổng hợp theo Form<br>
-                    • Chi tiết finding (tối đa 200 records)<br><br>
-                    PDF tự động chia trang A4.
+                    • 3 charts (Status, Top Forms, Monthly)<br>
+                    • Overdue by CAT analysis table<br>
+                    • Summary table by Form type<br>
+                    • Finding details (up to 200 records)<br><br>
+                    PDF is automatically paginated to A4.
                   </div>
                 </div>
                 <div style="background:rgba(29,111,66,0.1);border:1px solid rgba(29,111,66,0.3);border-radius:10px;padding:14px">
-                  <div style="font-size:13px;font-weight:600;color:var(--green);margin-bottom:8px">📊 Xuất Excel</div>
+                  <div style="font-size:13px;font-weight:600;color:var(--green);margin-bottom:8px">📊 Export Excel</div>
                   <div style="font-size:12px;color:var(--muted);line-height:1.7">
-                    Xuất file .xlsx để phân tích thêm trong Excel.<br><br>
-                    <b style="color:var(--text)">File Excel có 3 sheets:</b><br>
-                    • <b>Sheet 1 — KPI Summary:</b> Tổng hợp số liệu KPI và Overdue CAT<br>
-                    • <b>Sheet 2 — Form Summary:</b> Bảng Open/Overdue/On-time/Lately/Closed theo từng loại form<br>
-                    • <b>Sheet 3 — Detail Data:</b> Toàn bộ finding với đầy đủ thông tin<br><br>
-                    Tên file tự động gồm tiêu đề báo cáo và ngày xuất.
+                    Export a .xlsx file for further analysis in Excel.<br><br>
+                    <b style="color:var(--text)">Excel file has 3 sheets:</b><br>
+                    • <b>Sheet 1 — KPI Summary:</b> KPI totals and Overdue CAT breakdown<br>
+                    • <b>Sheet 2 — Form Summary:</b> Open/Overdue/On-time/Lately/Closed per form type<br>
+                    • <b>Sheet 3 — Detail Data:</b> All findings with full field data<br><br>
+                    Filename is auto-generated with the report title and export date.
                   </div>
                 </div>
               </div>
 
               <div style="background:var(--card2);border-radius:8px;padding:12px 14px">
-                <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">🔧 Cách sử dụng trang Xuất Báo Cáo:</div>
+                <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">🔧 How to use the Export page:</div>
                 <div style="font-size:12px;color:var(--muted);line-height:1.8">
-                  <b>Bước 1:</b> Vào menu <b style="color:var(--text)">Xuất Báo Cáo</b> từ sidebar trái<br>
-                  <b>Bước 2:</b> Chọn loại lọc từ dropdown <b style="color:var(--text)">"Lọc theo"</b>:<br>
-                  &nbsp;&nbsp;• <b>Theo Tháng/Năm</b> → chọn Năm và Tháng cụ thể<br>
-                  &nbsp;&nbsp;• <b>Theo Quý/Năm</b> → chọn Năm và Quý (Q1-Q4)<br>
-                  &nbsp;&nbsp;• <b>Theo Form Type</b> → chọn form cụ thể (MCAR, PAVOI...)<br>
-                  &nbsp;&nbsp;• <b>Tất cả</b> → không lọc, lấy toàn bộ data<br>
-                  <b>Bước 3:</b> Xem preview báo cáo trong trang<br>
-                  <b>Bước 4:</b> Click <span style="background:#E30613;color:white;padding:2px 8px;border-radius:4px;font-size:11px">📄 PDF</span> hoặc <span style="background:#1D6F42;color:white;padding:2px 8px;border-radius:4px;font-size:11px">📊 Excel</span> để tải về
+                  <b>Step 1:</b> Open <b style="color:var(--text)">Export Reports</b> from the left sidebar<br>
+                  <b>Step 2:</b> Choose a filter type from the <b style="color:var(--text)">"Filter by"</b> dropdown:<br>
+                  &nbsp;&nbsp;• <b>By Month/Year</b> → select a specific Year and Month<br>
+                  &nbsp;&nbsp;• <b>By Quarter/Year</b> → select a Year and Quarter (Q1–Q4)<br>
+                  &nbsp;&nbsp;• <b>By Form Type</b> → select a specific form (MCAR, PAVOI…)<br>
+                  &nbsp;&nbsp;• <b>All</b> → no filter, loads all data<br>
+                  <b>Step 3:</b> Review the report preview on the page<br>
+                  <b>Step 4:</b> Click <span style="background:#E30613;color:white;padding:2px 8px;border-radius:4px;font-size:11px">📄 PDF</span> or <span style="background:#1D6F42;color:white;padding:2px 8px;border-radius:4px;font-size:11px">📊 Excel</span> to download
                 </div>
               </div>
             </div>
@@ -1301,17 +1302,17 @@ tr:last-child td{border-bottom:none}
             <div class="chart-card" style="margin-bottom:14px" id="sec-faq">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
                 <span style="font-size:18px">💡</span>
-                <div style="font-size:15px;font-weight:700">Câu Hỏi Thường Gặp</div>
+                <div style="font-size:15px;font-weight:700">Frequently Asked Questions</div>
               </div>
 
               <div style="display:grid;gap:8px">
                 ${[
-                  ['Tại sao tổng số report là 3000+?', 'Dashboard load toàn bộ lịch sử QA AMO từ khi hệ thống Galileo hoạt động. Sử dụng bộ lọc năm trên trang Overview để xem số liệu theo từng năm cụ thể.'],
-                  ['On-time rate 12% có nghĩa là gì?', 'Chỉ 12% số form có target date được đóng đúng hạn. Con số này chỉ tính trên form có target date (CAR, MCAR, PAVOI). Form không có target (Surveillance, AISC) không được tính vào on-time rate.'],
-                  ['Tại sao Repetitive = 0?', 'Field "Repetitive" trong Galileo cần được điền "Yes" khi tạo finding. Nếu không điền, dashboard không nhận diện được. Cần nhắc nhở auditor điền đầy đủ.'],
-                  ['Data được cập nhật khi nào?', 'Click nút "↻ Refresh" trên topbar để tải lại data mới nhất từ Galileo. Dashboard không tự động refresh. Quá trình tải mất khoảng 30-60 giây.'],
-                  ['Tại sao Audit Plan có 963 records?', 'Dashboard load tất cả audit của QA AMO auditors (Vo Vinh Hien, Le Hong Chuong, Thai Ba Hoa...) từ trước đến nay, bao gồm cả Scheduled tương lai. Dùng filter Năm để xem kế hoạch năm cụ thể.'],
-                  ['Làm sao thêm user mới?', 'User tự đăng ký tại trang đăng nhập → Admin vào trang "Quản lý Users" → Approve tài khoản. Admin có thể Approve/Reject/cấp quyền Admin cho user khác.'],
+                  ['Why does the total report count exceed 3,000?', 'The dashboard loads the full QA AMO history since the Galileo system went live. Use the Year filter on the Overview page to view data for a specific year.'],
+                  ['What does an on-time rate of 12% mean?', 'Only 12% of forms with a target date were closed on time. This figure is calculated only on forms that have a target date (CAR, MCAR, PAVOI). Forms without a target date (Surveillance, AISC) are excluded from the on-time rate.'],
+                  ['Why is the Repetitive count 0?', 'The "Repetitive" field in Galileo must be set to "Yes" when creating a finding. If it is left blank, the dashboard cannot detect it. Auditors should be reminded to fill in this field.'],
+                  ['When is the data updated?', 'Click the "↻ Refresh" button on the topbar to reload the latest data from Galileo. The dashboard does not refresh automatically. Loading takes approximately 30–60 seconds.'],
+                  ['Why does Audit Plan show 963 records?', 'The dashboard loads all audits for QA AMO auditors (Vo Vinh Hien, Le Hong Chuong, Thai Ba Hoa…) from past to present, including future Scheduled audits. Use the Year filter to view a specific year\'s plan.'],
+                  ['How do I add a new user?', 'The user self-registers on the login page → Admin goes to "User Management" → Approve the account. Admins can Approve/Reject/grant Admin rights to other users.'],
                 ].map(([q,a])=>`<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
                   <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ ${q}</div>
                   <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">${a}</div>
@@ -1321,7 +1322,7 @@ tr:last-child td{border-bottom:none}
 
             <!-- Footer -->
             <div style="text-align:center;padding:16px;color:var(--muted);font-size:11px;border-top:1px solid var(--border)">
-              QA AMO Dashboard v7 · VietJet Air · Dữ liệu từ Galileo GRC · Phát triển bởi QA AMO Team
+              QA AMO Dashboard v7 · VietJet Air · Data from Galileo GRC · Developed by QA AMO Team
             </div>
 
           </div>
@@ -1331,8 +1332,8 @@ tr:last-child td{border-bottom:none}
         <div class="page" id="page-admin">
           <div class="tbl-card">
             <div class="tbl-bar">
-              <div><div class="tbl-title">Quản lý Users</div><div class="tbl-count" id="userCnt">—</div></div>
-              <button class="pill on" onclick="setUF('all',this)">Tất cả</button>
+              <div><div class="tbl-title">User Management</div><div class="tbl-count" id="userCnt">—</div></div>
+              <button class="pill on" onclick="setUF('all',this)">All</button>
               <button class="pill" onclick="setUF('pending',this)">⏳ Pending</button>
               <button class="pill" onclick="setUF('approved',this)">✅ Approved</button>
               <button class="pill" onclick="setUF('rejected',this)">❌ Rejected</button>
@@ -1340,7 +1341,7 @@ tr:last-child td{border-bottom:none}
             </div>
             <div class="tbl-wrap">
               <table>
-                <thead><tr><th>Họ tên</th><th>Tên đăng nhập</th><th>Email khai báo</th><th>Role</th><th>Ngày đăng ký</th><th>Approved by</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Full Name</th><th>Username</th><th>Email</th><th>Role</th><th>Registered</th><th>Approved by</th><th>Actions</th></tr></thead>
                 <tbody id="userBody"></tbody>
               </table>
             </div>
@@ -1368,13 +1369,13 @@ tr:last-child td{border-bottom:none}
         <div class="kpi-lbl">Total</div><div class="kpi-val" id="dtk-total" style="color:var(--blue)">—</div>
       </div>
       <div class="chart-card" style="text-align:center;padding:8px">
-        <div class="kpi-lbl">Đúng hạn</div><div class="kpi-val" id="dtk-done" style="color:var(--green)">—</div>
+        <div class="kpi-lbl">On Time</div><div class="kpi-val" id="dtk-done" style="color:var(--green)">—</div>
       </div>
       <div class="chart-card" style="text-align:center;padding:8px">
-        <div class="kpi-lbl">Trễ</div><div class="kpi-val" id="dtk-late" style="color:var(--yellow)">—</div>
+        <div class="kpi-lbl">Late</div><div class="kpi-val" id="dtk-late" style="color:var(--yellow)">—</div>
       </div>
       <div class="chart-card" style="text-align:center;padding:8px">
-        <div class="kpi-lbl">Quá hạn</div><div class="kpi-val" id="dtk-over" style="color:#ff6b6b">—</div>
+        <div class="kpi-lbl">Overdue</div><div class="kpi-val" id="dtk-over" style="color:#ff6b6b">—</div>
       </div>
     </div>
     <!-- Task table -->
@@ -1382,16 +1383,16 @@ tr:last-child td{border-bottom:none}
       <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed">
         <colgroup><col style="width:28%"><col style="width:16%"><col style="width:16%"><col style="width:20%"><col style="width:20%"></colgroup>
         <thead style="position:sticky;top:0;background:var(--card);z-index:1"><tr>
-          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Nhân Viên</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Staff</th>
           <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Distribution Date</th>
           <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Due Date</th>
           <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Acknowledged Date</th>
-          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Trạng Thái</th>
+          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Status</th>
         </tr></thead>
         <tbody id="docTaskBody"></tbody>
       </table>
     </div>
-    <div id="docTaskLoading" style="text-align:center;padding:24px;color:var(--muted);font-size:13px;display:none">Đang tải danh sách copyholder...</div>
+    <div id="docTaskLoading" style="text-align:center;padding:24px;color:var(--muted);font-size:13px;display:none">Loading copyholders...</div>
   </div>
 </div>
 
@@ -1416,7 +1417,7 @@ tr:last-child td{border-bottom:none}
   <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:93%;max-width:1020px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
     <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0">
       <div>
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Chi tiết Audit</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Audit Detail</div>
         <div style="font-size:15px;font-weight:700;color:var(--text);margin-top:2px" id="adTitle">—</div>
         <div style="font-size:11px;color:var(--muted);margin-top:3px" id="adMeta">—</div>
       </div>
@@ -1437,7 +1438,7 @@ tr:last-child td{border-bottom:none}
         <thead style="position:sticky;top:0;background:var(--card);z-index:1"><tr>
           <th style="padding:7px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap">Report No</th>
           <th style="padding:7px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Form</th>
-          <th style="padding:7px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Trạng thái</th>
+          <th style="padding:7px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Status</th>
           <th style="padding:7px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap">Raised</th>
           <th style="padding:7px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap">Target</th>
           <th style="padding:7px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Finding Workflow</th>
@@ -1451,9 +1452,9 @@ tr:last-child td{border-bottom:none}
 <div class="overlay" id="overlay">
   <div class="ov-box">
     <div class="spinner" id="ovSpinner"></div>
-    <div class="ov-text" id="ovText">Đang tải...</div>
+    <div class="ov-text" id="ovText">Loading...</div>
     <div class="ov-detail" id="ovDetail"></div>
-    <button class="ov-retry" id="ovRetry" onclick="loadData()" style="display:none">↻ Thử lại</button>
+    <button class="ov-retry" id="ovRetry" onclick="loadData()" style="display:none">↻ Retry</button>
   </div>
 </div>
 <div class="toast-wrap" id="toastWrap"></div>
@@ -1522,21 +1523,21 @@ function switchAuth(tab) {
 async function doLogin() {
   const username=g('lUsername').value.trim().toLowerCase(), pass=g('lPass').value;
   const al=g('loginAlert'); showAl(al,'',''); g('btnLogin').disabled=true;
-  if(!username||!pass){showAl(al,'error','Vui lòng nhập tên đăng nhập và mật khẩu.');g('btnLogin').disabled=false;return;}
+  if(!username||!pass){showAl(al,'error','Please enter username and password.');g('btnLogin').disabled=false;return;}
   try {
     const {data,error} = await sb.from('users').select('*').eq('email',username).single();
-    if(error||!data){showAl(al,'error','Tên đăng nhập không tồn tại.');return;}
+    if(error||!data){showAl(al,'error','Username not found.');return;}
     const hash = await hashPass(pass);
     const passOk = data.password === hash || data.password === pass;
-    if(!passOk){showAl(al,'error','Mật khẩu không đúng.');return;}
+    if(!passOk){showAl(al,'error','Incorrect password.');return;}
     if(data.password === pass) sb.from('users').update({password:hash}).eq('id',data.id);
     if(data.role==='pending'){g('loginForm').style.display='none';g('authTabs').style.display='none';g('pendingBox').style.display='';return;}
-    if(data.role==='rejected'){showAl(al,'error','Tài khoản đã bị từ chối.');return;}
+    if(data.role==='rejected'){showAl(al,'error','Account has been rejected.');return;}
     curUser=data;
     const safeUser={id:data.id,email:data.email,full_name:data.full_name,role:data.role};
     sessionStorage.setItem('qaUser',JSON.stringify(safeUser));
     initApp();
-  } catch(e){showAl(al,'error','Lỗi: '+e.message);}
+  } catch(e){showAl(al,'error','Error: '+e.message);}
   finally{g('btnLogin').disabled=false;}
 }
 
@@ -1545,21 +1546,21 @@ async function doRegister() {
   const contactEmail=g('rEmail').value.trim().toLowerCase();
   const pass=g('rPass').value, pass2=g('rPass2').value;
   const al=g('registerAlert');
-  if(!name||!username||!pass){showAl(al,'error','Vui lòng điền đầy đủ họ tên, tên đăng nhập và mật khẩu.');return;}
-  if(!/^[a-z0-9._-]{3,30}$/.test(username)){showAl(al,'error','Tên đăng nhập chỉ gồm chữ thường, số, dấu chấm/gạch dưới (3–30 ký tự).');return;}
-  if(pass.length<8){showAl(al,'error','Mật khẩu tối thiểu 8 ký tự.');return;}
-  if(pass!==pass2){showAl(al,'error','Mật khẩu không khớp.');return;}
-  g('btnRegister').disabled=true; showAl(al,'info','Đang gửi...');
+  if(!name||!username||!pass){showAl(al,'error','Please fill in full name, username and password.');return;}
+  if(!/^[a-z0-9._-]{3,30}$/.test(username)){showAl(al,'error','Username may only contain lowercase letters, numbers, dots or underscores (3–30 chars).');return;}
+  if(pass.length<8){showAl(al,'error','Password must be at least 8 characters.');return;}
+  if(pass!==pass2){showAl(al,'error','Passwords do not match.');return;}
+  g('btnRegister').disabled=true; showAl(al,'info','Submitting...');
   try {
     const {data:ex}=await sb.from('users').select('id').eq('email',username).single();
-    if(ex){showAl(al,'error','Tên đăng nhập đã được sử dụng.');return;}
+    if(ex){showAl(al,'error','Username already in use.');return;}
     const hash=await hashPass(pass);
     const {error}=await sb.from('users').insert({email:username,password:hash,full_name:name,contact_email:contactEmail||null,role:'pending'});
     if(error)throw error;
-    showAl(al,'success','✓ Đăng ký thành công! Chờ Admin phê duyệt.');
+    showAl(al,'success','Registration successful! Awaiting Admin approval.');
     g('rName').value=g('rUsername').value=g('rEmail').value=g('rPass').value=g('rPass2').value='';
     setTimeout(()=>{g('registerForm').style.display='none';g('authTabs').style.display='none';g('pendingBox').style.display='';},2000);
-  } catch(e){showAl(al,'error','Lỗi: '+e.message);}
+  } catch(e){showAl(al,'error','Error: '+e.message);}
   finally{g('btnRegister').disabled=false;}
 }
 
@@ -1608,7 +1609,7 @@ function cacheLoad() {
     g('recCount').textContent = allData.length;
     updateCacheAge(c.ts);
     const age = Math.round((Date.now()-c.ts)/60000);
-    toast(`✓ Cache (${age < 60 ? age+'ph' : Math.floor(age/60)+'h'} trước) — ${allData.length} reports, ${auditData.length} audits · Bấm ↻ để load mới`,'ok');
+    toast(`Cache (${age < 60 ? age+'m' : Math.floor(age/60)+'h'} ago) — ${allData.length} reports, ${auditData.length} audits · Press ↻ to refresh`,'ok');
     return true;
   } catch { return false; }
 }
@@ -1632,26 +1633,26 @@ function updateCacheAge(ts) {
   if (!el) return;
   const age = Math.round((Date.now()-ts)/60000);
   const nextH = Math.ceil((CACHE_TTL - (Date.now()-ts)) / 3600000);
-  el.textContent = age < 2 ? 'Vừa load' : age < 60 ? `${age}ph trước` : `${Math.floor(age/60)}h${age%60?age%60+'ph':''} trước`;
-  el.title = `Sẽ tự động hết hạn sau ~${nextH}h — bấm ↻ Refresh để load ngay`;
+  el.textContent = age < 2 ? 'Just loaded' : age < 60 ? `${age}m ago` : `${Math.floor(age/60)}h${age%60?age%60+'m':''} ago`;
+  el.title = `Cache expires in ~${nextH}h — click ↻ Refresh to reload now`;
 }
 
 // ── DATA LOADING ─────────────────────────────────────────────
 async function loadData(forceRefresh=false) {
-  if(isLoading){toast('Đang tải dữ liệu, vui lòng chờ...','info');return;}
+  if(isLoading){toast('Loading data, please wait...','info');return;}
   isLoading=true;
-  setOv(true,'Đang kết nối Galileo...','');
+  setOv(true,'Connecting to Galileo...','');
   try {
 
     // 1. SUMMARY — lấy toàn bộ QA AMO, không filter year
-    setOv(true,'[1/3] Đang tải report summary...','');
+    setOv(true,'[1/4] Loading report summary...','');
     const sumRaw = await fetchAll(
       G_URL + 'dwreporting_report_summary' +
       '?$select=report_id,report_title,report_number,report_status,' +
       'org_unit_name,raised_date,audit_title,audit_id,modified_date,valid_from,valid_to,owner_id' +
       '&$filter=org_unit_name eq \'' + ORG_UNIT + '\''
     );
-    setOv(true,`[1/3] ${sumRaw.length} rows thô. Đang dedup...`,'');
+    setOv(true,`[1/4] ${sumRaw.length} rows — deduplicating...`,'');
 
     // DEDUP đúng:
     // - Key = report_id (mỗi report có 1 report_id duy nhất)
@@ -1670,7 +1671,7 @@ async function loadData(forceRefresh=false) {
     const summary = Object.values(sumMap);
 
     // 2. USERS — build userMap[user_id] = full_name for owner lookup
-    setOv(true,`[2/4] Đang tải users...`,'');
+    setOv(true,'[2/4] Loading users...','');
     let userMap = {};
     try {
       const usersRaw = await fetchAll(G_URL + 'dwreporting_users?$select=user_id,full_name');
@@ -1678,7 +1679,7 @@ async function loadData(forceRefresh=false) {
     } catch(e) { console.warn('Users load error:',e); }
 
     // 3. WORKFLOW — tải tất cả stages để hiển thị bước + lấy ngày close (ReportAcceptReject)
-    setOv(true,`[3/4] ${summary.length} reports. Đang tải workflow...`,'');
+    setOv(true,`[3/4] ${summary.length} reports — loading workflow...`,'');
     let wfMap = {};
     let wfAllMap = {};
     try {
@@ -1705,7 +1706,7 @@ async function loadData(forceRefresh=false) {
     } catch(e) { console.warn('Workflow load error:',e); }
 
     // 4. CUSTOM FIELDS — Target date, Finding level, Repetitive, v.v.
-    setOv(true,'[4/4] Đang tải custom fields...','');
+    setOv(true,'[4/4] Loading custom fields...','');
     let fMap = {};
     try {
       const fRaw = await fetchAll(
@@ -1729,7 +1730,7 @@ async function loadData(forceRefresh=false) {
     } catch(e) { console.warn('Fields load error:',e); }
 
     // BUILD FINAL DATASET
-    setOv(true,'Đang xử lý data...','');
+    setOv(true,'Processing data...','');
     allData = summary.map(r => {
       const f  = fMap[r.report_id] || {};
       const wf = wfMap[r.report_id] || null;
@@ -1770,7 +1771,7 @@ async function loadData(forceRefresh=false) {
     });
 
     // 4. LOAD AUDIT SUMMARY — lấy audit_id từ allData rồi fetch audit info
-    setOv(true,'[4/4] Đang tải audit plan...','');
+    setOv(true,'[4/4] Loading audit plan...','');
     try {
       // Lấy danh sách audit_id có trong QA AMO reports
       const auditIdSet = new Set(allData.map(r=>r.audit_id).filter(Boolean));
@@ -1876,13 +1877,13 @@ async function loadData(forceRefresh=false) {
     renderAll();
     g('liveBadge').style.display='';
     g('recCount').textContent=allData.length;
-    toast(`✓ Đã load ${allData.length} reports, ${auditData.length} audits từ QA AMO`,'ok');
+    toast(`Loaded ${allData.length} reports, ${auditData.length} audits`,'ok');
     cacheSave();
     setOv(false);
 
   } catch(e) {
     console.error(e);
-    toast('Lỗi load data: '+e.message,'err');
+    toast('Error loading data: '+e.message,'err');
     showLoadError(e.message);
   } finally { isLoading=false; }
 }
@@ -1896,7 +1897,7 @@ async function fetchAll(url) {
     const tid=setTimeout(()=>ctl.abort(),30000);
     let r;
     try { r=await fetch(next,{signal:ctl.signal}); }
-    catch(e){ throw new Error(e.name==='AbortError'?'Hết thời gian chờ (30s) — server phản hồi chậm':e.message); }
+    catch(e){ throw new Error(e.name==='AbortError'?'Request timed out (30s) — server responded slowly':e.message); }
     finally { clearTimeout(tid); }
     if(!r.ok) throw new Error('HTTP '+r.status+' '+r.statusText);
     const j=await r.json();
@@ -1964,26 +1965,26 @@ function renderAll() {
 // ── POPULATE FILTERS ─────────────────────────────────────────
 function populateFilters() {
   const forms=[...new Set(allData.map(r=>r.report_title).filter(Boolean))].sort();
-  const fOpts='<option value="">Tất cả Form</option>'+forms.map(f=>`<option>${f}</option>`).join('');
+  const fOpts='<option value="">All Forms</option>'+forms.map(f=>`<option>${f}</option>`).join('');
   ['openFormF','ovFormF','afFormF'].forEach(id=>{const el=g(id);if(el)el.innerHTML=fOpts;});
 
   const years=[...new Set(allData.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
-  const yOpts='<option value="">Tất cả năm</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  const yOpts='<option value="">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
   ['openYearF','afYearF','pavoiYearF'].forEach(id=>{const el=g(id);if(el)el.innerHTML=yOpts;});
 
   // Overview year filter — default to current year
   const curYear = new Date().getFullYear();
-  const ovYOpts='<option value="all">Tất cả năm</option>'+years.map(y=>`<option value="${y}" ${y===curYear?'selected':''}>${y}</option>`).join('');
+  const ovYOpts='<option value="all">All Years</option>'+years.map(y=>`<option value="${y}" ${y===curYear?'selected':''}>${y}</option>`).join('');
   const ovYEl=g('ovYearFilter'); if(ovYEl) ovYEl.innerHTML=ovYOpts;
 
   // KPI year filter — default to current year
   const curYearKpi = new Date().getFullYear();
-  const kpiYOpts='<option value="all">Tất cả năm</option>'+years.map(y=>`<option value="${y}" ${y===curYearKpi?'selected':''}>${y}</option>`).join('');
+  const kpiYOpts='<option value="all">All Years</option>'+years.map(y=>`<option value="${y}" ${y===curYearKpi?'selected':''}>${y}</option>`).join('');
   const kpiYEl=g('kpiYear'); if(kpiYEl) kpiYEl.innerHTML=kpiYOpts;
 
   // Audit year filter
   const auYears=[...new Set(auditData.map(a=>a.sched_year).filter(Boolean))].sort((a,b)=>b-a);
-  const auYOpts='<option value="">Tất cả năm</option>'+auYears.map(y=>`<option value="${y}">${y}</option>`).join('');
+  const auYOpts='<option value="">All Years</option>'+auYears.map(y=>`<option value="${y}">${y}</option>`).join('');
   const auYEl=g('auditYearF'); if(auYEl) auYEl.innerHTML=auYOpts;
 }
 
@@ -1991,7 +1992,7 @@ function filterOverviewYear() {
   const yr = g('ovYearFilter')?.value || 'all';
   const d = yr==='all' ? allData : allData.filter(r=>String(r.raised_year)===yr);
   const countEl = g('ovYearCount');
-  if(countEl) countEl.textContent = yr==='all' ? `${allData.length} records` : `${d.length} records năm ${yr}`;
+  if(countEl) countEl.textContent = yr==='all' ? `${allData.length} records` : `${d.length} records for ${yr}`;
   renderOverview(d);
 }
 
@@ -2006,8 +2007,8 @@ function renderOverview(d) {
   const c2=d.filter(r=>r.overdue_cat==='CAT II').length;
   const c3=d.filter(r=>r.overdue_cat==='CAT III').length;
   s('k-total',tot); s('k-open',open);
-  s('k-over',ov); s('k-over-r',pct(ov/(open+ov||1))+' của Open+Overdue');
-  s('k-on',on); s('k-on-r','On-time: '+pct(on/(withTgt||1))+' (form có target)');
+  s('k-over',ov); s('k-over-r',pct(ov/(open+ov||1))+' of Open+Overdue');
+  s('k-on',on); s('k-on-r','On-time: '+pct(on/(withTgt||1))+' (forms with target)');
   s('k-late',late); s('k-cls',cls);
   s('k-c1',c1); s('k-c2',c2); s('k-c3',c3);
   buildChartsFor(d);
@@ -2074,7 +2075,7 @@ function renderStatTblsFor(d) {
       <td style="text-align:center;color:var(--muted)">${Math.round(rows.length/total*100)}%</td>
     </tr>`;
   }).join('');
-  const fc=g('statFormCount'); if(fc)fc.textContent=forms.length+' loại form';
+  const fc=g('statFormCount'); if(fc)fc.textContent=forms.length+' form types';
   const ontime=d.filter(r=>r.semantic_status==='On-time Closed').length;
   const lately=d.filter(r=>r.semantic_status==='Lately Closed').length;
   const ov3=d.filter(r=>r.semantic_status==='Overdue').length;
@@ -2083,12 +2084,12 @@ function renderStatTblsFor(d) {
   const cat3=d.filter(r=>r.overdue_cat==='CAT III').length;
   const rep=d.filter(r=>r.is_rep).length;
   s('mc-open-ov',openCnt+ov3);
-  s('mc-open-ov-r',pct((openCnt+ov3)/total)+' của tổng');
+  s('mc-open-ov-r',pct((openCnt+ov3)/total)+' of total');
   s('mc-ontime-r',pct(ontime/(withTgt||1)));
-  s('mc-ontime-v',ontime+' / '+withTgt+' form có target');
+  s('mc-ontime-v',ontime+' / '+withTgt+' forms with target');
   s('mc-cat3',cat3);
   s('mc-rep',rep);
-  s('mc-rep-r',pct(rep/total)+' tỷ lệ lặp');
+  s('mc-rep-r',pct(rep/total)+' repetitive rate');
   // CAT breakdown bars
   const cat1=d.filter(r=>r.overdue_cat==='CAT I').length;
   const cat2=d.filter(r=>r.overdue_cat==='CAT II').length;
@@ -2174,7 +2175,7 @@ function filterKpiYear() {
   const yr = g('kpiYear')?.value || 'all';
   const data = yr==='all' ? allData : allData.filter(r=>String(r.raised_year)===yr);
   const countEl = g('kpiYearCount');
-  if(countEl) countEl.textContent = yr==='all' ? `${allData.length} records` : `${data.length} records năm ${yr}`;
+  if(countEl) countEl.textContent = yr==='all' ? `${allData.length} records` : `${data.length} records for ${yr}`;
   buildKPICharts(data);
 }
 
@@ -2444,7 +2445,7 @@ function renderPaged(bodyId,infoId,pgId,cntId,data,ts,rowFn) {
   if(cntId)s(cntId,total+' records');
   s(infoId,`${Math.min(start+1,total)}–${Math.min(start+PS,total)} / ${total}`);
   g(bodyId).innerHTML=slice.length===0
-    ?`<tr><td colspan="20" style="text-align:center;padding:40px;color:var(--muted)">Không có data</td></tr>`
+    ?`<tr><td colspan="20" style="text-align:center;padding:40px;color:var(--muted)">No data</td></tr>`
     :slice.map(rowFn).join('');
   const pDiv=g(pgId); if(!pDiv)return;
   let btns=`<button class="pg-btn" onclick="goPg('${bodyId}',${ts.page-1})" ${ts.page===1?'disabled':''}>‹</button>`;
@@ -2520,7 +2521,7 @@ function parseAircraftFromTitle(title){
 }
 
 async function loadCmr(){
-  setOv(true,'Đang tải CMR-CAR...','');
+  setOv(true,'Loading CMR-CAR...','');
   try{
     const raw=await fetchAll(
       G_URL+'dwreporting_report_summary'+
@@ -2535,7 +2536,7 @@ async function loadCmr(){
     });
     const summary=Object.values(map);
 
-    setOv(true,`${summary.length} CMR-CAR records. Đang tải custom fields...`,'');
+    setOv(true,`${summary.length} CMR-CAR records — loading custom fields...`,'');
     let fMap={};
     try{
       const fRaw=await fetchAll(
@@ -2556,7 +2557,12 @@ async function loadCmr(){
       fRaw.forEach(f=>{
         if(!cmrIds.has(f.report_id))return;
         if(!fMap[f.report_id])fMap[f.report_id]={};
-        if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
+        if(f.field_name==='Finding description'){
+          if(!fMap[f.report_id].findings)fMap[f.report_id].findings=[];
+          if(f.text_value)fMap[f.report_id].findings.push(f.text_value);
+        } else {
+          if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
+        }
       });
     }catch(e){console.warn('CMR fields error:',e);}
 
@@ -2570,7 +2576,9 @@ async function loadCmr(){
       return{
         ...r,
         aircraft_reg:   aircraft,
-        finding_desc:   f['Finding description']   ||null,
+        findings:       f.findings||[],
+        finding_count:  (f.findings||[]).length,
+        finding_desc:   (f.findings||[])[0]||null,
         finding_level:  f['Finding level']         ||null,
         nc_type:        f['NC Type']               ||null,
         Target_date:    td,
@@ -2593,7 +2601,7 @@ async function loadCmr(){
     cmrLoaded=true;
   }catch(e){
     console.error('CMR-CAR load error:',e);
-    toast('Lỗi tải CMR-CAR: '+e.message,'err');
+    toast('Error loading CMR-CAR: '+e.message,'err');
   }
   setOv(false);
   renderCmr();
@@ -2610,7 +2618,7 @@ let _dCmr;function dRenderCmr(){clearTimeout(_dCmr);_dCmr=setTimeout(()=>{TS.cmr
 
 function renderCmr(){
   if(!cmrLoaded||!cmrData.length){
-    g('cmrBody').innerHTML='<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted)">Chưa có dữ liệu</td></tr>';
+    g('cmrBody').innerHTML='<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted)">No data</td></tr>';
     return;
   }
   const ts=TS.cmr;
@@ -2622,7 +2630,7 @@ function renderCmr(){
   const years=[...new Set(cmrData.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
   const yrEl=g('cmrYearF');
   if(yrEl&&yrEl.options.length<=1)
-    yrEl.innerHTML='<option value="">Tất cả năm</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+    yrEl.innerHTML='<option value="">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
 
   // Build aircraft list for pills
   const acCounts={};
@@ -2630,7 +2638,7 @@ function renderCmr(){
   const acList=Object.keys(acCounts).sort();
   const acBar=g('cmrAcBar');
   if(acBar){
-    acBar.innerHTML=`<button class="pill${ts.ac==='all'?' on':''}" onclick="setCmrAC('all')" style="font-size:11px">✈️ Tất cả (${cmrData.length})</button>`+
+    acBar.innerHTML=`<button class="pill${ts.ac==='all'?' on':''}" onclick="setCmrAC('all')" style="font-size:11px">✈️ All (${cmrData.length})</button>`+
       acList.map(ac=>`<button class="pill${ts.ac===ac?' on':''}" onclick="setCmrAC(${JSON.stringify(ac)})" style="font-size:11px">${esc(ac)} <span style="color:var(--muted)">${acCounts[ac]}</span></button>`).join('');
   }
 
@@ -2666,6 +2674,7 @@ function renderCmr(){
       <td><b style="color:var(--blue)">${esc(r.report_number)||'—'}</b></td>
       <td style="font-size:11px;font-weight:500">✈️ ${esc(r.aircraft_reg)||'—'}</td>
       <td>${sBadge(r.semantic_status)}</td>
+      <td style="text-align:center"><b style="color:var(--blue)">${r.finding_count||0}</b></td>
       <td style="font-size:11px;color:var(--muted);max-width:320px"><div style="overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(r.finding_desc)||'—'}</div></td>
       <td style="font-size:11px">${esc(r.dept)||'—'}</td>
       <td style="font-size:11px;color:var(--muted);white-space:nowrap">${fd(r.raised_date)}</td>
@@ -2704,7 +2713,13 @@ function showCmrDetail(report_id){
       </div>
     </div>
     <div style="margin-top:4px;border-top:1px solid var(--border);padding-top:12px">
-      ${row('Finding Description',r.finding_desc)}
+      ${(r.findings&&r.findings.length)?`<div style="margin-bottom:10px">
+        <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Findings (${r.findings.length})</div>
+        ${r.findings.map((desc,i)=>`<div style="margin-bottom:8px;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--blue)">
+          <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:4px">FINDING ${i+1}</div>
+          <div style="font-size:12px;color:var(--text);white-space:pre-wrap;line-height:1.5">${esc(desc)}</div>
+        </div>`).join('')}
+      </div>`:''}
       ${row('Corrective Action Plan',r.cap)}
       ${row('Final Action Taken',r.final_action)}
       ${row('RCA Analysis',r.rca)}
@@ -2717,7 +2732,7 @@ function closeCmrModal(e){
 }
 
 function exportCmrPDF(){
-  if(!cmrLoaded||!cmrData.length){toast('Chưa có dữ liệu CMR-CAR','err');return;}
+  if(!cmrLoaded||!cmrData.length){toast('No CMR-CAR data loaded','err');return;}
   const ts=TS.cmr;
   const yr=g('cmrYearF')?.value||'';
   const qr=g('cmrQtrF')?.value||'';
@@ -2733,11 +2748,11 @@ function exportCmrPDF(){
   data=sortD(data,ts.sort,ts.asc);
 
   // Build period label
-  let period='Toàn bộ';
+  let period='All';
   if(yr&&qr)period=`Q${qr}/${yr}`;
-  else if(yr)period=`Năm ${yr}`;
-  else if(qr)period=`Q${qr} (tất cả năm)`;
-  const acLabel=ts.ac==='all'?'Tất cả tàu bay':ts.ac;
+  else if(yr)period=`Year ${yr}`;
+  else if(qr)period=`Q${qr} (all years)`;
+  const acLabel=ts.ac==='all'?'All Aircraft':ts.ac;
 
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
@@ -2746,8 +2761,8 @@ function exportCmrPDF(){
   doc.setFontSize(14);doc.setFont(undefined,'bold');
   doc.text('CMR-CAR Findings Report',14,14);
   doc.setFontSize(9);doc.setFont(undefined,'normal');
-  doc.text(`Thời gian: ${period}   |   Tàu bay: ${acLabel}   |   Tổng: ${data.length} findings`,14,21);
-  doc.text(`Xuất ngày: ${new Date().toLocaleDateString('vi-VN')}`,14,26);
+  doc.text(`Period: ${period}  |  Aircraft: ${acLabel}  |  Total: ${data.length} findings`,14,21);
+  doc.text(`Exported: ${new Date().toLocaleDateString('en-GB')}`,14,26);
 
   // Group by aircraft
   const acGroups={};
@@ -2757,42 +2772,40 @@ function exportCmrPDF(){
   });
 
   let y=32;
-  const qtrNames=['','Q1 (Jan–Mar)','Q2 (Apr–Jun)','Q3 (Jul–Sep)','Q4 (Oct–Dec)'];
   const statusColor={
     'Open':[88,166,255],'Overdue':[255,107,107],
     'On-time Closed':[63,185,80],'Lately Closed':[210,153,34],'Closed':[110,118,129]
   };
 
   Object.entries(acGroups).forEach(([ac,rows])=>{
-    // Aircraft section header
     doc.autoTable({
       startY:y,
-      head:[[{content:`✈  ${ac}  (${rows.length} findings)`,colSpan:6}]],
+      head:[[{content:`Aircraft: ${ac}  (${rows.length} findings)`,colSpan:7}]],
       headStyles:{fillColor:[30,35,45],textColor:[140,160,200],fontStyle:'bold',fontSize:9},
       theme:'plain',margin:{left:14,right:14},
     });
     y=doc.lastAutoTable.finalY;
 
-    // Findings table for this aircraft
     doc.autoTable({
       startY:y,
-      head:[['Report No','Status','Raised Date','Target Date','Department','Finding Description']],
+      head:[['Report No','Aircraft','Status','Raised','Target','Dept','Finding Description']],
       body:rows.map(r=>[
         r.report_number||'—',
+        r.aircraft_reg||'—',
         r.semantic_status||'—',
         fd(r.raised_date),
         fd(r.Target_date),
         r.dept||'—',
-        (r.finding_desc||'—').substring(0,300),
+        (r.findings||[]).join('\n\n')||'—',
       ]),
       headStyles:{fillColor:[22,27,34],textColor:[139,148,158],fontSize:8,fontStyle:'bold'},
       bodyStyles:{fontSize:7.5,valign:'top'},
       columnStyles:{
-        0:{cellWidth:28},1:{cellWidth:26},2:{cellWidth:22},
-        3:{cellWidth:22},4:{cellWidth:28},5:{cellWidth:'auto'},
+        0:{cellWidth:24},1:{cellWidth:22},2:{cellWidth:22},
+        3:{cellWidth:18},4:{cellWidth:18},5:{cellWidth:22},6:{cellWidth:'auto'},
       },
       didParseCell:function(d){
-        if(d.section==='body'&&d.column.index===1){
+        if(d.section==='body'&&d.column.index===2){
           const sc=statusColor[d.cell.raw];
           if(sc)d.cell.styles.textColor=sc;
         }
@@ -2809,7 +2822,7 @@ function exportCmrPDF(){
 
   const fname=`CMR-CAR_${yr||'all'}_${qr?'Q'+qr:'allQ'}_${new Date().toISOString().slice(0,10)}.pdf`;
   doc.save(fname);
-  toast(`✓ Đã xuất ${fname}`,'ok');
+  toast(`Exported ${fname}`,'ok');
 }
 
 // ── TABLE: AUDIT PLAN ─────────────────────────────────────────
@@ -2969,7 +2982,7 @@ function renderAuditTimeline(audit) {
   const header = fallback
     ? `<div style="font-size:10px;color:var(--orange);margin-bottom:8px">⚠ Dữ liệu ước tính theo trạng thái audit (${audit.status}) — chưa có API workflow</div>`
     : '';
-  if (!sorted.length) return '<span style="color:var(--muted);font-size:12px">Chưa có thông tin workflow</span>';
+  if (!sorted.length) return '<span style="color:var(--muted);font-size:12px">No workflow information available</span>';
   return header + sorted.map((s,i) => {
     const done = s.stage_status === 'Completed';
     const prog = s.stage_status === 'InProgress';
@@ -2979,12 +2992,12 @@ function renderAuditTimeline(audit) {
     const border = done ? 'rgba(63,185,80,.25)' : prog ? 'rgba(88,166,255,.3)' : 'var(--border)';
 
     const dateParts = [];
-    if (s.scheduled_start_date) dateParts.push('Kế hoạch: '+new Date(s.scheduled_start_date).toLocaleDateString('vi-VN')+
-      (s.scheduled_end_date?' → '+new Date(s.scheduled_end_date).toLocaleDateString('vi-VN'):''));
-    if (s.actual_start_date)    dateParts.push('Thực tế: '+new Date(s.actual_start_date).toLocaleDateString('vi-VN')+
-      (s.actual_end_date?' → '+new Date(s.actual_end_date).toLocaleDateString('vi-VN'):''));
-    if (s.stage_completed_date) dateParts.push('Hoàn thành: '+new Date(s.stage_completed_date).toLocaleDateString('vi-VN'));
-    if (!done && s.stage_target_date) dateParts.push('Target: '+new Date(s.stage_target_date).toLocaleDateString('vi-VN'));
+    if (s.scheduled_start_date) dateParts.push('Planned: '+new Date(s.scheduled_start_date).toLocaleDateString('en-GB')+
+      (s.scheduled_end_date?' → '+new Date(s.scheduled_end_date).toLocaleDateString('en-GB'):''));
+    if (s.actual_start_date)    dateParts.push('Actual: '+new Date(s.actual_start_date).toLocaleDateString('en-GB')+
+      (s.actual_end_date?' → '+new Date(s.actual_end_date).toLocaleDateString('en-GB'):''));
+    if (s.stage_completed_date) dateParts.push('Completed: '+new Date(s.stage_completed_date).toLocaleDateString('en-GB'));
+    if (!done && s.stage_target_date) dateParts.push('Target: '+new Date(s.stage_target_date).toLocaleDateString('en-GB'));
 
     const sep = i < sorted.length-1
       ? '<div style="width:2px;height:10px;background:var(--border);margin:2px 0 2px 14px"></div>' : '';
@@ -3014,8 +3027,8 @@ function renderWfSteps(stages) {
     const col  = done ? 'var(--green)' : prog ? 'var(--blue)' : 'var(--muted)';
     const icon = done ? '✓' : prog ? '●' : '○';
     const dateStr = s.stage_completed_date
-      ? ' ('+new Date(s.stage_completed_date).toLocaleDateString('vi-VN')+')'
-      : s.stage_target_date ? ' →'+new Date(s.stage_target_date).toLocaleDateString('vi-VN') : '';
+      ? ' ('+new Date(s.stage_completed_date).toLocaleDateString('en-GB')+')'
+      : s.stage_target_date ? ' →'+new Date(s.stage_target_date).toLocaleDateString('en-GB') : '';
     const sep = i>0 ? '<span style="color:var(--border);margin:0 3px">›</span>' : '';
     return `${sep}<span title="${s.stage_type}: ${s.stage_status}${dateStr}" style="color:${col};font-size:11px;white-space:nowrap">${icon} ${s.stage_type.replace(/([A-Z])/g,' $1').trim()}</span>`;
   }).join('');
@@ -3031,7 +3044,7 @@ function showAuditDetail(auditId) {
     audit.audit_type, audit.status,
     audit.lead_auditor_name ? '👤 '+audit.lead_auditor_name : null,
     audit.primary_scope_item_name,
-    audit.scheduled_start_date ? 'Scheduled: '+new Date(audit.scheduled_start_date).toLocaleDateString('vi-VN') : null
+    audit.scheduled_start_date ? 'Scheduled: '+new Date(audit.scheduled_start_date).toLocaleDateString('en-GB') : null
   ].filter(Boolean).join(' · '));
 
   // Audit workflow timeline
@@ -3064,8 +3077,8 @@ function showAuditDetail(auditId) {
       <td style="padding:7px 12px;white-space:nowrap"><b style="color:var(--blue)">${esc(r.report_number)||'—'}</b></td>
       <td style="padding:7px 12px;font-size:11px;color:var(--muted)">${esc(r.report_title)||'—'}</td>
       <td style="padding:7px 12px">${SM[r.semantic_status]||`<span class="badge b-with">${esc(r.semantic_status)||'—'}</span>`}</td>
-      <td style="padding:7px 12px;font-size:11px;white-space:nowrap">${r.raised_date?new Date(r.raised_date).toLocaleDateString('vi-VN'):'—'}</td>
-      <td style="padding:7px 12px;font-size:11px;white-space:nowrap">${r.Target_date?new Date(r.Target_date).toLocaleDateString('vi-VN'):'—'}</td>
+      <td style="padding:7px 12px;font-size:11px;white-space:nowrap">${r.raised_date?new Date(r.raised_date).toLocaleDateString('en-GB'):'—'}</td>
+      <td style="padding:7px 12px;font-size:11px;white-space:nowrap">${r.Target_date?new Date(r.Target_date).toLocaleDateString('en-GB'):'—'}</td>
       <td style="padding:7px 12px">${renderWfSteps(r.wf_stages)}</td>
     </tr>`).join('');
 
@@ -3116,18 +3129,18 @@ function updateReportFilters(){
   const type=g('rptFilterType').value;
   const pw=g('rptPeriodWrap'), pl=g('rptPeriodLabel'), ps=g('rptPeriod');
   if(type==='month'){
-    pw.style.display=''; pl.textContent='Tháng';
-    ps.innerHTML='<option value="all">Tất cả tháng</option>'+Array.from({length:12},(_,i)=>`<option value="${i+1}">Tháng ${i+1}</option>`).join('');
+    pw.style.display=''; pl.textContent='Month';
+    ps.innerHTML='<option value="all">All months</option>'+Array.from({length:12},(_,i)=>`<option value="${i+1}">Month ${i+1}</option>`).join('');
   } else if(type==='quarter'){
-    pw.style.display=''; pl.textContent='Quý';
-    ps.innerHTML='<option value="all">Tất cả quý</option>'+['Q1 (T1-T3)','Q2 (T4-T6)','Q3 (T7-T9)','Q4 (T10-T12)'].map((q,i)=>`<option value="${i+1}">${q}</option>`).join('');
+    pw.style.display=''; pl.textContent='Quarter';
+    ps.innerHTML='<option value="all">All quarters</option>'+['Q1 (Jan-Mar)','Q2 (Apr-Jun)','Q3 (Jul-Sep)','Q4 (Oct-Dec)'].map((q,i)=>`<option value="${i+1}">${q}</option>`).join('');
   } else { pw.style.display='none'; }
   generateReport();
 }
 
 function initReportFilters(){
   const years=[...new Set(allData.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
-  g('rptYear').innerHTML='<option value="all">Tất cả năm</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  g('rptYear').innerHTML='<option value="all">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
   const forms=[...new Set(allData.map(r=>r.report_title).filter(Boolean))].sort();
   rptFormSelected=[];
   g('rptFormChecks').innerHTML=forms.map(f=>`<label style="display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;font-size:13px"><input type="checkbox" class="rptFormItem" value="${f.replace(/"/g,'&quot;')}" onchange="rptFormItemChange()" checked> ${f}</label>`).join('');
@@ -3155,7 +3168,7 @@ function getRptTitle(){
   let t='QA AMO';
   if(sel.length===1)t+=` — ${sel[0]}`;
   else if(sel.length>1)t+=` — ${sel.length} form`;
-  if(type==='month'&&period!=='all')t+=` Tháng ${period}`;
+  if(type==='month'&&period!=='all')t+=` Month ${period}`;
   else if(type==='quarter'&&period!=='all')t+=` Q${period}`;
   if(year!=='all')t+=` ${year}`;
   return t;
@@ -3178,17 +3191,17 @@ function generateReport(){
   rptData=getRptData();
   const d=rptData, total=d.length;
   s('rptTitle',getRptTitle());
-  s('rptDate',new Date().toLocaleDateString('vi-VN'));
+  s('rptDate',new Date().toLocaleDateString('en-GB'));
   s('rptTotal',total+' records');
   // subtitle
   const type=g('rptFilterType').value, year=g('rptYear').value;
   const period=g('rptPeriod')?.value||'all';
   const sel=rptFormSelected;
   let sub='';
-  if(type==='month')sub=period==='all'?`Năm ${year==='all'?'Tất cả':year}`:`Tháng ${period}/${year==='all'?'Tất cả':year}`;
-  else if(type==='quarter')sub=period==='all'?`Năm ${year==='all'?'Tất cả':year}`:`Q${period} — ${year==='all'?'Tất cả':year}`;
-  else if(type==='form')sub=sel.length===0?'Tất cả form':sel.length===1?sel[0]:`${sel.length} form`;
-  else sub='Toàn bộ QA AMO';
+  if(type==='month')sub=period==='all'?`Year ${year==='all'?'All':year}`:`Month ${period}/${year==='all'?'All':year}`;
+  else if(type==='quarter')sub=period==='all'?`Year ${year==='all'?'All':year}`:`Q${period} — ${year==='all'?'All':year}`;
+  else if(type==='form')sub=sel.length===0?'All forms':sel.length===1?sel[0]:`${sel.length} forms`;
+  else sub='All QA AMO';
   s('rptSubtitle',sub);
 
   // KPIs
@@ -3494,19 +3507,19 @@ function exportExcel(){
     const on=d.filter(r=>r.semantic_status==='On-time Closed').length, late=d.filter(r=>r.semantic_status==='Lately Closed').length;
     const cls=d.filter(r=>r.semantic_status==='Closed').length, rep=d.filter(r=>r.is_rep).length;
     const c1=d.filter(r=>r.overdue_cat==='CAT I').length, c2=d.filter(r=>r.overdue_cat==='CAT II').length, c3=d.filter(r=>r.overdue_cat==='CAT III').length;
-    const ws1=XLSX.utils.aoa_to_sheet([['QA AMO — '+getRptTitle()],['Ngày xuất:',new Date().toLocaleDateString('vi-VN')],[''],['KPI SUMMARY'],['Metric','Value','Rate'],['Total',total,'100%'],['Open',open,pct(open/total)],['Overdue',ov,pct(ov/total)],['On-time Closed',on,pct(on/(on+late||1))],['Lately Closed',late,pct(late/(on+late||1))],['Closed (no target)',cls,pct(cls/total)],['Repetitive',rep,pct(rep/total)],[''],['OVERDUE'],['CAT','Count','Rate','Desc'],['CAT I',c1,pct(c1/(c1+c2+c3||1)),'≤30 ngày'],['CAT II',c2,pct(c2/(c1+c2+c3||1)),'30-60 ngày'],['CAT III',c3,pct(c3/(c1+c2+c3||1)),'>60 ngày']]);
+    const ws1=XLSX.utils.aoa_to_sheet([['QA AMO — '+getRptTitle()],['Exported:',new Date().toLocaleDateString('en-GB')],[''],['KPI SUMMARY'],['Metric','Value','Rate'],['Total',total,'100%'],['Open',open,pct(open/total)],['Overdue',ov,pct(ov/total)],['On-time Closed',on,pct(on/(on+late||1))],['Lately Closed',late,pct(late/(on+late||1))],['Closed (no target)',cls,pct(cls/total)],['Repetitive',rep,pct(rep/total)],[''],['OVERDUE'],['CAT','Count','Rate','Desc'],['CAT I',c1,pct(c1/(c1+c2+c3||1)),'<=30 days'],['CAT II',c2,pct(c2/(c1+c2+c3||1)),'30-60 days'],['CAT III',c3,pct(c3/(c1+c2+c3||1)),'>60 days']]);
     ws1['!cols']=[{wch:25},{wch:12},{wch:12},{wch:20}];
     XLSX.utils.book_append_sheet(wb,ws1,'KPI Summary');
     const forms=[...new Set(d.map(r=>r.report_title).filter(Boolean))].sort();
     const ws2=XLSX.utils.aoa_to_sheet([['Form','Open','Overdue','On-time','Lately','Closed','Total','%'],...forms.map(f=>{const rows=d.filter(r=>r.report_title===f);return[f,rows.filter(r=>r.semantic_status==='Open').length,rows.filter(r=>r.semantic_status==='Overdue').length,rows.filter(r=>r.semantic_status==='On-time Closed').length,rows.filter(r=>r.semantic_status==='Lately Closed').length,rows.filter(r=>r.semantic_status==='Closed').length,rows.length,Math.round(rows.length/total*100)+'%'];}),['TOTAL',open,ov,on,late,cls,total,'100%']]);
     ws2['!cols']=[{wch:35},{wch:8},{wch:10},{wch:12},{wch:12},{wch:10},{wch:8},{wch:6}];
     XLSX.utils.book_append_sheet(wb,ws2,'Form Summary');
-    const ws3=XLSX.utils.aoa_to_sheet([['Report No','Form','Status','Raised','Target','Days','CAT','Finding Level','Repetitive','MNT No','Audit Title'],...d.map(r=>[r.report_number||'',r.report_title||'',r.semantic_status||'',r.raised_date?new Date(r.raised_date).toLocaleDateString('vi-VN'):'',r.Target_date?new Date(r.Target_date).toLocaleDateString('vi-VN'):'',r.report_ageing??'',r.overdue_cat||'',r.finding_level||'',r.is_rep?'Yes':'No',r.audit_number||'',r.audit_title||''])]);
+    const ws3=XLSX.utils.aoa_to_sheet([['Report No','Form','Status','Raised','Target','Days','CAT','Finding Level','Repetitive','MNT No','Audit Title'],...d.map(r=>[r.report_number||'',r.report_title||'',r.semantic_status||'',r.raised_date?new Date(r.raised_date).toLocaleDateString('en-GB'):'',r.Target_date?new Date(r.Target_date).toLocaleDateString('en-GB'):'',r.report_ageing??'',r.overdue_cat||'',r.finding_level||'',r.is_rep?'Yes':'No',r.audit_number||'',r.audit_title||''])]);
     ws3['!cols']=[{wch:15},{wch:30},{wch:16},{wch:12},{wch:12},{wch:10},{wch:8},{wch:15},{wch:10},{wch:12},{wch:40}];
     XLSX.utils.book_append_sheet(wb,ws3,'Detail Data');
     XLSX.writeFile(wb,`QA_AMO_${getRptTitle().replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`);
-    toast('✓ Excel đã xuất!','ok');
-  }catch(e){toast('Lỗi Excel: '+e.message,'err');}
+    toast('✓ Excel exported!','ok');
+  }catch(e){toast('Excel error: '+e.message,'err');}
   finally{setOv(false);}
 }
 // ── ADMIN ─────────────────────────────────────────────────────
@@ -3538,25 +3551,25 @@ async function loadUsers() {
           ${u.role==='rejected'?`<button class="btn-approve" onclick="approveUser('${u.id}','${u.email}')">✓ Re-approve</button>`:''}
           ${u.role==='admin'?'<span style="font-size:11px;color:var(--muted)">—</span>':''}
         </div></td></tr>`).join('');
-  } catch(e){toast('Lỗi load users: '+e.message,'err');}
+  } catch(e){toast('Error loading users: '+e.message,'err');}
 }
 
 async function approveUser(id,email){
-  try{const{error}=await sb.from('users').update({role:'approved',approved_by:curUser.email,approved_at:new Date().toISOString()}).eq('id',id);if(error)throw error;toast('✓ Đã approve: '+email,'ok');loadUsers();}
-  catch(e){toast('Lỗi: '+e.message,'err');}
+  try{const{error}=await sb.from('users').update({role:'approved',approved_by:curUser.email,approved_at:new Date().toISOString()}).eq('id',id);if(error)throw error;toast('✓ Approved: '+email,'ok');loadUsers();}
+  catch(e){toast('Error: '+e.message,'err');}
 }
 async function rejectUser(id){
-  try{const{error}=await sb.from('users').update({role:'rejected'}).eq('id',id);if(error)throw error;toast('User đã bị reject','info');loadUsers();}
-  catch(e){toast('Lỗi: '+e.message,'err');}
+  try{const{error}=await sb.from('users').update({role:'rejected'}).eq('id',id);if(error)throw error;toast('User rejected','info');loadUsers();}
+  catch(e){toast('Error: '+e.message,'err');}
 }
 async function makeAdmin(id){
-  if(!confirm('Cấp quyền Admin cho user này?'))return;
-  try{const{error}=await sb.from('users').update({role:'admin'}).eq('id',id);if(error)throw error;toast('✓ Đã cấp quyền Admin','ok');loadUsers();}
-  catch(e){toast('Lỗi: '+e.message,'err');}
+  if(!confirm('Grant Admin rights to this user?'))return;
+  try{const{error}=await sb.from('users').update({role:'admin'}).eq('id',id);if(error)throw error;toast('✓ Admin rights granted','ok');loadUsers();}
+  catch(e){toast('Error: '+e.message,'err');}
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────
-const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',auditplan:'Audit Plan',docs:'Quản Lý Tài Liệu',reports:'Xuất Báo Cáo',help:'Hướng Dẫn Sử Dụng',admin:'Quản lý Users'};
+const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management'};
 function showPage(name,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -3578,7 +3591,7 @@ function showPage(name,btn){
 }
 
 // ── HELPERS ───────────────────────────────────────────────────
-function fd(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('vi-VN')}catch{return d}}
+function fd(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('en-GB')}catch{return d}}
 function pct(v){return isNaN(v)||!isFinite(v)?'—':Math.round(v*100)+'%'}
 
 function ageDis(ageing,status){
@@ -3614,7 +3627,7 @@ function setOv(show,txt='',detail=''){
 function showLoadError(msg){
   g('overlay').classList.add('show');
   g('ovSpinner').style.display='none';
-  s('ovText','⚠ Không tải được dữ liệu');
+  s('ovText','⚠ Could not load data');
   s('ovDetail',msg);
   g('ovRetry').style.display='';
 }
@@ -3643,11 +3656,11 @@ function closeSidebar(){
 let docLoading = false;
 
 async function loadDocuments(force=false) {
-  if(docLoading){toast('Đang tải documents...','info');return;}
+  if(docLoading){toast('Loading documents...','info');return;}
   if(docData.length && !force){renderDocPage();return;}
   docLoading=true;
   const btn=g('docRefreshBtn'); if(btn)btn.disabled=true;
-  setOv(true,'Đang tải tài liệu...','');
+  setOv(true,'Loading documents...','');
   try {
     const raw = await fetchAll(G_URL + 'dwreporting_document_summary');
     if(raw.length > 0) {
@@ -3665,10 +3678,10 @@ async function loadDocuments(force=false) {
       if(!ex || (r.modified_date||'') > (ex.modified_date||'')) dedupMap[id] = r;
     });
     docData = Object.values(dedupMap);
-    toast(`✓ Đã load ${docData.length} tài liệu (từ ${raw.length} records)`,'ok');
+    toast(`✓ Loaded ${docData.length} documents (from ${raw.length} records)`,'ok');
     renderDocPage();
   } catch(e) {
-    toast('Lỗi load documents: '+e.message,'err');
+    toast('Error loading documents: '+e.message,'err');
   } finally {
     docLoading=false;
     if(btn)btn.disabled=false;
@@ -3694,7 +3707,7 @@ function renderDocPage() {
   const years = [...new Set(docData.map(r=>r.created_date?new Date(r.created_date).getFullYear():null).filter(Boolean))].sort((a,b)=>b-a);
   const yearEl = g('docYearF');
   if(yearEl && yearEl.options.length <= 1) {
-    yearEl.innerHTML = '<option value="">Tất cả năm</option>' +
+    yearEl.innerHTML = '<option value="">All Years</option>' +
       years.map(y=>`<option value="${y}">${y}</option>`).join('');
     if(yearF) yearEl.value = yearF;
   }
@@ -3726,7 +3739,7 @@ function renderDocPage() {
 
   // Sort
   data = sortD(data, ts.sort, ts.asc);
-  s('docCnt', data.length + ' tài liệu');
+  s('docCnt', data.length + ' documents');
 
   // Build charts
   buildDocCharts(data);
@@ -3766,7 +3779,7 @@ function buildDocCharts(data) {
   const yKeys = Object.keys(yearMap).sort();
   dc('cDocYear');
   if(g('cDocYear')) charts['cDocYear']=new Chart(g('cDocYear'),{type:'bar',
-    data:{labels:yKeys,datasets:[{label:'Tài liệu',data:yKeys.map(k=>yearMap[k]),backgroundColor:'#3FB950',borderRadius:3}]},
+    data:{labels:yKeys,datasets:[{label:'Documents',data:yKeys.map(k=>yearMap[k]),backgroundColor:'#3FB950',borderRadius:3}]},
     options:{...CO,plugins:{legend:{display:false}},scales:{
       x:{ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
       y:{ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}}}}});
@@ -3783,7 +3796,7 @@ function docDelivBadge(ds) {
   const m = {
     'completed early': `<span style="background:rgba(63,185,80,.15);color:var(--green);padding:2px 8px;border-radius:4px;font-size:11px">✅ Đúng hạn</span>`,
     'completed late':  `<span style="background:rgba(210,153,34,.15);color:var(--yellow);padding:2px 8px;border-radius:4px;font-size:11px">⚠️ Trễ</span>`,
-    'in progress':     `<span style="background:rgba(88,166,255,.15);color:var(--blue);padding:2px 8px;border-radius:4px;font-size:11px">🔵 Đang xử lý</span>`,
+    'in progress':     `<span style="background:rgba(88,166,255,.15);color:var(--blue);padding:2px 8px;border-radius:4px;font-size:11px">🔵 In Progress</span>`,
     'overdue':         `<span style="background:rgba(255,107,107,.15);color:#ff6b6b;padding:2px 8px;border-radius:4px;font-size:11px">🔴 Quá hạn</span>`,
   };
   return m[ds.toLowerCase()] || `<span style="color:var(--muted);font-size:11px">${esc(ds)}</span>`;
@@ -3909,7 +3922,7 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
         ontime:     `<span style="background:rgba(63,185,80,.15);color:var(--green);padding:2px 8px;border-radius:4px;font-size:11px">✅ Đúng hạn</span>`,
         late:       `<span style="background:rgba(210,153,34,.15);color:var(--yellow);padding:2px 8px;border-radius:4px;font-size:11px">⚠️ Trễ</span>`,
         overdue:    `<span style="background:rgba(255,107,107,.15);color:#ff6b6b;padding:2px 8px;border-radius:4px;font-size:11px">🔴 Quá hạn</span>`,
-        inprogress: `<span style="background:rgba(88,166,255,.15);color:var(--blue);padding:2px 8px;border-radius:4px;font-size:11px">🔵 Đang xử lý</span>`,
+        inprogress: `<span style="background:rgba(88,166,255,.15);color:var(--blue);padding:2px 8px;border-radius:4px;font-size:11px">🔵 In Progress</span>`,
       }[status];
 
       return `<tr>
@@ -3931,7 +3944,7 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
     let debugHtml = '';
     if(allBlank) {
       debugHtml = `<tr><td colspan="5" style="padding:12px 16px;background:rgba(210,153,34,.08);border:1px solid rgba(210,153,34,.25);border-radius:6px">
-        <div style="font-size:11px;color:var(--yellow);font-weight:600;margin-bottom:6px">⚠️ Tên field chưa khớp — Field thực tế từ API:</div>
+        <div style="font-size:11px;color:var(--yellow);font-weight:600;margin-bottom:6px">⚠️ Field name mismatch — Actual field names from API:</div>
         <div style="font-size:10px;color:var(--muted);word-break:break-all;margin-bottom:4px"><b>Keys:</b> ${keys.join(' · ')}</div>
         <div style="font-size:10px;color:var(--muted);word-break:break-all"><b>Record[0]:</b> ${esc(JSON.stringify(tasks[0]))}</div>
       </td></tr>`;
@@ -3941,7 +3954,7 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
 
   } catch(e) {
     g('docTaskLoading').style.display='none';
-    g('docTaskBody').innerHTML=`<tr><td colspan="5" style="text-align:center;padding:24px;color:#ff6b6b">Lỗi: ${esc(e.message)}</td></tr>`;
+    g('docTaskBody').innerHTML=`<tr><td colspan="5" style="text-align:center;padding:24px;color:#ff6b6b">Error: ${esc(e.message)}</td></tr>`;
     console.error('[DocTask] Error:', e);
   }
 }
