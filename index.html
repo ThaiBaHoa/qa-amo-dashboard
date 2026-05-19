@@ -345,7 +345,7 @@ tr:last-child td{border-bottom:none}
       <div class="sb-nav">
         <div class="nav-sec">Main</div>
         <button class="nav-item active" onclick="showPage('overview',this)"><span class="nav-icon">📊</span>Overview</button>
-        <button class="nav-item" onclick="showPage('openrfi',this)"><span class="nav-icon">📋</span>Open RFI</button>
+        <button class="nav-item" onclick="showPage('openrfi',this)"><span class="nav-icon">📋</span>Open Reports</button>
         <button class="nav-item" onclick="showPage('overdue',this)"><span class="nav-icon">⚠️</span>Overdue</button>
         <button class="nav-item" onclick="showPage('kpi',this)"><span class="nav-icon">📈</span>KPI Charts</button>
         <div class="nav-sec" style="margin-top:6px">Detail</div>
@@ -492,7 +492,7 @@ tr:last-child td{border-bottom:none}
         <div class="page" id="page-openrfi">
           <div class="tbl-card">
             <div class="tbl-bar">
-              <div><div class="tbl-title">Open RFI — Đang xử lý</div><div class="tbl-count" id="openCnt">—</div></div>
+              <div><div class="tbl-title">Open Reports — Đang xử lý</div><div class="tbl-count" id="openCnt">—</div></div>
               <button class="pill on" onclick="setOpenF('all',this)">Tất cả Open</button>
               <button class="pill" onclick="setOpenF('Open',this)">Open</button>
               <button class="pill" onclick="setOpenF('Overdue',this)">Overdue</button>
@@ -508,6 +508,7 @@ tr:last-child td{border-bottom:none}
                   <th onclick="openSort('report_number')">Report No ↕</th>
                   <th onclick="openSort('report_title')">Form ↕</th>
                   <th onclick="openSort('semantic_status')">Status ↕</th>
+                  <th onclick="openSort('owner_name')">Owner ↕</th>
                   <th onclick="openSort('raised_date')">Raised Date ↕</th>
                   <th onclick="openSort('Target_date')">Target Date ↕</th>
                   <th onclick="openSort('report_ageing')">Days to Due ↕</th>
@@ -612,6 +613,7 @@ tr:last-child td{border-bottom:none}
                   <th onclick="afSort('report_number')">Report No ↕</th>
                   <th onclick="afSort('report_title')">Form ↕</th>
                   <th onclick="afSort('semantic_status')">Status ↕</th>
+                  <th onclick="afSort('owner_name')">Owner ↕</th>
                   <th onclick="afSort('raised_date')">Raised Date ↕</th>
                   <th onclick="afSort('Target_date')">Target Date ↕</th>
                   <th onclick="afSort('report_ageing')">Days to Due ↕</th>
@@ -701,7 +703,7 @@ tr:last-child td{border-bottom:none}
                   <th onclick="auditSort('status')">Status ↕</th>
                   <th onclick="auditSort('scheduled_start_date')">Scheduled ↕</th>
                   <th>Lead Auditor</th>
-                  <th>Scope</th>
+                  <th onclick="auditSort('location_name')" style="cursor:pointer">Location ↕</th>
                   <th onclick="auditSort('finding_count')">Findings ↕</th>
                   <th>Open</th>
                   <th>Overdue</th>
@@ -740,11 +742,18 @@ tr:last-child td{border-bottom:none}
                   <option value="all">Tất cả</option>
                 </select>
               </div>
-              <div>
+              <div style="position:relative">
                 <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500">Form Type</div>
-                <select class="sel" id="rptForm" onchange="generateReport()" style="width:100%;padding:7px 10px">
-                  <option value="all">Tất cả form</option>
-                </select>
+                <div id="rptFormBtn" onclick="toggleRptFormDrop()" style="cursor:pointer;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--input);color:var(--text);font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:6px;user-select:none;white-space:nowrap;overflow:hidden;min-width:0">
+                  <span id="rptFormLabel" style="overflow:hidden;text-overflow:ellipsis">Tất cả form</span>
+                  <span style="flex-shrink:0;font-size:10px;color:var(--muted)">▼</span>
+                </div>
+                <div id="rptFormDrop" style="display:none;position:absolute;z-index:50;top:calc(100% + 4px);left:0;min-width:220px;width:max-content;max-width:320px;background:var(--card);border:1px solid var(--border);border-radius:8px;max-height:240px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.5)">
+                  <label style="display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card)">
+                    <input type="checkbox" id="rptFormAll" onchange="rptFormAllChange(this)" checked> Tất cả form
+                  </label>
+                  <div id="rptFormChecks"></div>
+                </div>
               </div>
               <div style="display:flex;gap:8px">
                 <button onclick="exportPDF()" style="padding:7px 14px;border-radius:8px;border:none;background:#E30613;color:white;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">📄 PDF</button>
@@ -1342,6 +1351,55 @@ window.addEventListener('DOMContentLoaded',()=>{
   const s=sessionStorage.getItem('qaUser');
   if(s){curUser=JSON.parse(s);initApp();}
 });
+document.addEventListener('click',e=>{
+  const drop=g('rptFormDrop'), btn=g('rptFormBtn');
+  if(drop&&btn&&!btn.contains(e.target)&&!drop.contains(e.target))drop.style.display='none';
+});
+
+// ── CACHE (4 giờ) ────────────────────────────────────────────
+const CACHE_KEY = 'qaAmoV5';
+const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
+
+function cacheLoad() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return false;
+    const c = JSON.parse(raw);
+    if (!c.ts || !c.a || Date.now() - c.ts > CACHE_TTL) return false;
+    allData   = c.a;
+    auditData = c.b || [];
+    renderAll();
+    g('liveBadge').style.display = '';
+    g('recCount').textContent = allData.length;
+    updateCacheAge(c.ts);
+    const age = Math.round((Date.now()-c.ts)/60000);
+    toast(`✓ Cache (${age < 60 ? age+'ph' : Math.floor(age/60)+'h'} trước) — ${allData.length} reports, ${auditData.length} audits · Bấm ↻ để load mới`,'ok');
+    return true;
+  } catch { return false; }
+}
+
+function cacheSave() {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), a:allData, b:auditData}));
+    updateCacheAge(Date.now());
+  } catch {
+    // Quota exceeded — thử lưu không có wf_stages
+    try {
+      const slim = allData.map(r=>({...r,wf_stages:[]}));
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), a:slim, b:auditData}));
+      updateCacheAge(Date.now());
+    } catch { /* bỏ qua nếu vẫn quá lớn */ }
+  }
+}
+
+function updateCacheAge(ts) {
+  const el = g('cacheAge');
+  if (!el) return;
+  const age = Math.round((Date.now()-ts)/60000);
+  const nextH = Math.ceil((CACHE_TTL - (Date.now()-ts)) / 3600000);
+  el.textContent = age < 2 ? 'Vừa load' : age < 60 ? `${age}ph trước` : `${Math.floor(age/60)}h${age%60?age%60+'ph':''} trước`;
+  el.title = `Sẽ tự động hết hạn sau ~${nextH}h — bấm ↻ Refresh để load ngay`;
+}
 
 // ── DATA LOADING ─────────────────────────────────────────────
 async function loadData() {
@@ -1383,9 +1441,12 @@ async function loadData() {
     try {
       const wfRaw = await fetchAll(
         G_URL + 'dwreporting_report_workflow' +
-        '?$select=report_id,stage_type,stage_status,stage_completed_date,stage_target_date'
+        '?$select=report_id,stage_type,stage_status,stage_completed_date,stage_target_date,stage_owner'
       );
+      const ownerMap = {}; // report_id → first stage_owner value
       wfRaw.forEach(w => {
+        // First stage_owner per report_id
+        if (w.stage_owner && !ownerMap[w.report_id]) ownerMap[w.report_id] = w.stage_owner;
         // Tất cả stages theo report_id (để hiển thị workflow steps)
         if (!wfAllMap[w.report_id]) wfAllMap[w.report_id] = [];
         wfAllMap[w.report_id].push(w);
@@ -1456,6 +1517,7 @@ async function loadData() {
         report_ref:    f['Report Reference']          || null,
         verif_result:  f['Verification Result']       || null,
         dept:          f['Department']                || null,
+        owner_name:      ownerMap[r.report_id] || null,
         semantic_status: sm,
         report_ageing:   ag,
         overdue_cat:     catCalc(ag, sm),
@@ -1477,7 +1539,7 @@ async function loadData() {
       const auRaw = await fetchAll(
         G_URL + 'dwreporting_audit_summary' +
         '?$select=audit_id,number,title,audit_type,status,scheduled_start_date,' +
-        'actual_start_date,closed_date,lead_auditor_name,primary_scope_item_name'
+        'actual_start_date,closed_date,lead_auditor_name,primary_scope_item_name,location_name'
       );
 
       // Dedup audit by audit_id — giữ bản đầu tiên (audit không có versioning)
@@ -1931,6 +1993,7 @@ function renderOpen() {
       <td><b>${esc(r.report_number)||'—'}</b></td>
       <td><span style="font-size:11px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">${esc(r.report_title)||'—'}</span></td>
       <td>${sBadge(r.semantic_status)}</td>
+      <td style="font-size:11px;color:var(--muted)">${esc(r.owner_name)||'—'}</td>
       <td style="font-size:11px;color:var(--muted)">${fd(r.raised_date)}</td>
       <td>${fd(r.Target_date)}</td>
       <td>${ageDis(r.report_ageing,r.semantic_status)}</td>
@@ -1999,6 +2062,7 @@ function renderAF() {
       <td><b>${esc(r.report_number)||'—'}</b></td>
       <td><span style="font-size:11px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">${esc(r.report_title)||'—'}</span></td>
       <td>${sBadge(r.semantic_status)}</td>
+      <td style="font-size:11px;color:var(--muted)">${esc(r.owner_name)||'—'}</td>
       <td style="font-size:11px;color:var(--muted)">${fd(r.raised_date)}</td>
       <td>${fd(r.Target_date)}</td>
       <td>${ageDis(r.report_ageing,r.semantic_status)}</td>
@@ -2141,7 +2205,7 @@ function renderAudit() {
       <td><span class="badge ${STATUS_COLOR[a.status]||'b-with'}">${esc(a.status)||'—'}</span></td>
       <td style="font-size:11px">${fdYM(a.scheduled_start_date)}</td>
       <td style="font-size:11px;color:var(--muted)">${esc(a.lead_auditor_name)||'—'}</td>
-      <td style="font-size:11px;color:var(--muted)">${esc(a.primary_scope_item_name)||'—'}</td>
+      <td style="font-size:11px;color:var(--muted)">${esc(a.location_name)||'—'}</td>
       <td style="text-align:center"><b>${a.finding_count||0}</b></td>
       <td style="text-align:center;color:var(--blue)">${a.open_count||0}</td>
       <td style="text-align:center;color:#ff6b6b">${a.overdue_count||0}</td>
@@ -2337,19 +2401,53 @@ function updateReportFilters(){
   generateReport();
 }
 
+let rptFormSelected=[];
+function toggleRptFormDrop(){
+  const d=g('rptFormDrop');
+  d.style.display=d.style.display==='none'?'block':'none';
+}
+function rptFormAllChange(cb){
+  if(cb.checked){
+    rptFormSelected=[];
+    g('rptFormChecks').querySelectorAll('input[type=checkbox]').forEach(c=>{c.checked=false;});
+  }
+  updateRptFormLabel();
+  generateReport();
+}
+function rptFormItemChange(){
+  const checks=[...g('rptFormChecks').querySelectorAll('input[type=checkbox]')];
+  rptFormSelected=checks.filter(c=>c.checked).map(c=>c.value);
+  const allCb=g('rptFormAll');
+  if(rptFormSelected.length===0){allCb.checked=true;allCb.indeterminate=false;}
+  else if(rptFormSelected.length===checks.length){allCb.checked=true;allCb.indeterminate=false;}
+  else{allCb.checked=false;allCb.indeterminate=true;}
+  updateRptFormLabel();
+  generateReport();
+}
+function updateRptFormLabel(){
+  const lbl=g('rptFormLabel');
+  if(!lbl)return;
+  if(rptFormSelected.length===0)lbl.textContent='Tất cả form';
+  else if(rptFormSelected.length===1)lbl.textContent=rptFormSelected[0];
+  else lbl.textContent=rptFormSelected.length+' form được chọn';
+}
 function initReportFilters(){
   const years=[...new Set(allData.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
   g('rptYear').innerHTML='<option value="all">Tất cả năm</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
   const forms=[...new Set(allData.map(r=>r.report_title).filter(Boolean))].sort();
-  g('rptForm').innerHTML='<option value="all">Tất cả form</option>'+forms.map(f=>`<option value="${f}">${f}</option>`).join('');
+  rptFormSelected=[];
+  g('rptFormChecks').innerHTML=forms.map(f=>`<label style="display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.04)"><input type="checkbox" value="${f.replace(/"/g,'&quot;')}" onchange="rptFormItemChange()"> ${f}</label>`).join('');
+  g('rptFormAll').checked=true;
+  g('rptFormAll').indeterminate=false;
+  updateRptFormLabel();
   updateReportFilters();
 }
 
 function getRptData(){
   const type=g('rptFilterType').value, year=g('rptYear').value;
-  const period=g('rptPeriod')?.value||'all', form=g('rptForm').value;
+  const period=g('rptPeriod')?.value||'all';
   return allData.filter(r=>{
-    if(form!=='all'&&r.report_title!==form)return false;
+    if(rptFormSelected.length>0&&!rptFormSelected.includes(r.report_title))return false;
     if(year!=='all'&&String(r.raised_year)!==year)return false;
     if(type==='month'&&period!=='all'){const m=r.raised_date?new Date(r.raised_date).getMonth()+1:null;if(m!==parseInt(period))return false;}
     if(type==='quarter'&&period!=='all'){const m=r.raised_date?new Date(r.raised_date).getMonth()+1:null;const q=Math.ceil(m/3);if(q!==parseInt(period))return false;}
@@ -2359,9 +2457,10 @@ function getRptData(){
 
 function getRptTitle(){
   const type=g('rptFilterType').value, year=g('rptYear').value;
-  const period=g('rptPeriod')?.value||'all', form=g('rptForm').value;
+  const period=g('rptPeriod')?.value||'all';
   let t='QA AMO';
-  if(form!=='all')t+=` — ${form}`;
+  if(rptFormSelected.length===1)t+=` — ${rptFormSelected[0]}`;
+  else if(rptFormSelected.length>1)t+=` — ${rptFormSelected.length} form`;
   if(type==='month'&&period!=='all')t+=` Tháng ${period}`;
   else if(type==='quarter'&&period!=='all')t+=` Q${period}`;
   if(year!=='all')t+=` ${year}`;
@@ -2369,9 +2468,10 @@ function getRptTitle(){
 }
 function getRptTitleEn(){
   const type=g('rptFilterType').value, year=g('rptYear').value;
-  const period=g('rptPeriod')?.value||'all', form=g('rptForm').value;
+  const period=g('rptPeriod')?.value||'all';
   let t='QA AMO';
-  if(form!=='all')t+=` - ${form}`;
+  if(rptFormSelected.length===1)t+=` - ${rptFormSelected[0]}`;
+  else if(rptFormSelected.length>1)t+=` - ${rptFormSelected.length} forms`;
   if(type==='month'&&period!=='all')t+=` Month ${period}`;
   else if(type==='quarter'&&period!=='all')t+=` Q${period}`;
   if(year!=='all')t+=` ${year}`;
@@ -2387,11 +2487,11 @@ function generateReport(){
   s('rptTotal',total+' records');
   // subtitle
   const type=g('rptFilterType').value, year=g('rptYear').value;
-  const period=g('rptPeriod')?.value||'all', form=g('rptForm').value;
+  const period=g('rptPeriod')?.value||'all';
   let sub='';
   if(type==='month')sub=period==='all'?`Năm ${year==='all'?'Tất cả':year}`:`Tháng ${period}/${year==='all'?'Tất cả':year}`;
   else if(type==='quarter')sub=period==='all'?`Năm ${year==='all'?'Tất cả':year}`:`Q${period} — ${year==='all'?'Tất cả':year}`;
-  else if(type==='form')sub=form==='all'?'Tất cả form':form;
+  else if(type==='form')sub=rptFormSelected.length===0?'Tất cả form':rptFormSelected.length===1?rptFormSelected[0]:rptFormSelected.length+' form được chọn';
   else sub='Toàn bộ QA AMO';
   s('rptSubtitle',sub);
 
@@ -2760,7 +2860,7 @@ async function makeAdmin(id){
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────
-const PT={overview:'Overview',openrfi:'Open RFI',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',auditplan:'Audit Plan',reports:'Xuất Báo Cáo',help:'Hướng Dẫn Sử Dụng',admin:'Quản lý Users'};
+const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',auditplan:'Audit Plan',docs:'Quản Lý Tài Liệu',reports:'Xuất Báo Cáo',help:'Hướng Dẫn Sử Dụng',admin:'Quản lý Users'};
 function showPage(name,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
