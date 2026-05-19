@@ -2564,6 +2564,15 @@ async function loadCmr(){
           if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
         }
       });
+      // Sort findings numerically by leading digit prefix (e.g. "1.FILLER..." → 1)
+      Object.values(fMap).forEach(fm=>{
+        if(fm.findings&&fm.findings.length>1){
+          fm.findings.sort((a,b)=>{
+            const na=parseInt(a)||0, nb=parseInt(b)||0;
+            return na-nb||a.localeCompare(b);
+          });
+        }
+      });
     }catch(e){console.warn('CMR fields error:',e);}
 
     cmrData=summary.map(r=>{
@@ -2731,6 +2740,17 @@ function closeCmrModal(e){
   g('cmrModal').style.display='none';
 }
 
+function pdfSafe(str){
+  if(!str)return str;
+  return String(str)
+    .replace(/[‘’]/g,"'")   // curly single quotes
+    .replace(/[“”]/g,'"')   // curly double quotes
+    .replace(/–/g,'-')           // en-dash
+    .replace(/—/g,'--')          // em-dash
+    .replace(/…/g,'...')         // ellipsis
+    .replace(/ /g,' ')           // non-breaking space
+    .replace(/[^\x00-\xFF]/g,'?');    // any remaining non-Latin-1
+}
 function exportCmrPDF(){
   if(!cmrLoaded||!cmrData.length){toast('No CMR-CAR data loaded','err');return;}
   const ts=TS.cmr;
@@ -2761,7 +2781,7 @@ function exportCmrPDF(){
   doc.setFontSize(14);doc.setFont(undefined,'bold');
   doc.text('CMR-CAR Findings Report',14,14);
   doc.setFontSize(9);doc.setFont(undefined,'normal');
-  doc.text(`Period: ${period}  |  Aircraft: ${acLabel}  |  Total: ${data.length} findings`,14,21);
+  doc.text(pdfSafe(`Period: ${period}  |  Aircraft: ${acLabel}  |  Total: ${data.length} findings`),14,21);
   doc.text(`Exported: ${new Date().toLocaleDateString('en-GB')}`,14,26);
 
   // Group by aircraft
@@ -2780,7 +2800,7 @@ function exportCmrPDF(){
   Object.entries(acGroups).forEach(([ac,rows])=>{
     doc.autoTable({
       startY:y,
-      head:[[{content:`Aircraft: ${ac}  (${rows.length} findings)`,colSpan:7}]],
+      head:[[{content:pdfSafe(`Aircraft: ${ac}  (${rows.length} findings)`),colSpan:7}]],
       headStyles:{fillColor:[30,35,45],textColor:[140,160,200],fontStyle:'bold',fontSize:9},
       theme:'plain',margin:{left:14,right:14},
     });
@@ -2790,13 +2810,13 @@ function exportCmrPDF(){
       startY:y,
       head:[['Report No','Aircraft','Status','Raised','Target','Dept','Finding Description']],
       body:rows.map(r=>[
-        r.report_number||'—',
-        r.aircraft_reg||'—',
-        r.semantic_status||'—',
+        pdfSafe(r.report_number||'-'),
+        pdfSafe(r.aircraft_reg||'-'),
+        pdfSafe(r.semantic_status||'-'),
         fd(r.raised_date),
         fd(r.Target_date),
-        r.dept||'—',
-        (r.findings||[]).join('\n\n')||'—',
+        pdfSafe(r.dept||'-'),
+        pdfSafe((r.findings||[]).join('\n\n')||'-'),
       ]),
       headStyles:{fillColor:[22,27,34],textColor:[139,148,158],fontSize:8,fontStyle:'bold'},
       bodyStyles:{fontSize:7.5,valign:'top'},
