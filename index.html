@@ -739,7 +739,7 @@ tr:last-child td{border-bottom:none}
         <!-- CMR-CAR -->
         <div class="page" id="page-cmrcar">
           <div id="cmrKPIs" class="kpi-grid" style="margin-bottom:12px"></div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px" id="cmrAcBar"></div>
+
           <div class="tbl-card">
             <div class="tbl-bar">
               <div><div class="tbl-title">CMR-CAR Findings</div><div class="tbl-count" id="cmrCnt">—</div></div>
@@ -2641,15 +2641,7 @@ function renderCmr(){
   if(yrEl&&yrEl.options.length<=1)
     yrEl.innerHTML='<option value="">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
 
-  // Build aircraft list for pills
-  const acCounts={};
-  cmrData.forEach(r=>{acCounts[r.aircraft_reg]=(acCounts[r.aircraft_reg]||0)+1;});
-  const acList=Object.keys(acCounts).sort();
-  const acBar=g('cmrAcBar');
-  if(acBar){
-    acBar.innerHTML=`<button class="pill${ts.ac==='all'?' on':''}" onclick="setCmrAC('all')" style="font-size:11px">✈️ All (${cmrData.length})</button>`+
-      acList.map(ac=>`<button class="pill${ts.ac===ac?' on':''}" onclick="setCmrAC(${JSON.stringify(ac)})" style="font-size:11px">${esc(ac)} <span style="color:var(--muted)">${acCounts[ac]}</span></button>`).join('');
-  }
+
 
   // Filter
   let data=cmrData.filter(r=>{
