@@ -352,6 +352,7 @@ tr:last-child td{border-bottom:none}
         <button class="nav-item" onclick="showPage('allforms',this)"><span class="nav-icon">📄</span>All Forms</button>
         <button class="nav-item" onclick="showPage('pavoi',this)"><span class="nav-icon">🔍</span>PAVOI Detail</button>
         <button class="nav-item" onclick="showPage('cmrcar',this)"><span class="nav-icon">✈️</span>CMR-CAR</button>
+        <button class="nav-item" onclick="showPage('ecar',this)"><span class="nav-icon">🔧</span>ECAR</button>
         <button class="nav-item" onclick="showPage('auditplan',this)"><span class="nav-icon">📅</span>Audit Plan</button>
         <button class="nav-item" onclick="showPage('docs',this)"><span class="nav-icon">📁</span>Documents</button>
         <button class="nav-item" onclick="showPage('reports',this)"><span class="nav-icon">📊</span>Export Reports</button>
@@ -778,6 +779,76 @@ tr:last-child td{border-bottom:none}
               </table>
             </div>
             <div class="tbl-foot"><span id="cmrInfo">—</span><div class="pg-btns" id="cmrPg"></div></div>
+          </div>
+        </div>
+
+        <!-- ECAR DETAIL -->
+        <div class="page" id="page-ecar">
+          <div class="kpi-grid" id="ecarKPIs" style="margin-bottom:8px;flex-shrink:0"></div>
+          <div class="tbl-card" style="margin-bottom:8px;flex-shrink:0">
+            <div class="tbl-bar" style="flex-wrap:wrap;gap:6px">
+              <div><div class="tbl-title">ECAR Findings</div><div class="tbl-count" id="ecarCnt">—</div></div>
+              <select class="sel" id="ecarYearF" onchange="ecarYearChange()"><option value="">All Years</option></select>
+              <select class="sel" id="ecarMonthF" onchange="renderEcar()" disabled style="opacity:.5">
+                <option value="">All Months</option>
+                <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+                <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+                <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+                <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+              </select>
+              <button class="pill on" onclick="setEcarF('all',this)">All</button>
+              <button class="pill" onclick="setEcarF('Open',this)">Open</button>
+              <button class="pill" onclick="setEcarF('Overdue',this)">Overdue</button>
+              <button class="pill" onclick="setEcarF('On-time Closed',this)">On-time</button>
+              <button class="pill" onclick="setEcarF('Lately Closed',this)">Lately</button>
+              <div class="srch-wrap"><span class="srch-icon">🔍</span>
+                <input class="srch" id="ecarSrch" placeholder="Search..." oninput="dRenderEcar()">
+              </div>
+              <button onclick="exportEcarPDF()" style="padding:5px 12px;border-radius:7px;border:none;background:#E30613;color:white;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;margin-left:auto">📄 PDF</button>
+              <button onclick="exportEcarExcel()" style="padding:5px 12px;border-radius:7px;border:none;background:#1D6F42;color:white;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">📊 Excel</button>
+            </div>
+          </div>
+          <div class="chart-card" style="margin-bottom:8px;flex-shrink:0">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <div>
+                <div class="chart-title">Monthly Finding Trend</div>
+                <div class="chart-sub">MoM change — green = fewer findings (better), red = more (worse)</div>
+              </div>
+              <select class="sel" id="ecarChartYr" onchange="buildEcarChart();buildEcarMoM()" style="font-size:11px;padding:4px 8px"><option value="">All Years</option></select>
+            </div>
+            <div style="height:220px;position:relative"><canvas id="cEcarTrend"></canvas></div>
+            <div id="ecarChartSummary" style="margin-top:8px;font-size:11px;display:flex;gap:16px;flex-wrap:wrap"></div>
+          </div>
+          <div class="chart-card" style="margin-bottom:8px;flex-shrink:0">
+            <div class="chart-title" style="margin-bottom:8px">Month-over-Month Comparison</div>
+            <div style="overflow-x:auto">
+              <table class="stat-tbl" style="width:100%">
+                <thead><tr>
+                  <th>Month</th><th style="text-align:center">Total</th><th style="text-align:center">Open</th>
+                  <th style="text-align:center">Overdue</th><th style="text-align:center">Closed</th>
+                  <th style="text-align:center">vs Prev Month</th><th style="text-align:center">Trend</th>
+                </tr></thead>
+                <tbody id="ecarMoMBody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="tbl-card">
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr>
+                  <th onclick="ecarSort('report_number')">Report No ↕</th>
+                  <th onclick="ecarSort('aircraft_reg')">Aircraft ↕</th>
+                  <th onclick="ecarSort('semantic_status')">Status ↕</th>
+                  <th>Finding Description</th>
+                  <th onclick="ecarSort('raised_date')" style="white-space:nowrap">Raised Date ↕</th>
+                  <th onclick="ecarSort('Target_date')" style="white-space:nowrap">Target Date ↕</th>
+                  <th onclick="ecarSort('report_ageing')" style="white-space:nowrap">Days to Due ↕</th>
+                  <th>Detail</th>
+                </tr></thead>
+                <tbody id="ecarBody"></tbody>
+              </table>
+            </div>
+            <div class="tbl-foot"><span id="ecarInfo">—</span><div class="pg-btns" id="ecarPg"></div></div>
           </div>
         </div>
 
@@ -1449,6 +1520,23 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- ECAR DETAIL MODAL -->
+<div class="overlay" id="ecarModal" onclick="closeEcarModal(event)" style="z-index:215;display:none">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:95%;max-width:680px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0">
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">ECAR Finding Detail</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text);margin-top:2px" id="ecarMTitle">—</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px" id="ecarMSub">—</div>
+      </div>
+      <button onclick="closeEcarModal()" style="background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);font-size:16px;cursor:pointer;padding:3px 10px;border-radius:6px;flex-shrink:0;margin-left:12px">✕</button>
+    </div>
+    <div style="overflow:auto;flex:1;padding:16px 18px">
+      <div id="ecarMBody"></div>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="overlay">
   <div class="ov-box">
     <div class="spinner" id="ovSpinner"></div>
@@ -1496,8 +1584,8 @@ const { createClient } = supabase;
 const sb = createClient(SUPA_URL, SUPA_KEY);
 
 // ── STATE ────────────────────────────────────────────────────
-let curUser = null, allData = [], auditData = [], docData = [], cmrData = [], docTaskCache = {}, charts = {}, userFilter = 'all', isLoading = false;
-let cmrLoaded = false;
+let curUser = null, allData = [], auditData = [], docData = [], cmrData = [], ecarData = [], docTaskCache = {}, charts = {}, userFilter = 'all', isLoading = false;
+let cmrLoaded = false, ecarLoaded = false;
 const PS = 25; // page size
 
 // Table states — mỗi table có state riêng
@@ -1509,6 +1597,7 @@ const TS = {
   audit:  { page:1, sort:'scheduled_start_date', asc:false, sf:'all', typeF:'all', yr:'', srch:'' },
   docs:   { page:1, sort:'document_number', asc:true, typeF:'', yr:'', srch:'' },
   cmr:    { page:1, sort:'raised_date', asc:false, sf:'all', ac:'all', yr:'', qr:'', srch:'' },
+  ecar:   { page:1, sort:'raised_date', asc:false, sf:'all', ac:'all', yr:'', mo:'', srch:'' },
 };
 
 // ── AUTH ─────────────────────────────────────────────────────
@@ -2837,6 +2926,465 @@ function exportCmrPDF(){
   toast(`Exported ${fname}`,'ok');
 }
 
+// ── ECAR DETAIL ───────────────────────────────────────────────
+const ECAR_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+async function loadEcar(){
+  setOv(true,'Loading ECAR...','');
+  try{
+    const raw=await fetchAll(
+      G_URL+'dwreporting_report_summary'+
+      '?$select=report_id,report_number,report_status,audit_title,raised_date,modified_date'+
+      '&$filter='+encodeURIComponent("org_unit_name eq 'TQA' and report_title eq 'AMO ECAR'")
+    );
+    const map={};
+    raw.forEach(r=>{
+      if(!r.report_number?.trim())return;
+      const ex=map[r.report_id];
+      if(!ex||new Date(r.modified_date)>new Date(ex.modified_date))map[r.report_id]=r;
+    });
+    const summary=Object.values(map);
+
+    setOv(true,`${summary.length} ECAR records — loading fields...`,'');
+    let fMap={};
+    try{
+      const fRaw=await fetchAll(
+        G_URL+'dwanalytics_report_form_section_field'+
+        '?$select=report_id,field_name,text_value'+
+        '&$filter='+encodeURIComponent(
+          "field_name eq 'Aircraft Registration' or field_name eq 'Finding description' or "+
+          "field_name eq 'Target date' or field_name eq 'Date completed' or "+
+          "field_name eq 'Issued by'"
+        )
+      );
+      const ids=new Set(summary.map(r=>r.report_id));
+      fRaw.forEach(f=>{
+        if(!ids.has(f.report_id))return;
+        if(!fMap[f.report_id])fMap[f.report_id]={};
+        if(f.field_name==='Finding description'){
+          if(!fMap[f.report_id].findings)fMap[f.report_id].findings=[];
+          if(f.text_value)fMap[f.report_id].findings.push(f.text_value);
+        } else {
+          if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
+        }
+      });
+      Object.values(fMap).forEach(fm=>{
+        if(fm.findings&&fm.findings.length>1)
+          fm.findings.sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)||a.localeCompare(b));
+      });
+    }catch(e){console.warn('ECAR fields error:',e);}
+
+    ecarData=summary.map(r=>{
+      const f=fMap[r.report_id]||{};
+      const td=f['Target date']||null;
+      const cd=f['Date completed']||null;
+      const sm=semCalc(r.report_status,cd,td);
+      const ag=ageCalc(td);
+      const aircraft=f['Aircraft Registration']||parseAircraftFromTitle(r.audit_title)||'Unknown';
+      return{
+        ...r,
+        aircraft_reg:  aircraft,
+        findings:      f.findings||[],
+        finding_count: (f.findings||[]).length,
+        finding_desc:  (f.findings||[])[0]||null,
+        issued_by:     f['Issued by']||null,
+        Target_date:   td,
+        close_date:    cd,
+        semantic_status: sm,
+        report_ageing:   ag,
+        overdue_cat:     catCalc(ag,sm),
+        raised_year:     r.raised_date?new Date(r.raised_date).getFullYear():null,
+        raised_month:    r.raised_date?new Date(r.raised_date).getMonth()+1:null,
+      };
+    });
+    ecarLoaded=true;
+  }catch(e){
+    console.error('ECAR load error:',e);
+    toast('Error loading ECAR: '+e.message,'err');
+  }
+  setOv(false);
+  renderEcar();
+}
+
+function ecarYearChange(){
+  const yr=g('ecarYearF')?.value||'';
+  const moEl=g('ecarMonthF');
+  if(moEl){moEl.disabled=!yr;moEl.style.opacity=yr?'1':'.5';if(!yr)moEl.value='';}
+  TS.ecar.page=1;
+  renderEcar();
+}
+
+function setEcarF(val,btn){
+  TS.ecar.sf=val;TS.ecar.page=1;
+  document.querySelectorAll('#page-ecar .pill').forEach(p=>p.classList.remove('on'));
+  btn.classList.add('on');renderEcar();
+}
+function setEcarAC(ac){TS.ecar.ac=ac;TS.ecar.page=1;renderEcar();}
+function ecarSort(col){TS.ecar.asc=TS.ecar.sort===col?!TS.ecar.asc:true;TS.ecar.sort=col;TS.ecar.page=1;renderEcar();}
+let _dEcar;function dRenderEcar(){clearTimeout(_dEcar);_dEcar=setTimeout(()=>{TS.ecar.page=1;renderEcar();},220);}
+
+function renderEcar(){
+  if(!ecarLoaded||!ecarData.length){
+    g('ecarBody').innerHTML='<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted)">No data</td></tr>';
+    return;
+  }
+  const ts=TS.ecar;
+  const yr=g('ecarYearF')?.value||'';
+  const mo=g('ecarMonthF')?.value||'';
+  const srch=(g('ecarSrch')?.value||'').toLowerCase();
+
+  // Populate year filter once
+  const years=[...new Set(ecarData.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
+  const yrEl=g('ecarYearF');
+  if(yrEl&&yrEl.options.length<=1)
+    yrEl.innerHTML='<option value="">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+
+  // Populate chart year selector once
+  const cYrEl=g('ecarChartYr');
+  if(cYrEl&&cYrEl.options.length<=1)
+    cYrEl.innerHTML='<option value="">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+
+  // Filter data
+  let data=ecarData.filter(r=>{
+    if(ts.ac!=='all'&&r.aircraft_reg!==ts.ac)return false;
+    if(ts.sf!=='all'&&r.semantic_status!==ts.sf)return false;
+    if(yr&&String(r.raised_year)!==yr)return false;
+    if(mo&&String(r.raised_month)!==mo)return false;
+    if(srch){
+      const t=[r.report_number,r.aircraft_reg,r.issued_by,r.finding_desc].join(' ').toLowerCase();
+      if(!t.includes(srch))return false;
+    }
+    return true;
+  });
+
+  // KPIs
+  const tot=data.length,
+    op=data.filter(r=>r.semantic_status==='Open').length,
+    ov=data.filter(r=>r.semantic_status==='Overdue').length,
+    cl=data.filter(r=>['On-time Closed','Lately Closed','Closed'].includes(r.semantic_status)).length,
+    acN=new Set(data.map(r=>r.aircraft_reg)).size,
+    ontime=data.filter(r=>r.semantic_status==='On-time Closed').length,
+    lately=data.filter(r=>r.semantic_status==='Lately Closed').length,
+    withTgt=ontime+lately,
+    onRate=withTgt?Math.round(ontime/withTgt*100)+'%':'N/A';
+  g('ecarKPIs').innerHTML=[
+    {l:'Total',v:tot,c:'var(--blue)'},
+    {l:'Aircraft',v:acN,c:'#BC8CFF'},
+    {l:'Open',v:op,c:'var(--blue)'},
+    {l:'Overdue',v:ov,c:'#ff6b6b'},
+    {l:'Closed',v:cl,c:'var(--green)'},
+    {l:'On-time Rate',v:onRate,c:'var(--green)'},
+  ].map(k=>`<div class="kpi" style="--accent:${k.c}"><div class="kpi-lbl">${k.l}</div><div class="kpi-val">${k.v}</div></div>`).join('');
+
+  // Chart and MoM
+  buildEcarChart();
+  buildEcarMoM();
+
+  // Table
+  const sorted=sortD(data,ts.sort,ts.asc);
+  renderPaged('ecarBody','ecarInfo','ecarPg','ecarCnt',sorted,ts,r=>`
+    <tr style="cursor:pointer" onclick="showEcarDetail('${r.report_id}')">
+      <td><b style="color:var(--blue)">${esc(r.report_number)||'—'}</b></td>
+      <td style="font-size:11px;font-weight:500">✈️ ${esc(r.aircraft_reg)||'—'}</td>
+      <td>${sBadge(r.semantic_status)}</td>
+      <td style="font-size:11px;color:var(--muted);max-width:300px"><div style="overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(r.finding_desc)||'—'}</div></td>
+      <td style="font-size:11px;color:var(--muted);white-space:nowrap">${fd(r.raised_date)}</td>
+      <td style="font-size:11px;white-space:nowrap">${fd(r.Target_date)}</td>
+      <td>${ageDis(r.report_ageing,r.semantic_status)}</td>
+      <td><button class="btn-sm" style="padding:3px 8px;font-size:11px" onclick="event.stopPropagation();showEcarDetail('${r.report_id}')">Detail</button></td>
+    </tr>`);
+}
+
+function _ecarMonthData(baseData, chartYr){
+  let monthKeys=[];
+  if(chartYr){
+    for(let m=1;m<=12;m++)monthKeys.push(`${chartYr}-${String(m).padStart(2,'0')}`);
+  } else {
+    const mm=new Set();
+    baseData.forEach(r=>{
+      if(!r.raised_date)return;
+      const d=new Date(r.raised_date);
+      mm.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+    });
+    monthKeys=[...mm].sort();
+  }
+  return monthKeys.map(k=>{
+    const [y,m]=k.split('-');
+    const rows=baseData.filter(r=>r.raised_year===parseInt(y)&&r.raised_month===parseInt(m));
+    return{key:k,label:`${ECAR_MONTHS[parseInt(m)-1]} ${y}`,rows,total:rows.length,
+      open:rows.filter(r=>r.semantic_status==='Open').length,
+      ov:rows.filter(r=>r.semantic_status==='Overdue').length,
+      cl:rows.filter(r=>['On-time Closed','Lately Closed','Closed'].includes(r.semantic_status)).length};
+  });
+}
+
+function buildEcarChart(){
+  const chartYr=g('ecarChartYr')?.value||'';
+  const ts=TS.ecar;
+  const base=ts.ac==='all'?ecarData:ecarData.filter(r=>r.aircraft_reg===ts.ac);
+  const md=_ecarMonthData(base,chartYr);
+  const labels=md.map(d=>d.label);
+  const counts=md.map(d=>d.total);
+
+  const bgColors=counts.map((c,i)=>{
+    if(i===0)return 'rgba(88,166,255,0.75)';
+    return c<counts[i-1]?'rgba(63,185,80,0.8)':'rgba(255,107,107,0.8)';
+  });
+
+  const ctx=g('cEcarTrend')?.getContext('2d');
+  if(!ctx)return;
+  if(charts.ecarTrend){charts.ecarTrend.destroy();delete charts.ecarTrend;}
+  charts.ecarTrend=new Chart(ctx,{
+    type:'bar',
+    data:{labels,datasets:[{label:'Findings',data:counts,backgroundColor:bgColors,borderRadius:3}]},
+    plugins:[{
+      id:'ecarDelta',
+      afterDatasetsDraw(chart){
+        const {ctx:c2,data}=chart;
+        data.datasets[0].data.forEach((val,i)=>{
+          if(i===0||val===0)return;
+          const prev=counts[i-1];
+          const diff=val-prev;
+          if(diff===0)return;
+          const meta=chart.getDatasetMeta(0);
+          const bar=meta.data[i];
+          const pct=prev===0?'':Math.abs(Math.round(diff/prev*100))+'%';
+          const lbl=(diff>0?'+':'')+diff+(pct?' ('+pct+')':'');
+          c2.save();
+          c2.fillStyle=diff<0?'#3FB950':'#ff6b6b';
+          c2.font='bold 8px sans-serif';
+          c2.textAlign='center';
+          c2.fillText(lbl,bar.x,bar.y-5);
+          c2.restore();
+        });
+      }
+    }],
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{
+          title:ctx=>ctx[0].label,
+          label:ctx=>{
+            const i=ctx.dataIndex,c=ctx.raw;
+            if(i===0)return `${c} findings`;
+            const prev=counts[i-1],diff=c-prev;
+            const pct=prev===0?'—':Math.abs(Math.round(diff/prev*100))+'%';
+            const prevLbl=labels[i-1].split(' ')[0];
+            return `${c} findings (${diff>=0?'+':''}${diff} vs ${prevLbl}, ${diff>=0?'+':''}${pct})`;
+          }
+        }}
+      },
+      scales:{
+        x:{ticks:{font:{size:10},maxRotation:45},grid:{color:'rgba(255,255,255,.04)'}},
+        y:{ticks:{font:{size:10}},grid:{color:'rgba(255,255,255,.06)'},beginAtZero:true}
+      }
+    }
+  });
+
+  // Summary stats
+  const nonZero=counts.filter(c=>c>0);
+  if(!nonZero.length){if(g('ecarChartSummary'))g('ecarChartSummary').innerHTML='';return;}
+  const maxC=Math.max(...counts),minC=Math.min(...nonZero);
+  const maxI=counts.indexOf(maxC),minI=counts.findIndex(c=>c===minC);
+  const avg=(counts.reduce((a,b)=>a+b,0)/Math.max(counts.length,1)).toFixed(1);
+  if(g('ecarChartSummary'))g('ecarChartSummary').innerHTML=
+    `<span style="color:#ff6b6b">↑ Worst: ${labels[maxI]||''} (${maxC})</span>`+
+    `<span style="color:var(--green)">↓ Best: ${labels[minI]||''} (${minC})</span>`+
+    `<span style="color:var(--muted)">→ Average: ${avg} findings/month</span>`;
+}
+
+function buildEcarMoM(){
+  const chartYr=g('ecarChartYr')?.value||'';
+  const ts=TS.ecar;
+  const base=ts.ac==='all'?ecarData:ecarData.filter(r=>r.aircraft_reg===ts.ac);
+  const md=_ecarMonthData(base,chartYr);
+  const tbody=g('ecarMoMBody');
+  if(!tbody)return;
+  if(!md.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">No data</td></tr>';return;}
+  tbody.innerHTML=md.map((d,i)=>{
+    const prev=i>0?md[i-1]:null;
+    let vsHtml='—',trendHtml='—';
+    if(prev){
+      const diff=d.total-prev.total;
+      if(diff<0){
+        const pct=prev.total?Math.round(Math.abs(diff/prev.total*100))+'%':'—';
+        vsHtml=`<span style="color:var(--green)">${diff} (${pct})</span>`;
+        trendHtml=`<span style="color:var(--green)">↓ Better</span>`;
+      } else if(diff>0){
+        const pct=prev.total?'+'+Math.round(diff/prev.total*100)+'%':'—';
+        vsHtml=`<span style="color:#ff6b6b">+${diff} (${pct})</span>`;
+        trendHtml=`<span style="color:#ff6b6b">↑ Worse</span>`;
+      } else {
+        vsHtml=`<span style="color:var(--muted)">0</span>`;
+        trendHtml=`<span style="color:var(--muted)">→ Same</span>`;
+      }
+    }
+    return `<tr>
+      <td style="white-space:nowrap;font-weight:500">${d.label}</td>
+      <td style="text-align:center"><b>${d.total}</b></td>
+      <td style="text-align:center;color:var(--blue)">${d.open}</td>
+      <td style="text-align:center;color:#ff6b6b">${d.ov}</td>
+      <td style="text-align:center;color:var(--green)">${d.cl}</td>
+      <td style="text-align:center">${vsHtml}</td>
+      <td style="text-align:center">${trendHtml}</td>
+    </tr>`;
+  }).join('');
+}
+
+function showEcarDetail(report_id){
+  const r=ecarData.find(x=>x.report_id===report_id);
+  if(!r)return;
+  s('ecarMTitle',r.report_number||'—');
+  s('ecarMSub','✈️ '+r.aircraft_reg+' · '+fd(r.raised_date));
+  const row=(label,val)=>val?`<div style="margin-bottom:10px">
+    <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">${label}</div>
+    <div style="font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.5">${esc(val)}</div>
+  </div>`:'';
+  g('ecarMBody').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 20px;margin-bottom:12px">
+      <div>
+        <div style="margin-bottom:10px">${sBadge(r.semantic_status)}</div>
+        ${row('Aircraft',r.aircraft_reg)}
+        ${row('Issued By',r.issued_by)}
+      </div>
+      <div>
+        ${row('Raised Date',fd(r.raised_date))}
+        ${row('Target Date',fd(r.Target_date))}
+        ${row('Date Completed',fd(r.close_date))}
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:12px">
+      ${r.findings&&r.findings.length?`
+        <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Finding Description${r.findings.length>1?' ('+r.findings.length+')':''}</div>
+        ${r.findings.map((desc,i)=>`<div style="margin-bottom:8px;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--blue)">
+          ${r.findings.length>1?'<div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:4px">FINDING '+(i+1)+'</div>':''}
+          <div style="font-size:12px;color:var(--text);white-space:pre-wrap;line-height:1.5">${esc(desc)}</div>
+        </div>`).join('')}
+      `:'<div style="color:var(--muted);font-size:12px">No finding description</div>'}
+    </div>`;
+  g('ecarModal').style.display='flex';
+}
+function closeEcarModal(e){if(e&&e.target!==g('ecarModal'))return;g('ecarModal').style.display='none';}
+
+function exportEcarPDF(){
+  if(!ecarLoaded||!ecarData.length){toast('No ECAR data loaded','err');return;}
+  setOv(true,'Exporting PDF...','');
+  try{
+    const ts=TS.ecar,yr=g('ecarYearF')?.value||'',mo=g('ecarMonthF')?.value||'';
+    let data=ecarData.filter(r=>{
+      if(ts.ac!=='all'&&r.aircraft_reg!==ts.ac)return false;
+      if(ts.sf!=='all'&&r.semantic_status!==ts.sf)return false;
+      if(yr&&String(r.raised_year)!==yr)return false;
+      if(mo&&String(r.raised_month)!==mo)return false;
+      return true;
+    });
+    let period='All';
+    if(yr&&mo)period=`${ECAR_MONTHS[parseInt(mo)-1]} ${yr}`;
+    else if(yr)period=`Year ${yr}`;
+    const acLabel=ts.ac==='all'?'All Aircraft':ts.ac;
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+    doc.setFontSize(14);doc.setFont(undefined,'bold');doc.text('ECAR Findings Report',14,14);
+    doc.setFontSize(9);doc.setFont(undefined,'normal');
+    doc.text(pdfSafe(`Period: ${period}  |  Aircraft: ${acLabel}  |  Total: ${data.length} findings`),14,21);
+    doc.text(`Exported: ${new Date().toLocaleDateString('en-GB')}`,14,26);
+
+    // Section 1: Monthly trend
+    const chartYr=g('ecarChartYr')?.value||'';
+    const base=ts.ac==='all'?ecarData:ecarData.filter(r=>r.aircraft_reg===ts.ac);
+    const md=_ecarMonthData(base,chartYr);
+    doc.autoTable({startY:32,head:[['Monthly Trend']],
+      headStyles:{fillColor:[30,35,45],textColor:[140,160,200],fontStyle:'bold',fontSize:9},
+      theme:'plain',margin:{left:14,right:14}});
+    doc.autoTable({startY:doc.lastAutoTable.finalY,
+      head:[['Month','Total','Open','Overdue','Closed','vs Prev Month','Trend']],
+      body:md.map((d,i)=>{
+        const prev=i>0?md[i-1].total:null;
+        let vs='—',trend='—';
+        if(prev!==null){const diff=d.total-prev;vs=(diff>=0?'+':'')+diff+(prev?` (${diff>=0?'+':''}${Math.round(diff/prev*100)}%)`:'');trend=diff<0?'Better':diff>0?'Worse':'Same';}
+        return[pdfSafe(d.label),d.total,d.open,d.ov,d.cl,pdfSafe(vs),trend];
+      }),
+      headStyles:{fillColor:[22,27,34],textColor:[139,148,158],fontSize:8,fontStyle:'bold'},
+      bodyStyles:{fontSize:7.5},
+      styles:{fillColor:[16,20,28],textColor:[201,209,217],lineColor:[48,54,63],lineWidth:.2},
+      margin:{left:14,right:14}});
+
+    let y=doc.lastAutoTable.finalY+6;
+    if(y>185){doc.addPage();y=14;}
+
+    // Section 2: Findings by aircraft
+    const acGroups={};
+    data.forEach(r=>{if(!acGroups[r.aircraft_reg])acGroups[r.aircraft_reg]=[];acGroups[r.aircraft_reg].push(r);});
+    doc.autoTable({startY:y,head:[['Findings by Aircraft']],
+      headStyles:{fillColor:[30,35,45],textColor:[140,160,200],fontStyle:'bold',fontSize:9},
+      theme:'plain',margin:{left:14,right:14}});
+    y=doc.lastAutoTable.finalY;
+    const sc={'Open':[88,166,255],'Overdue':[255,107,107],'On-time Closed':[63,185,80],'Lately Closed':[210,153,34],'Closed':[110,118,129]};
+    Object.entries(acGroups).forEach(([ac,rows])=>{
+      doc.autoTable({startY:y,head:[[{content:pdfSafe(`Aircraft: ${ac}  (${rows.length})`),colSpan:6}]],
+        headStyles:{fillColor:[30,35,45],textColor:[140,160,200],fontStyle:'bold',fontSize:9},
+        theme:'plain',margin:{left:14,right:14}});
+      y=doc.lastAutoTable.finalY;
+      doc.autoTable({startY:y,
+        head:[['Report No','Aircraft','Status','Raised','Target','Finding Description']],
+        body:rows.map(r=>[pdfSafe(r.report_number||'-'),pdfSafe(r.aircraft_reg||'-'),pdfSafe(r.semantic_status||'-'),fd(r.raised_date),fd(r.Target_date),pdfSafe((r.findings||[]).join('\n\n')||'-')]),
+        headStyles:{fillColor:[22,27,34],textColor:[139,148,158],fontSize:8,fontStyle:'bold'},
+        bodyStyles:{fontSize:7.5,valign:'top'},
+        columnStyles:{0:{cellWidth:24},1:{cellWidth:22},2:{cellWidth:22},3:{cellWidth:18},4:{cellWidth:18},5:{cellWidth:'auto'}},
+        didParseCell:function(d){if(d.section==='body'&&d.column.index===2){const c2=sc[d.cell.raw];if(c2)d.cell.styles.textColor=c2;}},
+        alternateRowStyles:{fillColor:[22,27,34]},
+        styles:{fillColor:[16,20,28],textColor:[201,209,217],lineColor:[48,54,63],lineWidth:.2},
+        margin:{left:14,right:14}});
+      y=doc.lastAutoTable.finalY+4;
+      if(y>185&&Object.keys(acGroups).indexOf(ac)<Object.keys(acGroups).length-1){doc.addPage();y=14;}
+    });
+    const fname=`ECAR_${yr||'all'}_${mo?'M'+mo:'allM'}_${new Date().toISOString().slice(0,10)}.pdf`;
+    doc.save(fname);toast(`Exported ${fname}`,'ok');
+  }catch(e){toast('PDF error: '+e.message,'err');}
+  finally{setOv(false);}
+}
+
+function exportEcarExcel(){
+  if(!ecarLoaded||!ecarData.length){toast('No ECAR data loaded','err');return;}
+  setOv(true,'Exporting Excel...','');
+  try{
+    const ts=TS.ecar,yr=g('ecarYearF')?.value||'',mo=g('ecarMonthF')?.value||'';
+    let data=ecarData.filter(r=>{
+      if(ts.ac!=='all'&&r.aircraft_reg!==ts.ac)return false;
+      if(ts.sf!=='all'&&r.semantic_status!==ts.sf)return false;
+      if(yr&&String(r.raised_year)!==yr)return false;
+      if(mo&&String(r.raised_month)!==mo)return false;
+      return true;
+    });
+    const wb=XLSX.utils.book_new();
+    const chartYr=g('ecarChartYr')?.value||'';
+    const base=ts.ac==='all'?ecarData:ecarData.filter(r=>r.aircraft_reg===ts.ac);
+    const md=_ecarMonthData(base,chartYr);
+    const s1=[['Month','Total','Open','Overdue','Closed','vs Prev Month','% Change']];
+    md.forEach((d,i)=>{
+      const prev=i>0?md[i-1].total:null;
+      const diff=prev!==null?d.total-prev:null;
+      const pct=diff!==null&&prev?Math.round(diff/prev*100):null;
+      s1.push([d.label,d.total,d.open,d.ov,d.cl,diff!==null?(diff>=0?'+'+diff:diff):'—',pct!==null?(pct>=0?'+'+pct+'%':pct+'%'):'—']);
+    });
+    const ws1=XLSX.utils.aoa_to_sheet(s1);
+    ws1['!cols']=[{wch:15},{wch:8},{wch:8},{wch:10},{wch:8},{wch:16},{wch:12}];
+    XLSX.utils.book_append_sheet(wb,ws1,'Monthly Summary');
+    const s2=[['Report No','Aircraft','Status','Raised','Target','Days to Due','Finding Description']];
+    data.forEach(r=>s2.push([r.report_number||'',r.aircraft_reg||'',r.semantic_status||'',
+      r.raised_date?new Date(r.raised_date).toLocaleDateString('en-GB'):'',
+      r.Target_date?new Date(r.Target_date).toLocaleDateString('en-GB'):'',
+      r.report_ageing??'',(r.findings||[]).join('\n')||'']));
+    const ws2=XLSX.utils.aoa_to_sheet(s2);
+    ws2['!cols']=[{wch:15},{wch:18},{wch:16},{wch:12},{wch:12},{wch:10},{wch:60}];
+    XLSX.utils.book_append_sheet(wb,ws2,'Finding Detail');
+    const fname=`ECAR_${yr||'all'}_${mo?'M'+mo:'allM'}_${new Date().toISOString().slice(0,10)}.xlsx`;
+    XLSX.writeFile(wb,fname);toast('Excel exported!','ok');
+  }catch(e){toast('Excel error: '+e.message,'err');}
+  finally{setOv(false);}
+}
+
 // ── TABLE: AUDIT PLAN ─────────────────────────────────────────
 function setAuditF(val,filterType,btn){
   if(filterType==='type'){
@@ -3581,7 +4129,7 @@ async function makeAdmin(id){
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────
-const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management'};
+const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',ecar:'ECAR Detail',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management'};
 function showPage(name,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -3593,6 +4141,7 @@ function showPage(name,btn){
   if(name==='reports'){initReportFilters();generateReport();}
   if(name==='docs'){ if(!docData.length) loadDocuments(); else renderDocPage(); }
   if(name==='cmrcar'){ if(!cmrLoaded) loadCmr(); else renderCmr(); }
+  if(name==='ecar'){ if(!ecarLoaded) loadEcar(); else renderEcar(); }
   if(name==='overview'){
     setTimeout(()=>{
       Object.values(charts).forEach(c=>{ try{c.resize()}catch(e){} });
