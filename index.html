@@ -809,12 +809,9 @@ tr:last-child td{border-bottom:none}
             </div>
           </div>
           <div class="chart-card" style="margin-bottom:8px;flex-shrink:0">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-              <div>
-                <div class="chart-title">Monthly Finding Trend</div>
-                <div class="chart-sub">MoM change — green = fewer findings (better), red = more (worse)</div>
-              </div>
-              <select class="sel" id="ecarChartYr" onchange="buildEcarChart();buildEcarMoM()" style="font-size:11px;padding:4px 8px"><option value="">All Years</option></select>
+            <div style="margin-bottom:10px">
+              <div class="chart-title">Monthly Finding Trend</div>
+              <div class="chart-sub">MoM change — green = fewer findings (better), red = more (worse). Year follows the filter above.</div>
             </div>
             <div style="height:220px;position:relative"><canvas id="cEcarTrend"></canvas></div>
             <div id="ecarChartSummary" style="margin-top:8px;font-size:11px;display:flex;gap:16px;flex-wrap:wrap"></div>
@@ -3039,10 +3036,6 @@ function renderEcar(){
   if(yrEl&&yrEl.options.length<=1)
     yrEl.innerHTML='<option value="">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
 
-  // Populate chart year selector once
-  const cYrEl=g('ecarChartYr');
-  if(cYrEl&&cYrEl.options.length<=1)
-    cYrEl.innerHTML='<option value="">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
 
   // Filter data
   let data=ecarData.filter(r=>{
@@ -3119,7 +3112,7 @@ function _ecarMonthData(baseData, chartYr){
 }
 
 function buildEcarChart(){
-  const chartYr=g('ecarChartYr')?.value||'';
+  const chartYr=g('ecarYearF')?.value||'';
   const ts=TS.ecar;
   const base=ts.ac==='all'?ecarData:ecarData.filter(r=>r.aircraft_reg===ts.ac);
   const md=_ecarMonthData(base,chartYr);
@@ -3195,7 +3188,7 @@ function buildEcarChart(){
 }
 
 function buildEcarMoM(){
-  const chartYr=g('ecarChartYr')?.value||'';
+  const chartYr=g('ecarYearF')?.value||'';
   const ts=TS.ecar;
   const base=ts.ac==='all'?ecarData:ecarData.filter(r=>r.aircraft_reg===ts.ac);
   const md=_ecarMonthData(base,chartYr);
@@ -3291,7 +3284,7 @@ function exportEcarPDF(){
     doc.text(`Exported: ${new Date().toLocaleDateString('en-GB')}`,14,26);
 
     // Section 1: Monthly trend
-    const chartYr=g('ecarChartYr')?.value||'';
+    const chartYr=g('ecarYearF')?.value||'';
     const base=ts.ac==='all'?ecarData:ecarData.filter(r=>r.aircraft_reg===ts.ac);
     const md=_ecarMonthData(base,chartYr);
     doc.autoTable({startY:32,head:[['Monthly Trend']],
@@ -3358,7 +3351,7 @@ function exportEcarExcel(){
       return true;
     });
     const wb=XLSX.utils.book_new();
-    const chartYr=g('ecarChartYr')?.value||'';
+    const chartYr=g('ecarYearF')?.value||'';
     const base=ts.ac==='all'?ecarData:ecarData.filter(r=>r.aircraft_reg===ts.ac);
     const md=_ecarMonthData(base,chartYr);
     const s1=[['Month','Total','Open','Overdue','Closed','vs Prev Month','% Change']];
