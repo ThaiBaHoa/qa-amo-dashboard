@@ -2932,18 +2932,9 @@ const ECAR_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','
 async function loadEcar(){
   setOv(true,'Loading ECAR...','');
   try{
-    const raw=await fetchAll(
-      G_URL+'dwreporting_report_summary'+
-      '?$select=report_id,report_number,report_status,audit_title,raised_date,modified_date'+
-      '&$filter='+encodeURIComponent("org_unit_name eq 'TQA' and report_title eq 'AMO ECAR'")
-    );
-    const map={};
-    raw.forEach(r=>{
-      if(!r.report_number?.trim())return;
-      const ex=map[r.report_id];
-      if(!ex||new Date(r.modified_date)>new Date(ex.modified_date))map[r.report_id]=r;
-    });
-    const summary=Object.values(map);
+    // Use allData already loaded — filter by report_title containing 'ECAR' (case-insensitive).
+    // This avoids hardcoding the exact DB title and is fast (no extra summary fetch).
+    const summary=allData.filter(r=>(r.report_title||'').toUpperCase().includes('ECAR'));
 
     setOv(true,`${summary.length} ECAR records — loading fields...`,'');
     let fMap={};
@@ -2953,8 +2944,7 @@ async function loadEcar(){
         '?$select=report_id,field_name,text_value'+
         '&$filter='+encodeURIComponent(
           "field_name eq 'Aircraft Registration' or field_name eq 'Finding description' or "+
-          "field_name eq 'Target date' or field_name eq 'Date completed' or "+
-          "field_name eq 'Issued by'"
+          "field_name eq 'Date completed' or field_name eq 'Issued by'"
         )
       );
       const ids=new Set(summary.map(r=>r.report_id));
@@ -2976,10 +2966,9 @@ async function loadEcar(){
 
     ecarData=summary.map(r=>{
       const f=fMap[r.report_id]||{};
-      const td=f['Target date']||null;
-      const cd=f['Date completed']||null;
-      const sm=semCalc(r.report_status,cd,td);
-      const ag=ageCalc(td);
+      // Target_date and semantic_status already computed by loadData from allData
+      const cd=f['Date completed']||r.close_date||null;
+      const sm=cd&&r.Target_date?semCalc(r.report_status,cd,r.Target_date):r.semantic_status;
       const aircraft=f['Aircraft Registration']||parseAircraftFromTitle(r.audit_title)||'Unknown';
       return{
         ...r,
@@ -2988,11 +2977,8 @@ async function loadEcar(){
         finding_count: (f.findings||[]).length,
         finding_desc:  (f.findings||[])[0]||null,
         issued_by:     f['Issued by']||null,
-        Target_date:   td,
         close_date:    cd,
         semantic_status: sm,
-        report_ageing:   ag,
-        overdue_cat:     catCalc(ag,sm),
         raised_year:     r.raised_date?new Date(r.raised_date).getFullYear():null,
         raised_month:    r.raised_date?new Date(r.raised_date).getMonth()+1:null,
       };
