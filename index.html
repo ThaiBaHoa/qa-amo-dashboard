@@ -1610,12 +1610,12 @@ async function loadData(forceRefresh=false) {
     setOv(true,`[2/3] ${summary.length} reports. Đang tải workflow...`,'');
     let wfMap = {};
     let wfAllMap = {};
+    let ownerMap = {};
     try {
       const wfRaw = await fetchAll(
         G_URL + 'dwreporting_report_workflow' +
         '?$select=report_id,stage_type,stage_status,stage_completed_date,stage_target_date,stage_owner'
       );
-      const ownerMap = {}; // report_id → first stage_owner value
       wfRaw.forEach(w => {
         if (w.stage_owner && !ownerMap[w.report_id]) ownerMap[w.report_id] = w.stage_owner;
         // Tất cả stages theo report_id (để hiển thị workflow steps)
