@@ -1070,7 +1070,7 @@ tr:last-child td{border-bottom:none}
             <div style="background:linear-gradient(135deg,#E30613,#a00010);border-radius:12px;padding:28px 32px;margin-bottom:16px;color:white">
               <div style="font-size:11px;opacity:.7;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">VietJet Air · Quality Assurance AMO</div>
               <div style="font-size:24px;font-weight:700;margin-bottom:6px">User Guide</div>
-              <div style="font-size:13px;opacity:.85">QA AMO Dashboard · Full documentation · <span id="helpRev"></span></div>
+              <div style="font-size:13px;opacity:.85">QA AMO Dashboard v7 · Full documentation</div>
             </div>
 
             <!-- Quick Nav -->
@@ -1152,42 +1152,19 @@ tr:last-child td{border-bottom:none}
               <!-- Form types -->
               <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">QA AMO Form Types</div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px">
-                <div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
-                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">Surveillance Report (SR)</div>
-                  <div style="font-size:11px;color:var(--muted)">Periodic surveillance report. No target date. Generated from Inspection activities.</div>
-                </div>
-                <div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
-                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">Aircraft Inspection/Spot Check (AISC)</div>
-                  <div style="font-size:11px;color:var(--muted)">Random or scheduled aircraft inspection at the ramp. No target date.</div>
-                </div>
-                <div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
-                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">MCAR</div>
-                  <div style="font-size:11px;color:var(--muted)">Mandatory Corrective Action Report — Mandatory corrective action report from internal audits. Has target date.</div>
-                </div>
-                <div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
-                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">PAVOI</div>
-                  <div style="font-size:11px;color:var(--muted)">Post Audit Verification of Implementation — Tracks implementation of corrective actions. Has target date.</div>
-                </div>
-                <div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
-                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">CAR</div>
-                  <div style="font-size:11px;color:var(--muted)">Corrective Action Report — Corrective action report from external audits or CAAV. Has target date.</div>
-                </div>
-                <div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
-                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">MOR</div>
-                  <div style="font-size:11px;color:var(--muted)">Mandatory Occurrence Report — Mandatory occurrence report as required by CAAV regulations.</div>
-                </div>
-                <div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
-                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">ECAR (AMO ECAR)</div>
-                  <div style="font-size:11px;color:var(--muted)">Internal AMO Electronic Corrective Action Report. Tracked in the dedicated ECAR Detail page. Has target date.</div>
-                </div>
-                <div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
-                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">CMR CAR</div>
-                  <div style="font-size:11px;color:var(--muted)">Component Maintenance Report — Corrective Action Report. Tracked in the dedicated CMR-CAR page. Has target date.</div>
-                </div>
-                <div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
-                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">Battery Workshop Inspection (BWI)</div>
-                  <div style="font-size:11px;color:var(--muted)">Periodic battery maintenance workshop inspection — once per month.</div>
-                </div>
+                ${[
+                  ['Surveillance Report (SR)','Periodic surveillance report. No target date. Generated from Inspection activities.'],
+                  ['Aircraft Inspection/Spot Check (AISC)','Random or scheduled aircraft inspection at the ramp.'],
+                  ['MCAR','Mandatory Corrective Action Report — Mandatory corrective action report from internal audits.'],
+                  ['PAVOI','Post Audit Verification of Implementation — Tracks implementation of corrective actions.'],
+                  ['CAR','Corrective Action Report — Corrective action report from external audits or CAAV.'],
+                  ['MOR','Mandatory Occurrence Report — Mandatory occurrence report as required by CAAV regulations.'],
+                  ['AMO ECAR','Internal AMO Electronic Corrective Action Report.'],
+                  ['Battery Workshop Inspection (BWI)','Periodic battery maintenance workshop inspection — once per month.'],
+                ].map(([name,desc])=>`<div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">${name}</div>
+                  <div style="font-size:11px;color:var(--muted)">${desc}</div>
+                </div>`).join('')}
               </div>
 
               <!-- KPI definitions -->
@@ -1290,40 +1267,11 @@ tr:last-child td{border-bottom:none}
                     <span>🔍</span><span style="font-size:13px;font-weight:600">PAVOI Detail</span>
                   </div>
                   <div style="padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7">
-                    Hiển thị chỉ các form <b>PAVOI</b> với đầy đủ thông tin xác minh.<br>
-                    • <b style="color:var(--text)">Request For Verification:</b> Nội dung yêu cầu xác minh việc thực hiện<br>
-                    • <b style="color:var(--text)">Report Reference:</b> Số report gốc mà PAVOI đang theo dõi (VD: MCAR-0086)<br>
-                    • <b style="color:var(--text)">Verification Result:</b> <span style="color:var(--green)">Satisfactory</span> = đạt / <span style="color:#ff6b6b">Not Satisfactory</span> = chưa đạt<br>
-                    • <b style="color:var(--text)">Department:</b> Phòng ban chịu trách nhiệm thực hiện
-                  </div>
-                </div>
-
-                <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
-                  <div style="background:rgba(255,100,50,0.08);padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
-                    <span>✈️</span><span style="font-size:13px;font-weight:600">CMR-CAR</span>
-                  </div>
-                  <div style="padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7">
-                    Trang riêng cho Component Maintenance Report — Corrective Action Report.<br>
-                    • <b style="color:var(--text)">5 KPI cards:</b> Total / Aircraft / Open / Overdue / Closed<br>
-                    • Lọc theo Status (All/Open/Overdue/On-time/Lately), Year, Quarter, Search<br>
-                    • Cột <b style="color:var(--text)">Findings:</b> Số lượng finding trong report<br>
-                    • Cột <b style="color:var(--text)">Department:</b> Phòng ban phụ trách<br>
-                    • Click vào dòng để mở detail với đầy đủ thông tin CAP, RCA, Verified by<br>
-                    • Nút <b style="color:var(--text)">⬇ PDF</b> xuất báo cáo (chỉ Admin)
-                  </div>
-                </div>
-
-                <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
-                  <div style="background:rgba(99,180,100,0.08);padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
-                    <span>🔧</span><span style="font-size:13px;font-weight:600">ECAR Detail</span>
-                  </div>
-                  <div style="padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7">
-                    Trang riêng cho AMO Electronic Corrective Action Report.<br>
-                    • <b style="color:var(--text)">6 KPI cards:</b> Total / Aircraft / Open / Overdue / Closed / On-time Rate<br>
-                    • Lọc theo Status, Year, Quarter (Q1–Q4 multi-select), Issued By, Search<br>
-                    • Cột <b style="color:var(--text)">Finding Description:</b> Nội dung finding đầu tiên<br>
-                    • Nút <b style="color:var(--text)">Detail</b> để xem chi tiết từng report<br>
-                    • Nút <b style="color:var(--text)">⬇ PDF</b> và <b style="color:var(--text)">⬇ Excel</b> xuất báo cáo theo bộ lọc đã chọn (chỉ Admin)
+                    Shows only <b>PAVOI</b> forms with full verification details.<br>
+                    • <b style="color:var(--text)">Request For Verification:</b> Content of the verification request for implementation<br>
+                    • <b style="color:var(--text)">Report Reference:</b> Original report number that the PAVOI is tracking (e.g. MCAR-0086)<br>
+                    • <b style="color:var(--text)">Verification Result:</b> <span style="color:var(--green)">Satisfactory</span> = passed / <span style="color:#ff6b6b">Not Satisfactory</span> = not yet passed<br>
+                    • <b style="color:var(--text)">Department:</b> Department responsible for implementation
                   </div>
                 </div>
 
@@ -1332,12 +1280,12 @@ tr:last-child td{border-bottom:none}
                     <span>📅</span><span style="font-size:13px;font-weight:600">Audit Plan</span>
                   </div>
                   <div style="padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7">
-                    Lịch và lịch sử audit QA AMO từ Galileo Planner.<br>
+                    QA AMO audit schedule and history from Galileo Planner.<br>
                     • <b style="color:var(--text)">6 KPI cards:</b> Total / Internal Audit / Inspection / Closed / In Progress / Scheduled<br>
-                    • Lọc theo Type (📋 Internal Audit / 🔍 Inspection), Status, Year<br>
-                    • Cột <b style="color:var(--text)">Findings:</b> Số report được tạo ra từ audit đó<br>
-                    • Cột <b style="color:var(--text)">Open/Overdue:</b> Số finding đang mở/quá hạn của audit<br>
-                    • <b style="color:var(--blue)">Scheduled</b> = audit chưa bắt đầu (kế hoạch tương lai)
+                    • Filter by Type (📋 Internal Audit / 🔍 Inspection), Status, Year<br>
+                    • <b style="color:var(--text)">Findings</b> column: Number of reports generated from that audit<br>
+                    • <b style="color:var(--text)">Open/Overdue</b> column: Open/overdue finding count for that audit<br>
+                    • <b style="color:var(--blue)">Scheduled</b> audits = not yet started (future plans)
                   </div>
                 </div>
 
@@ -1402,44 +1350,23 @@ tr:last-child td{border-bottom:none}
               </div>
 
               <div style="display:grid;gap:8px">
-                <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
-                  <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ Tại sao tổng số báo cáo vượt quá 3,000?</div>
-                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">Dashboard tải toàn bộ lịch sử QA AMO từ khi hệ thống Galileo đi vào hoạt động. Sử dụng bộ lọc Year trên trang Overview để xem dữ liệu theo từng năm.</div>
-                </div>
-                <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
-                  <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ On-time Rate 12% có nghĩa là gì?</div>
-                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">Chỉ 12% các form có target date được đóng đúng hạn. Tỉ lệ này chỉ tính trên các form có target date (CAR, MCAR, PAVOI, ECAR, CMR CAR). Các form không có target date (Surveillance, AISC) được loại khỏi tính toán.</div>
-                </div>
-                <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
-                  <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ Tại sao Repetitive count = 0?</div>
-                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">Trường "Repetitive" trong Galileo phải được điền "Yes" khi tạo finding. Nếu để trống, dashboard không thể phát hiện. Cần nhắc nhở auditor điền đầy đủ trường này.</div>
-                </div>
-                <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
-                  <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ Dữ liệu được cập nhật khi nào?</div>
-                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">Nhấn nút <b style="color:var(--text)">↻ Refresh</b> trên thanh tiêu đề để tải lại dữ liệu mới nhất từ Galileo. Dashboard không tự động refresh. Thời gian tải khoảng 30–60 giây.</div>
-                </div>
-                <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
-                  <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ Tại sao CMR-CAR và ECAR không hiển thị Finding Description?</div>
-                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">Dữ liệu chi tiết finding được tải từ Galileo theo từng đợt. Nếu kết nối chậm hoặc timeout, cột Finding Description có thể hiển thị "—". Nhấn <b style="color:var(--text)">↻ Refresh</b> và chờ đầy đủ để tải lại.</div>
-                </div>
-                <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
-                  <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ Tại sao Audit Plan hiển thị nhiều record?</div>
-                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">Dashboard tải tất cả audit của QA AMO auditors (Vo Vinh Hien, Le Hong Chuong, Thai Ba Hoa…) từ quá khứ đến hiện tại, bao gồm cả các audit Scheduled trong tương lai. Sử dụng bộ lọc Year để xem kế hoạch theo từng năm.</div>
-                </div>
-                <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
-                  <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ Làm thế nào để thêm người dùng mới?</div>
-                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">Người dùng tự đăng ký trên trang login → Admin vào <b style="color:var(--text)">User Management</b> → Approve tài khoản. Admin có thể Approve / Reject / cấp quyền Admin cho người dùng khác.</div>
-                </div>
-                <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
-                  <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ Tại sao chức năng Export PDF/Excel không hiển thị?</div>
-                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">Chức năng xuất báo cáo chỉ dành cho <b style="color:#BC8CFF">Administrator</b>. Nếu tài khoản của bạn là Viewer, các nút PDF/Excel và mục Export Reports sẽ bị ẩn. Liên hệ Admin để được cấp quyền.</div>
-                </div>
+                ${[
+                  ['Why does the total report count exceed 3,000?', 'The dashboard loads the full QA AMO history since the Galileo system went live. Use the Year filter on the Overview page to view data for a specific year.'],
+                  ['What does an on-time rate of 12% mean?', 'Only 12% of forms with a target date were closed on time. This figure is calculated only on forms that have a target date (CAR, MCAR, PAVOI). Forms without a target date (Surveillance, AISC) are excluded from the on-time rate.'],
+                  ['Why is the Repetitive count 0?', 'The "Repetitive" field in Galileo must be set to "Yes" when creating a finding. If it is left blank, the dashboard cannot detect it. Auditors should be reminded to fill in this field.'],
+                  ['When is the data updated?', 'Click the "↻ Refresh" button on the topbar to reload the latest data from Galileo. The dashboard does not refresh automatically. Loading takes approximately 30–60 seconds.'],
+                  ['Why does Audit Plan show 963 records?', 'The dashboard loads all audits for QA AMO auditors (Vo Vinh Hien, Le Hong Chuong, Thai Ba Hoa…) from past to present, including future Scheduled audits. Use the Year filter to view a specific year\'s plan.'],
+                  ['How do I add a new user?', 'The user self-registers on the login page → Admin goes to "User Management" → Approve the account. Admins can Approve/Reject/grant Admin rights to other users.'],
+                ].map(([q,a])=>`<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
+                  <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ ${q}</div>
+                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">${a}</div>
+                </div>`).join('')}
               </div>
             </div>
 
             <!-- Footer -->
             <div style="text-align:center;padding:16px;color:var(--muted);font-size:11px;border-top:1px solid var(--border)">
-              QA AMO Dashboard · VietJet Air · Data from Galileo GRC · Developed by QA AMO Team
+              QA AMO Dashboard v7 · VietJet Air · Data from Galileo GRC · Developed by QA AMO Team
             </div>
 
           </div>
@@ -1626,7 +1553,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2025.05.20-r13';
+const APP_REV = '2025.05.20-r9';
 const { createClient } = supabase;
 const sb = createClient(SUPA_URL, SUPA_KEY);
 
@@ -1657,55 +1584,58 @@ function switchAuth(tab) {
 }
 
 async function doLogin() {
-  const username=g('lUsername').value.trim().toLowerCase(), pass=g('lPass').value;
+  const email=g('lUsername').value.trim().toLowerCase(), pass=g('lPass').value;
   const al=g('loginAlert'); showAl(al,'',''); g('btnLogin').disabled=true;
-  if(!username||!pass){showAl(al,'error','Please enter username and password.');g('btnLogin').disabled=false;return;}
+  if(!email||!pass){showAl(al,'error','Please enter email and password.');g('btnLogin').disabled=false;return;}
   try {
-    const {data,error} = await sb.from('users').select('*').eq('email',username).single();
-    if(error||!data){showAl(al,'error','Username not found.');return;}
-    const hash = await hashPass(pass);
-    const passOk = data.password === hash || data.password === pass;
-    if(!passOk){showAl(al,'error','Incorrect password.');return;}
-    if(data.password === pass) sb.from('users').update({password:hash}).eq('id',data.id);
-    if(data.role==='pending'){g('loginForm').style.display='none';g('authTabs').style.display='none';g('pendingBox').style.display='';return;}
-    if(data.role==='rejected'){showAl(al,'error','Account has been rejected.');return;}
-    curUser=data;
-    const safeUser={id:data.id,email:data.email,full_name:data.full_name,role:data.role};
-    sessionStorage.setItem('qaUser',JSON.stringify(safeUser));
+    // Supabase Auth — bcrypt server-side, password never leaves the server
+    const {data:auth,error:authErr}=await sb.auth.signInWithPassword({email,password:pass});
+    if(authErr||!auth.user) throw new Error('Incorrect email or password.');
+    // RLS ensures we only read our own profile
+    const {data:profile,error:profErr}=await sb.from('users').select('id,email,full_name,role').eq('supabase_id',auth.user.id).single();
+    if(profErr||!profile) throw new Error('Account profile not found.');
+    if(profile.role==='pending'){g('loginForm').style.display='none';g('authTabs').style.display='none';g('pendingBox').style.display='';return;}
+    if(profile.role==='rejected'){await sb.auth.signOut();throw new Error('Account has been rejected.');}
+    curUser=profile;
+    sessionStorage.setItem('qaUser',JSON.stringify(profile));
     initApp();
-  } catch(e){showAl(al,'error','Error: '+e.message);}
+  } catch(e){showAl(al,'error',e.message);}
   finally{g('btnLogin').disabled=false;}
 }
 
 async function doRegister() {
-  const name=g('rName').value.trim(), username=g('rUsername').value.trim().toLowerCase();
-  const contactEmail=g('rEmail').value.trim().toLowerCase();
+  const name=g('rName').value.trim();
+  const email=g('rEmail').value.trim().toLowerCase();
   const pass=g('rPass').value, pass2=g('rPass2').value;
   const al=g('registerAlert');
-  if(!name||!username||!pass){showAl(al,'error','Please fill in full name, username and password.');return;}
-  if(!/^[a-z0-9._-]{3,30}$/.test(username)){showAl(al,'error','Username may only contain lowercase letters, numbers, dots or underscores (3–30 chars).');return;}
+  if(!name||!email||!pass){showAl(al,'error','Please fill in all fields.');return;}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){showAl(al,'error','Please enter a valid email address.');return;}
   if(pass.length<8){showAl(al,'error','Password must be at least 8 characters.');return;}
   if(pass!==pass2){showAl(al,'error','Passwords do not match.');return;}
   g('btnRegister').disabled=true; showAl(al,'info','Submitting...');
   try {
-    const {data:ex}=await sb.from('users').select('id').eq('email',username).single();
-    if(ex){showAl(al,'error','Username already in use.');return;}
-    const hash=await hashPass(pass);
-    const {error}=await sb.from('users').insert({email:username,password:hash,full_name:name,contact_email:contactEmail||null,role:'pending'});
-    if(error)throw error;
+    // Create Auth user — Supabase hashes with bcrypt automatically
+    const {data:auth,error:authErr}=await sb.auth.signUp({email,password:pass});
+    if(authErr) throw authErr;
+    // Insert profile — no password stored here
+    const {error:insertErr}=await sb.from('users').insert({
+      supabase_id:auth.user.id, email, full_name:name, role:'pending'
+    });
+    if(insertErr) throw insertErr;
     showAl(al,'success','Registration successful! Awaiting Admin approval.');
-    g('rName').value=g('rUsername').value=g('rEmail').value=g('rPass').value=g('rPass2').value='';
+    g('rName').value=g('rEmail').value=g('rUsername').value=g('rPass').value=g('rPass2').value='';
     setTimeout(()=>{g('registerForm').style.display='none';g('authTabs').style.display='none';g('pendingBox').style.display='';},2000);
-  } catch(e){showAl(al,'error','Error: '+e.message);}
+  } catch(e){showAl(al,'error',e.message);}
   finally{g('btnRegister').disabled=false;}
 }
 
-function doLogout() {
-  sessionStorage.removeItem('qaUser'); curUser=null; allData=[];
+async function doLogout() {
+  await sb.auth.signOut(); // Invalidate JWT server-side
+  sessionStorage.clear(); curUser=null; allData=[];
   g('authWrap').style.display='flex'; g('app').style.display='none';
   g('loginForm').style.display=''; g('registerForm').style.display='none';
-  g('pendingBox').style.display=''; g('authTabs').style.display='';
-  switchAuth('login'); g('lUsername').value=g('lPass').value=''; showAl(g('loginAlert'),'','');
+  g('authTabs').style.display=''; switchAuth('login');
+  g('lUsername').value=g('lPass').value=''; showAl(g('loginAlert'),'','');
   g('pendingBox').style.display='none';
 }
 
@@ -1715,7 +1645,6 @@ function initApp() {
   g('sideName').textContent=curUser.full_name;
   g('sideRole').textContent=curUser.role==='admin'?'🔑 Administrator':'👤 Viewer';
   if(g('appRev'))g('appRev').textContent='Rev '+APP_REV;
-  if(g('helpRev'))g('helpRev').textContent='Rev '+APP_REV;
   if(curUser.role==='admin'){
     g('adminNav').style.display='';
     document.querySelectorAll('.admin-only').forEach(el=>el.style.display='');
@@ -1728,9 +1657,16 @@ const dRenderAF    = debounce(renderAF,    300);
 const dRenderPavoi = debounce(renderPavoi, 300);
 const dRenderAudit = debounce(renderAudit, 300);
 
-window.addEventListener('DOMContentLoaded',()=>{
-  const s=sessionStorage.getItem('qaUser');
-  if(s){curUser=JSON.parse(s);initApp();}
+window.addEventListener('DOMContentLoaded', async ()=>{
+  // Verify Supabase session is still valid — not just sessionStorage
+  const {data:{session}}=await sb.auth.getSession();
+  if(session){
+    const s=sessionStorage.getItem('qaUser');
+    if(s){curUser=JSON.parse(s);initApp();return;}
+    // Session valid but no profile cached — re-fetch
+    const {data:profile}=await sb.from('users').select('id,email,full_name,role').eq('supabase_id',session.user.id).single();
+    if(profile){curUser=profile;sessionStorage.setItem('qaUser',JSON.stringify(profile));initApp();}
+  }
 });
 
 // ── CACHE (4 giờ) ────────────────────────────────────────────
@@ -2667,7 +2603,7 @@ async function loadCmr(){
     const raw=await fetchAll(
       G_URL+'dwreporting_report_summary'+
       '?$select=report_id,report_number,report_status,audit_title,raised_date,modified_date'+
-      '&$filter='+encodeURIComponent("org_unit_name eq 'TQA' and report_title eq 'CMR CAR'")
+      '&$filter='+encodeURIComponent("org_unit_name eq '"+ORG_UNIT+"' and report_title eq 'CMR CAR'")
     );
     const map={};
     raw.forEach(r=>{
@@ -2681,19 +2617,19 @@ async function loadCmr(){
     let fMap={};
     try{
       const cmrIdSet=new Set(summary.map(r=>r.report_id));
+      const CMR_FF=
+        "field_name eq 'Aircraft Registration' or field_name eq 'Finding description' or "+
+        "field_name eq 'Finding level' or field_name eq 'NC Type' or "+
+        "field_name eq 'Target date' or field_name eq 'Audit Ref. No' or "+
+        "field_name eq 'ATA Chapter' or field_name eq 'Defect Classification' or "+
+        "field_name eq 'Department' or field_name eq 'Corrective action plan' or "+
+        "field_name eq 'Final action taken' or field_name eq 'Issued to (person)' or "+
+        "field_name eq 'Verified by (auditor)' or field_name eq 'Date completed' or "+
+        "field_name eq 'RCA analysis'";
       const fRaw=await fetchAll(
         G_URL+'dwanalytics_report_form_section_field'+
         '?$select=report_id,field_name,text_value'+
-        '&$filter='+encodeURIComponent(
-          "field_name eq 'Aircraft Registration' or field_name eq 'Finding description' or "+
-          "field_name eq 'Finding level' or field_name eq 'NC Type' or "+
-          "field_name eq 'Target date' or field_name eq 'Audit Ref. No' or "+
-          "field_name eq 'ATA Chapter' or field_name eq 'Defect Classification' or "+
-          "field_name eq 'Department' or field_name eq 'Corrective action plan' or "+
-          "field_name eq 'Final action taken' or field_name eq 'Issued to (person)' or "+
-          "field_name eq 'Verified by (auditor)' or field_name eq 'Date completed' or "+
-          "field_name eq 'RCA analysis'"
-        )
+        '&$filter='+encodeURIComponent(CMR_FF)
       );
       fRaw.forEach(f=>{
         if(!cmrIdSet.has(f.report_id))return;
@@ -2705,11 +2641,16 @@ async function loadCmr(){
           if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
         }
       });
+      // Sort findings numerically by leading digit prefix (e.g. "1.FILLER..." → 1)
       Object.values(fMap).forEach(fm=>{
-        if(fm.findings&&fm.findings.length>1)
-          fm.findings.sort((a,b)=>{const na=parseInt(a)||0,nb=parseInt(b)||0;return na-nb||a.localeCompare(b);});
+        if(fm.findings&&fm.findings.length>1){
+          fm.findings.sort((a,b)=>{
+            const na=parseInt(a)||0, nb=parseInt(b)||0;
+            return na-nb||a.localeCompare(b);
+          });
+        }
       });
-    }catch(e){console.warn('CMR fields error:',e.message);}
+    }catch(e){console.warn('CMR fields error:',e);}
 
     cmrData=summary.map(r=>{
       const f=fMap[r.report_id]||{};
@@ -2983,7 +2924,7 @@ async function loadEcar(){
     const raw=await fetchAll(
       G_URL+'dwreporting_report_summary'+
       '?$select=report_id,report_number,report_status,audit_title,raised_date,modified_date'+
-      '&$filter='+encodeURIComponent("org_unit_name eq 'TQA' and report_title eq 'ECAR'")
+      '&$filter='+encodeURIComponent("org_unit_name eq '"+ORG_UNIT+"' and report_title eq 'ECAR'")
     );
     const map={};
     raw.forEach(r=>{
@@ -2997,14 +2938,14 @@ async function loadEcar(){
     let fMap={};
     try{
       const ecarIdSet=new Set(summary.map(r=>r.report_id));
+      const ECAR_FF=
+        "field_name eq 'Target date' or "+
+        "field_name eq 'Aircraft Registration' or field_name eq 'Finding description' or "+
+        "field_name eq 'Date completed' or field_name eq 'Issued by'";
       const fRaw=await fetchAll(
         G_URL+'dwanalytics_report_form_section_field'+
         '?$select=report_id,field_name,text_value'+
-        '&$filter='+encodeURIComponent(
-          "field_name eq 'Target date' or field_name eq 'Aircraft Registration' or "+
-          "field_name eq 'Finding description' or field_name eq 'Date completed' or "+
-          "field_name eq 'Issued by'"
-        )
+        '&$filter='+encodeURIComponent(ECAR_FF)
       );
       fRaw.forEach(f=>{
         if(!ecarIdSet.has(f.report_id))return;
@@ -3020,7 +2961,7 @@ async function loadEcar(){
         if(fm.findings&&fm.findings.length>1)
           fm.findings.sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)||a.localeCompare(b));
       });
-    }catch(e){console.warn('ECAR fields error:',e.message);}
+    }catch(e){console.warn('ECAR fields error:',e);}
 
     ecarData=summary.map(r=>{
       const f=fMap[r.report_id]||{};
@@ -4241,7 +4182,7 @@ async function loadUsers() {
 }
 
 async function approveUser(id,email){
-  try{const{error}=await sb.from('users').update({role:'approved',approved_by:curUser.email,approved_at:new Date().toISOString()}).eq('id',id);if(error)throw error;toast('✓ Approved: '+email,'ok');loadUsers();}
+  try{const{error}=await sb.from('users').update({role:'approved'}).eq('id',id);if(error)throw error;toast('✓ Approved: '+email,'ok');loadUsers();}
   catch(e){toast('Error: '+e.message,'err');}
 }
 async function rejectUser(id){
@@ -4307,7 +4248,7 @@ function g(id){return document.getElementById(id)}
 function s(id,v){const el=g(id);if(el)el.textContent=v}
 function esc(v){if(v==null)return'';return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function debounce(fn,ms){let t;return function(...a){clearTimeout(t);t=setTimeout(()=>fn.apply(this,a),ms)}}
-async function hashPass(p){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(p));return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('')}
+
 function setOv(show,txt='',detail=''){
   g('overlay').classList.toggle('show',show);
   if(show){g('ovSpinner').style.display='';g('ovRetry').style.display='none';}
