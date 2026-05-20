@@ -1553,7 +1553,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2025.05.20-r9';
+const APP_REV = '2025.05.20-r10';
 const { createClient } = supabase;
 const sb = createClient(SUPA_URL, SUPA_KEY);
 
@@ -2617,17 +2617,17 @@ async function loadCmr(){
         "field_name eq 'Verified by (auditor)' or field_name eq 'Date completed' or "+
         "field_name eq 'RCA analysis'";
       const BATCH=50;
-      const batches=[];
-      for(let i=0;i<cmrIds.length;i+=BATCH)batches.push(cmrIds.slice(i,i+BATCH));
-      const fRawParts=await Promise.all(batches.map(batch=>{
+      let fRaw=[];
+      for(let i=0;i<cmrIds.length;i+=BATCH){
+        const batch=cmrIds.slice(i,i+BATCH);
         const idF=batch.map(id=>`report_id eq ${id}`).join(' or ');
-        return fetchAll(
+        const part=await fetchAll(
           G_URL+'dwanalytics_report_form_section_field'+
           '?$select=report_id,field_name,text_value'+
           '&$filter='+encodeURIComponent(`(${idF}) and (${CMR_FF})`)
         );
-      }));
-      const fRaw=fRawParts.flat();
+        fRaw=fRaw.concat(part);
+      }
       fRaw.forEach(f=>{
         if(!fMap[f.report_id])fMap[f.report_id]={};
         if(f.field_name==='Finding description'){
@@ -2939,17 +2939,17 @@ async function loadEcar(){
         "field_name eq 'Aircraft Registration' or field_name eq 'Finding description' or "+
         "field_name eq 'Date completed' or field_name eq 'Issued by'";
       const BATCH=50;
-      const batches=[];
-      for(let i=0;i<ecarIds.length;i+=BATCH)batches.push(ecarIds.slice(i,i+BATCH));
-      const fRawParts=await Promise.all(batches.map(batch=>{
+      let fRaw=[];
+      for(let i=0;i<ecarIds.length;i+=BATCH){
+        const batch=ecarIds.slice(i,i+BATCH);
         const idF=batch.map(id=>`report_id eq ${id}`).join(' or ');
-        return fetchAll(
+        const part=await fetchAll(
           G_URL+'dwanalytics_report_form_section_field'+
           '?$select=report_id,field_name,text_value'+
           '&$filter='+encodeURIComponent(`(${idF}) and (${ECAR_FF})`)
         );
-      }));
-      const fRaw=fRawParts.flat();
+        fRaw=fRaw.concat(part);
+      }
       fRaw.forEach(f=>{
         if(!fMap[f.report_id])fMap[f.report_id]={};
         if(f.field_name==='Finding description'){
