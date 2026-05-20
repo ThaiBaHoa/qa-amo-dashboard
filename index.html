@@ -1555,7 +1555,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2025.05.20-r5';
+const APP_REV = '2025.05.20-r6';
 const { createClient } = supabase;
 const sb = createClient(SUPA_URL, SUPA_KEY);
 
@@ -3235,9 +3235,9 @@ function showEcarDetail(report_id){
 }
 function closeEcarModal(e){if(e&&e.target!==g('ecarModal'))return;g('ecarModal').style.display='none';}
 
-function exportEcarPDF(){
+async function exportEcarPDF(){
   if(!ecarLoaded||!ecarData.length){toast('No ECAR data loaded','err');return;}
-  setOv(true,'Exporting PDF...','');
+  setOv(true,'Generating PDF...','');
   try{
     const ts=TS.ecar,yr=g('ecarYearF')?.value||'',qr=g('ecarQtrF')?.value||'';
     let data=ecarData.filter(r=>{
@@ -3252,62 +3252,114 @@ function exportEcarPDF(){
     else if(yr)period=`Year ${yr}`;
     else if(qr)period=`Q${qr} (All Years)`;
     const acLabel=ts.ac==='all'?'All Aircraft':ts.ac;
+    const base=ts.ac==='all'?ecarData:ecarData.filter(r=>r.aircraft_reg===ts.ac);
+    const md=_ecarMonthData(base,yr);
+    const counts=md.map(d=>d.total);
+
+    // Render bar chart offscreen → PNG
+    let chartImg=null;
+    if(md.length){
+      const oc=document.createElement('canvas');
+      oc.width=900;oc.height=280;
+      oc.style.cssText='position:fixed;left:-9999px;top:-9999px;visibility:hidden';
+      document.body.appendChild(oc);
+      const ctx2=oc.getContext('2d');
+      ctx2.fillStyle='#ffffff';ctx2.fillRect(0,0,900,280);
+      const bgC=counts.map((c,i)=>i===0?'#3B82F6':c<counts[i-1]?'#22C55E':'#EF4444');
+      const tmpC=new Chart(oc,{type:'bar',
+        data:{labels:md.map(d=>d.label),datasets:[{data:counts,backgroundColor:bgC,borderRadius:4,borderSkipped:false}]},
+        options:{animation:false,responsive:false,
+          plugins:{legend:{display:false},tooltip:{enabled:false}},
+          scales:{
+            x:{ticks:{font:{size:10},maxRotation:50,color:'#374151'},grid:{color:'#E5E7EB'},border:{color:'#D1D5DB'}},
+            y:{ticks:{font:{size:10},color:'#374151'},grid:{color:'#E5E7EB'},border:{color:'#D1D5DB'},beginAtZero:true}
+          }
+        }
+      });
+      await new Promise(r=>setTimeout(r,250));
+      chartImg=oc.toDataURL('image/png');
+      tmpC.destroy();document.body.removeChild(oc);
+    }
+
     const {jsPDF}=window.jspdf;
     const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-    doc.setFontSize(14);doc.setFont(undefined,'bold');doc.text('ECAR Findings Report',14,14);
-    doc.setFontSize(9);doc.setFont(undefined,'normal');
-    doc.text(pdfSafe(`Period: ${period}  |  Aircraft: ${acLabel}  |  Total: ${data.length} findings`),14,21);
-    doc.text(`Exported: ${new Date().toLocaleDateString('en-GB')}`,14,26);
+    const PW=297,M=14;
 
-    // Section 1: Monthly trend
-    const chartYr=g('ecarYearF')?.value||'';
-    const base=ts.ac==='all'?ecarData:ecarData.filter(r=>r.aircraft_reg===ts.ac);
-    const md=_ecarMonthData(base,chartYr);
-    doc.autoTable({startY:32,head:[['Monthly Trend']],
-      headStyles:{fillColor:[30,35,45],textColor:[140,160,200],fontStyle:'bold',fontSize:9},
-      theme:'plain',margin:{left:14,right:14}});
-    doc.autoTable({startY:doc.lastAutoTable.finalY,
+    // Red header banner
+    doc.setFillColor(227,6,19);doc.rect(0,0,PW,20,'F');
+    doc.setFontSize(13);doc.setFont(undefined,'bold');doc.setTextColor(255,255,255);
+    doc.text('ECAR Findings Report',M,13);
+    doc.setFontSize(8);doc.setFont(undefined,'normal');
+    doc.text('Rev '+APP_REV,PW-M,13,{align:'right'});
+
+    doc.setTextColor(40,40,40);
+    doc.setFontSize(9);doc.setFont(undefined,'normal');
+    doc.text(pdfSafe(`Period: ${period}  |  Aircraft: ${acLabel}  |  Total: ${data.length} findings`),M,27);
+    doc.text(`Exported: ${new Date().toLocaleDateString('en-GB')}`,M,32);
+
+    let y=38;
+
+    // Bar chart image
+    if(chartImg){
+      doc.setFontSize(10);doc.setFont(undefined,'bold');doc.setTextColor(40,40,40);
+      doc.text('Monthly Finding Trend',M,y);y+=3;
+      doc.setFontSize(7.5);doc.setFont(undefined,'normal');doc.setTextColor(100,100,100);
+      doc.text('Green = fewer findings (improvement)   Red = more findings (worse)',M,y+2);y+=5;
+      const iW=PW-M*2,iH=Math.round(iW*280/900);
+      doc.addImage(chartImg,'PNG',M,y,iW,iH);
+      y+=iH+6;
+    }
+
+    if(y>175){doc.addPage();y=14;}
+
+    // Monthly trend table
+    doc.autoTable({startY:y,
       head:[['Month','Total','Open','Overdue','Closed','vs Prev Month','Trend']],
       body:md.map((d,i)=>{
         const prev=i>0?md[i-1].total:null;
         let vs='—',trend='—';
-        if(prev!==null){const diff=d.total-prev;vs=(diff>=0?'+':'')+diff+(prev?` (${diff>=0?'+':''}${Math.round(diff/prev*100)}%)`:'');trend=diff<0?'Better':diff>0?'Worse':'Same';}
+        if(prev!==null){const diff=d.total-prev;
+          vs=(diff>=0?'+':'')+diff+(prev?` (${diff>=0?'+':''}${Math.round(diff/prev*100)}%)`:'');
+          trend=diff<0?'Better':diff>0?'Worse':'Same';}
         return[pdfSafe(d.label),d.total,d.open,d.ov,d.cl,pdfSafe(vs),trend];
       }),
-      headStyles:{fillColor:[22,27,34],textColor:[139,148,158],fontSize:8,fontStyle:'bold'},
-      bodyStyles:{fontSize:7.5},
-      styles:{fillColor:[16,20,28],textColor:[201,209,217],lineColor:[48,54,63],lineWidth:.2},
-      margin:{left:14,right:14}});
+      headStyles:{fillColor:[30,64,175],textColor:[255,255,255],fontSize:8,fontStyle:'bold'},
+      bodyStyles:{fontSize:8,textColor:[30,30,30]},
+      alternateRowStyles:{fillColor:[245,247,250]},
+      styles:{fillColor:[255,255,255],lineColor:[209,213,219],lineWidth:.2},
+      didParseCell(d){
+        if(d.section==='body'&&d.column.index===6){
+          if(d.cell.raw==='Better')d.cell.styles.textColor=[21,128,61];
+          else if(d.cell.raw==='Worse')d.cell.styles.textColor=[185,28,28];
+        }
+      },
+      margin:{left:M,right:M}});
 
-    let y=doc.lastAutoTable.finalY+6;
-    if(y>185){doc.addPage();y=14;}
+    y=doc.lastAutoTable.finalY+8;
+    if(y>175){doc.addPage();y=14;}
 
-    // Section 2: Findings by aircraft
+    // Findings by aircraft
     const acGroups={};
     data.forEach(r=>{if(!acGroups[r.aircraft_reg])acGroups[r.aircraft_reg]=[];acGroups[r.aircraft_reg].push(r);});
-    doc.autoTable({startY:y,head:[['Findings by Aircraft']],
-      headStyles:{fillColor:[30,35,45],textColor:[140,160,200],fontStyle:'bold',fontSize:9},
-      theme:'plain',margin:{left:14,right:14}});
-    y=doc.lastAutoTable.finalY;
-    const sc={'Open':[88,166,255],'Overdue':[255,107,107],'On-time Closed':[63,185,80],'Lately Closed':[210,153,34],'Closed':[110,118,129]};
-    Object.entries(acGroups).forEach(([ac,rows])=>{
-      doc.autoTable({startY:y,head:[[{content:pdfSafe(`Aircraft: ${ac}  (${rows.length})`),colSpan:6}]],
-        headStyles:{fillColor:[30,35,45],textColor:[140,160,200],fontStyle:'bold',fontSize:9},
-        theme:'plain',margin:{left:14,right:14}});
-      y=doc.lastAutoTable.finalY;
+    const sc={'Open':[30,80,220],'Overdue':[185,28,28],'On-time Closed':[21,128,61],'Lately Closed':[161,98,7],'Closed':[100,100,100]};
+    Object.entries(acGroups).forEach(([ac,rows],idx)=>{
+      if(idx>0&&y>175){doc.addPage();y=14;}
       doc.autoTable({startY:y,
-        head:[['Report No','Aircraft','Status','Raised','Target','Finding Description']],
-        body:rows.map(r=>[pdfSafe(r.report_number||'-'),pdfSafe(r.aircraft_reg||'-'),pdfSafe(r.semantic_status||'-'),fd(r.raised_date),fd(r.Target_date),pdfSafe((r.findings||[]).join('\n\n')||'-')]),
-        headStyles:{fillColor:[22,27,34],textColor:[139,148,158],fontSize:8,fontStyle:'bold'},
-        bodyStyles:{fontSize:7.5,valign:'top'},
-        columnStyles:{0:{cellWidth:24},1:{cellWidth:22},2:{cellWidth:22},3:{cellWidth:18},4:{cellWidth:18},5:{cellWidth:'auto'}},
-        didParseCell:function(d){if(d.section==='body'&&d.column.index===2){const c2=sc[d.cell.raw];if(c2)d.cell.styles.textColor=c2;}},
-        alternateRowStyles:{fillColor:[22,27,34]},
-        styles:{fillColor:[16,20,28],textColor:[201,209,217],lineColor:[48,54,63],lineWidth:.2},
-        margin:{left:14,right:14}});
-      y=doc.lastAutoTable.finalY+4;
-      if(y>185&&Object.keys(acGroups).indexOf(ac)<Object.keys(acGroups).length-1){doc.addPage();y=14;}
+        head:[[{content:pdfSafe(`Aircraft: ${ac}  (${rows.length} findings)`),colSpan:6}],
+              ['Report No','Status','Raised','Target','Days','Finding Description']],
+        body:rows.map(r=>[pdfSafe(r.report_number||'-'),pdfSafe(r.semantic_status||'-'),
+          fd(r.raised_date),fd(r.Target_date),r.report_ageing??'-',
+          pdfSafe((r.findings||[]).join('\n\n')||'-')]),
+        headStyles:{fillColor:[30,64,175],textColor:[255,255,255],fontSize:8,fontStyle:'bold'},
+        bodyStyles:{fontSize:7.5,valign:'top',textColor:[30,30,30]},
+        columnStyles:{0:{cellWidth:26},1:{cellWidth:26},2:{cellWidth:18},3:{cellWidth:18},4:{cellWidth:12},5:{cellWidth:'auto'}},
+        didParseCell(d){if(d.section==='body'&&d.column.index===1){const c=sc[d.cell.raw];if(c)d.cell.styles.textColor=c;}},
+        alternateRowStyles:{fillColor:[245,247,250]},
+        styles:{fillColor:[255,255,255],lineColor:[209,213,219],lineWidth:.2},
+        margin:{left:M,right:M}});
+      y=doc.lastAutoTable.finalY+6;
     });
+
     const fname=`ECAR_${yr||'all'}_${qr?'Q'+qr:'allQ'}_${new Date().toISOString().slice(0,10)}.pdf`;
     doc.save(fname);toast(`Exported ${fname}`,'ok');
   }catch(e){toast('PDF error: '+e.message,'err');}
