@@ -301,8 +301,8 @@ tr:last-child td{border-bottom:none}
       <button class="auth-tab" onclick="switchAuth('register')">Register</button>
     </div>
     <div id="loginForm">
-      <div class="form-group"><label class="form-label">Username</label>
-        <input class="form-input" id="lUsername" type="text" placeholder="Enter username" autocomplete="username"></div>
+      <div class="form-group"><label class="form-label">Email</label>
+        <input class="form-input" id="lUsername" type="email" placeholder="email@vietjetair.com" autocomplete="email"></div>
       <div class="form-group"><label class="form-label">Password</label>
         <input class="form-input" id="lPass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
       <button class="btn-primary" id="btnLogin" onclick="doLogin()">Login</button>
@@ -311,10 +311,8 @@ tr:last-child td{border-bottom:none}
     <div id="registerForm" style="display:none">
       <div class="form-group"><label class="form-label">Full Name</label>
         <input class="form-input" id="rName" type="text" placeholder="e.g. Nguyen Van A"></div>
-      <div class="form-group"><label class="form-label">Username</label>
-        <input class="form-input" id="rUsername" type="text" placeholder="e.g. nguyen.van.a" autocomplete="username"></div>
-      <div class="form-group"><label class="form-label">Email <span style="font-size:11px;color:var(--muted);font-weight:400">(for reference only)</span></label>
-        <input class="form-input" id="rEmail" type="email" placeholder="email@vietjetair.com"></div>
+      <div class="form-group"><label class="form-label">Email</label>
+        <input class="form-input" id="rEmail" type="email" placeholder="email@vietjetair.com" autocomplete="email"></div>
       <div class="form-group"><label class="form-label">Password</label>
         <input class="form-input" id="rPass" type="password" placeholder="Minimum 8 characters"></div>
       <div class="form-group"><label class="form-label">Confirm Password</label>
