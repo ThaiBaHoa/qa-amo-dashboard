@@ -786,27 +786,6 @@ tr:last-child td{border-bottom:none}
         <!-- ECAR DETAIL -->
         <div class="page" id="page-ecar">
           <div class="kpi-grid" id="ecarKPIs"></div>
-          <div class="chart-card" style="margin-bottom:8px;flex-shrink:0">
-            <div style="margin-bottom:10px">
-              <div class="chart-title">Monthly Finding Trend</div>
-              <div class="chart-sub">MoM change — green = fewer findings (better), red = more (worse). Year follows the filter below.</div>
-            </div>
-            <div style="height:220px;position:relative"><canvas id="cEcarTrend"></canvas></div>
-            <div id="ecarChartSummary" style="margin-top:8px;font-size:11px;display:flex;gap:16px;flex-wrap:wrap"></div>
-          </div>
-          <div class="chart-card" style="margin-bottom:8px;flex-shrink:0">
-            <div class="chart-title" style="margin-bottom:8px">Month-over-Month Comparison</div>
-            <div style="overflow-x:auto">
-              <table class="stat-tbl" style="width:100%">
-                <thead><tr>
-                  <th>Month</th><th style="text-align:center">Total</th><th style="text-align:center">Open</th>
-                  <th style="text-align:center">Overdue</th><th style="text-align:center">Closed</th>
-                  <th style="text-align:center">vs Prev Month</th><th style="text-align:center">Trend</th>
-                </tr></thead>
-                <tbody id="ecarMoMBody"></tbody>
-              </table>
-            </div>
-          </div>
           <div class="tbl-card">
             <div class="tbl-bar">
               <div><div class="tbl-title">ECAR Findings</div><div class="tbl-count" id="ecarCnt">—</div></div>
@@ -1576,7 +1555,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2025.05.20-r4';
+const APP_REV = '2025.05.20-r5';
 const { createClient } = supabase;
 const sb = createClient(SUPA_URL, SUPA_KEY);
 
@@ -3068,10 +3047,6 @@ function renderEcar(){
     {l:'Closed',v:cl,c:'var(--green)'},
     {l:'On-time Rate',v:onRate,c:'var(--green)'},
   ].map(k=>`<div class="kpi" style="--accent:${k.c}"><div class="kpi-lbl">${k.l}</div><div class="kpi-val">${k.v}</div></div>`).join('');
-
-  // Chart and MoM
-  buildEcarChart();
-  buildEcarMoM();
 
   // Table
   const sorted=sortD(data,ts.sort,ts.asc);
