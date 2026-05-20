@@ -307,6 +307,18 @@ tr:last-child td{border-bottom:none}
         <input class="form-input" id="lPass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
       <button class="btn-primary" id="btnLogin" onclick="doLogin()">Login</button>
       <div class="auth-alert" id="loginAlert"></div>
+      <div style="text-align:center;margin-top:10px">
+        <a href="#" onclick="showForgot();return false;" style="font-size:12px;color:var(--muted);text-decoration:none;border-bottom:1px dashed var(--muted)">Forgot password?</a>
+      </div>
+    </div>
+    <div id="forgotForm" style="display:none">
+      <div class="form-group"><label class="form-label">Enter your email to reset password</label>
+        <input class="form-input" id="fEmail" type="email" placeholder="email@vietjetair.com"></div>
+      <button class="btn-primary" id="btnForgot" onclick="doForgot()">Send Reset Link</button>
+      <div class="auth-alert" id="forgotAlert"></div>
+      <div style="text-align:center;margin-top:10px">
+        <a href="#" onclick="hideForgot();return false;" style="font-size:12px;color:var(--muted);text-decoration:none;border-bottom:1px dashed var(--muted)">← Back to Login</a>
+      </div>
     </div>
     <div id="registerForm" style="display:none">
       <div class="form-group"><label class="form-label">Full Name</label>
@@ -365,6 +377,7 @@ tr:last-child td{border-bottom:none}
           <div class="avatar" id="sideAvatar">U</div>
           <div><div class="user-name" id="sideName">—</div><div class="user-role" id="sideRole">—</div></div>
         </div>
+        <button class="btn-logout" onclick="showChangePass()" style="margin-bottom:6px;color:var(--muted)">🔑 Change Password</button>
         <button class="btn-logout" onclick="doLogout()">Logout</button>
         <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:6px;letter-spacing:.04em" id="appRev"></div>
       </div>
@@ -1633,6 +1646,60 @@ async function doRegister() {
   finally{g('btnRegister').disabled=false;}
 }
 
+// ── FORGOT PASSWORD ─────────────────────────────────────────
+function showForgot() {
+  g('loginForm').style.display='none';
+  g('forgotForm').style.display='';
+  g('authTabs').style.display='none';
+  showAl(g('forgotAlert'),'','');
+  if(g('fEmail')) g('fEmail').value='';
+}
+function hideForgot() {
+  g('forgotForm').style.display='none';
+  g('loginForm').style.display='';
+  g('authTabs').style.display='';
+}
+async function doForgot() {
+  const email=g('fEmail').value.trim().toLowerCase();
+  const al=g('forgotAlert');
+  if(!email){showAl(al,'error','Please enter your email.');return;}
+  g('btnForgot').disabled=true;
+  try {
+    const {error}=await sb.auth.resetPasswordForEmail(email,{
+      redirectTo: window.location.origin + window.location.pathname + '?reset=1'
+    });
+    if(error) throw error;
+    showAl(al,'success','Reset link sent! Check your email inbox.');
+    g('fEmail').value='';
+  } catch(e){showAl(al,'error',e.message);}
+  finally{g('btnForgot').disabled=false;}
+}
+
+// ── CHANGE PASSWORD ──────────────────────────────────────────
+function showChangePass() {
+  g('changePwModal').style.display='flex';
+  g('cpNewPass').value=''; g('cpConfPass').value='';
+  showAl(g('cpAlert'),'','');
+}
+function hideChangePass() {
+  g('changePwModal').style.display='none';
+}
+async function doChangePass() {
+  const np=g('cpNewPass').value, cp=g('cpConfPass').value;
+  const al=g('cpAlert');
+  if(!np||!cp){showAl(al,'error','Please fill in both fields.');return;}
+  if(np.length<8){showAl(al,'error','Password must be at least 8 characters.');return;}
+  if(np!==cp){showAl(al,'error','Passwords do not match.');return;}
+  g('btnCp').disabled=true;
+  try {
+    const {error}=await sb.auth.updateUser({password:np});
+    if(error) throw error;
+    showAl(al,'success','Password updated successfully!');
+    setTimeout(()=>hideChangePass(),1500);
+  } catch(e){showAl(al,'error',e.message);}
+  finally{g('btnCp').disabled=false;}
+}
+
 async function doLogout() {
   await sb.auth.signOut(); // Invalidate JWT server-side
   sessionStorage.clear(); curUser=null; allData=[];
@@ -1661,7 +1728,21 @@ const dRenderAF    = debounce(renderAF,    300);
 const dRenderPavoi = debounce(renderPavoi, 300);
 const dRenderAudit = debounce(renderAudit, 300);
 
+// Handle password reset redirect từ email link
 window.addEventListener('DOMContentLoaded', async ()=>{
+  // Supabase gửi token qua URL hash khi user click reset link
+  const hash = window.location.hash;
+  if(hash.includes('type=recovery')) {
+    // Supabase tự xử lý session từ hash — chờ onAuthStateChange
+    sb.auth.onAuthStateChange(async (event, session) => {
+      if(event === 'PASSWORD_RECOVERY') {
+        // Hiện modal đổi password ngay
+        document.getElementById('authWrap').style.display='none';
+        showChangePass();
+      }
+    });
+    return;
+  }
   // Verify Supabase session is still valid — not just sessionStorage
   const {data:{session}}=await sb.auth.getSession();
   if(session){
@@ -4606,5 +4687,21 @@ document.addEventListener('click',function(e){
   }
 });
 </script>
+
+<!-- Change Password Modal -->
+<div id="changePwModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:28px 24px;width:340px;max-width:90vw">
+    <div style="font-size:16px;font-weight:600;margin-bottom:16px;color:var(--text)">Change Password</div>
+    <div class="form-group"><label class="form-label">New Password</label>
+      <input class="form-input" id="cpNewPass" type="password" placeholder="Minimum 8 characters"></div>
+    <div class="form-group"><label class="form-label">Confirm New Password</label>
+      <input class="form-input" id="cpConfPass" type="password" placeholder="Repeat new password"></div>
+    <div class="auth-alert" id="cpAlert" style="margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-primary" id="btnCp" onclick="doChangePass()" style="flex:1">Update Password</button>
+      <button onclick="hideChangePass()" style="flex:1;padding:10px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;cursor:pointer;font-size:13px">Cancel</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
