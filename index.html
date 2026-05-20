@@ -795,13 +795,11 @@ tr:last-child td{border-bottom:none}
               <button class="pill" onclick="setEcarF('On-time Closed',this)">On-time</button>
               <button class="pill" onclick="setEcarF('Lately Closed',this)">Lately</button>
               <select class="sel" id="ecarYearF" onchange="ecarYearChange()"><option value="">All Years</option></select>
-              <select class="sel" id="ecarQtrF" onchange="renderEcar()" disabled style="opacity:.5">
-                <option value="">All Quarters</option>
-                <option value="1">Q1 (Jan–Mar)</option>
-                <option value="2">Q2 (Apr–Jun)</option>
-                <option value="3">Q3 (Jul–Sep)</option>
-                <option value="4">Q4 (Oct–Dec)</option>
-              </select>
+              <button class="pill qtr-pill" onclick="toggleEcarQtr(1,this)" disabled style="opacity:.5">Q1</button>
+              <button class="pill qtr-pill" onclick="toggleEcarQtr(2,this)" disabled style="opacity:.5">Q2</button>
+              <button class="pill qtr-pill" onclick="toggleEcarQtr(3,this)" disabled style="opacity:.5">Q3</button>
+              <button class="pill qtr-pill" onclick="toggleEcarQtr(4,this)" disabled style="opacity:.5">Q4</button>
+              <select class="sel" id="ecarIssuedByF" onchange="renderEcar()"><option value="">All Issued By</option></select>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
                 <input class="srch" id="ecarSrch" placeholder="Search..." oninput="dRenderEcar()">
               </div>
@@ -1555,7 +1553,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2025.05.20-r6';
+const APP_REV = '2025.05.20-r7';
 const { createClient } = supabase;
 const sb = createClient(SUPA_URL, SUPA_KEY);
 
@@ -1573,7 +1571,7 @@ const TS = {
   audit:  { page:1, sort:'scheduled_start_date', asc:false, sf:'all', typeF:'all', yr:'', srch:'' },
   docs:   { page:1, sort:'document_number', asc:true, typeF:'', yr:'', srch:'' },
   cmr:    { page:1, sort:'raised_date', asc:false, sf:'all', ac:'all', yr:'', qr:'', srch:'' },
-  ecar:   { page:1, sort:'raised_date', asc:false, sf:'all', ac:'all', yr:'', qr:'', srch:'' },
+  ecar:   { page:1, sort:'raised_date', asc:false, sf:'all', ac:'all', yr:'', qrs:[], issuedBy:'', srch:'' },
 };
 
 // ── AUTH ─────────────────────────────────────────────────────
@@ -2983,22 +2981,29 @@ async function loadEcar(){
   renderEcar();
 }
 
-function ecarYearChange(){
-  const yr=g('ecarYearF')?.value||'';
-  const qEl=g('ecarQtrF');
-  if(qEl){qEl.disabled=!yr;qEl.style.opacity=yr?'1':'.5';if(!yr)qEl.value='';}
-  TS.ecar.page=1;
-  renderEcar();
-}
+
 
 function setEcarF(val,btn){
   TS.ecar.sf=val;TS.ecar.page=1;
-  document.querySelectorAll('#page-ecar .pill').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('#page-ecar .pill:not(.qtr-pill)').forEach(p=>p.classList.remove('on'));
   btn.classList.add('on');renderEcar();
 }
 function setEcarAC(ac){TS.ecar.ac=ac;TS.ecar.page=1;renderEcar();}
 function ecarSort(col){TS.ecar.asc=TS.ecar.sort===col?!TS.ecar.asc:true;TS.ecar.sort=col;TS.ecar.page=1;renderEcar();}
 let _dEcar;function dRenderEcar(){clearTimeout(_dEcar);_dEcar=setTimeout(()=>{TS.ecar.page=1;renderEcar();},220);}
+
+function ecarYearChange(){
+  const yr=g('ecarYearF')?.value||'';
+  document.querySelectorAll('#page-ecar .qtr-pill').forEach(b=>{b.disabled=!yr;b.style.opacity=yr?'1':'.5';});
+  if(!yr){TS.ecar.qrs=[];document.querySelectorAll('#page-ecar .qtr-pill').forEach(b=>b.classList.remove('on'));}
+  TS.ecar.page=1;renderEcar();
+}
+function toggleEcarQtr(q,btn){
+  const idx=TS.ecar.qrs.indexOf(q);
+  if(idx===-1)TS.ecar.qrs.push(q);else TS.ecar.qrs.splice(idx,1);
+  btn.classList.toggle('on',TS.ecar.qrs.includes(q));
+  TS.ecar.page=1;renderEcar();
+}
 
 function renderEcar(){
   if(!ecarLoaded||!ecarData.length){
@@ -3007,7 +3012,8 @@ function renderEcar(){
   }
   const ts=TS.ecar;
   const yr=g('ecarYearF')?.value||'';
-  const qr=g('ecarQtrF')?.value||'';
+  const qrs=ts.qrs;
+  const issuedBy=g('ecarIssuedByF')?.value||'';
   const srch=(g('ecarSrch')?.value||'').toLowerCase();
 
   // Populate year filter once
@@ -3016,12 +3022,20 @@ function renderEcar(){
   if(yrEl&&yrEl.options.length<=1)
     yrEl.innerHTML='<option value="">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
 
+  // Populate issued-by filter once
+  const ibEl=g('ecarIssuedByF');
+  if(ibEl&&ibEl.options.length<=1){
+    const issuers=[...new Set(ecarData.map(r=>r.issued_by).filter(Boolean))].sort();
+    ibEl.innerHTML='<option value="">All Issued By</option>'+issuers.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('');
+  }
+
   // Filter data
   let data=ecarData.filter(r=>{
     if(ts.ac!=='all'&&r.aircraft_reg!==ts.ac)return false;
     if(ts.sf!=='all'&&r.semantic_status!==ts.sf)return false;
     if(yr&&String(r.raised_year)!==yr)return false;
-    if(qr&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(Math.ceil(m/3)!==parseInt(qr))return false;}
+    if(qrs.length&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(!qrs.includes(Math.ceil(m/3)))return false;}
+    if(issuedBy&&r.issued_by!==issuedBy)return false;
     if(srch){
       const t=[r.report_number,r.aircraft_reg,r.issued_by,r.finding_desc].join(' ').toLowerCase();
       if(!t.includes(srch))return false;
@@ -3239,21 +3253,28 @@ async function exportEcarPDF(){
   if(!ecarLoaded||!ecarData.length){toast('No ECAR data loaded','err');return;}
   setOv(true,'Generating PDF...','');
   try{
-    const ts=TS.ecar,yr=g('ecarYearF')?.value||'',qr=g('ecarQtrF')?.value||'';
+    const ts=TS.ecar,yr=g('ecarYearF')?.value||'',qrs=ts.qrs,issuedBy=g('ecarIssuedByF')?.value||'';
     let data=ecarData.filter(r=>{
       if(ts.ac!=='all'&&r.aircraft_reg!==ts.ac)return false;
       if(ts.sf!=='all'&&r.semantic_status!==ts.sf)return false;
       if(yr&&String(r.raised_year)!==yr)return false;
-      if(qr&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(Math.ceil(m/3)!==parseInt(qr))return false;}
+      if(qrs.length&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(!qrs.includes(Math.ceil(m/3)))return false;}
+      if(issuedBy&&r.issued_by!==issuedBy)return false;
       return true;
     });
     let period='All';
-    if(yr&&qr)period=`Q${qr}/${yr}`;
+    const qLabel=qrs.length?qrs.slice().sort((a,b)=>a-b).map(q=>'Q'+q).join('+'):'';
+    if(yr&&qLabel)period=`${qLabel}/${yr}`;
     else if(yr)period=`Year ${yr}`;
-    else if(qr)period=`Q${qr} (All Years)`;
+    else if(qLabel)period=`${qLabel} (All Years)`;
     const acLabel=ts.ac==='all'?'All Aircraft':ts.ac;
     const base=ts.ac==='all'?ecarData:ecarData.filter(r=>r.aircraft_reg===ts.ac);
-    const md=_ecarMonthData(base,yr);
+    const baseFiltered=base.filter(r=>{
+      if(yr&&String(r.raised_year)!==yr)return false;
+      if(qrs.length&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(!qrs.includes(Math.ceil(m/3)))return false;}
+      return true;
+    });
+    const md=_ecarMonthData(baseFiltered,qrs.length?'':yr);
     const counts=md.map(d=>d.total);
 
     // Render bar chart offscreen → PNG
@@ -3360,7 +3381,8 @@ async function exportEcarPDF(){
       y=doc.lastAutoTable.finalY+6;
     });
 
-    const fname=`ECAR_${yr||'all'}_${qr?'Q'+qr:'allQ'}_${new Date().toISOString().slice(0,10)}.pdf`;
+    const qFname=qrs.length?qrs.slice().sort((a,b)=>a-b).map(q=>'Q'+q).join(''):'allQ';
+    const fname=`ECAR_${yr||'all'}_${qFname}_${new Date().toISOString().slice(0,10)}.pdf`;
     doc.save(fname);toast(`Exported ${fname}`,'ok');
   }catch(e){toast('PDF error: '+e.message,'err');}
   finally{setOv(false);}
@@ -3370,18 +3392,23 @@ function exportEcarExcel(){
   if(!ecarLoaded||!ecarData.length){toast('No ECAR data loaded','err');return;}
   setOv(true,'Exporting Excel...','');
   try{
-    const ts=TS.ecar,yr=g('ecarYearF')?.value||'',qr=g('ecarQtrF')?.value||'';
+    const ts=TS.ecar,yr=g('ecarYearF')?.value||'',qrs=ts.qrs,issuedBy=g('ecarIssuedByF')?.value||'';
     let data=ecarData.filter(r=>{
       if(ts.ac!=='all'&&r.aircraft_reg!==ts.ac)return false;
       if(ts.sf!=='all'&&r.semantic_status!==ts.sf)return false;
       if(yr&&String(r.raised_year)!==yr)return false;
-      if(qr&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(Math.ceil(m/3)!==parseInt(qr))return false;}
+      if(qrs.length&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(!qrs.includes(Math.ceil(m/3)))return false;}
+      if(issuedBy&&r.issued_by!==issuedBy)return false;
       return true;
     });
     const wb=XLSX.utils.book_new();
-    const chartYr=g('ecarYearF')?.value||'';
     const base=ts.ac==='all'?ecarData:ecarData.filter(r=>r.aircraft_reg===ts.ac);
-    const md=_ecarMonthData(base,chartYr);
+    const baseFiltered=base.filter(r=>{
+      if(yr&&String(r.raised_year)!==yr)return false;
+      if(qrs.length&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(!qrs.includes(Math.ceil(m/3)))return false;}
+      return true;
+    });
+    const md=_ecarMonthData(baseFiltered,qrs.length?'':yr);
     const s1=[['Month','Total','Open','Overdue','Closed','vs Prev Month','% Change']];
     md.forEach((d,i)=>{
       const prev=i>0?md[i-1].total:null;
@@ -3400,7 +3427,8 @@ function exportEcarExcel(){
     const ws2=XLSX.utils.aoa_to_sheet(s2);
     ws2['!cols']=[{wch:15},{wch:18},{wch:16},{wch:12},{wch:12},{wch:10},{wch:60}];
     XLSX.utils.book_append_sheet(wb,ws2,'Finding Detail');
-    const fname=`ECAR_${yr||'all'}_${qr?'Q'+qr:'allQ'}_${new Date().toISOString().slice(0,10)}.xlsx`;
+    const qFname=qrs.length?qrs.slice().sort((a,b)=>a-b).map(q=>'Q'+q).join(''):'allQ';
+    const fname=`ECAR_${yr||'all'}_${qFname}_${new Date().toISOString().slice(0,10)}.xlsx`;
     XLSX.writeFile(wb,fname);toast('Excel exported!','ok');
   }catch(e){toast('Excel error: '+e.message,'err');}
   finally{setOv(false);}
