@@ -355,7 +355,7 @@ tr:last-child td{border-bottom:none}
         <button class="nav-item" onclick="showPage('ecar',this)"><span class="nav-icon">🔧</span>ECAR</button>
         <button class="nav-item" onclick="showPage('auditplan',this)"><span class="nav-icon">📅</span>Audit Plan</button>
         <button class="nav-item" onclick="showPage('docs',this)"><span class="nav-icon">📁</span>Documents</button>
-        <button class="nav-item" onclick="showPage('reports',this)"><span class="nav-icon">📊</span>Export Reports</button>
+        <button class="nav-item admin-only" id="reportsNav" onclick="showPage('reports',this)" style="display:none"><span class="nav-icon">📊</span>Export Reports</button>
         <button class="nav-item" onclick="showPage('help',this)"><span class="nav-icon">❓</span>User Guide</button>
         <div id="adminNav" style="display:none">
           <div class="nav-sec" style="margin-top:6px">Admin</div>
@@ -761,7 +761,7 @@ tr:last-child td{border-bottom:none}
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
                 <input class="srch" id="cmrSrch" placeholder="Search..." oninput="dRenderCmr()">
               </div>
-              <button class="btn-sm" onclick="exportCmrPDF()" style="white-space:nowrap;flex-shrink:0">⬇ PDF</button>
+              <button class="btn-sm admin-only" onclick="exportCmrPDF()" style="white-space:nowrap;flex-shrink:0;display:none">⬇ PDF</button>
             </div>
             <div class="tbl-wrap">
               <table>
@@ -803,8 +803,8 @@ tr:last-child td{border-bottom:none}
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
                 <input class="srch" id="ecarSrch" placeholder="Search..." oninput="dRenderEcar()">
               </div>
-              <button class="btn-sm" onclick="exportEcarPDF()" style="white-space:nowrap;flex-shrink:0">⬇ PDF</button>
-              <button class="btn-sm" onclick="exportEcarExcel()" style="white-space:nowrap;flex-shrink:0;background:#1D6F42;border-color:#1D6F42">⬇ Excel</button>
+              <button class="btn-sm admin-only" onclick="exportEcarPDF()" style="white-space:nowrap;flex-shrink:0;display:none">⬇ PDF</button>
+              <button class="btn-sm admin-only" onclick="exportEcarExcel()" style="white-space:nowrap;flex-shrink:0;background:#1D6F42;border-color:#1D6F42;display:none">⬇ Excel</button>
             </div>
             <div class="tbl-wrap">
               <table>
@@ -978,8 +978,8 @@ tr:last-child td{border-bottom:none}
                 </div>
               </div>
               <div style="display:flex;gap:8px">
-                <button onclick="exportPDF()" style="padding:7px 14px;border-radius:8px;border:none;background:#E30613;color:white;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">📄 PDF</button>
-                <button onclick="exportExcel()" style="padding:7px 14px;border-radius:8px;border:none;background:#1D6F42;color:white;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap">📊 Excel</button>
+                <button class="admin-only" onclick="exportPDF()" style="padding:7px 14px;border-radius:8px;border:none;background:#E30613;color:white;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;display:none">📄 PDF</button>
+                <button class="admin-only" onclick="exportExcel()" style="padding:7px 14px;border-radius:8px;border:none;background:#1D6F42;color:white;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;display:none">📊 Excel</button>
               </div>
             </div>
           </div>
@@ -1553,7 +1553,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2025.05.20-r7';
+const APP_REV = '2025.05.20-r8';
 const { createClient } = supabase;
 const sb = createClient(SUPA_URL, SUPA_KEY);
 
@@ -1642,7 +1642,10 @@ function initApp() {
   g('sideName').textContent=curUser.full_name;
   g('sideRole').textContent=curUser.role==='admin'?'🔑 Administrator':'👤 Viewer';
   if(g('appRev'))g('appRev').textContent='Rev '+APP_REV;
-  if(curUser.role==='admin') g('adminNav').style.display='';
+  if(curUser.role==='admin'){
+    g('adminNav').style.display='';
+    document.querySelectorAll('.admin-only').forEach(el=>el.style.display='');
+  }
   if(!cacheLoad()) loadData();
 }
 
@@ -2808,6 +2811,7 @@ function pdfSafe(str){
     .replace(/[^\x00-\xFF]/g,'?');    // any remaining non-Latin-1
 }
 function exportCmrPDF(){
+  if(!curUser||curUser.role!=='admin'){toast('Chỉ admin mới có quyền xuất báo cáo','err');return;}
   if(!cmrLoaded||!cmrData.length){toast('No CMR-CAR data loaded','err');return;}
   const ts=TS.cmr;
   const yr=g('cmrYearF')?.value||'';
@@ -3250,6 +3254,7 @@ function showEcarDetail(report_id){
 function closeEcarModal(e){if(e&&e.target!==g('ecarModal'))return;g('ecarModal').style.display='none';}
 
 async function exportEcarPDF(){
+  if(!curUser||curUser.role!=='admin'){toast('Chỉ admin mới có quyền xuất báo cáo','err');return;}
   if(!ecarLoaded||!ecarData.length){toast('No ECAR data loaded','err');return;}
   setOv(true,'Generating PDF...','');
   try{
@@ -3389,6 +3394,7 @@ async function exportEcarPDF(){
 }
 
 function exportEcarExcel(){
+  if(!curUser||curUser.role!=='admin'){toast('Chỉ admin mới có quyền xuất báo cáo','err');return;}
   if(!ecarLoaded||!ecarData.length){toast('No ECAR data loaded','err');return;}
   setOv(true,'Exporting Excel...','');
   try{
@@ -3880,6 +3886,7 @@ function generateReport(){
 }
 
 function exportPDF(){
+  if(!curUser||curUser.role!=='admin'){toast('Chỉ admin mới có quyền xuất báo cáo','err');return;}
   if(!rptData.length){toast('No data to export','err');return;}
   const {jsPDF}=window.jspdf;
   setOv(true,'Generating PDF...','Please wait');
@@ -4108,6 +4115,7 @@ function exportPDF(){
 }
 
 function exportExcel(){
+  if(!curUser||curUser.role!=='admin'){toast('Chỉ admin mới có quyền xuất báo cáo','err');return;}
   if(!rptData.length){toast('Không có data','err');return;}
   setOv(true,'Đang tạo Excel...','');
   try{
@@ -4180,6 +4188,9 @@ async function makeAdmin(id){
 // ── NAVIGATION ────────────────────────────────────────────────
 const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',ecar:'ECAR Detail',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management'};
 function showPage(name,btn){
+  if((name==='reports'||name==='admin')&&(!curUser||curUser.role!=='admin')){
+    toast('Bạn không có quyền truy cập trang này','err');return;
+  }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const pg = g('page-'+name);
