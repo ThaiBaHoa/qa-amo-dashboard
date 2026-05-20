@@ -785,9 +785,30 @@ tr:last-child td{border-bottom:none}
 
         <!-- ECAR DETAIL -->
         <div class="page" id="page-ecar">
-          <div class="kpi-grid" id="ecarKPIs" style="margin-bottom:8px;flex-shrink:0"></div>
-          <div class="tbl-card" style="margin-bottom:8px;flex-shrink:0">
-            <div class="tbl-bar" style="flex-wrap:wrap;gap:6px">
+          <div class="kpi-grid" id="ecarKPIs"></div>
+          <div class="chart-card" style="margin-bottom:8px;flex-shrink:0">
+            <div style="margin-bottom:10px">
+              <div class="chart-title">Monthly Finding Trend</div>
+              <div class="chart-sub">MoM change — green = fewer findings (better), red = more (worse). Year follows the filter below.</div>
+            </div>
+            <div style="height:220px;position:relative"><canvas id="cEcarTrend"></canvas></div>
+            <div id="ecarChartSummary" style="margin-top:8px;font-size:11px;display:flex;gap:16px;flex-wrap:wrap"></div>
+          </div>
+          <div class="chart-card" style="margin-bottom:8px;flex-shrink:0">
+            <div class="chart-title" style="margin-bottom:8px">Month-over-Month Comparison</div>
+            <div style="overflow-x:auto">
+              <table class="stat-tbl" style="width:100%">
+                <thead><tr>
+                  <th>Month</th><th style="text-align:center">Total</th><th style="text-align:center">Open</th>
+                  <th style="text-align:center">Overdue</th><th style="text-align:center">Closed</th>
+                  <th style="text-align:center">vs Prev Month</th><th style="text-align:center">Trend</th>
+                </tr></thead>
+                <tbody id="ecarMoMBody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="tbl-card">
+            <div class="tbl-bar">
               <div><div class="tbl-title">ECAR Findings</div><div class="tbl-count" id="ecarCnt">—</div></div>
               <button class="pill on" onclick="setEcarF('all',this)">All</button>
               <button class="pill" onclick="setEcarF('Open',this)">Open</button>
@@ -808,29 +829,6 @@ tr:last-child td{border-bottom:none}
               <button class="btn-sm" onclick="exportEcarPDF()" style="white-space:nowrap;flex-shrink:0">⬇ PDF</button>
               <button class="btn-sm" onclick="exportEcarExcel()" style="white-space:nowrap;flex-shrink:0;background:#1D6F42;border-color:#1D6F42">⬇ Excel</button>
             </div>
-          </div>
-          <div class="chart-card" style="margin-bottom:8px;flex-shrink:0">
-            <div style="margin-bottom:10px">
-              <div class="chart-title">Monthly Finding Trend</div>
-              <div class="chart-sub">MoM change — green = fewer findings (better), red = more (worse). Year follows the filter above.</div>
-            </div>
-            <div style="height:220px;position:relative"><canvas id="cEcarTrend"></canvas></div>
-            <div id="ecarChartSummary" style="margin-top:8px;font-size:11px;display:flex;gap:16px;flex-wrap:wrap"></div>
-          </div>
-          <div class="chart-card" style="margin-bottom:8px;flex-shrink:0">
-            <div class="chart-title" style="margin-bottom:8px">Month-over-Month Comparison</div>
-            <div style="overflow-x:auto">
-              <table class="stat-tbl" style="width:100%">
-                <thead><tr>
-                  <th>Month</th><th style="text-align:center">Total</th><th style="text-align:center">Open</th>
-                  <th style="text-align:center">Overdue</th><th style="text-align:center">Closed</th>
-                  <th style="text-align:center">vs Prev Month</th><th style="text-align:center">Trend</th>
-                </tr></thead>
-                <tbody id="ecarMoMBody"></tbody>
-              </table>
-            </div>
-          </div>
-          <div class="tbl-card">
             <div class="tbl-wrap">
               <table>
                 <thead><tr>
@@ -1578,7 +1576,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2025.05.20-r3';
+const APP_REV = '2025.05.20-r4';
 const { createClient } = supabase;
 const sb = createClient(SUPA_URL, SUPA_KEY);
 
