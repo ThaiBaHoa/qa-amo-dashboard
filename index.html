@@ -1553,7 +1553,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2025.05.20-r10';
+const APP_REV = '2025.05.20-r11';
 const { createClient } = supabase;
 const sb = createClient(SUPA_URL, SUPA_KEY);
 
@@ -2604,19 +2604,14 @@ async function loadCmr(){
     const summary=Object.values(map);
 
     setOv(true,`${summary.length} CMR-CAR records — loading custom fields...`,'');
+    const CMR_WANT=new Set(['Aircraft Registration','Finding description','Finding level',
+      'NC Type','Target date','Audit Ref. No','ATA Chapter','Defect Classification',
+      'Department','Corrective action plan','Final action taken','Issued to (person)',
+      'Verified by (auditor)','Date completed','RCA analysis']);
     let fMap={};
     try{
       const cmrIds=summary.map(r=>r.report_id);
-      const CMR_FF=
-        "field_name eq 'Aircraft Registration' or field_name eq 'Finding description' or "+
-        "field_name eq 'Finding level' or field_name eq 'NC Type' or "+
-        "field_name eq 'Target date' or field_name eq 'Audit Ref. No' or "+
-        "field_name eq 'ATA Chapter' or field_name eq 'Defect Classification' or "+
-        "field_name eq 'Department' or field_name eq 'Corrective action plan' or "+
-        "field_name eq 'Final action taken' or field_name eq 'Issued to (person)' or "+
-        "field_name eq 'Verified by (auditor)' or field_name eq 'Date completed' or "+
-        "field_name eq 'RCA analysis'";
-      const BATCH=50;
+      const BATCH=100;
       let fRaw=[];
       for(let i=0;i<cmrIds.length;i+=BATCH){
         const batch=cmrIds.slice(i,i+BATCH);
@@ -2624,29 +2619,25 @@ async function loadCmr(){
         const part=await fetchAll(
           G_URL+'dwanalytics_report_form_section_field'+
           '?$select=report_id,field_name,text_value'+
-          '&$filter='+encodeURIComponent(`(${idF}) and (${CMR_FF})`)
+          '&$filter='+encodeURIComponent(idF)
         );
-        fRaw=fRaw.concat(part);
+        part.forEach(f=>{
+          if(!CMR_WANT.has(f.field_name))return;
+          if(!fMap[f.report_id])fMap[f.report_id]={};
+          if(f.field_name==='Finding description'){
+            if(!fMap[f.report_id].findings)fMap[f.report_id].findings=[];
+            if(f.text_value)fMap[f.report_id].findings.push(f.text_value);
+          } else {
+            if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
+          }
+        });
       }
-      fRaw.forEach(f=>{
-        if(!fMap[f.report_id])fMap[f.report_id]={};
-        if(f.field_name==='Finding description'){
-          if(!fMap[f.report_id].findings)fMap[f.report_id].findings=[];
-          if(f.text_value)fMap[f.report_id].findings.push(f.text_value);
-        } else {
-          if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
-        }
-      });
-      // Sort findings numerically by leading digit prefix (e.g. "1.FILLER..." → 1)
       Object.values(fMap).forEach(fm=>{
-        if(fm.findings&&fm.findings.length>1){
-          fm.findings.sort((a,b)=>{
-            const na=parseInt(a)||0, nb=parseInt(b)||0;
-            return na-nb||a.localeCompare(b);
-          });
-        }
+        if(fm.findings&&fm.findings.length>1)
+          fm.findings.sort((a,b)=>{const na=parseInt(a)||0,nb=parseInt(b)||0;return na-nb||a.localeCompare(b);});
       });
-    }catch(e){console.warn('CMR fields error:',e);}
+      console.log(`CMR fields loaded: ${Object.keys(fMap).length} reports`);
+    }catch(e){console.warn('CMR fields error:',e.message);}
 
     cmrData=summary.map(r=>{
       const f=fMap[r.report_id]||{};
@@ -2931,39 +2922,37 @@ async function loadEcar(){
     const summary=Object.values(map);
 
     setOv(true,`${summary.length} ECAR records — loading fields...`,'');
+    const ECAR_WANT=new Set(['Target date','Aircraft Registration','Finding description',
+      'Date completed','Issued by']);
     let fMap={};
     try{
       const ecarIds=summary.map(r=>r.report_id);
-      const ECAR_FF=
-        "field_name eq 'Target date' or "+
-        "field_name eq 'Aircraft Registration' or field_name eq 'Finding description' or "+
-        "field_name eq 'Date completed' or field_name eq 'Issued by'";
-      const BATCH=50;
-      let fRaw=[];
+      const BATCH=100;
       for(let i=0;i<ecarIds.length;i+=BATCH){
         const batch=ecarIds.slice(i,i+BATCH);
         const idF=batch.map(id=>`report_id eq ${id}`).join(' or ');
         const part=await fetchAll(
           G_URL+'dwanalytics_report_form_section_field'+
           '?$select=report_id,field_name,text_value'+
-          '&$filter='+encodeURIComponent(`(${idF}) and (${ECAR_FF})`)
+          '&$filter='+encodeURIComponent(idF)
         );
-        fRaw=fRaw.concat(part);
+        part.forEach(f=>{
+          if(!ECAR_WANT.has(f.field_name))return;
+          if(!fMap[f.report_id])fMap[f.report_id]={};
+          if(f.field_name==='Finding description'){
+            if(!fMap[f.report_id].findings)fMap[f.report_id].findings=[];
+            if(f.text_value)fMap[f.report_id].findings.push(f.text_value);
+          } else {
+            if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
+          }
+        });
       }
-      fRaw.forEach(f=>{
-        if(!fMap[f.report_id])fMap[f.report_id]={};
-        if(f.field_name==='Finding description'){
-          if(!fMap[f.report_id].findings)fMap[f.report_id].findings=[];
-          if(f.text_value)fMap[f.report_id].findings.push(f.text_value);
-        } else {
-          if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
-        }
-      });
       Object.values(fMap).forEach(fm=>{
         if(fm.findings&&fm.findings.length>1)
           fm.findings.sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)||a.localeCompare(b));
       });
-    }catch(e){console.warn('ECAR fields error:',e);}
+      console.log(`ECAR fields loaded: ${Object.keys(fMap).length} reports`);
+    }catch(e){console.warn('ECAR fields error:',e.message);}
 
     ecarData=summary.map(r=>{
       const f=fMap[r.report_id]||{};
