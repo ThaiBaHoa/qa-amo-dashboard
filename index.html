@@ -1615,11 +1615,17 @@ async function doRegister() {
     // Create Auth user — Supabase hashes with bcrypt automatically
     const {data:auth,error:authErr}=await sb.auth.signUp({email,password:pass});
     if(authErr) throw authErr;
+    if(!auth.user) throw new Error('Registration failed, please try again.');
+
     // Insert profile — no password stored here
     const {error:insertErr}=await sb.from('users').insert({
       supabase_id:auth.user.id, email, full_name:name, role:'pending'
     });
     if(insertErr) throw insertErr;
+
+    // Sign out immediately — user must wait for admin approval before logging in
+    await sb.auth.signOut();
+
     showAl(al,'success','Registration successful! Awaiting Admin approval.');
     g('rName').value=g('rEmail').value=g('rPass').value=g('rPass2').value='';
     setTimeout(()=>{g('registerForm').style.display='none';g('authTabs').style.display='none';g('pendingBox').style.display='';},2000);
