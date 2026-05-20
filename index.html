@@ -2886,7 +2886,7 @@ function showCmrDetail(report_id){
       ${row('Corrective Action Plan',r.cap)}
       ${row('Final Action Taken',r.final_action)}
       ${row('RCA Analysis',r.rca)}
-    </div>`;
+    </div>`);
   g('cmrModal').style.display='flex';
 }
 function closeCmrModal(e){
@@ -3343,7 +3343,7 @@ function showEcarDetail(report_id){
           <div style="font-size:12px;color:var(--text);white-space:pre-wrap;line-height:1.5">${esc(desc)}</div>
         </div>`).join('')}
       `:'<div style="color:var(--muted);font-size:12px">No finding description</div>'}
-    </div>`;
+    </div>`);
   g('ecarModal').style.display='flex';
 }
 function closeEcarModal(e){if(e&&e.target!==g('ecarModal'))return;g('ecarModal').style.display='none';}
@@ -3790,7 +3790,7 @@ function showAuditDetail(auditId) {
       <td style="padding:7px 12px;font-size:11px;white-space:nowrap">${r.raised_date?new Date(r.raised_date).toLocaleDateString('en-GB'):'—'}</td>
       <td style="padding:7px 12px;font-size:11px;white-space:nowrap">${r.Target_date?new Date(r.Target_date).toLocaleDateString('en-GB'):'—'}</td>
       <td style="padding:7px 12px">${renderWfSteps(r.wf_stages)}</td>
-    </tr>`).join('');
+    </tr>`).join(''));
 
   g('auditModal').classList.add('show');
 }
@@ -4262,7 +4262,7 @@ async function loadUsers() {
           ${u.role==='approved'&&u.email!==curUser.email?`<button class="btn-make-admin" onclick="makeAdmin('${esc(u.id)}')">★ Admin</button><button class="btn-reject" onclick="rejectUser('${esc(u.id)}')">✗ Revoke</button>`:''}
           ${u.role==='rejected'?`<button class="btn-approve" onclick="approveUser('${esc(u.id)}','${esc(u.email)}')">✓ Re-approve</button>`:''}
           ${u.role==='admin'?'<span style="font-size:11px;color:var(--muted)">—</span>':''}
-        </div></td></tr>`).join('');
+        </div></td></tr>`).join(''));
   } catch(e){toast('Error loading users: '+e.message,'err');}
 }
 
