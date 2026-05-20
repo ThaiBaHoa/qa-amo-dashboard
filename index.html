@@ -1621,7 +1621,7 @@ async function doRegister() {
     });
     if(insertErr) throw insertErr;
     showAl(al,'success','Registration successful! Awaiting Admin approval.');
-    g('rName').value=g('rEmail').value=g('rUsername').value=g('rPass').value=g('rPass2').value='';
+    g('rName').value=g('rEmail').value=g('rPass').value=g('rPass2').value='';
     setTimeout(()=>{g('registerForm').style.display='none';g('authTabs').style.display='none';g('pendingBox').style.display='';},2000);
   } catch(e){showAl(al,'error',e.message);}
   finally{g('btnRegister').disabled=false;}
