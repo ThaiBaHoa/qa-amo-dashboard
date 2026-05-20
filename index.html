@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.5/purify.min.js" integrity="sha512-TZyK8y3aDR+eBPNpqBeJaTFoqDrFomqBOdQSbxHB3DaJuNL1x3C9E7Y+JiDHVHe3O+bAqHVkZGGMBKBj1g4w==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>QA AMO · VietJet Air</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -2856,7 +2857,7 @@ function showCmrDetail(report_id){
       <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">${label}</div>
       <div style="font-size:13px;color:${opts.color||'var(--text)'};white-space:pre-wrap;line-height:1.5">${esc(val)}</div>
     </div>`:''  ;
-  g('cmrMBody').innerHTML=`
+  safeHTML(g('cmrMBody'),`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 20px">
       <div>
         ${row('Status',r.semantic_status?r.semantic_status:null)}
@@ -3322,7 +3323,7 @@ function showEcarDetail(report_id){
     <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">${label}</div>
     <div style="font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.5">${esc(val)}</div>
   </div>`:'';
-  g('ecarMBody').innerHTML=`
+  safeHTML(g('ecarMBody'),`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 20px;margin-bottom:12px">
       <div>
         <div style="margin-bottom:10px">${sBadge(r.semantic_status)}</div>
@@ -3780,7 +3781,7 @@ function showAuditDetail(auditId) {
     'Closed':        '<span class="badge b-on">Closed</span>',
   };
 
-  g('adBody').innerHTML = findings.length === 0
+  safeHTML(g('adBody'), findings.length === 0
     ? `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--muted)">Không có finding</td></tr>`
     : findings.sort((a,b)=>(a.report_number||'').localeCompare(b.report_number||'')).map(r=>`
     <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
@@ -4248,7 +4249,7 @@ async function loadUsers() {
     if(userFilter!=='all')q=q.eq('role',userFilter);
     const {data,error}=await q; if(error)throw error;
     s('userCnt',(data||[]).length+' users');
-    g('userBody').innerHTML=(data||[]).length===0
+    safeHTML(g('userBody'),(data||[]).length===0
       ?'<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">Không có user</td></tr>'
       :data.map(u=>`<tr>
         <td><b>${esc(u.full_name)}</b></td>
@@ -4258,9 +4259,9 @@ async function loadUsers() {
         <td style="font-size:11px;color:var(--muted)">${fd(u.created_at)}</td>
         <td style="font-size:11px;color:var(--muted)">${esc(u.approved_by)||'—'}</td>
         <td><div class="admin-actions">
-          ${u.role==='pending'?`<button class="btn-approve" onclick="approveUser('${u.id}','${u.email}')">✓ Approve</button><button class="btn-reject" onclick="rejectUser('${u.id}')">✗ Reject</button>`:''}
-          ${u.role==='approved'&&u.email!==curUser.email?`<button class="btn-make-admin" onclick="makeAdmin('${u.id}')">★ Admin</button><button class="btn-reject" onclick="rejectUser('${u.id}')">✗ Revoke</button>`:''}
-          ${u.role==='rejected'?`<button class="btn-approve" onclick="approveUser('${u.id}','${u.email}')">✓ Re-approve</button>`:''}
+          ${u.role==='pending'?`<button class="btn-approve" onclick="approveUser('${esc(u.id)}','${esc(u.email)}')">✓ Approve</button><button class="btn-reject" onclick="rejectUser('${esc(u.id)}')">✗ Reject</button>`:''}
+          ${u.role==='approved'&&u.email!==curUser.email?`<button class="btn-make-admin" onclick="makeAdmin('${esc(u.id)}')">★ Admin</button><button class="btn-reject" onclick="rejectUser('${esc(u.id)}')">✗ Revoke</button>`:''}
+          ${u.role==='rejected'?`<button class="btn-approve" onclick="approveUser('${esc(u.id)}','${esc(u.email)}')">✓ Re-approve</button>`:''}
           ${u.role==='admin'?'<span style="font-size:11px;color:var(--muted)">—</span>':''}
         </div></td></tr>`).join('');
   } catch(e){toast('Error loading users: '+e.message,'err');}
@@ -4332,6 +4333,7 @@ function sortD(data,col,asc){return[...data].sort((a,b)=>{let va=a[col],vb=b[col
 function g(id){return document.getElementById(id)}
 function s(id,v){const el=g(id);if(el)el.textContent=v}
 function esc(v){if(v==null)return'';return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function safeHTML(el,html){if(window.DOMPurify)el.innerHTML=DOMPurify.sanitize(html,{ALLOWED_TAGS:['div','span','b','i','br','td','tr','th','table','thead','tbody','button','select','option','a','ul','li'],ALLOWED_ATTR:['style','class','colspan','rowspan','onclick','value','href','title']});else el.innerHTML=html;}
 function debounce(fn,ms){let t;return function(...a){clearTimeout(t);t=setTimeout(()=>fn.apply(this,a),ms)}}
 
 function setOv(show,txt='',detail=''){
