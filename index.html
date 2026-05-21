@@ -1495,7 +1495,8 @@ tr:last-child td{border-bottom:none}
           <th style="padding:7px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Form</th>
           <th style="padding:7px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Status</th>
           <th style="padding:7px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap">Raised</th>
-          <th style="padding:7px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap">Target</th>
+          <th style="padding:7px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap">Due (Task)</th>
+          <th style="padding:7px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Owner</th>
           <th style="padding:7px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Finding Workflow</th>
         </tr></thead>
         <tbody id="adBody"></tbody>
@@ -1564,7 +1565,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2025.05.20-r9';
+const APP_REV = '2026.05.21-r10';
 const { createClient } = supabase;
 const sb = createClient(SUPA_URL, SUPA_KEY);
 
@@ -3522,8 +3523,8 @@ function exportEcarExcel(){
     XLSX.utils.book_append_sheet(wb,ws1,'Monthly Summary');
     const s2=[['Report No','Aircraft','Status','Raised','Target','Days to Due','Finding Description']];
     data.forEach(r=>s2.push([r.report_number||'',r.aircraft_reg||'',r.semantic_status||'',
-      r.raised_date?new Date(r.raised_date).toLocaleDateString('en-GB'):'',
-      r.Target_date?new Date(r.Target_date).toLocaleDateString('en-GB'):'',
+      r.raised_date?fd(r.raised_date):'',
+      r.Target_date?fd(r.Target_date):'',
       r.report_ageing??'',(r.findings||[]).join('\n')||'']));
     const ws2=XLSX.utils.aoa_to_sheet(s2);
     ws2['!cols']=[{wch:15},{wch:18},{wch:16},{wch:12},{wch:12},{wch:10},{wch:60}];
@@ -3787,8 +3788,9 @@ function showAuditDetail(auditId) {
       <td style="padding:7px 12px;white-space:nowrap"><b style="color:var(--blue)">${esc(r.report_number)||'—'}</b></td>
       <td style="padding:7px 12px;font-size:11px;color:var(--muted)">${esc(r.report_title)||'—'}</td>
       <td style="padding:7px 12px">${SM[r.semantic_status]||`<span class="badge b-with">${esc(r.semantic_status)||'—'}</span>`}</td>
-      <td style="padding:7px 12px;font-size:11px;white-space:nowrap">${r.raised_date?new Date(r.raised_date).toLocaleDateString('en-GB'):'—'}</td>
-      <td style="padding:7px 12px;font-size:11px;white-space:nowrap">${r.Target_date?new Date(r.Target_date).toLocaleDateString('en-GB'):'—'}</td>
+      <td style="padding:7px 12px;font-size:11px;white-space:nowrap">${fd(r.raised_date)}</td>
+      <td style="padding:7px 12px;font-size:11px;white-space:nowrap">${fd(r.Target_date)}</td>
+      <td style="padding:7px 12px;font-size:11px;color:var(--muted);white-space:nowrap">${esc(r.owner_name)||'—'}</td>
       <td style="padding:7px 12px">${renderWfSteps(r.wf_stages)}</td>
     </tr>`).join(''));
 
@@ -4226,7 +4228,7 @@ function exportExcel(){
     const ws2=XLSX.utils.aoa_to_sheet([['Form','Open','Overdue','On-time','Lately','Closed','Total','%'],...forms.map(f=>{const rows=d.filter(r=>r.report_title===f);return[f,rows.filter(r=>r.semantic_status==='Open').length,rows.filter(r=>r.semantic_status==='Overdue').length,rows.filter(r=>r.semantic_status==='On-time Closed').length,rows.filter(r=>r.semantic_status==='Lately Closed').length,rows.filter(r=>r.semantic_status==='Closed').length,rows.length,Math.round(rows.length/total*100)+'%'];}),['TOTAL',open,ov,on,late,cls,total,'100%']]);
     ws2['!cols']=[{wch:35},{wch:8},{wch:10},{wch:12},{wch:12},{wch:10},{wch:8},{wch:6}];
     XLSX.utils.book_append_sheet(wb,ws2,'Form Summary');
-    const ws3=XLSX.utils.aoa_to_sheet([['Report No','Form','Status','Raised','Target','Days','CAT','Finding Level','Repetitive','MNT No','Audit Title'],...d.map(r=>[r.report_number||'',r.report_title||'',r.semantic_status||'',r.raised_date?new Date(r.raised_date).toLocaleDateString('en-GB'):'',r.Target_date?new Date(r.Target_date).toLocaleDateString('en-GB'):'',r.report_ageing??'',r.overdue_cat||'',r.finding_level||'',r.is_rep?'Yes':'No',r.audit_number||'',r.audit_title||''])]);
+    const ws3=XLSX.utils.aoa_to_sheet([['Report No','Form','Status','Raised','Target','Days','CAT','Finding Level','Repetitive','MNT No','Audit Title'],...d.map(r=>[r.report_number||'',r.report_title||'',r.semantic_status||'',fd(r.raised_date),fd(r.Target_date),r.report_ageing??'',r.overdue_cat||'',r.finding_level||'',r.is_rep?'Yes':'No',r.audit_number||'',r.audit_title||''])]);
     ws3['!cols']=[{wch:15},{wch:30},{wch:16},{wch:12},{wch:12},{wch:10},{wch:8},{wch:15},{wch:10},{wch:12},{wch:40}];
     XLSX.utils.book_append_sheet(wb,ws3,'Detail Data');
     XLSX.writeFile(wb,`QA_AMO_${getRptTitle().replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`);
@@ -4307,7 +4309,22 @@ function showPage(name,btn){
 }
 
 // ── HELPERS ───────────────────────────────────────────────────
-function fd(d){if(!d)return'—';try{return new Date(d).toLocaleDateString('en-GB')}catch{return d}}
+function fd(d){
+  if(!d)return'—';
+  try{
+    // Nếu d chỉ có phần date (yyyy-mm-dd), parse UTC để tránh bị lệch 1 ngày do timezone
+    if(/^\d{4}-\d{2}-\d{2}$/.test(d)){
+      const [y,m,dy]=d.split('-').map(Number);
+      return new Date(Date.UTC(y,m-1,dy)).toLocaleDateString('en-GB');
+    }
+    // Nếu có datetime (có T hoặc space), lấy phần date UTC để tránh UTC+7 làm lệch ngày
+    if(d.includes('T')||d.includes(' ')){
+      const dt=new Date(d);
+      return new Date(Date.UTC(dt.getUTCFullYear(),dt.getUTCMonth(),dt.getUTCDate())).toLocaleDateString('en-GB');
+    }
+    return new Date(d).toLocaleDateString('en-GB');
+  }catch{return d}
+}
 function pct(v){return isNaN(v)||!isFinite(v)?'—':Math.round(v*100)+'%'}
 
 function ageDis(ageing,status){
