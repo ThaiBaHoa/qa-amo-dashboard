@@ -2688,7 +2688,7 @@ async function loadCmr(){
     const raw=await fetchAll(
       G_URL+'dwreporting_report_summary'+
       '?$select=report_id,report_number,report_status,audit_title,raised_date,modified_date'+
-      '&$filter='+encodeURIComponent("org_unit_name eq '"+ORG_UNIT+"' and report_title eq 'CMR CAR'")
+      '&$filter='+encodeURIComponent("org_unit_name eq 'TQA' and report_title eq 'CMR CAR'")
     );
     const map={};
     raw.forEach(r=>{
@@ -3009,7 +3009,7 @@ async function loadEcar(){
     const raw=await fetchAll(
       G_URL+'dwreporting_report_summary'+
       '?$select=report_id,report_number,report_status,audit_title,raised_date,modified_date'+
-      '&$filter='+encodeURIComponent("org_unit_name eq '"+ORG_UNIT+"' and report_title eq 'ECAR'")
+      '&$filter='+encodeURIComponent("org_unit_name eq 'TQA' and report_title eq 'ECAR'")
     );
     const map={};
     raw.forEach(r=>{
