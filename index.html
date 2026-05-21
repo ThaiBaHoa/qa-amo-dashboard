@@ -1565,7 +1565,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.21-r10';
+const APP_REV = '2026.05.21-r11';
 const { createClient } = supabase;
 const sb = createClient(SUPA_URL, SUPA_KEY);
 
@@ -1978,11 +1978,12 @@ async function loadData(forceRefresh=false) {
           'stage_target_date,stage_started_date,stage_completed_date'
         );
         // Group by audit_id → dedup by stage_id (giữ record mới nhất stage_completed_date)
-        const stageMap = {}; // "audit_id|stage_id" → normalized stage
+        // Nếu stage_id null (thường xảy ra với stages NotStarted/chưa assign), dùng stage_title làm key
+        const stageMap = {}; // "audit_id|stage_id_or_title" → normalized stage
         auWfRaw.forEach(s => {
           const aid = s.audit_id;
-          const sid = s.stage_id;
-          if (!aid || !sid) return;
+          if (!aid) return;
+          const sid = s.stage_id || ('_title_' + (s.stage_title || '?'));
           const key = aid + '|' + sid;
           const ex = stageMap[key];
           // Giữ bản có completed_date mới nhất, hoặc bản đầu tiên
@@ -3703,12 +3704,12 @@ function renderAuditTimeline(audit) {
     const border = done ? 'rgba(63,185,80,.25)' : prog ? 'rgba(88,166,255,.3)' : 'var(--border)';
 
     const dateParts = [];
-    if (s.scheduled_start_date) dateParts.push('Planned: '+new Date(s.scheduled_start_date).toLocaleDateString('en-GB')+
-      (s.scheduled_end_date?' → '+new Date(s.scheduled_end_date).toLocaleDateString('en-GB'):''));
-    if (s.actual_start_date)    dateParts.push('Actual: '+new Date(s.actual_start_date).toLocaleDateString('en-GB')+
-      (s.actual_end_date?' → '+new Date(s.actual_end_date).toLocaleDateString('en-GB'):''));
-    if (s.stage_completed_date) dateParts.push('Completed: '+new Date(s.stage_completed_date).toLocaleDateString('en-GB'));
-    if (!done && s.stage_target_date) dateParts.push('Target: '+new Date(s.stage_target_date).toLocaleDateString('en-GB'));
+    if (s.scheduled_start_date) dateParts.push('Planned: '+fd(s.scheduled_start_date)+
+      (s.scheduled_end_date?' → '+fd(s.scheduled_end_date):''));
+    if (s.actual_start_date)    dateParts.push('Actual: '+fd(s.actual_start_date)+
+      (s.actual_end_date?' → '+fd(s.actual_end_date):''));
+    if (s.stage_completed_date) dateParts.push('Completed: '+fd(s.stage_completed_date));
+    if (!done && s.stage_target_date) dateParts.push('Target: '+fd(s.stage_target_date));
 
     const sep = i < sorted.length-1
       ? '<div style="width:2px;height:10px;background:var(--border);margin:2px 0 2px 14px"></div>' : '';
@@ -3782,17 +3783,20 @@ function showAuditDetail(auditId) {
   };
 
   safeHTML(g('adBody'), findings.length === 0
-    ? `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--muted)">Không có finding</td></tr>`
-    : findings.sort((a,b)=>(a.report_number||'').localeCompare(b.report_number||'')).map(r=>`
+    ? `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted)">Không có finding</td></tr>`
+    : findings.sort((a,b)=>(a.report_number||'').localeCompare(b.report_number||'')).map(r=>{
+      const taskStage=(r.wf_stages||[]).find(s=>s.stage_type==='Task');
+      const taskDue=taskStage?.stage_target_date||null;
+      return `
     <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
       <td style="padding:7px 12px;white-space:nowrap"><b style="color:var(--blue)">${esc(r.report_number)||'—'}</b></td>
       <td style="padding:7px 12px;font-size:11px;color:var(--muted)">${esc(r.report_title)||'—'}</td>
       <td style="padding:7px 12px">${SM[r.semantic_status]||`<span class="badge b-with">${esc(r.semantic_status)||'—'}</span>`}</td>
       <td style="padding:7px 12px;font-size:11px;white-space:nowrap">${fd(r.raised_date)}</td>
-      <td style="padding:7px 12px;font-size:11px;white-space:nowrap">${fd(r.Target_date)}</td>
+      <td style="padding:7px 12px;font-size:11px;white-space:nowrap">${fd(taskDue)}</td>
       <td style="padding:7px 12px;font-size:11px;color:var(--muted);white-space:nowrap">${esc(r.owner_name)||'—'}</td>
       <td style="padding:7px 12px">${renderWfSteps(r.wf_stages)}</td>
-    </tr>`).join(''));
+    </tr>`; }).join(''));
 
   g('auditModal').classList.add('show');
 }
