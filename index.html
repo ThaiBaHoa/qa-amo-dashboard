@@ -370,6 +370,7 @@ tr:last-child td{border-bottom:none}
         <div id="adminNav" style="display:none">
           <div class="nav-sec" style="margin-top:6px">Admin</div>
           <button class="nav-item" onclick="showPage('admin',this)"><span class="nav-icon">👤</span>User Management</button>
+          <button class="nav-item" onclick="showPage('querybuilder',this)"><span class="nav-icon">🔬</span>Query Builder</button>
         </div>
       </div>
       <div class="sb-footer">
@@ -1403,6 +1404,192 @@ tr:last-child td{border-bottom:none}
           </div>
         </div>
 
+        <!-- QUERY BUILDER -->
+        <div class="page" id="page-querybuilder">
+          <style>
+            .qb-wrap{display:grid;grid-template-columns:280px 1fr;gap:14px;height:calc(100vh - 110px);min-height:0}
+            .qb-panel{background:var(--card);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;overflow:hidden}
+            .qb-section{padding:12px 14px;border-bottom:1px solid var(--border)}
+            .qb-section-title{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px}
+            .qb-table-btn{width:100%;text-align:left;padding:7px 10px;border-radius:6px;border:1px solid transparent;background:none;color:var(--muted);font-size:12px;cursor:pointer;transition:all .15s;margin-bottom:3px;display:flex;align-items:center;gap:7px}
+            .qb-table-btn:hover{background:var(--card2);color:var(--text);border-color:var(--border)}
+            .qb-table-btn.active{background:rgba(88,166,255,.1);color:var(--blue);border-color:rgba(88,166,255,.3);font-weight:600}
+            .qb-table-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+            .qb-field-item{display:flex;align-items:center;gap:7px;padding:5px 2px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:background .1s;border-radius:4px}
+            .qb-field-item:hover{background:rgba(255,255,255,.04)}
+            .qb-field-item input[type=checkbox]{accent-color:var(--blue);width:14px;height:14px;flex-shrink:0;cursor:pointer}
+            .qb-field-name{font-size:12px;color:var(--text);flex:1}
+            .qb-field-type{font-size:10px;color:var(--muted);background:var(--card2);padding:1px 5px;border-radius:3px}
+            .qb-filter-row{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+            .qb-filter-row select,.qb-filter-row input{background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px;outline:none}
+            .qb-filter-row select:focus,.qb-filter-row input:focus{border-color:var(--blue)}
+            .qb-filter-row select{flex:1}
+            .qb-filter-row input{flex:1.2}
+            .qb-filter-del{background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.2);color:#f85149;border-radius:5px;padding:3px 7px;font-size:11px;cursor:pointer}
+            .qb-run-btn{width:100%;padding:9px;background:var(--blue);color:#000;font-weight:700;font-size:13px;border:none;border-radius:7px;cursor:pointer;transition:all .15s}
+            .qb-run-btn:hover{opacity:.88}
+            .qb-run-btn:disabled{opacity:.4;cursor:not-allowed}
+            .qb-node-meter{height:5px;border-radius:3px;background:var(--card2);overflow:hidden;margin-top:4px}
+            .qb-node-fill{height:100%;border-radius:3px;transition:width .3s,background .3s}
+            .qb-result-bar{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap}
+            .qb-viz-btn{padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);font-size:12px;cursor:pointer;transition:all .15s}
+            .qb-viz-btn.active{background:rgba(88,166,255,.12);color:var(--blue);border-color:rgba(88,166,255,.3)}
+            .qb-result-body{flex:1;overflow:auto;min-height:0}
+            .qb-tbl{width:100%;border-collapse:collapse;font-size:12px}
+            .qb-tbl th{position:sticky;top:0;background:var(--card);padding:7px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--muted);border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;cursor:pointer;user-select:none}
+            .qb-tbl th:hover{color:var(--text)}
+            .qb-tbl td{padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text);font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+            .qb-tbl tr:hover td{background:rgba(255,255,255,.03)}
+            .qb-chart-wrap{padding:14px;height:100%;display:flex;flex-direction:column;gap:10px}
+            .qb-chart-cfg{display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex-shrink:0}
+            .qb-chart-cfg select{background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 10px;font-size:12px;outline:none}
+            .qb-chart-cfg label{font-size:11px;color:var(--muted)}
+            .qb-sql-box{background:#010409;border:1px solid var(--border);border-radius:7px;padding:12px;font-family:monospace;font-size:11px;color:#a5d6ff;line-height:1.7;flex-shrink:0;white-space:pre-wrap;word-break:break-all}
+            .qb-tmpl-item{padding:8px 10px;border-radius:7px;border:1px solid var(--border);margin-bottom:6px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:space-between}
+            .qb-tmpl-item:hover{border-color:var(--blue);background:rgba(88,166,255,.05)}
+            .qb-tmpl-name{font-size:12px;font-weight:600;color:var(--text)}
+            .qb-tmpl-meta{font-size:10px;color:var(--muted);margin-top:2px}
+            .qb-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px}
+          </style>
+
+          <div style="padding:0 0 10px">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+              <div>
+                <div style="font-size:16px;font-weight:700">🔬 Query Builder</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:2px">Tự do khám phá và truy vấn toàn bộ data Galileo không cần viết code</div>
+              </div>
+              <div style="display:flex;gap:8px">
+                <button class="btn-sm" onclick="qbShowTemplates()" style="gap:5px">📋 Templates</button>
+                <button class="btn-sm" onclick="qbSaveTemplate()" style="gap:5px">💾 Lưu template</button>
+                <button class="btn-sm admin-only" onclick="qbExportExcel()" style="background:#1D6F42;border-color:#1D6F42;color:#fff">📥 Excel</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="qb-wrap">
+            <!-- LEFT PANEL: Config -->
+            <div style="display:flex;flex-direction:column;gap:10px;overflow-y:auto;padding-right:2px">
+
+              <!-- 1. Chọn bảng -->
+              <div class="qb-panel" style="flex-shrink:0">
+                <div class="qb-section" style="border-bottom:none">
+                  <div class="qb-section-title">1 · Chọn bảng Galileo</div>
+                  <div id="qbTableList"></div>
+                </div>
+              </div>
+
+              <!-- 2. Chọn fields -->
+              <div class="qb-panel" style="flex-shrink:0">
+                <div class="qb-section" style="border-bottom:none">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                    <div class="qb-section-title" style="margin-bottom:0">2 · Chọn fields hiển thị</div>
+                    <div style="display:flex;gap:4px">
+                      <button onclick="qbCheckAll(true)" style="font-size:10px;color:var(--blue);background:none;border:none;cursor:pointer;padding:0">All</button>
+                      <span style="color:var(--border)">|</span>
+                      <button onclick="qbCheckAll(false)" style="font-size:10px;color:var(--muted);background:none;border:none;cursor:pointer;padding:0">None</button>
+                    </div>
+                  </div>
+                  <div id="qbFieldList" style="max-height:220px;overflow-y:auto"></div>
+                </div>
+              </div>
+
+              <!-- 3. Filter -->
+              <div class="qb-panel" style="flex-shrink:0">
+                <div class="qb-section" style="border-bottom:none">
+                  <div class="qb-section-title">3 · Điều kiện lọc (filter)</div>
+                  <div id="qbFilterList"></div>
+                  <button onclick="qbAddFilter()" style="width:100%;padding:5px;border:1px dashed var(--border);background:none;color:var(--muted);font-size:12px;border-radius:6px;cursor:pointer;margin-top:4px;transition:all .15s" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Thêm điều kiện</button>
+                  <!-- OData node meter -->
+                  <div style="margin-top:8px">
+                    <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:3px">
+                      <span>OData nodes</span><span id="qbNodeCount">0 / 100</span>
+                    </div>
+                    <div class="qb-node-meter"><div class="qb-node-fill" id="qbNodeFill" style="width:0%;background:var(--green)"></div></div>
+                    <div id="qbNodeWarn" style="font-size:10px;color:var(--yellow);margin-top:3px;display:none">⚠ Gần giới hạn — sẽ tự động fetch-all + JS filter</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 4. Sort & Limit -->
+              <div class="qb-panel" style="flex-shrink:0">
+                <div class="qb-section" style="border-bottom:none">
+                  <div class="qb-section-title">4 · Sắp xếp & giới hạn</div>
+                  <div style="display:flex;gap:6px;margin-bottom:6px">
+                    <select id="qbSortField" style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px;outline:none">
+                      <option value="">— Không sort —</option>
+                    </select>
+                    <select id="qbSortDir" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px;outline:none">
+                      <option value="asc">↑ ASC</option>
+                      <option value="desc">↓ DESC</option>
+                    </select>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px">
+                    <span style="font-size:12px;color:var(--muted)">Giới hạn</span>
+                    <select id="qbLimit" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px;outline:none">
+                      <option value="0">Lấy tất cả</option>
+                      <option value="50">50 rows</option>
+                      <option value="100">100 rows</option>
+                      <option value="500">500 rows</option>
+                      <option value="1000">1000 rows</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Run button -->
+              <button class="qb-run-btn" id="qbRunBtn" onclick="qbRun()">▶ Chạy Query</button>
+
+            </div>
+
+            <!-- RIGHT PANEL: Results -->
+            <div class="qb-panel">
+              <!-- Toolbar -->
+              <div class="qb-result-bar">
+                <div id="qbResultMeta" style="font-size:12px;color:var(--muted);flex:1">Chọn bảng và chạy query để xem kết quả</div>
+                <button class="qb-viz-btn active" id="qbVizTable" onclick="qbSetViz('table',this)">📋 Bảng</button>
+                <button class="qb-viz-btn" id="qbVizBar" onclick="qbSetViz('bar',this)">📊 Bar</button>
+                <button class="qb-viz-btn" id="qbVizPie" onclick="qbSetViz('pie',this)">🥧 Pie</button>
+                <button class="qb-viz-btn" id="qbVizSql" onclick="qbSetViz('sql',this)">🔗 Query URL</button>
+              </div>
+
+              <!-- Chart config (hidden by default) -->
+              <div id="qbChartCfg" style="display:none;padding:8px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
+                <div class="qb-chart-cfg">
+                  <label>Nhóm theo (X):</label>
+                  <select id="qbChartX" onchange="qbRenderChart()"></select>
+                  <label>Đếm / tổng (Y):</label>
+                  <select id="qbChartY" onchange="qbRenderChart()">
+                    <option value="__count__">Count (đếm)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Body -->
+              <div class="qb-result-body" id="qbResultBody">
+                <div class="qb-empty">🔬<br><br>Chọn bảng → tick fields → thêm filter → <b>Chạy Query</b></div>
+              </div>
+
+              <!-- Chart canvas (hidden) -->
+              <div id="qbChartWrap" style="display:none;padding:14px;flex:1">
+                <canvas id="qbChartCanvas"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TEMPLATE MODAL -->
+        <div class="overlay" id="qbTmplModal" onclick="closeQbTmpl(event)" style="z-index:250;display:none">
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:92%;max-width:520px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
+            <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+              <div style="font-size:14px;font-weight:700">📋 Saved Templates</div>
+              <button onclick="closeQbTmpl()" style="background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);font-size:14px;cursor:pointer;padding:3px 9px;border-radius:6px">✕</button>
+            </div>
+            <div style="overflow-y:auto;flex:1;padding:14px 18px" id="qbTmplList">
+              <div class="qb-empty">Chưa có template nào</div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -1527,6 +1714,9 @@ tr:last-child td{border-bottom:none}
     <div class="spinner" id="ovSpinner"></div>
     <div class="ov-text" id="ovText">Loading...</div>
     <div class="ov-detail" id="ovDetail"></div>
+    <div style="width:220px;height:4px;background:rgba(255,255,255,.1);border-radius:2px;margin:10px auto 0;overflow:hidden">
+      <div id="ovProgress" style="height:100%;background:var(--blue);border-radius:2px;width:0%;transition:width .4s ease"></div>
+    </div>
     <button class="ov-retry" id="ovRetry" onclick="loadData()" style="display:none">↻ Retry</button>
   </div>
 </div>
@@ -1565,9 +1755,17 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.21-r12';
-const { createClient } = supabase;
-const sb = createClient(SUPA_URL, SUPA_KEY);
+const APP_REV = '2026.05.24-r22';
+let sb;
+try {
+  const { createClient } = supabase;
+  sb = createClient(SUPA_URL, SUPA_KEY, {
+    realtime: { params: { eventsPerSecond: 0 } },
+    global: { headers: {} }
+  });
+} catch(e) {
+  console.error('Supabase failed to load:', e);
+}
 
 // ── STATE ────────────────────────────────────────────────────
 let curUser = null, allData = [], auditData = [], docData = [], cmrData = [], ecarData = [], docTaskCache = {}, charts = {}, userFilter = 'all', isLoading = false;
@@ -1731,27 +1929,72 @@ const dRenderAudit = debounce(renderAudit, 300);
 
 // Handle password reset redirect từ email link
 window.addEventListener('DOMContentLoaded', async ()=>{
-  // Supabase gửi token qua URL hash khi user click reset link
+  // Check Supabase loaded
+  if(!sb) {
+    showLoadError('Supabase library failed to load. Check network/extensions blocking cdn.jsdelivr.net');
+    return;
+  }
+
+  // Handle password reset redirect từ email link
   const hash = window.location.hash;
   if(hash.includes('type=recovery')) {
-    // Supabase tự xử lý session từ hash — chờ onAuthStateChange
     sb.auth.onAuthStateChange(async (event, session) => {
       if(event === 'PASSWORD_RECOVERY') {
-        // Hiện modal đổi password ngay
         document.getElementById('authWrap').style.display='none';
         showChangePass();
       }
     });
     return;
   }
-  // Verify Supabase session is still valid — not just sessionStorage
-  const {data:{session}}=await sb.auth.getSession();
+
+  // Restore session với timeout cứng 8 giây
+  console.log('[restoreSession] starting...');
+  let session = null;
+  let settled = false;
+
+  const timeoutId = setTimeout(() => {
+    if(!settled) {
+      settled = true;
+      console.warn('[restoreSession] timeout — showing login');
+      // Không có session hoặc Supabase chậm → show login
+    }
+  }, 8000);
+
+  try {
+    const { data } = await sb.auth.getSession();
+    session = data?.session || null;
+    console.log('[restoreSession] session:', session ? 'found' : 'none');
+  } catch(e) {
+    console.warn('[restoreSession] getSession error:', e.message);
+  } finally {
+    settled = true;
+    clearTimeout(timeoutId);
+  }
+
   if(session){
-    const s=sessionStorage.getItem('qaUser');
-    if(s){curUser=JSON.parse(s);initApp();return;}
-    // Session valid but no profile cached — re-fetch
-    const {data:profile}=await sb.from('users').select('id,email,full_name,role').eq('supabase_id',session.user.id).single();
-    if(profile){curUser=profile;sessionStorage.setItem('qaUser',JSON.stringify(profile));initApp();}
+    const cached = sessionStorage.getItem('qaUser');
+    if(cached) {
+      curUser = JSON.parse(cached);
+      console.log('[restoreSession] using cached user:', curUser.email);
+      initApp();
+      return;
+    }
+    try {
+      const { data: profile } = await sb.from('users')
+        .select('id,email,full_name,role')
+        .eq('supabase_id', session.user.id)
+        .single();
+      if(profile) {
+        curUser = profile;
+        sessionStorage.setItem('qaUser', JSON.stringify(profile));
+        console.log('[restoreSession] profile loaded:', curUser.email);
+        initApp();
+      }
+    } catch(e) {
+      console.warn('[restoreSession] profile fetch error:', e.message);
+    }
+  } else {
+    console.log('[restoreSession] no session — login screen');
   }
 });
 
@@ -1804,57 +2047,57 @@ function updateCacheAge(ts) {
 async function loadData(forceRefresh=false) {
   if(isLoading){toast('Loading data, please wait...','info');return;}
   isLoading=true;
-  setOv(true,'Connecting to Galileo...','');
+  setOv(true,'[1/6] Connecting to Galileo...','',5);
   try {
 
     // 1. SUMMARY — lấy toàn bộ QA AMO, không filter year
-    setOv(true,'[1/4] Loading report summary...','');
+    setOv(true,'[1/6] Loading report summary...','',15);
     const sumRaw = await fetchAll(
       G_URL + 'dwreporting_report_summary' +
       '?$select=report_id,report_title,report_number,report_status,' +
       'org_unit_name,raised_date,audit_title,audit_id,modified_date,valid_from,valid_to,owner_id' +
       '&$filter=org_unit_name eq \'' + ORG_UNIT + '\''
     );
-    setOv(true,`[1/4] ${sumRaw.length} rows — deduplicating...`,'');
+    setOv(true,`[2/6] ${sumRaw.length} rows — deduplicating...`,'',25);
 
-    // DEDUP đúng:
-    // - Key = report_id (mỗi report có 1 report_id duy nhất)
-    // - Giữ row có modified_date MỚI NHẤT (đây là version hiện tại)
-    // - Bỏ rows không có report_number (draft chưa được đánh số)
-    // NOTE: valid_from/valid_to không dùng được vì tất cả rows đều valid_to=null
-    const sumMap = {};
-    sumRaw.forEach(r => {
-      if (!r.report_number || !r.report_number.trim()) return;
-      const ex = sumMap[r.report_id];
-      if (!ex) { sumMap[r.report_id]=r; return; }
-      if (new Date(r.modified_date) > new Date(ex.modified_date)) {
-        sumMap[r.report_id] = r;
-      }
-    });
-    const summary = Object.values(sumMap);
+    let summary;
+    try {
+      // DEDUP: giữ 1 record/report_id có modified_date mới nhất, bỏ record không có report_number
+      const sumMap = {};
+      sumRaw.forEach(r => {
+        if (!r.report_number || !r.report_number.trim()) return;
+        const ex = sumMap[r.report_id];
+        if (!ex) { sumMap[r.report_id]=r; return; }
+        if (new Date(r.modified_date) > new Date(ex.modified_date)) {
+          sumMap[r.report_id] = r;
+        }
+      });
+      summary = Object.values(sumMap);
+      console.log('[loadData] summary dedup OK:', summary.length, 'reports');
+    } catch(e) {
+      console.error('[loadData] CRASH in dedup:', e);
+      throw e;
+    }
 
-    // 2. USERS — build userMap[user_id] = full_name for owner lookup
-    setOv(true,'[2/4] Loading users...','');
+    // 2. USERS
+    setOv(true,'[3/6] Loading users...','',35);
     let userMap = {};
     try {
       const usersRaw = await fetchAll(G_URL + 'dwreporting_users?$select=user_id,full_name');
       usersRaw.forEach(u => { if (u.user_id) userMap[u.user_id] = u.full_name || null; });
     } catch(e) { console.warn('Users load error:',e); }
 
-    // 3. WORKFLOW — tải tất cả stages để hiển thị bước + lấy ngày close (ReportAcceptReject)
-    setOv(true,`[3/4] ${summary.length} reports — loading workflow...`,'');
-    let wfMap = {};
-    let wfAllMap = {};
+    // 3. WORKFLOW
+    setOv(true,`[4/6] Loading workflow (${summary.length} reports)...`,'',50);
+    let wfMap = {}, wfAllMap = {};
     try {
       const wfRaw = await fetchAll(
         G_URL + 'dwreporting_report_workflow' +
         '?$select=report_id,stage_type,stage_status,stage_completed_date,stage_target_date'
       );
       wfRaw.forEach(w => {
-        // Tất cả stages theo report_id (để hiển thị workflow steps)
         if (!wfAllMap[w.report_id]) wfAllMap[w.report_id] = [];
         wfAllMap[w.report_id].push(w);
-        // Chỉ giữ ReportAcceptReject + Completed/InProgress để lấy close date
         if (w.stage_type !== 'ReportAcceptReject') return;
         if (w.stage_status !== 'Completed' && w.stage_status !== 'InProgress') return;
         const ex = wfMap[w.report_id];
@@ -1868,8 +2111,8 @@ async function loadData(forceRefresh=false) {
       });
     } catch(e) { console.warn('Workflow load error:',e); }
 
-    // 4. CUSTOM FIELDS — Target date, Finding level, Repetitive, v.v.
-    setOv(true,'[4/4] Loading custom fields...','');
+    // 4. CUSTOM FIELDS
+    setOv(true,'[5/6] Loading custom fields...','',68);
     let fMap = {};
     try {
       const fRaw = await fetchAll(
@@ -1886,14 +2129,13 @@ async function loadData(forceRefresh=false) {
       );
       fRaw.forEach(f => {
         if (!fMap[f.report_id]) fMap[f.report_id]={};
-        // Giữ giá trị đầu tiên (không ghi đè) để tránh duplicate field
         if (!fMap[f.report_id][f.field_name])
           fMap[f.report_id][f.field_name] = f.text_value;
       });
     } catch(e) { console.warn('Fields load error:',e); }
 
     // BUILD FINAL DATASET
-    setOv(true,'Processing data...','');
+    setOv(true,'Processing data...','',80);
     allData = summary.map(r => {
       const f  = fMap[r.report_id] || {};
       const wf = wfMap[r.report_id] || null;
@@ -1934,7 +2176,7 @@ async function loadData(forceRefresh=false) {
     });
 
     // 4. LOAD AUDIT SUMMARY — lấy audit_id từ allData rồi fetch audit info
-    setOv(true,'[4/4] Loading audit plan...','');
+    setOv(true,'[6/6] Loading audit plan...','',90);
     try {
       // Lấy danh sách audit_id có trong QA AMO reports
       const auditIdSet = new Set(allData.map(r=>r.audit_id).filter(Boolean));
@@ -2066,9 +2308,20 @@ async function fetchAll(url) {
     if(!r.ok) throw new Error('HTTP '+r.status+' '+r.statusText);
     const j=await r.json();
     res=res.concat(j.value||[]);
-    // Route nextLink qua proxy (tránh CORS khi OData trả về URL gốc)
+    // Route nextLink qua proxy — lấy phần sau /odata/ ghép vào G_URL
     const rawNext = j['@odata.nextLink'] || null;
-    next = rawNext ? rawNext.replace(/^https?:\/\/[^/]+\/odata\//, G_URL) : null;
+    if(rawNext) {
+      try {
+        const u = new URL(rawNext);
+        const pathParts = u.pathname.replace(/\/$/, '').split('/');
+        const tablePart = pathParts[pathParts.length - 1];
+        next = G_URL + tablePart + u.search;
+      } catch(e) {
+        next = rawNext.replace(/^https?:\/\/[^/]+\/odata\//, G_URL);
+      }
+    } else {
+      next = null;
+    }
     if(p>200) break; // safety cap
   }
   return res;
@@ -4285,9 +4538,9 @@ async function makeAdmin(id){
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────
-const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',ecar:'ECAR Detail',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management'};
+const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',ecar:'ECAR Detail',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management',querybuilder:'Query Builder'};
 function showPage(name,btn){
-  if((name==='reports'||name==='admin')&&(!curUser||curUser.role!=='admin')){
+  if((name==='reports'||name==='admin'||name==='querybuilder')&&(!curUser||curUser.role!=='admin')){
     toast('Bạn không có quyền truy cập trang này','err');return;
   }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -4297,6 +4550,7 @@ function showPage(name,btn){
   if(btn)btn.classList.add('active');
   s('pageTitle',PT[name]||name);
   if(name==='admin')loadUsers();
+  if(name==='querybuilder')qbInit();
   if(name==='reports'){initReportFilters();generateReport();}
   if(name==='docs'){ if(!docData.length) loadDocuments(); else renderDocPage(); }
   if(name==='cmrcar'){ if(!cmrLoaded) loadCmr(); else renderCmr(); }
@@ -4354,11 +4608,14 @@ function esc(v){if(v==null)return'';return String(v).replace(/&/g,'&amp;').repla
 function safeHTML(el,html){if(window.DOMPurify)el.innerHTML=DOMPurify.sanitize(html,{ALLOWED_TAGS:['div','span','b','i','br','td','tr','th','table','thead','tbody','button','select','option','a','ul','li'],ALLOWED_ATTR:['style','class','colspan','rowspan','onclick','value','href','title']});else el.innerHTML=html;}
 function debounce(fn,ms){let t;return function(...a){clearTimeout(t);t=setTimeout(()=>fn.apply(this,a),ms)}}
 
-function setOv(show,txt='',detail=''){
+function setOv(show,txt='',detail='',pct=null){
   g('overlay').classList.toggle('show',show);
   if(show){g('ovSpinner').style.display='';g('ovRetry').style.display='none';}
   if(txt)s('ovText',txt);
   if(detail!==undefined)s('ovDetail',detail);
+  const bar=g('ovProgress');
+  if(bar&&pct!==null)bar.style.width=pct+'%';
+  if(bar&&!show)bar.style.width='0%';
 }
 function showLoadError(msg){
   g('overlay').classList.add('show');
@@ -4706,6 +4963,482 @@ document.addEventListener('click',function(e){
     drop.style.display='none';
   }
 });
+
+// ── QUERY BUILDER ─────────────────────────────────────────────────────────
+const QB_TABLES = {
+  'dwreporting_report_summary': {
+    label:'Report Summary', color:'#58A6FF',
+    fields:['report_id','report_number','report_title','report_status','org_unit_name',
+            'raised_date','modified_date','valid_from','valid_to','owner_id','audit_id','audit_title']
+  },
+  'dwreporting_report_workflow': {
+    label:'Report Workflow', color:'#3FB950',
+    fields:['report_id','stage_type','stage_status','stage_completed_date','stage_target_date']
+  },
+  'dwreporting_users': {
+    label:'Users', color:'#BC8CFF',
+    fields:['user_id','full_name']
+  },
+  'dwanalytics_report_form_section_field': {
+    label:'Custom Fields (Form)', color:'#D29922',
+    fields:['report_id','field_name','text_value']
+  },
+  'dwreporting_audit_summary': {
+    label:'Audit Summary', color:'#F0883E',
+    fields:['audit_id','number','title','audit_type','status',
+            'scheduled_start_date','actual_start_date','closed_date',
+            'lead_auditor_name','primary_scope_item_name','location_name']
+  },
+  'dwreporting_audit_workflow': {
+    label:'Audit Workflow', color:'#56D364',
+    fields:['audit_id','stage_id','stage_title','stage_status','stage_owner',
+            'stage_target_date','stage_started_date','stage_completed_date']
+  },
+  'dwreporting_document_summary': {
+    label:'Document Summary', color:'#FF6B6B',
+    fields:['document_number','document_revision_title','document_type',
+            'document_revision_id','document_revision_status','modified_date']
+  },
+};
+
+const QB_OPS = ['eq','ne','lt','le','gt','ge','contains'];
+
+let qbState = {
+  table: null, fields: [], filters: [], sortField: '', sortDir: 'asc',
+  limit: 0, results: [], viz: 'table'
+};
+let qbChart = null;
+let qbInited = false;
+
+function qbInit() {
+  if(!curUser||curUser.role!=='admin') return;
+  if(qbInited) return;
+  qbInited = true;
+  // Render table list
+  const el = g('qbTableList');
+  if(!el) return;
+  safeHTML(el, Object.entries(QB_TABLES).map(([k,v]) =>
+    `<button class="qb-table-btn" id="qbt_${k}" onclick="qbSelectTable('${k}')">
+      <span class="qb-table-dot" style="background:${v.color}"></span>
+      <span>${v.label}</span>
+    </button>`
+  ).join(''));
+  // Select first table by default
+  qbSelectTable('dwreporting_report_summary');
+}
+
+function qbSelectTable(tbl) {
+  qbState.table = tbl;
+  qbState.filters = [];
+  qbState.results = [];
+  qbState.fields = []; // ← reset fields khi đổi bảng
+  // Highlight active
+  document.querySelectorAll('.qb-table-btn').forEach(b=>b.classList.remove('active'));
+  g('qbt_'+tbl)?.classList.add('active');
+  // Render fields
+  qbRenderFields();
+  qbRenderFilters();
+  qbUpdateNodeMeter();
+  qbUpdateSortField();
+  safeHTML(g('qbResultBody'),'<div class="qb-empty">Bảng đã chọn: <b style="color:var(--blue)">'+QB_TABLES[tbl].label+'</b><br><br>Tick fields → thêm filter → <b>Chạy Query</b></div>');
+}
+
+function qbRenderFields() {
+  const tbl = qbState.table;
+  if(!tbl) return;
+  const fields = QB_TABLES[tbl].fields;
+  if(!qbState.fields.length) qbState.fields = [...fields];
+  const container = g('qbFieldList');
+  container.innerHTML = '';
+  fields.forEach(f => {
+    const checked = qbState.fields.includes(f);
+    const type = f.includes('date')?'date':f.includes('id')?'uuid':'text';
+    const label = document.createElement('label');
+    label.className = 'qb-field-item';
+    label.style.cssText = 'display:flex;align-items:center;gap:7px;padding:5px 2px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;border-radius:4px';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = checked;
+    cb.style.cssText = 'accent-color:var(--blue);width:14px;height:14px;flex-shrink:0;cursor:pointer';
+    cb.addEventListener('change', () => qbToggleField(f, cb.checked));
+    const nameSpan = document.createElement('span');
+    nameSpan.style.cssText = 'font-size:12px;color:var(--text);flex:1';
+    nameSpan.textContent = f;
+    const typeSpan = document.createElement('span');
+    typeSpan.style.cssText = 'font-size:10px;color:var(--muted);background:var(--card2);padding:1px 5px;border-radius:3px';
+    typeSpan.textContent = type;
+    label.appendChild(cb);
+    label.appendChild(nameSpan);
+    label.appendChild(typeSpan);
+    container.appendChild(label);
+  });
+}
+
+function qbToggleField(f, checked) {
+  if(checked) { if(!qbState.fields.includes(f)) qbState.fields.push(f); }
+  else qbState.fields = qbState.fields.filter(x=>x!==f);
+}
+
+function qbCheckAll(val) {
+  const tbl = qbState.table; if(!tbl) return;
+  qbState.fields = val ? [...QB_TABLES[tbl].fields] : [];
+  qbRenderFields();
+}
+
+function qbAddFilter() {
+  const tbl = qbState.table; if(!tbl) return;
+  qbState.filters.push({ field: QB_TABLES[tbl].fields[0], op: 'eq', value: '' });
+  qbRenderFilters();
+  qbUpdateNodeMeter();
+}
+
+function qbRenderFilters() {
+  const tbl = qbState.table;
+  const fields = tbl ? QB_TABLES[tbl].fields : [];
+  const container = g('qbFilterList');
+  container.innerHTML = '';
+  qbState.filters.forEach((f, i) => {
+    const row = document.createElement('div');
+    row.className = 'qb-filter-row';
+    // Field select
+    const selField = document.createElement('select');
+    selField.style.flex = '1';
+    fields.forEach(fd => {
+      const opt = document.createElement('option');
+      opt.value = fd; opt.textContent = fd;
+      if(f.field === fd) opt.selected = true;
+      selField.appendChild(opt);
+    });
+    selField.addEventListener('change', () => { qbState.filters[i].field = selField.value; qbUpdateNodeMeter(); });
+    // Op select
+    const selOp = document.createElement('select');
+    QB_OPS.forEach(op => {
+      const opt = document.createElement('option');
+      opt.value = op; opt.textContent = op;
+      if(f.op === op) opt.selected = true;
+      selOp.appendChild(opt);
+    });
+    selOp.addEventListener('change', () => { qbState.filters[i].op = selOp.value; qbUpdateNodeMeter(); });
+    // Value input
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.value = f.value; inp.placeholder = 'Giá trị...';
+    inp.style.flex = '1.2';
+    inp.addEventListener('input', () => { qbState.filters[i].value = inp.value; qbUpdateNodeMeter(); });
+    // Delete button
+    const del = document.createElement('button');
+    del.className = 'qb-filter-del'; del.textContent = '✕';
+    del.addEventListener('click', () => qbRemoveFilter(i));
+    row.appendChild(selField); row.appendChild(selOp);
+    row.appendChild(inp); row.appendChild(del);
+    container.appendChild(row);
+  });
+}
+
+function qbRemoveFilter(i) {
+  qbState.filters.splice(i,1);
+  qbRenderFilters();
+  qbUpdateNodeMeter();
+}
+
+function qbUpdateNodeMeter() {
+  const n = qbState.filters.length;
+  const nodes = n === 0 ? 0 : (2*n - 1);
+  const pct = Math.min(100, Math.round(nodes/100*100));
+  const fill = g('qbNodeFill'); const lbl = g('qbNodeCount'); const warn = g('qbNodeWarn');
+  if(fill) { fill.style.width = pct+'%'; fill.style.background = nodes>=80?'#f85149':nodes>=60?'#d29922':'var(--green)'; }
+  if(lbl) lbl.textContent = nodes+' / 100';
+  if(warn) warn.style.display = nodes>=80?'':'none';
+}
+
+function qbUpdateSortField() {
+  const tbl = qbState.table; if(!tbl) return;
+  const sf = g('qbSortField');
+  if(!sf) return;
+  safeHTML(sf, '<option value="">— Không sort —</option>' +
+    QB_TABLES[tbl].fields.map(f=>`<option value="${f}">${f}</option>`).join(''));
+}
+
+async function qbRun() {
+  if(!curUser||curUser.role!=='admin'){toast('Admin only','err');return;}
+  const tbl = qbState.table;
+  if(!tbl){toast('Chọn bảng trước','err');return;}
+  const fields = qbState.fields;
+  if(!fields.length){toast('Chọn ít nhất 1 field','err');return;}
+
+  const btn = g('qbRunBtn');
+  btn.disabled = true; btn.textContent = '⏳ Đang chạy...';
+  safeHTML(g('qbResultBody'),'<div class="qb-empty" style="color:var(--muted)">⏳ Đang tải dữ liệu...</div>');
+  g('qbChartWrap').style.display='none';
+
+  try {
+    // Build URL
+    const select = '$select='+fields.join(',');
+    const filters = qbState.filters.filter(f=>f.value.trim()!=='');
+    const nodeCount = filters.length>0 ? 2*filters.length-1 : 0;
+    const useClientFilter = nodeCount >= 80; // fallback to fetch-all + JS
+
+    let filterStr = '';
+    if(filters.length && !useClientFilter) {
+      filterStr = '&$filter=' + filters.map(f => {
+        const v = isNaN(f.value)?`'${f.value}'`:f.value;
+        if(f.op==='contains') return `contains(${f.field},${v})`;
+        return `${f.field} ${f.op} ${v}`;
+      }).join(' and ');
+    }
+
+    const sf = g('qbSortField')?.value;
+    const sd = g('qbSortDir')?.value||'asc';
+    const sortStr = sf ? `&$orderby=${sf} ${sd}` : '';
+    const limit = parseInt(g('qbLimit')?.value)||0;
+    const topStr = (limit>0 && !useClientFilter) ? `&$top=${limit}` : '';
+
+    const url = G_URL + tbl + '?' + select + filterStr + sortStr + topStr;
+    const raw = limit===0 ? await fetchAll(url) : (await (await fetch(url)).json()).value||[];
+
+    // Client-side filter if needed
+    let data = raw;
+    if(useClientFilter && filters.length) {
+      data = raw.filter(row => filters.every(f => {
+        const rv = String(row[f.field]||'').toLowerCase();
+        const fv = f.value.toLowerCase();
+        switch(f.op){
+          case 'eq': return rv===fv;
+          case 'ne': return rv!==fv;
+          case 'contains': return rv.includes(fv);
+          case 'gt': return parseFloat(row[f.field])>parseFloat(f.value);
+          case 'lt': return parseFloat(row[f.field])<parseFloat(f.value);
+          case 'ge': return parseFloat(row[f.field])>=parseFloat(f.value);
+          case 'le': return parseFloat(row[f.field])<=parseFloat(f.value);
+          default: return true;
+        }
+      }));
+    }
+
+    // Sort client-side if needed
+    if(sf && useClientFilter) {
+      data.sort((a,b)=>{
+        const av=a[sf]||'', bv=b[sf]||'';
+        return sd==='asc'?String(av).localeCompare(String(bv)):String(bv).localeCompare(String(av));
+      });
+    }
+    if(limit>0) data = data.slice(0,limit);
+
+    qbState.results = data;
+    const meta = `${data.length} records${useClientFilter?' (fetch-all + JS filter)':''}${limit>0&&data.length===limit?' (limited)':''}`;
+    g('qbResultMeta').textContent = meta;
+
+    // Save last URL for SQL view
+    qbState.lastUrl = url;
+    qbState.lastFilterNote = useClientFilter ? '\n-- Node count >= 80 → fetch-all + client-side filter' : '';
+
+    // Update chart field selectors
+    const cx = g('qbChartX'); const cy = g('qbChartY');
+    if(cx) safeHTML(cx, fields.map(f=>`<option value="${f}">${f}</option>`).join(''));
+    if(cy) safeHTML(cy, '<option value="__count__">Count (đếm)</option>'+fields.filter(f=>!f.includes('id')&&!f.includes('date')).map(f=>`<option value="${f}">${f}</option>`).join(''));
+
+    qbRenderResult();
+  } catch(e) {
+    toast('Lỗi: '+e.message,'err');
+    safeHTML(g('qbResultBody'),'<div class="qb-empty" style="color:#f85149">❌ Lỗi: '+esc(e.message)+'</div>');
+  } finally {
+    btn.disabled=false; btn.textContent='▶ Chạy Query';
+  }
+}
+
+function qbSetViz(v, btn) {
+  qbState.viz = v;
+  document.querySelectorAll('.qb-viz-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  g('qbChartCfg').style.display = (v==='bar'||v==='pie') ? '' : 'none';
+  qbRenderResult();
+}
+
+function qbRenderResult() {
+  const data = qbState.results;
+  const fields = qbState.fields;
+  const viz = qbState.viz;
+  const body = g('qbResultBody');
+  const chartWrap = g('qbChartWrap');
+
+  if(!data.length) {
+    chartWrap.style.display='none';
+    safeHTML(body,'<div class="qb-empty">Không có dữ liệu</div>');
+    return;
+  }
+
+  if(viz==='sql') {
+    chartWrap.style.display='none';
+    body.style.display='';
+    safeHTML(body,`<div style="padding:14px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:600">OData Query URL (qua proxy)</div>
+      <div class="qb-sql-box">${esc(qbState.lastUrl||'')}${esc(qbState.lastFilterNote||'')}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:8px">Tip: Copy URL này vào browser để xem raw JSON từ Galileo API</div>
+    </div>`);
+    return;
+  }
+
+  if(viz==='bar'||viz==='pie') {
+    body.style.display='none';
+    chartWrap.style.display='';
+    qbRenderChart();
+    return;
+  }
+
+  // Table view
+  chartWrap.style.display='none';
+  body.style.display='';
+  safeHTML(body, `<table class="qb-tbl">
+    <thead><tr>${fields.map(f=>`<th onclick="qbSortLocal('${f}')" title="Click để sort">${f} <span style="opacity:.4;font-size:9px">↕</span></th>`).join('')}</tr></thead>
+    <tbody>${data.map(row=>
+      '<tr>'+fields.map(f=>{
+        const v = row[f];
+        if(v===null||v===undefined) return '<td style="color:var(--muted)">—</td>';
+        const sv = String(v);
+        // Format dates
+        if(f.includes('date')&&sv.includes('T')) return `<td>${fd(sv)}</td>`;
+        // Status badges
+        if(f==='report_status'||f==='status'||f==='stage_status') {
+          const color=sv==='Open'?'var(--blue)':sv==='Closed'||sv==='Completed'?'var(--green)':sv==='InProgress'?'var(--yellow)':'var(--muted)';
+          return `<td><span style="color:${color};font-size:11px;font-weight:600">● ${esc(sv)}</span></td>`;
+        }
+        return `<td title="${esc(sv)}">${esc(sv.length>60?sv.slice(0,60)+'…':sv)}</td>`;
+      }).join('')+'</tr>'
+    ).join('')}</tbody>
+  </table>`);
+}
+
+function qbSortLocal(field) {
+  const data = qbState.results;
+  const cur = qbState._localSort;
+  const dir = (cur&&cur.field===field&&cur.dir==='asc')?'desc':'asc';
+  qbState._localSort = {field,dir};
+  data.sort((a,b)=>{
+    const av=a[field]||'', bv=b[field]||'';
+    return dir==='asc'?String(av).localeCompare(String(bv)):String(bv).localeCompare(String(av));
+  });
+  qbRenderResult();
+}
+
+function qbRenderChart() {
+  if(qbChart){qbChart.destroy();qbChart=null;}
+  const data = qbState.results;
+  const xField = g('qbChartX')?.value;
+  const yField = g('qbChartY')?.value;
+  if(!xField||!data.length) return;
+
+  // Group by X field
+  const grouped = {};
+  data.forEach(row=>{
+    const k = String(row[xField]||'—').slice(0,40);
+    if(yField==='__count__') { grouped[k]=(grouped[k]||0)+1; }
+    else { grouped[k]=(grouped[k]||0)+(parseFloat(row[yField])||0); }
+  });
+  const labels = Object.keys(grouped).slice(0,30);
+  const values = labels.map(k=>grouped[k]);
+  const colors = labels.map((_,i)=>`hsl(${(i*47)%360},65%,58%)`);
+  const ctx = g('qbChartCanvas').getContext('2d');
+  qbChart = new Chart(ctx,{
+    type: qbState.viz==='pie'?'pie':'bar',
+    data:{ labels, datasets:[{ data:values,
+      backgroundColor:qbState.viz==='pie'?colors:'rgba(88,166,255,.7)',
+      borderColor:qbState.viz==='pie'?colors.map(c=>c):'rgba(88,166,255,1)',
+      borderWidth:1 }] },
+    options:{ responsive:true,maintainAspectRatio:false,plugins:{legend:{display:qbState.viz==='pie',labels:{color:'#A3AEB8'}}},
+      scales: qbState.viz==='pie'?{}:{
+        x:{ticks:{color:'#A3AEB8',maxRotation:45},grid:{color:'rgba(255,255,255,.05)'}},
+        y:{ticks:{color:'#A3AEB8'},grid:{color:'rgba(255,255,255,.08)'}} } }
+  });
+}
+
+function qbExportExcel() {
+  if(!curUser||curUser.role!=='admin'){toast('Admin only','err');return;}
+  const data = qbState.results;
+  if(!data.length){toast('Chạy query trước','err');return;}
+  const fields = qbState.fields;
+  const ws = XLSX.utils.aoa_to_sheet([fields, ...data.map(r=>fields.map(f=>r[f]??''))]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,(qbState.table||'data').slice(0,28));
+  XLSX.writeFile(wb,'QB_'+((qbState.table||'export').split('_').pop())+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  toast('✓ Đã xuất Excel','ok');
+}
+
+// ── Template system (localStorage per admin) ──────────────────────────────
+function qbSaveTemplate() {
+  const tbl = qbState.table;
+  if(!tbl||!qbState.results.length){toast('Chạy query trước khi lưu','err');return;}
+  const name = prompt('Tên template:');
+  if(!name||!name.trim()) return;
+  const templates = qbGetTemplates();
+  const id = Date.now();
+  templates.push({
+    id, name:name.trim(), table:tbl, fields:[...qbState.fields],
+    filters:JSON.parse(JSON.stringify(qbState.filters)),
+    sortField:g('qbSortField')?.value||'', sortDir:g('qbSortDir')?.value||'asc',
+    limit:g('qbLimit')?.value||'0',
+    savedAt: new Date().toISOString()
+  });
+  localStorage.setItem('qb_templates_'+curUser.email, JSON.stringify(templates));
+  toast('✓ Đã lưu template "'+name.trim()+'"','ok');
+}
+
+function qbGetTemplates() {
+  if(!curUser) return [];
+  try { return JSON.parse(localStorage.getItem('qb_templates_'+curUser.email)||'[]'); }
+  catch{ return []; }
+}
+
+function qbShowTemplates() {
+  const templates = qbGetTemplates();
+  const el = g('qbTmplList');
+  safeHTML(el, templates.length===0
+    ? '<div class="qb-empty">Chưa có template nào.<br><br>Chạy query → Lưu template để sử dụng lại.</div>'
+    : templates.map(t=>`
+      <div class="qb-tmpl-item">
+        <div style="flex:1">
+          <div class="qb-tmpl-name">${esc(t.name)}</div>
+          <div class="qb-tmpl-meta">${QB_TABLES[t.table]?.label||t.table} · ${t.fields.length} fields · ${fd(t.savedAt)}</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button onclick="qbLoadTemplate(${t.id})" style="font-size:11px;padding:4px 10px;border-radius:5px;border:1px solid rgba(88,166,255,.3);background:rgba(88,166,255,.08);color:var(--blue);cursor:pointer">▶ Load</button>
+          <button onclick="qbDeleteTemplate(${t.id})" style="font-size:11px;padding:4px 8px;border-radius:5px;border:1px solid rgba(248,81,73,.2);background:rgba(248,81,73,.08);color:#f85149;cursor:pointer">✕</button>
+        </div>
+      </div>`).join('')
+  );
+  g('qbTmplModal').style.display='flex';
+}
+
+function qbLoadTemplate(id) {
+  const t = qbGetTemplates().find(x=>x.id===id);
+  if(!t) return;
+  qbSelectTable(t.table);
+  qbState.fields = [...t.fields];
+  qbState.filters = JSON.parse(JSON.stringify(t.filters));
+  qbRenderFields();
+  qbRenderFilters();
+  qbUpdateNodeMeter();
+  qbUpdateSortField();
+  setTimeout(()=>{
+    if(g('qbSortField')) g('qbSortField').value = t.sortField||'';
+    if(g('qbSortDir'))   g('qbSortDir').value   = t.sortDir||'asc';
+    if(g('qbLimit'))     g('qbLimit').value      = t.limit||'0';
+  },100);
+  closeQbTmpl();
+  toast('✓ Template "'+t.name+'" đã load — nhấn Chạy Query','ok');
+}
+
+function qbDeleteTemplate(id) {
+  if(!confirm('Xóa template này?')) return;
+  const templates = qbGetTemplates().filter(t=>t.id!==id);
+  localStorage.setItem('qb_templates_'+curUser.email, JSON.stringify(templates));
+  qbShowTemplates();
+  toast('Đã xóa template','info');
+}
+
+function closeQbTmpl(e) {
+  if(e&&e.target!==g('qbTmplModal')) return;
+  g('qbTmplModal').style.display='none';
+}
+
 </script>
 
 <!-- Change Password Modal -->
