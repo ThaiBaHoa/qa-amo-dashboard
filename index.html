@@ -942,26 +942,23 @@ tr:last-child td{border-bottom:none}
               <div class="ch-wrap" style="height:160px"><canvas id="cDocYear"></canvas></div>
             </div>
           </div>
-          <!-- Table fills remaining space -->
-          <div style="flex:1;min-height:0;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:11px;overflow:hidden">
-            <div class="tbl-wrap" style="flex:1;min-height:0">
-              <table>
-                <thead><tr>
-                  <th onclick="docSort('document_number')" style="cursor:pointer">Doc Number ↕</th>
-                  <th onclick="docSort('document_revision_title')" style="cursor:pointer">Title ↕</th>
-                  <th onclick="docSort('document_type')" style="cursor:pointer">Type ↕</th>
-                  <th>Rev</th>
-                  <th>Status</th>
-                  <th onclick="docSort('owner_name')" style="cursor:pointer">Owner ↕</th>
-                  <th onclick="docSort('valid_from')" style="cursor:pointer">Active Date ↕</th>
-                  <th>Distributed</th>
-                  <th>Action</th>
-                </tr></thead>
-                <tbody id="docBody"></tbody>
-              </table>
-            </div>
-            <div class="tbl-foot"><span id="docInfo">—</span><div class="pg-btns" id="docPg"></div></div>
-          </div>
+          <!-- Grouped document list -->
+          <style>
+            .doc-group{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:8px;flex-shrink:0}
+            .doc-group-hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background .15s;user-select:none}
+            .doc-group-hdr:hover{background:rgba(255,255,255,.04)}
+            .doc-group-arrow{font-size:11px;color:var(--muted);width:12px;flex-shrink:0;transition:transform .2s}
+            .doc-group-arrow.open{transform:rotate(90deg)}
+            .doc-group-name{font-size:13px;font-weight:600;flex:1}
+            .doc-group-cnt{font-size:11px;color:var(--muted);background:var(--card2);padding:2px 10px;border-radius:20px}
+            .doc-group-body{border-top:1px solid var(--border)}
+            .doc-group-body table{width:100%;border-collapse:collapse;font-size:11px}
+            .doc-group-body th{padding:7px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
+            .doc-group-body td{padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.04)}
+            .doc-group-body tr:last-child td{border-bottom:none}
+            .doc-group-body tr:hover td{background:rgba(255,255,255,.03)}
+          </style>
+          <div id="docGrouped" style="flex:1;overflow-y:auto;min-height:0"></div>
         </div>
 
         <!-- REPORTS PAGE -->
@@ -1520,17 +1517,12 @@ tr:last-child td{border-bottom:none}
               <!-- 2b. Org Unit Filter -->
               <div class="qb-panel" id="qbOrgUnitPanel" style="flex-shrink:0;display:none">
                 <div class="qb-section" style="border-bottom:none">
-                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                    <div class="qb-section-title" style="margin-bottom:0">🏢 Org Unit</div>
-                    <button onclick="qbLoadOrgUnits()" id="qbOrgUnitLoadBtn"
-                      style="font-size:10px;color:var(--orange);background:rgba(240,136,62,.1);border:1px solid rgba(240,136,62,.3);border-radius:4px;cursor:pointer;padding:2px 10px;transition:all .15s">
-                      Load</button>
-                  </div>
-                  <div style="font-size:10px;color:var(--muted);margin-bottom:6px">Tick để lọc theo Org Unit (OR logic)</div>
-                  <div id="qbOrgUnitList" style="max-height:160px;overflow-y:auto">
-                    <div style="font-size:11px;color:var(--muted);padding:4px">Nhấn <b>Load</b> để tải danh sách</div>
-                  </div>
-                  <div id="qbOrgUnitSel" style="font-size:10px;color:var(--orange);margin-top:5px;display:none"></div>
+                  <div class="qb-section-title">🏢 Org Unit</div>
+                  <select id="qbOrgUnitSel" onchange="qbOrgUnit=this.value"
+                    style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px;outline:none">
+                    <option value="">— Tất cả Org Unit —</option>
+                  </select>
+                  <div id="qbOrgUnitStatus" style="font-size:10px;color:var(--muted);margin-top:5px">⏳ Đang tải danh sách...</div>
                 </div>
               </div>
 
@@ -1841,7 +1833,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.24-r26';
+const APP_REV = '2026.05.24-r27';
 let sb;
 try {
   const { createClient } = supabase;
@@ -4812,11 +4804,71 @@ async function loadDocuments(force=false) {
   }
 }
 
-let docActiveType = ''; // type đang được chọn
+let docActiveType = '';     // type chip đang chọn ('' = tất cả)
+let docCollapsedTypes = new Set(); // lưu các group đang collapse
 
 function docSetType(type) {
   docActiveType = type;
   renderDocPage();
+}
+
+// Toggle collapse/expand một group — thao tác trực tiếp trên DOM, không cần re-render
+function docToggleGroup(type) {
+  if (docCollapsedTypes.has(type)) docCollapsedTypes.delete(type);
+  else docCollapsedTypes.add(type);
+  const grpEl = document.querySelector('#docGrouped [data-grpkey="' + CSS.escape(type) + '"]');
+  if (!grpEl) return;
+  const body  = grpEl.querySelector('.doc-group-body');
+  const arrow = grpEl.querySelector('.doc-group-arrow');
+  const isOpen = !docCollapsedTypes.has(type);
+  if (body)  body.style.display = isOpen ? '' : 'none';
+  if (arrow) arrow.classList.toggle('open', isOpen);
+}
+
+// Render danh sách document nhóm theo document_type (accordion)
+function renderDocGrouped(data) {
+  const el = g('docGrouped');
+  if (!el) return;
+  if (!data.length) {
+    el.innerHTML = '<div style="text-align:center;padding:48px 20px;color:var(--muted)">📭 Không có tài liệu nào phù hợp</div>';
+    return;
+  }
+  // Group by document_type
+  const groups = {};
+  data.forEach(r => {
+    const t = (r.document_type || '').trim() || '(Không phân loại)';
+    if (!groups[t]) groups[t] = [];
+    groups[t].push(r);
+  });
+  const typeKeys = Object.keys(groups).sort();
+  let html = '';
+  typeKeys.forEach(type => {
+    const rows = groups[type];
+    const isOpen = !docCollapsedTypes.has(type);
+    const rowsHtml = rows.map(r => `<tr>
+      <td><b>${esc(r.document_number)||'—'}</b></td>
+      <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.document_revision_title)||'—'}</td>
+      <td style="color:var(--muted)">${esc(r.revision_number)||'—'}</td>
+      <td>${docStatBadge(r.document_revision_status)}</td>
+      <td style="color:var(--muted)">${esc(r.owner_name)||'—'}</td>
+      <td style="color:var(--muted)">${fd(r.valid_from)}</td>
+      <td style="text-align:center">${r.has_been_distributed===true?'<span style="color:var(--green)">✅</span>':'<span style="color:var(--muted)">—</span>'}</td>
+      <td><button class="btn-sm" onclick="showDocDetail('${esc(r.document_revision_id)}','${esc(r.document_number||'')}','${esc((r.document_revision_title||'').replace(/'/g,''))}','${r.valid_from||''}')">Chi tiết</button></td>
+    </tr>`).join('');
+    html += `<div class="doc-group" data-grpkey="${esc(type)}">
+      <div class="doc-group-hdr" onclick="docToggleGroup(${JSON.stringify(type)})">
+        <span class="doc-group-arrow ${isOpen?'open':''}">▶</span>
+        <span class="doc-group-name">📂 ${esc(type)}</span>
+        <span class="doc-group-cnt">${rows.length} tài liệu</span>
+      </div>
+      <div class="doc-group-body" style="${isOpen?'':'display:none'}">
+        <table><thead><tr>
+          <th>Số hiệu</th><th>Tiêu đề tài liệu</th><th>Rev</th><th>Trạng thái</th><th>Owner</th><th>Hiệu lực từ</th><th>Phát hành</th><th></th>
+        </tr></thead><tbody>${rowsHtml}</tbody></table>
+      </div>
+    </div>`;
+  });
+  el.innerHTML = html;
 }
 
 function renderDocPage() {
@@ -4891,19 +4943,8 @@ function renderDocPage() {
   // Build charts
   buildDocCharts(data);
 
-  // Table
-  renderPaged('docBody','docInfo','docPg','docCnt',data,ts,r=>`
-    <tr>
-      <td><b style="font-size:11px">${esc(r.document_number)||'—'}</b></td>
-      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${esc(r.document_revision_title)||'—'}</td>
-      <td style="font-size:11px"><span style="background:rgba(255,255,255,.06);padding:2px 6px;border-radius:4px">${esc((r.document_type||'').trim())||'—'}</span></td>
-      <td style="font-size:11px;color:var(--muted)">${esc(r.revision_number)||'—'}</td>
-      <td>${docStatBadge(r.document_revision_status)}</td>
-      <td style="font-size:11px;color:var(--muted)">${esc(r.owner_name)||'—'}</td>
-      <td style="font-size:11px;color:var(--muted)">${fd(r.valid_from)}</td>
-      <td style="text-align:center">${r.has_been_distributed===true?'<span style="color:var(--green)">✅</span>':'<span style="color:var(--muted)">—</span>'}</td>
-      <td><button class="btn-sm" onclick="showDocDetail('${esc(r.document_revision_id)}','${esc(r.document_number||'')}','${esc((r.document_revision_title||'').replace(/'/g,''))}','${r.valid_from||''}')">Chi tiết</button></td>
-    </tr>`);
+  // Grouped accordion view
+  renderDocGrouped(data);
 }
 
 function buildDocCharts(data) {
@@ -5215,7 +5256,7 @@ function qbSetPrimary(tbl) {
   qbState.filters = [];
   qbState.results = [];
   qbState.resultFields = [];
-  qbOrgUnits = [];
+  qbOrgUnit = '';
   qbRenderPrimaryFields();
   qbRenderJoins();
   qbRenderFilters();
@@ -5385,64 +5426,38 @@ function qbRenderJoins() {
 }
 
 // ── ORG UNIT FILTER ───────────────────────────────────────────────────────
-let qbOrgUnits = []; // danh sách org unit đang được tick
+let qbOrgUnit = ''; // org unit đang chọn (1 đơn vị hoặc '' = tất cả)
 
 function qbShowOrgUnitPanel(tbl) {
   const panel = g('qbOrgUnitPanel'); if(!panel) return;
   const hasOrgUnit = tbl && QB_TABLES[tbl]?.fields.includes('org_unit_name');
   panel.style.display = hasOrgUnit ? '' : 'none';
   if(hasOrgUnit) {
-    safeHTML(g('qbOrgUnitList'), '<div style="font-size:11px;color:var(--muted);padding:4px">Nhấn <b>Load</b> để tải danh sách</div>');
-    const sel = g('qbOrgUnitSel'); if(sel) sel.style.display = 'none';
+    qbOrgUnit = '';
+    const sel = g('qbOrgUnitSel');
+    if(sel) { sel.innerHTML = '<option value="">— Tất cả Org Unit —</option>'; sel.value = ''; }
+    const status = g('qbOrgUnitStatus');
+    if(status) status.textContent = '⏳ Đang tải danh sách...';
+    qbLoadOrgUnits(tbl);
   }
 }
 
-async function qbLoadOrgUnits() {
-  const tbl = qbState.primary.table; if(!tbl) return;
-  const btn = g('qbOrgUnitLoadBtn');
-  btn.textContent = '⏳'; btn.disabled = true;
+async function qbLoadOrgUnits(tbl) {
+  tbl = tbl || qbState.primary.table; if(!tbl) return;
+  const status = g('qbOrgUnitStatus');
   try {
     const url = G_URL + tbl + '?$select=org_unit_name&$top=2000';
     const data = ((await (await fetch(url)).json()).value || []);
     const units = [...new Set(data.map(r => r.org_unit_name).filter(Boolean))].sort();
-    const container = g('qbOrgUnitList');
-    if(!units.length) {
-      safeHTML(container, '<div style="font-size:11px;color:var(--muted)">Không có dữ liệu</div>');
-      return;
-    }
-    container.innerHTML = '';
-    units.forEach(u => {
-      const label = document.createElement('label');
-      label.style.cssText = 'display:flex;align-items:center;gap:7px;padding:4px 2px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox'; cb.value = u;
-      cb.checked = qbOrgUnits.includes(u);
-      cb.style.cssText = 'accent-color:var(--orange);width:13px;height:13px;flex-shrink:0;cursor:pointer';
-      cb.addEventListener('change', () => {
-        if(cb.checked) { if(!qbOrgUnits.includes(u)) qbOrgUnits.push(u); }
-        else qbOrgUnits = qbOrgUnits.filter(x => x !== u);
-        qbUpdateOrgUnitBadge();
-      });
-      const span = document.createElement('span');
-      span.style.cssText = 'font-size:11px;color:var(--text);flex:1'; span.textContent = u;
-      label.appendChild(cb); label.appendChild(span);
-      container.appendChild(label);
-    });
-    qbUpdateOrgUnitBadge();
-    btn.textContent = '↺ Reload';
+    const sel = g('qbOrgUnitSel');
+    if(!sel) return;
+    sel.innerHTML = '<option value="">— Tất cả Org Unit —</option>' +
+      units.map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join('');
+    sel.value = qbOrgUnit;
+    if(status) status.textContent = `${units.length} org units`;
   } catch(e) {
-    safeHTML(g('qbOrgUnitList'), `<div style="font-size:11px;color:#f85149;padding:4px">❌ ${esc(e.message)}</div>`);
-    btn.textContent = 'Retry';
-  } finally {
-    btn.disabled = false;
+    if(status) status.textContent = '❌ Không tải được';
   }
-}
-
-function qbUpdateOrgUnitBadge() {
-  const el = g('qbOrgUnitSel'); if(!el) return;
-  if(!qbOrgUnits.length) { el.style.display = 'none'; return; }
-  el.style.display = '';
-  el.textContent = '✓ Đã chọn: ' + qbOrgUnits.join(', ');
 }
 
 // ── FILTERS (trên primary table) ──────────────────────────────────────────
@@ -5536,10 +5551,9 @@ async function qbRun() {
         return `${f.field} ${f.op} ${v}`;
       }).join(' and '));
     }
-    // Org Unit filter (OR giữa các unit đã chọn)
-    if(qbOrgUnits.length){
-      const ouFilter=qbOrgUnits.map(u=>`org_unit_name eq '${u.replace(/'/g,"''")}'`).join(' or ');
-      filterParts.push(qbOrgUnits.length>1?`(${ouFilter})`:ouFilter);
+    // Org Unit filter (single eq)
+    if(qbOrgUnit){
+      filterParts.push(`org_unit_name eq '${qbOrgUnit.replace(/'/g,"''")}'`);
     }
     let filterStr=filterParts.length?'&$filter='+filterParts.join(' and '):'';
     const sf=g('qbSortField')?.value;
