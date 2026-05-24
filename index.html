@@ -1443,7 +1443,7 @@ tr:last-child td{border-bottom:none}
             .qb-viz-btn{padding:5px 10px;border-radius:6px;border:1px solid var(--border);background:none;color:var(--muted);font-size:12px;cursor:pointer;transition:all .15s}
             .qb-viz-btn.active{background:rgba(88,166,255,.12);color:var(--blue);border-color:rgba(88,166,255,.3)}
             .qb-result-body{flex:1;overflow:auto;min-height:0}
-            .qb-tbl{width:100%;border-collapse:collapse;font-size:12px}
+            .qb-tbl{width:max-content;min-width:100%;border-collapse:collapse;font-size:12px}
             .qb-tbl th{position:sticky;top:0;background:var(--card);padding:7px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--muted);border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;cursor:pointer;user-select:none}
             .qb-tbl th:hover{color:var(--text)}
             .qb-tbl td{padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text);font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1831,7 +1831,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.24-r28';
+const APP_REV = '2026.05.24-r29';
 let sb;
 try {
   const { createClient } = supabase;
@@ -4846,7 +4846,17 @@ function docCollapseAll() {
   });
 }
 
-// Render danh sách document nhóm theo document_type (accordion)
+// Lấy group key = phần trước " - " đầu tiên
+// VD: "ENG - Manuals" → "ENG", "MQA - SOPs" → "MQA", "Safety Notice" → "Safety Notice"
+function getDocGroupKey(docType) {
+  const t = (docType || '').trim();
+  if (!t) return '(Không phân loại)';
+  const i = t.indexOf(' - ');
+  return i > 0 ? t.substring(0, i) : t;
+}
+
+// Render danh sách document nhóm theo PREFIX của document_type (accordion)
+// ENG - Manuals + ENG - SOPs + ENG - Technical Note → 1 group "ENG"
 function renderDocGrouped(data) {
   const el = g('docGrouped');
   if (!el) return;
@@ -4854,37 +4864,44 @@ function renderDocGrouped(data) {
     el.innerHTML = '<div style="text-align:center;padding:48px 20px;color:var(--muted)">📭 Không có tài liệu nào phù hợp</div>';
     return;
   }
-  // Group by document_type
+  // Group by prefix
   const groups = {};
   data.forEach(r => {
-    const t = (r.document_type || '').trim() || '(Không phân loại)';
-    if (!groups[t]) groups[t] = [];
-    groups[t].push(r);
+    const key = getDocGroupKey(r.document_type);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(r);
   });
-  const typeKeys = Object.keys(groups).sort();
+  const groupKeys = Object.keys(groups).sort();
   let html = '';
-  typeKeys.forEach(type => {
-    const rows = groups[type];
-    const isOpen = !docCollapsedTypes.has(type);
-    const rowsHtml = rows.map(r => `<tr>
-      <td><b>${esc(r.document_number)||'—'}</b></td>
-      <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.document_revision_title)||'—'}</td>
-      <td style="color:var(--muted)">${esc(r.revision_number)||'—'}</td>
-      <td>${docStatBadge(r.document_revision_status)}</td>
-      <td style="color:var(--muted)">${esc(r.owner_name)||'—'}</td>
-      <td style="color:var(--muted)">${fd(r.valid_from)}</td>
-      <td style="text-align:center">${r.has_been_distributed===true?'<span style="color:var(--green)">✅</span>':'<span style="color:var(--muted)">—</span>'}</td>
-      <td><button class="btn-sm" onclick="showDocDetail('${esc(r.document_revision_id)}','${esc(r.document_number||'')}','${esc((r.document_revision_title||'').replace(/'/g,''))}','${r.valid_from||''}')">Chi tiết</button></td>
-    </tr>`).join('');
-    html += `<div class="doc-group" data-grpkey="${esc(type)}">
-      <div class="doc-group-hdr" onclick="docToggleGroup(${JSON.stringify(type)})">
+  groupKeys.forEach(groupKey => {
+    const rows = groups[groupKey];
+    const isOpen = !docCollapsedTypes.has(groupKey);
+    const rowsHtml = rows.map(r => {
+      const fullType = (r.document_type || '').trim();
+      const dashIdx  = fullType.indexOf(' - ');
+      // Sub-type: phần sau " - " (ví dụ "Manuals", "SOPs"), hoặc "—" nếu không có
+      const subType  = dashIdx > 0 ? fullType.substring(dashIdx + 3) : '—';
+      return `<tr>
+        <td><b>${esc(r.document_number)||'—'}</b></td>
+        <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.document_revision_title)||'—'}</td>
+        <td style="color:var(--muted);white-space:nowrap;font-size:10px">${esc(subType)}</td>
+        <td style="color:var(--muted)">${esc(r.revision_number)||'—'}</td>
+        <td>${docStatBadge(r.document_revision_status)}</td>
+        <td style="color:var(--muted)">${esc(r.owner_name)||'—'}</td>
+        <td style="color:var(--muted)">${fd(r.valid_from)}</td>
+        <td style="text-align:center">${r.has_been_distributed===true?'<span style="color:var(--green)">✅</span>':'<span style="color:var(--muted)">—</span>'}</td>
+        <td><button class="btn-sm" onclick="showDocDetail('${esc(r.document_revision_id)}','${esc(r.document_number||'')}','${esc((r.document_revision_title||'').replace(/'/g,''))}','${r.valid_from||''}')">Chi tiết</button></td>
+      </tr>`;
+    }).join('');
+    html += `<div class="doc-group" data-grpkey="${esc(groupKey)}">
+      <div class="doc-group-hdr" onclick="docToggleGroup(${JSON.stringify(groupKey)})">
         <span class="doc-group-arrow ${isOpen?'open':''}">▶</span>
-        <span class="doc-group-name">📂 ${esc(type)}</span>
+        <span class="doc-group-name">📂 ${esc(groupKey)}</span>
         <span class="doc-group-cnt">${rows.length} tài liệu</span>
       </div>
       <div class="doc-group-body" style="${isOpen?'':'display:none'}">
         <table><thead><tr>
-          <th>Số hiệu</th><th>Tiêu đề tài liệu</th><th>Rev</th><th>Trạng thái</th><th>Owner</th><th>Hiệu lực từ</th><th>Phát hành</th><th></th>
+          <th>Số hiệu</th><th>Tiêu đề tài liệu</th><th>Loại</th><th>Rev</th><th>Trạng thái</th><th>Owner</th><th>Hiệu lực từ</th><th>Phát hành</th><th></th>
         </tr></thead><tbody>${rowsHtml}</tbody></table>
       </div>
     </div>`;
