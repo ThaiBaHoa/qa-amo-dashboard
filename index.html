@@ -371,6 +371,7 @@ tr:last-child td{border-bottom:none}
           <div class="nav-sec" style="margin-top:6px">Admin</div>
           <button class="nav-item" onclick="showPage('admin',this)"><span class="nav-icon">👤</span>User Management</button>
           <button class="nav-item" onclick="showPage('querybuilder',this)"><span class="nav-icon">🔬</span>Query Builder</button>
+          <button class="nav-item" onclick="showPage('mydashboard',this)"><span class="nav-icon">📌</span>My Dashboard</button>
         </div>
       </div>
       <div class="sb-footer">
@@ -1549,7 +1550,9 @@ tr:last-child td{border-bottom:none}
                 <button class="qb-viz-btn active" id="qbVizTable" onclick="qbSetViz('table',this)">📋 Bảng</button>
                 <button class="qb-viz-btn" id="qbVizBar" onclick="qbSetViz('bar',this)">📊 Bar</button>
                 <button class="qb-viz-btn" id="qbVizPie" onclick="qbSetViz('pie',this)">🥧 Pie</button>
+                <button class="qb-viz-btn" id="qbVizKpi" onclick="qbSetViz('kpi',this)">🔢 KPI</button>
                 <button class="qb-viz-btn" id="qbVizSql" onclick="qbSetViz('sql',this)">🔗 Query URL</button>
+                <button class="qb-viz-btn" onclick="dbPinWidget()" title="Pin widget này vào My Dashboard" style="border-color:rgba(188,140,255,.4);color:#BC8CFF">📌 Pin</button>
               </div>
 
               <!-- Chart config (hidden by default) -->
@@ -1574,6 +1577,50 @@ tr:last-child td{border-bottom:none}
                 <canvas id="qbChartCanvas"></canvas>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- MY DASHBOARD -->
+        <div class="page" id="page-mydashboard">
+          <style>
+            .db-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px;overflow-y:auto;padding-bottom:12px}
+            .db-panel{background:var(--card);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;overflow:hidden;min-height:260px;max-height:380px}
+            .db-panel-head{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(255,255,255,.02)}
+            .db-panel-title{font-size:13px;font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+            .db-panel-meta{font-size:10px;color:var(--muted);white-space:nowrap;margin-right:4px}
+            .db-panel-body{flex:1;overflow:auto;min-height:0}
+            .db-kpi-body{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:6px;padding:20px}
+            .db-kpi-val{font-size:52px;font-weight:800;color:var(--blue);line-height:1}
+            .db-kpi-sub{font-size:12px;color:var(--muted)}
+            .db-tbl{width:100%;border-collapse:collapse;font-size:11px}
+            .db-tbl th{padding:6px 10px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card);z-index:1}
+            .db-tbl td{padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+            .db-tbl tr:hover td{background:rgba(255,255,255,.03)}
+            .db-loading{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:13px;min-height:120px}
+            .db-panel-btn{background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);font-size:11px;cursor:pointer;padding:2px 8px;border-radius:5px;transition:all .15s;line-height:1.4}
+            .db-panel-btn:hover{color:var(--text);background:rgba(255,255,255,.1)}
+          </style>
+
+          <!-- Toolbar -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-shrink:0">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:15px;font-weight:700">My Dashboard</span>
+              <span style="font-size:10px;background:rgba(227,6,19,.12);color:var(--red);padding:2px 8px;border-radius:4px;font-weight:600">🔑 Admin Only</span>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn-sm" onclick="dbRefreshAll()">↺ Refresh All</button>
+              <button class="btn-sm" onclick="showPage('querybuilder',document.querySelector('[onclick*=querybuilder]'))">🔬 Query Builder</button>
+            </div>
+          </div>
+
+          <!-- Widget grid -->
+          <div id="dbGrid" class="db-grid"></div>
+
+          <!-- Empty state -->
+          <div id="dbEmpty" style="display:none;text-align:center;padding:60px 20px;color:var(--muted)">
+            <div style="font-size:36px;margin-bottom:12px">📌</div>
+            <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px">Dashboard trống</div>
+            <div style="font-size:12px;line-height:1.7">Vào <b>Query Builder</b> → chạy query → chọn kiểu hiển thị (📋 / 📊 / 🥧 / 🔢)<br>→ nhấn <b>📌 Pin to Dashboard</b> để thêm widget</div>
           </div>
         </div>
 
@@ -4581,9 +4628,9 @@ async function makeAdmin(id){
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────
-const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',ecar:'ECAR Detail',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management',querybuilder:'Query Builder'};
+const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',ecar:'ECAR Detail',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management',querybuilder:'Query Builder',mydashboard:'My Dashboard'};
 function showPage(name,btn){
-  if((name==='reports'||name==='admin'||name==='querybuilder')&&(!curUser||curUser.role!=='admin')){
+  if((name==='reports'||name==='admin'||name==='querybuilder'||name==='mydashboard')&&(!curUser||curUser.role!=='admin')){
     toast('Bạn không có quyền truy cập trang này','err');return;
   }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -4594,6 +4641,7 @@ function showPage(name,btn){
   s('pageTitle',PT[name]||name);
   if(name==='admin')loadUsers();
   if(name==='querybuilder')qbInit();
+  if(name==='mydashboard')dbInit();
   if(name==='reports'){initReportFilters();generateReport();}
   if(name==='docs'){ if(!docData.length) loadDocuments(); else renderDocPage(); }
   if(name==='cmrcar'){ if(!cmrLoaded) loadCmr(); else renderCmr(); }
@@ -5451,6 +5499,187 @@ function qbDeleteTemplate(id) {
 function closeQbTmpl(e) {
   if(e&&e.target!==g('qbTmplModal')) return;
   g('qbTmplModal').style.display='none';
+}
+
+// ── MY DASHBOARD ──────────────────────────────────────────────────────────
+const dbCharts = {};
+const DB_KEY = () => 'db_widgets_' + (curUser?.email||'');
+
+function dbGetWidgets() {
+  try { return JSON.parse(localStorage.getItem(DB_KEY())||'[]'); }
+  catch { return []; }
+}
+
+function dbSaveWidgets(arr) {
+  localStorage.setItem(DB_KEY(), JSON.stringify(arr));
+}
+
+function dbPinWidget() {
+  if(!curUser||curUser.role!=='admin'){toast('Admin only','err');return;}
+  const tbl = qbState.table;
+  if(!tbl||!qbState.results.length){toast('Chạy query trước khi Pin','err');return;}
+  const name = prompt('Tên widget hiển thị trên Dashboard:');
+  if(!name||!name.trim()) return;
+  const vizType = qbState.viz||'table';
+  const widgets = dbGetWidgets();
+  widgets.push({
+    id: Date.now(),
+    name: name.trim(),
+    table: tbl,
+    fields: [...qbState.fields],
+    filters: JSON.parse(JSON.stringify(qbState.filters)),
+    sortField: g('qbSortField')?.value||'',
+    sortDir: g('qbSortDir')?.value||'asc',
+    limit: parseInt(g('qbLimit')?.value)||500,
+    vizType,
+    chartX: g('qbChartX')?.value||'',
+    chartY: g('qbChartY')?.value||'__count__',
+    pinnedAt: new Date().toISOString()
+  });
+  dbSaveWidgets(widgets);
+  toast('✓ Đã pin "'+name.trim()+'" vào My Dashboard','ok');
+}
+
+function dbVizIcon(v) {
+  return {table:'📋 Table',bar:'📊 Bar',pie:'🥧 Pie',kpi:'🔢 KPI',sql:'🔗 URL'}[v]||v;
+}
+
+function dbInit() {
+  if(!curUser||curUser.role!=='admin') return;
+  dbRenderAll();
+}
+
+function dbRenderAll() {
+  const widgets = dbGetWidgets();
+  const grid = g('dbGrid');
+  const empty = g('dbEmpty');
+  if(!widgets.length) {
+    grid.innerHTML = '';
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+  safeHTML(grid, widgets.map(w=>`
+    <div class="db-panel" id="dbPanel_${w.id}">
+      <div class="db-panel-head">
+        <span class="db-panel-title" title="${esc(w.name)}">${esc(w.name)}</span>
+        <span class="db-panel-meta">${esc(QB_TABLES[w.table]?.label||w.table)} · ${dbVizIcon(w.vizType)}</span>
+        <button class="db-panel-btn" onclick="dbRefreshWidget(${w.id})" title="Refresh">↺</button>
+        <button class="db-panel-btn" onclick="dbDeleteWidget(${w.id})" title="Xóa widget" style="color:#f85149">✕</button>
+      </div>
+      <div class="db-panel-body" id="dbBody_${w.id}">
+        <div class="db-loading">⏳ Đang tải...</div>
+      </div>
+    </div>
+  `).join(''));
+  widgets.forEach(w => dbFetchWidget(w));
+}
+
+async function dbFetchWidget(w) {
+  const body = g('dbBody_'+w.id);
+  if(!body) return;
+  try {
+    const select = '$select='+w.fields.join(',');
+    let filterStr = '';
+    const validFilters = (w.filters||[]).filter(f=>String(f.value||'').trim());
+    if(validFilters.length) {
+      filterStr = '&$filter=' + validFilters.map(f => {
+        const v = isNaN(f.value) ? `'${f.value}'` : f.value;
+        if(f.op==='contains') return `contains(${f.field},${v})`;
+        return `${f.field} ${f.op} ${v}`;
+      }).join(' and ');
+    }
+    const sortStr = w.sortField ? `&$orderby=${w.sortField} ${w.sortDir||'asc'}` : '';
+    const url = G_URL + w.table + '?' + select + filterStr + sortStr + '&$top=' + (w.limit||500);
+    const resp = await fetch(url);
+    const json = await resp.json();
+    dbRenderPanel(body, w, json.value||[]);
+  } catch(e) {
+    safeHTML(body, `<div class="db-loading" style="color:#f85149">❌ ${esc(e.message)}</div>`);
+  }
+}
+
+function dbRenderPanel(body, w, data) {
+  if(!data.length) {
+    safeHTML(body, '<div class="db-loading" style="color:var(--muted)">Không có dữ liệu</div>');
+    return;
+  }
+
+  if(w.vizType==='kpi') {
+    safeHTML(body, `<div class="db-kpi-body">
+      <div class="db-kpi-val">${data.length}</div>
+      <div class="db-kpi-sub">${esc(QB_TABLES[w.table]?.label||w.table)} · ${data.length} records</div>
+    </div>`);
+    return;
+  }
+
+  if(w.vizType==='bar' || w.vizType==='pie') {
+    safeHTML(body, `<div style="padding:10px;height:calc(100% - 20px);box-sizing:border-box"><canvas id="dbChart_${w.id}"></canvas></div>`);
+    const xField = w.chartX||w.fields[0];
+    const yField = w.chartY||'__count__';
+    const counts = {};
+    data.forEach(row => {
+      const k = String(row[xField]??'(blank)');
+      counts[k] = (counts[k]||0) + (yField==='__count__' ? 1 : parseFloat(row[yField]||0));
+    });
+    const sorted = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,20);
+    const labels = sorted.map(x=>x[0]);
+    const values = sorted.map(x=>x[1]);
+    const colors = labels.map((_,i)=>`hsl(${(i*47)%360},65%,58%)`);
+    setTimeout(() => {
+      const canvas = g('dbChart_'+w.id);
+      if(!canvas) return;
+      if(dbCharts[w.id]) { dbCharts[w.id].destroy(); }
+      dbCharts[w.id] = new Chart(canvas.getContext('2d'), {
+        type: w.vizType==='pie' ? 'pie' : 'bar',
+        data: { labels, datasets: [{ data: values,
+          backgroundColor: w.vizType==='pie' ? colors : 'rgba(88,166,255,.7)',
+          borderColor: w.vizType==='pie' ? colors : 'rgba(88,166,255,1)',
+          borderWidth: 1 }] },
+        options: { responsive:true, maintainAspectRatio:false,
+          plugins: { legend: { display: w.vizType==='pie', labels: { color:'#A3AEB8' } } },
+          scales: w.vizType==='pie' ? {} : {
+            x: { ticks:{color:'#A3AEB8',maxRotation:45}, grid:{color:'rgba(255,255,255,.05)'} },
+            y: { ticks:{color:'#A3AEB8'}, grid:{color:'rgba(255,255,255,.08)'} }
+          }
+        }
+      });
+    }, 50);
+    return;
+  }
+
+  // Default: table
+  const cols = w.fields;
+  const rows = data.slice(0, 200);
+  safeHTML(body, `<table class="db-tbl">
+    <thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(row=>`<tr>${cols.map(c=>`<td title="${esc(String(row[c]??''))}">${esc(String(row[c]??''))}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table>`);
+}
+
+function dbRefreshWidget(id) {
+  const w = dbGetWidgets().find(x=>x.id===id);
+  if(!w) return;
+  const body = g('dbBody_'+id);
+  if(body) safeHTML(body, '<div class="db-loading">⏳ Đang tải...</div>');
+  if(dbCharts[id]) { dbCharts[id].destroy(); delete dbCharts[id]; }
+  dbFetchWidget(w);
+}
+
+function dbRefreshAll() {
+  const widgets = dbGetWidgets();
+  if(!widgets.length){toast('Không có widget nào','info');return;}
+  Object.keys(dbCharts).forEach(k=>{ try{dbCharts[k].destroy();}catch(e){} delete dbCharts[k]; });
+  dbRenderAll();
+  toast(`Đang refresh ${widgets.length} widget...`,'info');
+}
+
+function dbDeleteWidget(id) {
+  if(!confirm('Xóa widget này khỏi Dashboard?')) return;
+  if(dbCharts[id]) { dbCharts[id].destroy(); delete dbCharts[id]; }
+  dbSaveWidgets(dbGetWidgets().filter(w=>w.id!==id));
+  dbRenderAll();
+  toast('Đã xóa widget','info');
 }
 
 </script>
