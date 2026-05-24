@@ -1505,7 +1505,7 @@ tr:last-child td{border-bottom:none}
                       <span>OData nodes</span><span id="qbNodeCount">0 / 100</span>
                     </div>
                     <div class="qb-node-meter"><div class="qb-node-fill" id="qbNodeFill" style="width:0%;background:var(--green)"></div></div>
-                    <div id="qbNodeWarn" style="font-size:10px;color:var(--yellow);margin-top:3px;display:none">⚠ Gần giới hạn — sẽ tự động fetch-all + JS filter</div>
+                    <div id="qbNodeWarn" style="font-size:10px;color:var(--yellow);margin-top:3px;display:none">⚠ Quá nhiều filter — API có thể từ chối request</div>
                   </div>
                 </div>
               </div>
@@ -1526,11 +1526,11 @@ tr:last-child td{border-bottom:none}
                   <div style="display:flex;align-items:center;gap:8px">
                     <span style="font-size:12px;color:var(--muted)">Giới hạn</span>
                     <select id="qbLimit" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px;outline:none">
-                      <option value="0">Lấy tất cả</option>
                       <option value="50">50 rows</option>
                       <option value="100">100 rows</option>
-                      <option value="500">500 rows</option>
+                      <option value="500" selected>500 rows</option>
                       <option value="1000">1000 rows</option>
+                      <option value="5000">5000 rows ⚠️</option>
                     </select>
                   </div>
                 </div>
@@ -5090,7 +5090,7 @@ function qbRenderFields() {
   const tbl = qbState.table;
   if(!tbl) return;
   const fields = QB_TABLES[tbl].fields;
-  if(!qbState.fields.length) qbState.fields = [...fields];
+  // Không auto-select all — user phải tự tick fields để tránh query quá lớn
   const container = g('qbFieldList');
   container.innerHTML = '';
   fields.forEach(f => {
@@ -5217,11 +5217,9 @@ async function qbRun() {
     // Build URL
     const select = '$select='+fields.join(',');
     const filters = qbState.filters.filter(f=>f.value.trim()!=='');
-    const nodeCount = filters.length>0 ? 2*filters.length-1 : 0;
-    const useClientFilter = nodeCount >= 80; // fallback to fetch-all + JS
 
     let filterStr = '';
-    if(filters.length && !useClientFilter) {
+    if(filters.length) {
       filterStr = '&$filter=' + filters.map(f => {
         const v = isNaN(f.value)?`'${f.value}'`:f.value;
         if(f.op==='contains') return `contains(${f.field},${v})`;
@@ -5232,47 +5230,20 @@ async function qbRun() {
     const sf = g('qbSortField')?.value;
     const sd = g('qbSortDir')?.value||'asc';
     const sortStr = sf ? `&$orderby=${sf} ${sd}` : '';
-    const limit = parseInt(g('qbLimit')?.value)||0;
-    const topStr = (limit>0 && !useClientFilter) ? `&$top=${limit}` : '';
+    const limit = parseInt(g('qbLimit')?.value)||500;
+    const topStr = `&$top=${limit}`;
 
     const url = G_URL + tbl + '?' + select + filterStr + sortStr + topStr;
-    const raw = limit===0 ? await fetchAll(url) : (await (await fetch(url)).json()).value||[];
+    const raw = (await (await fetch(url)).json()).value||[];
 
-    // Client-side filter if needed
-    let data = raw;
-    if(useClientFilter && filters.length) {
-      data = raw.filter(row => filters.every(f => {
-        const rv = String(row[f.field]||'').toLowerCase();
-        const fv = f.value.toLowerCase();
-        switch(f.op){
-          case 'eq': return rv===fv;
-          case 'ne': return rv!==fv;
-          case 'contains': return rv.includes(fv);
-          case 'gt': return parseFloat(row[f.field])>parseFloat(f.value);
-          case 'lt': return parseFloat(row[f.field])<parseFloat(f.value);
-          case 'ge': return parseFloat(row[f.field])>=parseFloat(f.value);
-          case 'le': return parseFloat(row[f.field])<=parseFloat(f.value);
-          default: return true;
-        }
-      }));
-    }
-
-    // Sort client-side if needed
-    if(sf && useClientFilter) {
-      data.sort((a,b)=>{
-        const av=a[sf]||'', bv=b[sf]||'';
-        return sd==='asc'?String(av).localeCompare(String(bv)):String(bv).localeCompare(String(av));
-      });
-    }
-    if(limit>0) data = data.slice(0,limit);
-
+    const data = raw;
     qbState.results = data;
-    const meta = `${data.length} records${useClientFilter?' (fetch-all + JS filter)':''}${limit>0&&data.length===limit?' (limited)':''}`;
+    const meta = `${data.length} records${data.length===limit?' (có thể còn thêm — tăng giới hạn)':''}`;
     g('qbResultMeta').textContent = meta;
 
     // Save last URL for SQL view
     qbState.lastUrl = url;
-    qbState.lastFilterNote = useClientFilter ? '\n-- Node count >= 80 → fetch-all + client-side filter' : '';
+    qbState.lastFilterNote = '';
 
     // Update chart field selectors
     const cx = g('qbChartX'); const cy = g('qbChartY');
