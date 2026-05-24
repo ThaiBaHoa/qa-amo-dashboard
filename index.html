@@ -899,9 +899,24 @@ tr:last-child td{border-bottom:none}
           <div class="chart-card" style="padding:10px 12px;margin-bottom:8px;flex-shrink:0">
             <div style="display:flex;align-items:center;justify-content:space-between">
               <span style="font-size:13px;font-weight:700">📂 Documents</span>
-              <div style="display:flex;align-items:center;gap:8px">
-                <button class="btn-sm" onclick="docExpandAll()" title="Mở tất cả groups">⊞ Mở tất cả</button>
-                <button class="btn-sm" onclick="docCollapseAll()" title="Thu gọn tất cả groups">⊟ Thu gọn</button>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <!-- Dropdown chọn nhóm -->
+                <select class="sel" id="docGroupF" onchange="docGroupFilter=this.value;renderDocPage()" style="max-width:230px;font-size:12px">
+                  <option value="">🗂️ Tất cả nhóm</option>
+                  <option value="Approved Maintenance Organization">🔧 Approved Maintenance Org.</option>
+                  <option value="AMO — Maintenance Quality (MQA)">🔧 AMO — MQA</option>
+                  <option value="Flight Operations">✈️ Flight Operations</option>
+                  <option value="Ground Operations">🛬 Ground Operations</option>
+                  <option value="Safety & Quality Assurance">🛡️ Safety & Quality Assurance</option>
+                  <option value="External">🌐 External</option>
+                  <option value="Security">🔒 Security</option>
+                  <option value="VietJet Aviation Academy">🎓 VietJet Aviation Academy</option>
+                  <option value="AOC / OpsSpec / FAOC">📋 AOC / OpsSpec / FAOC</option>
+                  <option value="Flight Crew Safety Bulletin">📰 Flight Crew Safety Bulletin</option>
+                  <option value="Others">📂 Others (chưa phân loại)</option>
+                </select>
+                <button class="btn-sm" onclick="docExpandAll()">⊞ Mở tất cả</button>
+                <button class="btn-sm" onclick="docCollapseAll()">⊟ Thu gọn</button>
                 <select class="sel" id="docYearF" onchange="renderDocPage()"><option value="">All Years</option></select>
                 <div class="srch-wrap"><span class="srch-icon">🔍</span>
                   <input class="srch" id="docSrch" placeholder="Search number, title..." oninput="dRenderDoc()">
@@ -1831,7 +1846,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.24-r29';
+const APP_REV = '2026.05.25-r31';
 let sb;
 try {
   const { createClient } = supabase;
@@ -4802,8 +4817,116 @@ async function loadDocuments(force=false) {
   }
 }
 
-let docActiveType = '';     // type chip đang chọn ('' = tất cả)
-let docCollapsedTypes = new Set(); // lưu các group đang collapse
+let docActiveType   = '';
+let docGroupFilter  = '';            // giá trị dropdown nhóm
+let docCollapsedTypes = new Set();
+
+// Thứ tự hiển thị khi "Tất cả nhóm"
+const DOC_GROUP_ORDER = [
+  'Approved Maintenance Organization',
+  'AMO — Maintenance Quality (MQA)',
+  'Flight Operations',
+  'Ground Operations',
+  'Safety & Quality Assurance',
+  'External',
+  'Security',
+  'VietJet Aviation Academy',
+  'AOC / OpsSpec / FAOC',
+  'Flight Crew Safety Bulletin',
+  'Others',
+];
+const DOC_GROUP_ICONS = {
+  'Approved Maintenance Organization':'🔧',
+  'AMO — Maintenance Quality (MQA)':'🔧',
+  'Flight Operations':'✈️',
+  'Ground Operations':'🛬',
+  'Safety & Quality Assurance':'🛡️',
+  'External':'🌐',
+  'Security':'🔒',
+  'VietJet Aviation Academy':'🎓',
+  'AOC / OpsSpec / FAOC':'📋',
+  'Flight Crew Safety Bulletin':'📰',
+  'Others':'📂',
+};
+
+// Map 1 document_type → tên group predefined
+function getDocGroupForType(rawType) {
+  const t = (rawType || '').trim();
+  if (!t) return 'Others';
+  // Helper: match exact hoặc prefix (prefix + ' - ' hoặc prefix + ' ')
+  const sw = p => t === p || t.startsWith(p + ' - ') || t.startsWith(p + ' ');
+  const eq = (...arr) => arr.includes(t);
+
+  // MQA kiểm tra TRƯỚC AMO (tránh match sai)
+  if (sw('MQA')) return 'AMO — Maintenance Quality (MQA)';
+
+  // Approved Maintenance Organization (AMO)
+  if (sw('AMO') || sw('ENG') || sw('Engineering') || sw('Line Maintenance') ||
+      sw('Technical Training') ||
+      eq('MEL','Workshop','Battery Shop','Wheel Shop','AHM560_A320/A321/A330',
+         'Maintenance Operations Control','Supply - Store',
+         'A320/321 AMP','A330 AMP','CDL','Contractor/Subcontractor',
+         'Deicing Anti-icing Program','EDTO Manual','Datalink Manual'))
+    return 'Approved Maintenance Organization';
+
+  // Flight Operations
+  if (sw('FCD') || sw('FOE') || sw('FTD') || sw('OMC') || sw('OMB') ||
+      sw('CCD') || sw('Level 1') || sw('Level 2') || sw('Level 3') ||
+      eq('CAT A','CAT B','Operations Manual(s)','OMC Notice',
+         'Inflight Services Forms','Flight Crew Training',
+         'Public Announcement Manual','PIN - test',
+         'Roster IGO','Roster VJC','Roster VZ'))
+    return 'Flight Operations';
+
+  // Ground Operations (CUVS, FOAP, FOD, HC trước các group khác)
+  if (sw('GO') || sw('FOAP') || sw('FOD') || sw('HC') ||
+      sw('GSPV HH') || sw('CUVS') ||
+      eq('Ground Operations Training','Ramp Forms','Gate Management Forms',
+         'Baggage Handling Forms','Check-in Forms','CUSTOMER SERVICE (CS)',
+         'Station Emergency Response Plan','General Forms'))
+    return 'Ground Operations';
+
+  // Safety & Quality Assurance
+  if (sw('SQA') || sw('TQA') || sw('SSQA') || sw('Safety') ||
+      eq('ACV','Event Investigation Summary','Coruson User Guide',
+         'Information Security Management System','MQA Event Report F-008'))
+    return 'Safety & Quality Assurance';
+
+  // Security (kiểm tra TRƯỚC External)
+  if (sw('SEC') || sw('Security') || eq('Quy chế An Ninh Hàng Không'))
+    return 'Security';
+
+  // External
+  if (sw('CAAV') || sw('ICAO') || sw('IATA') ||
+      eq('MOT','VAR','CIRCULAR','Taiwan','Thai VietJet',
+         'External Official Correspondences',
+         'Dangerous Goods','Dangerous Goods Regulations',
+         'IOSA','Transport Security Program',
+         'Corporate Emergency Response Plan','CAAC','VATM'))
+    return 'External';
+
+  // VietJet Aviation Academy
+  if (sw('VAA') || sw('VJGS') || sw('PVHK') || sw('PVHL') || sw('PVSD') ||
+      sw('TCKT') || sw('TLGS') || sw('VHTTB') || sw('BDSC') || sw('ROS') ||
+      sw('HR') || eq('NBA','Project','CEO Office - Forms','COM - SOP',
+         'CRUC - SOPs','DCC - Forms','Điều Hành - HDCV','Others'))
+    return 'VietJet Aviation Academy';
+
+  // AOC / OpsSpec / FAOC
+  if (sw('OpsSpec') || sw('AOC') ||
+      eq('Operation Specification(s) - CAAV','Air Operator Certificate (AOC)',
+         'Aircraft Operator Security Program',
+         'Foreign Air Transport Air Operator Certificate (FAOC)',
+         'Others Certificates','FOAP - SOPs'))
+    return 'AOC / OpsSpec / FAOC';
+
+  // Flight Crew Safety Bulletin
+  if (sw('Flight Crew Safety Bulletin') ||
+      eq('Flight Crew Safety Bulletin (FCSB)'))
+    return 'Flight Crew Safety Bulletin';
+
+  return 'Others';
+}
 
 function docSetType(type) {
   docActiveType = type;
@@ -4846,17 +4969,9 @@ function docCollapseAll() {
   });
 }
 
-// Lấy group key = phần trước " - " đầu tiên
-// VD: "ENG - Manuals" → "ENG", "MQA - SOPs" → "MQA", "Safety Notice" → "Safety Notice"
-function getDocGroupKey(docType) {
-  const t = (docType || '').trim();
-  if (!t) return '(Không phân loại)';
-  const i = t.indexOf(' - ');
-  return i > 0 ? t.substring(0, i) : t;
-}
-
-// Render danh sách document nhóm theo PREFIX của document_type (accordion)
-// ENG - Manuals + ENG - SOPs + ENG - Technical Note → 1 group "ENG"
+// Render accordion documents.
+// - docGroupFilter === '' → group theo DOC_GROUP_ORDER (10 nhóm lớn)
+// - docGroupFilter !== '' → group theo document_type (sub-types trong nhóm đó)
 function renderDocGrouped(data) {
   const el = g('docGrouped');
   if (!el) return;
@@ -4864,49 +4979,72 @@ function renderDocGrouped(data) {
     el.innerHTML = '<div style="text-align:center;padding:48px 20px;color:var(--muted)">📭 Không có tài liệu nào phù hợp</div>';
     return;
   }
-  // Group by prefix
+
+  const bySubType = !!docGroupFilter; // true = đang xem 1 nhóm cụ thể
   const groups = {};
-  data.forEach(r => {
-    const key = getDocGroupKey(r.document_type);
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(r);
-  });
-  const groupKeys = Object.keys(groups).sort();
+
+  if (bySubType) {
+    // Sub-group by document_type
+    data.forEach(r => {
+      const key = (r.document_type || '').trim() || '(Không phân loại)';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(r);
+    });
+  } else {
+    // Group by predefined mapping
+    data.forEach(r => {
+      const key = getDocGroupForType(r.document_type);
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(r);
+    });
+  }
+
+  // Sắp xếp keys: predefined order (top-level) hoặc alphabetical (sub-type)
+  let groupKeys;
+  if (bySubType) {
+    groupKeys = Object.keys(groups).sort();
+  } else {
+    groupKeys = DOC_GROUP_ORDER.filter(k => groups[k]);
+    Object.keys(groups).forEach(k => { if (!DOC_GROUP_ORDER.includes(k)) groupKeys.push(k); });
+  }
+
   let html = '';
   groupKeys.forEach(groupKey => {
-    const rows = groups[groupKey];
-    const isOpen = !docCollapsedTypes.has(groupKey);
-    const rowsHtml = rows.map(r => {
-      const fullType = (r.document_type || '').trim();
-      const dashIdx  = fullType.indexOf(' - ');
-      // Sub-type: phần sau " - " (ví dụ "Manuals", "SOPs"), hoặc "—" nếu không có
-      const subType  = dashIdx > 0 ? fullType.substring(dashIdx + 3) : '—';
-      return `<tr>
-        <td><b>${esc(r.document_number)||'—'}</b></td>
-        <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.document_revision_title)||'—'}</td>
-        <td style="color:var(--muted);white-space:nowrap;font-size:10px">${esc(subType)}</td>
-        <td style="color:var(--muted)">${esc(r.revision_number)||'—'}</td>
-        <td>${docStatBadge(r.document_revision_status)}</td>
-        <td style="color:var(--muted)">${esc(r.owner_name)||'—'}</td>
-        <td style="color:var(--muted)">${fd(r.valid_from)}</td>
-        <td style="text-align:center">${r.has_been_distributed===true?'<span style="color:var(--green)">✅</span>':'<span style="color:var(--muted)">—</span>'}</td>
-        <td><button class="btn-sm" onclick="showDocDetail('${esc(r.document_revision_id)}','${esc(r.document_number||'')}','${esc((r.document_revision_title||'').replace(/'/g,''))}','${r.valid_from||''}')">Chi tiết</button></td>
-      </tr>`;
-    }).join('');
+    const rows = groups[groupKey] || [];
+    if (!rows.length) return;
+    const isOpen    = !docCollapsedTypes.has(groupKey);
+    const icon      = bySubType ? '📄' : (DOC_GROUP_ICONS[groupKey] || '📂');
+    const showType  = !bySubType; // cột Document Type chỉ hiện khi xem "Tất cả nhóm"
+
+    const rowsHtml = rows.map(r => `<tr>
+      <td><b>${esc(r.document_number)||'—'}</b></td>
+      <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.document_revision_title)||'—'}</td>
+      ${showType?`<td style="color:var(--muted);font-size:10px;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis">${esc((r.document_type||'').trim())||'—'}</td>`:''}
+      <td style="color:var(--muted)">${esc(r.revision_number)||'—'}</td>
+      <td>${docStatBadge(r.document_revision_status)}</td>
+      <td style="color:var(--muted)">${esc(r.owner_name)||'—'}</td>
+      <td style="color:var(--muted)">${fd(r.valid_from)}</td>
+      <td style="text-align:center">${r.has_been_distributed===true?'<span style="color:var(--green)">✅</span>':'<span style="color:var(--muted)">—</span>'}</td>
+      <td><button class="btn-sm" onclick="showDocDetail('${esc(r.document_revision_id)}','${esc(r.document_number||'')}','${esc((r.document_revision_title||'').replace(/'/g,''))}','${r.valid_from||''}')">Chi tiết</button></td>
+    </tr>`).join('');
+
+    const th = showType
+      ? '<th>Số hiệu</th><th>Tiêu đề tài liệu</th><th>Document Type</th><th>Rev</th><th>Trạng thái</th><th>Owner</th><th>Hiệu lực từ</th><th>Phát hành</th><th></th>'
+      : '<th>Số hiệu</th><th>Tiêu đề tài liệu</th><th>Rev</th><th>Trạng thái</th><th>Owner</th><th>Hiệu lực từ</th><th>Phát hành</th><th></th>';
+
     html += `<div class="doc-group" data-grpkey="${esc(groupKey)}">
       <div class="doc-group-hdr" onclick="docToggleGroup(${JSON.stringify(groupKey)})">
         <span class="doc-group-arrow ${isOpen?'open':''}">▶</span>
-        <span class="doc-group-name">📂 ${esc(groupKey)}</span>
+        <span class="doc-group-name">${icon} ${esc(groupKey)}</span>
         <span class="doc-group-cnt">${rows.length} tài liệu</span>
       </div>
       <div class="doc-group-body" style="${isOpen?'':'display:none'}">
-        <table><thead><tr>
-          <th>Số hiệu</th><th>Tiêu đề tài liệu</th><th>Loại</th><th>Rev</th><th>Trạng thái</th><th>Owner</th><th>Hiệu lực từ</th><th>Phát hành</th><th></th>
-        </tr></thead><tbody>${rowsHtml}</tbody></table>
+        <table><thead><tr>${th}</tr></thead><tbody>${rowsHtml}</tbody></table>
       </div>
     </div>`;
   });
-  el.innerHTML = html;
+
+  el.innerHTML = html || '<div style="text-align:center;padding:48px 20px;color:var(--muted)">📭 Không có tài liệu nào</div>';
 }
 
 function renderDocPage() {
@@ -4924,11 +5062,12 @@ function renderDocPage() {
     if(yearF) yearEl.value = yearF;
   }
 
-  // Filter (theo year + search)
+  // Filter (theo group dropdown + year + search)
   let data = docData.filter(r => {
+    if(docGroupFilter && getDocGroupForType(r.document_type) !== docGroupFilter) return false;
     if(yearF && String(new Date(r.created_date||0).getFullYear()) !== yearF) return false;
     if(srch){
-      const t = [r.document_number, r.document_revision_title].join(' ').toLowerCase();
+      const t = [r.document_number, r.document_revision_title, r.document_type].join(' ').toLowerCase();
       if(!t.includes(srch)) return false;
     }
     return true;
