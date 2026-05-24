@@ -895,11 +895,13 @@ tr:last-child td{border-bottom:none}
             .doc-type-chip .chip-cnt{background:rgba(255,255,255,.1);border-radius:4px;padding:1px 6px;font-size:10px}
             .doc-type-chip.active .chip-cnt{background:rgba(88,166,255,.25)}
           </style>
-          <!-- Document Type Chips -->
+          <!-- Documents header bar -->
           <div class="chart-card" style="padding:10px 12px;margin-bottom:8px;flex-shrink:0">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-              <span style="font-size:13px;font-weight:700">Documents</span>
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:13px;font-weight:700">📂 Documents</span>
               <div style="display:flex;align-items:center;gap:8px">
+                <button class="btn-sm" onclick="docExpandAll()" title="Mở tất cả groups">⊞ Mở tất cả</button>
+                <button class="btn-sm" onclick="docCollapseAll()" title="Thu gọn tất cả groups">⊟ Thu gọn</button>
                 <select class="sel" id="docYearF" onchange="renderDocPage()"><option value="">All Years</option></select>
                 <div class="srch-wrap"><span class="srch-icon">🔍</span>
                   <input class="srch" id="docSrch" placeholder="Search number, title..." oninput="dRenderDoc()">
@@ -907,10 +909,6 @@ tr:last-child td{border-bottom:none}
                 <div class="tbl-count" id="docCnt">—</div>
                 <button class="btn-sm" id="docRefreshBtn" onclick="loadDocuments(true)">↻ Reload</button>
               </div>
-            </div>
-            <!-- Type chip row -->
-            <div id="docTypeChips" style="display:flex;gap:6px;flex-wrap:wrap;overflow-x:auto;padding-bottom:2px">
-              <div class="doc-type-chip active" onclick="docSetType('')" id="docChip_all">📁 Tất cả <span class="chip-cnt" id="docChipCnt_all">—</span></div>
             </div>
           </div>
           <!-- KPI cards -->
@@ -1833,7 +1831,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.24-r27';
+const APP_REV = '2026.05.24-r28';
 let sb;
 try {
   const { createClient } = supabase;
@@ -4825,6 +4823,29 @@ function docToggleGroup(type) {
   if (arrow) arrow.classList.toggle('open', isOpen);
 }
 
+// Mở tất cả groups
+function docExpandAll() {
+  docCollapsedTypes.clear();
+  document.querySelectorAll('#docGrouped .doc-group').forEach(grp => {
+    const body  = grp.querySelector('.doc-group-body');
+    const arrow = grp.querySelector('.doc-group-arrow');
+    if (body)  body.style.display = '';
+    if (arrow) arrow.classList.add('open');
+  });
+}
+
+// Thu gọn tất cả groups
+function docCollapseAll() {
+  document.querySelectorAll('#docGrouped .doc-group').forEach(grp => {
+    const type = grp.dataset.grpkey;
+    if (type) docCollapsedTypes.add(type);
+    const body  = grp.querySelector('.doc-group-body');
+    const arrow = grp.querySelector('.doc-group-arrow');
+    if (body)  body.style.display = 'none';
+    if (arrow) arrow.classList.remove('open');
+  });
+}
+
 // Render danh sách document nhóm theo document_type (accordion)
 function renderDocGrouped(data) {
   const el = g('docGrouped');
@@ -4874,33 +4895,8 @@ function renderDocGrouped(data) {
 function renderDocPage() {
   if(!docData.length) return;
   const ts = TS.docs;
-  const typeF = docActiveType;
   const yearF = g('docYearF')?.value||'';
   const srch  = (g('docSrch')?.value||'').toLowerCase();
-
-  // Build type chips (luôn rebuild để cập nhật count)
-  const types = [...new Set(docData.map(r=>(r.document_type||'').trim()).filter(Boolean))].sort();
-  const chipsEl = g('docTypeChips');
-  if(chipsEl) {
-    // Cập nhật count cho "All"
-    const allChip = g('docChipCnt_all');
-    if(allChip) allChip.textContent = docData.length;
-    // Rebuild type chips (giữ lại chip All)
-    const existing = [...chipsEl.querySelectorAll('[data-doctype]')];
-    existing.forEach(el=>el.remove());
-    types.forEach(t => {
-      const cnt = docData.filter(r=>(r.document_type||'').trim()===t).length;
-      const chip = document.createElement('div');
-      chip.className = 'doc-type-chip' + (typeF===t?' active':'');
-      chip.dataset.doctype = t;
-      chip.innerHTML = `📄 ${esc(t)} <span class="chip-cnt">${cnt}</span>`;
-      chip.onclick = () => docSetType(t);
-      chipsEl.appendChild(chip);
-    });
-    // Active state cho chip "All"
-    const allChipEl = g('docChip_all');
-    if(allChipEl) allChipEl.className = 'doc-type-chip'+(typeF===''?' active':'');
-  }
 
   // Populate year dropdown (once)
   const years = [...new Set(docData.map(r=>r.created_date?new Date(r.created_date).getFullYear():null).filter(Boolean))].sort((a,b)=>b-a);
@@ -4911,9 +4907,8 @@ function renderDocPage() {
     if(yearF) yearEl.value = yearF;
   }
 
-  // Filter
+  // Filter (theo year + search)
   let data = docData.filter(r => {
-    if(typeF && (r.document_type||'').trim() !== typeF) return false;
     if(yearF && String(new Date(r.created_date||0).getFullYear()) !== yearF) return false;
     if(srch){
       const t = [r.document_number, r.document_revision_title].join(' ').toLowerCase();
