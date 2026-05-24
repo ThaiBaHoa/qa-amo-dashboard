@@ -888,17 +888,29 @@ tr:last-child td{border-bottom:none}
 
         <!-- DOCUMENTS PAGE -->
         <div class="page" id="page-docs">
-          <!-- Filter bar — use chart-card (no flex:1) to avoid growing -->
-          <div class="chart-card" style="padding:8px 12px;margin-bottom:8px;flex-shrink:0">
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <div class="tbl-title" style="margin-right:4px">Documents</div>
-              <div class="tbl-count" id="docCnt">—</div>
-              <select class="sel" id="docTypeF" onchange="renderDocPage()" style="min-width:160px"><option value="">All Types</option></select>
-              <select class="sel" id="docYearF" onchange="renderDocPage()"><option value="">All Years</option></select>
-              <div class="srch-wrap"><span class="srch-icon">🔍</span>
-                <input class="srch" id="docSrch" placeholder="Search number, title..." oninput="dRenderDoc()">
+          <style>
+            .doc-type-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 13px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:11px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0}
+            .doc-type-chip:hover{border-color:var(--blue);color:var(--text)}
+            .doc-type-chip.active{background:rgba(88,166,255,.15);border-color:var(--blue);color:var(--blue);font-weight:600}
+            .doc-type-chip .chip-cnt{background:rgba(255,255,255,.1);border-radius:4px;padding:1px 6px;font-size:10px}
+            .doc-type-chip.active .chip-cnt{background:rgba(88,166,255,.25)}
+          </style>
+          <!-- Document Type Chips -->
+          <div class="chart-card" style="padding:10px 12px;margin-bottom:8px;flex-shrink:0">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <span style="font-size:13px;font-weight:700">Documents</span>
+              <div style="display:flex;align-items:center;gap:8px">
+                <select class="sel" id="docYearF" onchange="renderDocPage()"><option value="">All Years</option></select>
+                <div class="srch-wrap"><span class="srch-icon">🔍</span>
+                  <input class="srch" id="docSrch" placeholder="Search number, title..." oninput="dRenderDoc()">
+                </div>
+                <div class="tbl-count" id="docCnt">—</div>
+                <button class="btn-sm" id="docRefreshBtn" onclick="loadDocuments(true)">↻ Reload</button>
               </div>
-              <button class="btn-sm" id="docRefreshBtn" onclick="loadDocuments(true)" style="margin-left:auto">↻ Reload</button>
+            </div>
+            <!-- Type chip row -->
+            <div id="docTypeChips" style="display:flex;gap:6px;flex-wrap:wrap;overflow-x:auto;padding-bottom:2px">
+              <div class="doc-type-chip active" onclick="docSetType('')" id="docChip_all">📁 Tất cả <span class="chip-cnt" id="docChipCnt_all">—</span></div>
             </div>
           </div>
           <!-- KPI cards -->
@@ -1505,6 +1517,23 @@ tr:last-child td{border-bottom:none}
                 </div>
               </div>
 
+              <!-- 2b. Org Unit Filter -->
+              <div class="qb-panel" id="qbOrgUnitPanel" style="flex-shrink:0;display:none">
+                <div class="qb-section" style="border-bottom:none">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                    <div class="qb-section-title" style="margin-bottom:0">🏢 Org Unit</div>
+                    <button onclick="qbLoadOrgUnits()" id="qbOrgUnitLoadBtn"
+                      style="font-size:10px;color:var(--orange);background:rgba(240,136,62,.1);border:1px solid rgba(240,136,62,.3);border-radius:4px;cursor:pointer;padding:2px 10px;transition:all .15s">
+                      Load</button>
+                  </div>
+                  <div style="font-size:10px;color:var(--muted);margin-bottom:6px">Tick để lọc theo Org Unit (OR logic)</div>
+                  <div id="qbOrgUnitList" style="max-height:160px;overflow-y:auto">
+                    <div style="font-size:11px;color:var(--muted);padding:4px">Nhấn <b>Load</b> để tải danh sách</div>
+                  </div>
+                  <div id="qbOrgUnitSel" style="font-size:10px;color:var(--orange);margin-top:5px;display:none"></div>
+                </div>
+              </div>
+
               <!-- 3. Filter (primary table fields only) -->
               <div class="qb-panel" style="flex-shrink:0">
                 <div class="qb-section" style="border-bottom:none">
@@ -1812,7 +1841,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.24-r24';
+const APP_REV = '2026.05.24-r26';
 let sb;
 try {
   const { createClient } = supabase;
@@ -4783,21 +4812,45 @@ async function loadDocuments(force=false) {
   }
 }
 
+let docActiveType = ''; // type đang được chọn
+
+function docSetType(type) {
+  docActiveType = type;
+  renderDocPage();
+}
+
 function renderDocPage() {
   if(!docData.length) return;
   const ts = TS.docs;
-  const typeF = g('docTypeF')?.value||'';
+  const typeF = docActiveType;
   const yearF = g('docYearF')?.value||'';
   const srch  = (g('docSrch')?.value||'').toLowerCase();
 
-  // Populate filters (once)
-  const types = [...new Set(docData.map(r=>r.document_type).filter(Boolean))].sort();
-  const typeEl = g('docTypeF');
-  if(typeEl && typeEl.options.length <= 1) {
-    typeEl.innerHTML = '<option value="">Tất cả loại</option>' +
-      types.map(t=>`<option value="${t.trim()}">${esc(t.trim())}</option>`).join('');
-    if(typeF) typeEl.value = typeF;
+  // Build type chips (luôn rebuild để cập nhật count)
+  const types = [...new Set(docData.map(r=>(r.document_type||'').trim()).filter(Boolean))].sort();
+  const chipsEl = g('docTypeChips');
+  if(chipsEl) {
+    // Cập nhật count cho "All"
+    const allChip = g('docChipCnt_all');
+    if(allChip) allChip.textContent = docData.length;
+    // Rebuild type chips (giữ lại chip All)
+    const existing = [...chipsEl.querySelectorAll('[data-doctype]')];
+    existing.forEach(el=>el.remove());
+    types.forEach(t => {
+      const cnt = docData.filter(r=>(r.document_type||'').trim()===t).length;
+      const chip = document.createElement('div');
+      chip.className = 'doc-type-chip' + (typeF===t?' active':'');
+      chip.dataset.doctype = t;
+      chip.innerHTML = `📄 ${esc(t)} <span class="chip-cnt">${cnt}</span>`;
+      chip.onclick = () => docSetType(t);
+      chipsEl.appendChild(chip);
+    });
+    // Active state cho chip "All"
+    const allChipEl = g('docChip_all');
+    if(allChipEl) allChipEl.className = 'doc-type-chip'+(typeF===''?' active':'');
   }
+
+  // Populate year dropdown (once)
   const years = [...new Set(docData.map(r=>r.created_date?new Date(r.created_date).getFullYear():null).filter(Boolean))].sort((a,b)=>b-a);
   const yearEl = g('docYearF');
   if(yearEl && yearEl.options.length <= 1) {
@@ -5102,7 +5155,17 @@ const QB_TABLES = {
   },
 };
 
-const QB_OPS = ['eq','ne','lt','le','gt','ge','contains'];
+const QB_OPS = ['eq','ne','lt','le','gt','ge','contains','year'];
+const QB_OPS_LABEL = {
+  eq:       '= bằng',
+  ne:       '≠ khác',
+  lt:       '< nhỏ hơn',
+  le:       '≤ nhỏ hơn hoặc bằng',
+  gt:       '> lớn hơn',
+  ge:       '≥ lớn hơn hoặc bằng',
+  contains: '⊃ chứa (contains)',
+  year:     '📅 Năm bằng'
+};
 
 // Quan hệ join được định nghĩa sẵn giữa các bảng
 const QB_JOINS = {
@@ -5152,11 +5215,13 @@ function qbSetPrimary(tbl) {
   qbState.filters = [];
   qbState.results = [];
   qbState.resultFields = [];
+  qbOrgUnits = [];
   qbRenderPrimaryFields();
   qbRenderJoins();
   qbRenderFilters();
   qbUpdateNodeMeter();
   qbUpdateSortField();
+  qbShowOrgUnitPanel(tbl);
   const lbl = QB_TABLES[tbl]?.label || '';
   safeHTML(g('qbResultBody'), tbl
     ? `<div class="qb-empty">Bảng chính: <b style="color:var(--blue)">${lbl}</b><br><br>Tick fields → Add Join Table → <b>Chạy Query</b></div>`
@@ -5319,6 +5384,67 @@ function qbRenderJoins() {
   });
 }
 
+// ── ORG UNIT FILTER ───────────────────────────────────────────────────────
+let qbOrgUnits = []; // danh sách org unit đang được tick
+
+function qbShowOrgUnitPanel(tbl) {
+  const panel = g('qbOrgUnitPanel'); if(!panel) return;
+  const hasOrgUnit = tbl && QB_TABLES[tbl]?.fields.includes('org_unit_name');
+  panel.style.display = hasOrgUnit ? '' : 'none';
+  if(hasOrgUnit) {
+    safeHTML(g('qbOrgUnitList'), '<div style="font-size:11px;color:var(--muted);padding:4px">Nhấn <b>Load</b> để tải danh sách</div>');
+    const sel = g('qbOrgUnitSel'); if(sel) sel.style.display = 'none';
+  }
+}
+
+async function qbLoadOrgUnits() {
+  const tbl = qbState.primary.table; if(!tbl) return;
+  const btn = g('qbOrgUnitLoadBtn');
+  btn.textContent = '⏳'; btn.disabled = true;
+  try {
+    const url = G_URL + tbl + '?$select=org_unit_name&$top=2000';
+    const data = ((await (await fetch(url)).json()).value || []);
+    const units = [...new Set(data.map(r => r.org_unit_name).filter(Boolean))].sort();
+    const container = g('qbOrgUnitList');
+    if(!units.length) {
+      safeHTML(container, '<div style="font-size:11px;color:var(--muted)">Không có dữ liệu</div>');
+      return;
+    }
+    container.innerHTML = '';
+    units.forEach(u => {
+      const label = document.createElement('label');
+      label.style.cssText = 'display:flex;align-items:center;gap:7px;padding:4px 2px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.value = u;
+      cb.checked = qbOrgUnits.includes(u);
+      cb.style.cssText = 'accent-color:var(--orange);width:13px;height:13px;flex-shrink:0;cursor:pointer';
+      cb.addEventListener('change', () => {
+        if(cb.checked) { if(!qbOrgUnits.includes(u)) qbOrgUnits.push(u); }
+        else qbOrgUnits = qbOrgUnits.filter(x => x !== u);
+        qbUpdateOrgUnitBadge();
+      });
+      const span = document.createElement('span');
+      span.style.cssText = 'font-size:11px;color:var(--text);flex:1'; span.textContent = u;
+      label.appendChild(cb); label.appendChild(span);
+      container.appendChild(label);
+    });
+    qbUpdateOrgUnitBadge();
+    btn.textContent = '↺ Reload';
+  } catch(e) {
+    safeHTML(g('qbOrgUnitList'), `<div style="font-size:11px;color:#f85149;padding:4px">❌ ${esc(e.message)}</div>`);
+    btn.textContent = 'Retry';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function qbUpdateOrgUnitBadge() {
+  const el = g('qbOrgUnitSel'); if(!el) return;
+  if(!qbOrgUnits.length) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.textContent = '✓ Đã chọn: ' + qbOrgUnits.join(', ');
+}
+
 // ── FILTERS (trên primary table) ──────────────────────────────────────────
 function qbAddFilter() {
   const tbl=qbState.primary.table; if(!tbl) return;
@@ -5336,9 +5462,22 @@ function qbRenderFilters() {
     fields.forEach(fd=>{ const opt=document.createElement('option'); opt.value=fd; opt.textContent=fd; if(f.field===fd) opt.selected=true; selField.appendChild(opt); });
     selField.addEventListener('change',()=>{qbState.filters[i].field=selField.value;qbUpdateNodeMeter();});
     const selOp=document.createElement('select');
-    QB_OPS.forEach(op=>{ const opt=document.createElement('option'); opt.value=op; opt.textContent=op; if(f.op===op) opt.selected=true; selOp.appendChild(opt); });
-    selOp.addEventListener('change',()=>{qbState.filters[i].op=selOp.value;qbUpdateNodeMeter();});
-    const inp=document.createElement('input'); inp.type='text'; inp.value=f.value; inp.placeholder='Giá trị...'; inp.style.flex='1.2';
+    const isDate=f.field.includes('date');
+    QB_OPS.forEach(op=>{
+      if(op==='year'&&!isDate) return; // chỉ hiện "Năm bằng" cho date field
+      const opt=document.createElement('option');
+      opt.value=op; opt.textContent=QB_OPS_LABEL[op]||op;
+      if(f.op===op) opt.selected=true;
+      selOp.appendChild(opt);
+    });
+    const updateInpHint=()=>{
+      if(selOp.value==='year'){inp.placeholder='Nhập năm, vd: 2025';inp.type='number';inp.min='2000';inp.max='2099';}
+      else if(f.field.includes('date')){inp.placeholder='vd: 2025-01-31';inp.type='text';}
+      else{inp.placeholder='Giá trị...';inp.type='text';}
+    };
+    selOp.addEventListener('change',()=>{qbState.filters[i].op=selOp.value;qbUpdateNodeMeter();updateInpHint();});
+    const inp=document.createElement('input'); inp.value=f.value; inp.style.flex='1.2';
+    updateInpHint();
     inp.addEventListener('input',()=>{qbState.filters[i].value=inp.value;qbUpdateNodeMeter();});
     const del=document.createElement('button'); del.className='qb-filter-del'; del.textContent='✕';
     del.addEventListener('click',()=>qbRemoveFilter(i));
@@ -5384,14 +5523,25 @@ async function qbRun() {
 
     const select='$select='+primaryFetchFields.join(',');
     const filters=qbState.filters.filter(f=>String(f.value).trim());
-    let filterStr='';
+    const filterParts=[];
+    // Điều kiện filter thông thường (AND)
     if(filters.length){
-      filterStr='&$filter='+filters.map(f=>{
+      filterParts.push(filters.map(f=>{
+        if(f.op==='year'){
+          const yr=parseInt(f.value);
+          if(yr>2000&&yr<2100) return `(${f.field} ge '${yr}-01-01' and ${f.field} lt '${yr+1}-01-01')`;
+        }
         const v=isNaN(f.value)?`'${f.value}'`:f.value;
         if(f.op==='contains') return `contains(${f.field},${v})`;
         return `${f.field} ${f.op} ${v}`;
-      }).join(' and ');
+      }).join(' and '));
     }
+    // Org Unit filter (OR giữa các unit đã chọn)
+    if(qbOrgUnits.length){
+      const ouFilter=qbOrgUnits.map(u=>`org_unit_name eq '${u.replace(/'/g,"''")}'`).join(' or ');
+      filterParts.push(qbOrgUnits.length>1?`(${ouFilter})`:ouFilter);
+    }
+    let filterStr=filterParts.length?'&$filter='+filterParts.join(' and '):'';
     const sf=g('qbSortField')?.value;
     const sd=g('qbSortDir')?.value||'asc';
     const sortStr=sf?`&$orderby=${sf} ${sd}`:'';
