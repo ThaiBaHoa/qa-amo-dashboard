@@ -1846,7 +1846,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.25-r32';
+const APP_REV = '2026.05.25-r35';
 let sb;
 try {
   const { createClient } = supabase;
@@ -4823,122 +4823,119 @@ let docCollapsedTypes = new Set();
 
 // Thứ tự hiển thị khi "Tất cả nhóm"
 const DOC_GROUP_ORDER = [
+  'AOC / OpsSpec / FAOC',
   'Approved Maintenance Organization',
-  'AMO — Maintenance Quality (MQA)',
+  'Engineering',
+  'External',
+  'Flight Crew Safety Bulletin',
   'Flight Operations',
   'Ground Operations',
   'Safety & Quality Assurance',
-  'External',
   'Security',
   'VietJet Aviation Academy',
-  'AOC / OpsSpec / FAOC',
-  'Flight Crew Safety Bulletin',
-  'Others',
 ];
 const DOC_GROUP_ICONS = {
+  'AOC / OpsSpec / FAOC':            '📋',
   'Approved Maintenance Organization':'🔧',
-  'AMO — Maintenance Quality (MQA)':'🔧',
-  'Flight Operations':'✈️',
-  'Ground Operations':'🛬',
-  'Safety & Quality Assurance':'🛡️',
-  'External':'🌐',
-  'Security':'🔒',
-  'VietJet Aviation Academy':'🎓',
-  'AOC / OpsSpec / FAOC':'📋',
-  'Flight Crew Safety Bulletin':'📰',
-  'Others':'📂',
+  'Engineering':                      '⚙️',
+  'External':                         '🌐',
+  'Flight Crew Safety Bulletin':      '📰',
+  'Flight Operations':                '✈️',
+  'Ground Operations':                '🛬',
+  'Safety & Quality Assurance':       '🛡️',
+  'Security':                         '🔒',
+  'VietJet Aviation Academy':         '🎓',
 };
 
-// Map 1 document_type → tên group predefined
+// Map document_type → group (10 groups từ Galileo web)
 function getDocGroupForType(rawType) {
   const t = (rawType || '').trim();
-  if (!t) return 'Others';
+  if (!t) return null;
   const sw = p => t === p || t.startsWith(p + ' - ') || t.startsWith(p + ' ');
   const eq = (...arr) => arr.includes(t);
 
-  // MQA kiểm tra TRƯỚC AMO — nhưng MQA Event Report F-008 thuộc Safety
-  if (t === 'MQA Event Report F-008') return 'Safety & Quality Assurance';
-  if (sw('MQA')) return 'AMO — Maintenance Quality (MQA)';
-
-  // Flight Crew Safety Bulletin (kiểm tra sớm tránh match Flight Operations)
-  if (eq('Flight Crew Safety Bulletin (FCSB)') || sw('Flight Crew Safety Bulletin'))
-    return 'Flight Crew Safety Bulletin';
-
   // AOC / OpsSpec / FAOC
-  if (eq('AOC/ OpsSpec/ FAOC','Air Operator Certificate (AOC) ',
-         'Air Operator Certificate (AOC)',
-         'Aircraft Operator Security Program',
-         "Foreign Air Transport Air Operator's Certificate (FAOC)",
-         'Operation Specification - CAAV','Operation Specifications (OpsSpec)',
-         'Others Certificates','FOAP-SOPs') ||
-      sw('OpsSpec') || sw('AOC'))
+  if (eq('Air Operator Certificate (AOC) ', 'Air Operator Certificate (AOC)',
+         'Foreign Air Transport Air Operator\'s Certificate (FAOC)',
+         'Operation Specifications (OpsSpec)', 'Operation Specification - CAAV',
+         'AOC/ OpsSpec/ FAOC', 'OpsSpec - A320', 'OpsSpec - A321',
+         'Aircraft Operator Security Program', 'Others Certificates',
+         'Operations Manual - Part A', 'Operations Manual - Part D',
+         'Operations Manuals') || sw('OpsSpec') || sw('AOC'))
     return 'AOC / OpsSpec / FAOC';
 
-  // Approved Maintenance Organization
-  if (sw('AMO') || sw('ENG') || sw('Engineering') || sw('Line Maintenance') ||
-      sw('Technical Training') ||
-      eq('MEL','Workshop','Battery Shop','Wheel Shop',
-         'AHM560_A320','AHM560_A321','AHM560_A330',
-         'Maintenance Operations Control','Supply - Store',
+  // Approved Maintenance Organization — đúng 4 sub-group từ Galileo
+  if (sw('AMO') || sw('MQA') || sw('Line Maintenance'))
+    return 'Approved Maintenance Organization';
+
+  // Engineering — ENG, MEL, TECH, AMP, CDL, Fleet, Workshop, AHM, Supply...
+  // Bao gồm cả VJGS, HR, PVHK... vì không thuộc group nào trong Galileo web
+  if (sw('ENG') || sw('Engineering') || sw('TECH') || sw('Technical Training') ||
+      sw('Supply') || sw('ROS') || sw('VJGS') || sw('PVHK') || sw('PVHL') ||
+      sw('PVSD') || sw('TCKT') || sw('TLGS') || sw('VHTTB') || sw('BDSC') ||
+      sw('HR') || sw('CUVS') || sw('DCC') || sw('COM') || sw('CRUC') ||
+      eq('MEL', 'Workshop', 'Battery Shop', 'Wheel Shop',
+         'AHM560_A320', 'AHM560_A321', 'AHM560_A330',
+         'Maintenance Operations Control',
          'A320/321 Aircraft Maintenance Program (AMP)',
          'A330 Aircraft Maintenance Program (AMP) ',
          'A330 Aircraft Maintenance Program (AMP)',
          'A320/A321 Configuration Deviation List (CDL)',
          'A330 Configuration Deviation List (CDL)',
-         'Contractor/Subcontractor',
-         'Deicing Anti-icing Program','EDTO Manual','Datalink Manual'))
-    return 'Approved Maintenance Organization';
+         'A320/A321 Fleet', 'A330 Fleet',
+         'Contractor/Subcontractor', 'Deicing Anti-icing Program',
+         'EDTO Manual', 'Datalink Manual',
+         'Event Investigation Summary', 'Project',
+         'FOAP-SOPs', 'CEO Office - Forms', 'Others', 'Điều Hành - HDCV'))
+    return 'Engineering';
 
-  // Flight Operations
+  // VietJet Aviation Academy — CHỈ 1 sub-type từ Galileo
+  if (sw('VJAA'))
+    return 'VietJet Aviation Academy';
+
+  // Flight Crew Safety Bulletin
+  if (eq('Flight Crew Safety Bulletin (FCSB)') || sw('Flight Crew Safety Bulletin'))
+    return 'Flight Crew Safety Bulletin';
+
+  // Flight Operations — FCD, FOE, FTD, OMC, CCD, Level 1/2/3, CAT, Roster...
   if (sw('FCD') || sw('FOE') || sw('FTD') || sw('OMC') || sw('OMB') ||
       sw('CCD') || sw('Level 1') || sw('Level 2') || sw('Level 3') ||
-      eq('CAT A','CAT B','OMC Notice','Inflight Services Forms',
-         'Flight Crew Training','Public Announcement Manual','PIN - test',
-         'Roster IGO','Roster VJC','Roster VZ',
-         'Operations Manual - Part A','Operations Manual - Part D',
-         'Operations Manuals','CUG Evaluation SIM'))
+      eq('CAT A', 'CAT B', 'OMC Notice', 'Inflight Services Forms',
+         'Flight Crew Training', 'Public Announcement Manual', 'PIN - test',
+         'Roster IGO', 'Roster VJC', 'Roster VZ', 'CUG Evaluation SIM',
+         'Datalink Manual'))
     return 'Flight Operations';
 
-  // Ground Operations — CUVS Biểu mẫu thuộc đây, CUVS HDCV thuộc VJAA
-  if (sw('GO') || sw('FOAP') || sw('FOD') || sw('HC') || sw('GSPV HH') ||
-      eq('CUVS - Biểu mẫu',
-         'Ground Operations Training','Ramp Forms','Gate Management Forms',
-         'Baggage Handling Forms','Check-in Forms','CUSTOMER SERVICE (CS)',
-         'Station Emergency Response Plan','General Forms'))
+  // Ground Operations — GO, Ramp, Gate, Check-in, HC, Station ERP...
+  if (sw('GO') || sw('FOD') || sw('HC') || sw('GSPV HH') ||
+      eq('CUVS - Biểu mẫu', 'Ground Operations Training', 'Ramp Forms',
+         'Gate Management Forms', 'Baggage Handling Forms', 'Check-in Forms',
+         'CUSTOMER SERVICE (CS)', 'Station Emergency Response Plan', 'General Forms'))
     return 'Ground Operations';
 
-  // Safety & Quality Assurance
+  // Safety & Quality Assurance — SQA, TQA, SSQA, Safety...
   if (sw('SQA') || sw('TQA') || sw('SSQA') || sw('Safety') ||
-      eq('ACV','Event Investigation Summary','Coruson User Guide',
-         'Information Security Management System','MQA Event Report F-008'))
+      eq('Coruson User Guide', 'Information Security Management System',
+         'MQA Event Report F-008'))
     return 'Safety & Quality Assurance';
 
-  // Security (trước External)
+  // Security
   if (sw('SEC') || sw('Security') || eq('Quy chế An Ninh Hàng Không'))
     return 'Security';
 
   // External
   if (sw('CAAV') || sw('ICAO') || sw('IATA') ||
-      eq('MOT (Bộ GTVT)','VAR','CIRCULAR','Taiwan','Thai VietJet',
+      eq('AC', 'ACV', 'NBA', 'VAR', 'CIRCULAR', 'Taiwan', 'Thai VietJet',
          'External Official Correspondences',
-         'Dangerous Goods','Dangerous Goods Regulations',
-         'IOSA Documentation','Transport Security Program',
-         'Corporate Emergency Response Plan','CAAC',
-         'VATM - Kế hoạch','AC',
-         'CAAT AMO Certificate','DCAL AMO Certificates',
-         'DGCA AMO Certificate','CAAV AMO Certificate','CAAV Caplist',
-         'A320/A321 Fleet','A330 Fleet'))
+         'Dangerous Goods', 'Dangerous Goods Regulations',
+         'IOSA Documentation', 'Transport Security Program',
+         'Corporate Emergency Response Plan', 'CAAC',
+         'VATM - Kế hoạch', 'CAAT AMO Certificate', 'DCAL AMO Certificates',
+         'DGCA AMO Certificate', 'CAAV AMO Certificate', 'CAAV Caplist',
+         'MOT (Bộ GTVT)'))
     return 'External';
 
-  // VietJet Aviation Academy
-  if (sw('VJAA') || sw('VJGS') || sw('PVHK') || sw('PVHL') || sw('PVSD') ||
-      sw('TCKT') || sw('TLGS') || sw('VHTTB') || sw('BDSC') || sw('ROS') ||
-      sw('HR') || sw('CUVS') ||
-      eq('NBA','Project','CEO Office - Forms','COM - SOP',
-         'CRUC - SOPs','DCC - Forms','Điều Hành - HDCV','Others'))
-    return 'VietJet Aviation Academy';
-
-  return 'Others';
+  return null; // không map được → ẩn hoặc hiện riêng
 }
 
 function docSetType(type) {
