@@ -903,17 +903,16 @@ tr:last-child td{border-bottom:none}
                 <!-- Dropdown chọn nhóm -->
                 <select class="sel" id="docGroupF" onchange="docGroupFilter=this.value;renderDocPage()" style="max-width:230px;font-size:12px">
                   <option value="">🗂️ Tất cả nhóm</option>
+                  <option value="AOC / OpsSpec / FAOC">📋 AOC / OpsSpec / FAOC</option>
                   <option value="Approved Maintenance Organization">🔧 Approved Maintenance Org.</option>
-                  <option value="AMO — Maintenance Quality (MQA)">🔧 AMO — MQA</option>
+                  <option value="Engineering">⚙️ Engineering</option>
+                  <option value="External">🌐 External</option>
+                  <option value="Flight Crew Safety Bulletin">📰 Flight Crew Safety Bulletin</option>
                   <option value="Flight Operations">✈️ Flight Operations</option>
                   <option value="Ground Operations">🛬 Ground Operations</option>
                   <option value="Safety & Quality Assurance">🛡️ Safety & Quality Assurance</option>
-                  <option value="External">🌐 External</option>
                   <option value="Security">🔒 Security</option>
                   <option value="VietJet Aviation Academy">🎓 VietJet Aviation Academy</option>
-                  <option value="AOC / OpsSpec / FAOC">📋 AOC / OpsSpec / FAOC</option>
-                  <option value="Flight Crew Safety Bulletin">📰 Flight Crew Safety Bulletin</option>
-                  <option value="Others">📂 Others (chưa phân loại)</option>
                 </select>
                 <button class="btn-sm" onclick="docExpandAll()">⊞ Mở tất cả</button>
                 <button class="btn-sm" onclick="docCollapseAll()">⊟ Thu gọn</button>
@@ -942,17 +941,6 @@ tr:last-child td{border-bottom:none}
             </div>
             <div class="chart-card" style="text-align:center;padding:10px 8px">
               <div class="kpi-lbl">Completed Early</div><div class="kpi-val" id="dk-early" style="color:var(--green)">—</div><div class="kpi-sub" style="font-size:10px;color:var(--muted)">from loaded tasks</div>
-            </div>
-          </div>
-          <!-- Charts row — reduced height to give table more room -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;flex-shrink:0">
-            <div class="chart-card">
-              <div class="chart-head" style="margin-bottom:8px"><div><div class="chart-title">Documents by Type</div><div class="chart-sub">Top 10</div></div></div>
-              <div class="ch-wrap" style="height:160px"><canvas id="cDocType"></canvas></div>
-            </div>
-            <div class="chart-card">
-              <div class="chart-head" style="margin-bottom:8px"><div><div class="chart-title">Documents by Year</div><div class="chart-sub">By created date</div></div></div>
-              <div class="ch-wrap" style="height:160px"><canvas id="cDocYear"></canvas></div>
             </div>
           </div>
           <!-- Grouped document list -->
@@ -1846,7 +1834,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.25-r35';
+const APP_REV = '2026.05.25-r39';
 let sb;
 try {
   const { createClient } = supabase;
@@ -4856,12 +4844,13 @@ function getDocGroupForType(rawType) {
 
   // AOC / OpsSpec / FAOC
   if (eq('Air Operator Certificate (AOC) ', 'Air Operator Certificate (AOC)',
-         'Foreign Air Transport Air Operator\'s Certificate (FAOC)',
+         "Foreign Air Transport Air Operator's Certificate (FAOC)",
+         "Foreign Air  Transport Air Operator's Certificate (FAOC)",
          'Operation Specifications (OpsSpec)', 'Operation Specification - CAAV',
          'AOC/ OpsSpec/ FAOC', 'OpsSpec - A320', 'OpsSpec - A321',
          'Aircraft Operator Security Program', 'Others Certificates',
          'Operations Manual - Part A', 'Operations Manual - Part D',
-         'Operations Manuals') || sw('OpsSpec') || sw('AOC'))
+         'Operations Manuals') || sw('OpsSpec') || sw('AOC') || sw('FAOC'))
     return 'AOC / OpsSpec / FAOC';
 
   // Approved Maintenance Organization — đúng 4 sub-group từ Galileo
@@ -5004,6 +4993,7 @@ function renderDocGrouped(data) {
     // Group by predefined mapping
     data.forEach(r => {
       const key = getDocGroupForType(r.document_type);
+      if (!key) return; // skip unmapped types
       if (!groups[key]) groups[key] = [];
       groups[key].push(r);
     });
@@ -5012,10 +5002,10 @@ function renderDocGrouped(data) {
   // Sắp xếp keys: predefined order (top-level) hoặc alphabetical (sub-type)
   let groupKeys;
   if (bySubType) {
-    groupKeys = Object.keys(groups).sort();
+    groupKeys = Object.keys(groups).filter(k => k && k !== 'null').sort();
   } else {
     groupKeys = DOC_GROUP_ORDER.filter(k => groups[k]);
-    Object.keys(groups).forEach(k => { if (!DOC_GROUP_ORDER.includes(k)) groupKeys.push(k); });
+    // Không thêm keys ngoài DOC_GROUP_ORDER — bỏ null và unmapped
   }
 
   let html = '';
