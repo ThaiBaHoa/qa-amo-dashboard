@@ -6114,6 +6114,114 @@ function dbDeleteWidget(id) {
   toast('Đã xóa widget','info');
 }
 
+// ── GALILEO API DIAGNOSTIC TOOLS (Admin · DevTools Console) ───────────────
+// Gọi từ DevTools Console:
+//   await fetchATAChapters()       → lấy ATA values từ form data thực tế
+//   await probeGalileoTables()     → thử 35+ tên bảng để tìm lookup table
+
+window.fetchATAChapters = async function(fieldName = 'ATA Chapter') {
+  console.log(`%c[ATA] Đang tìm values cho field: "${fieldName}"...`, 'color:#58A6FF;font-weight:bold');
+  try {
+    const url = G_URL + `dwanalytics_report_form_section_field?$filter=field_name eq '${fieldName}'&$select=text_value&$top=5000`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
+    const j = await r.json();
+
+    // Lấy unique values, bỏ null/empty
+    const values = [...new Set(
+      j.value.map(x => (x.text_value || '').trim()).filter(Boolean)
+    )].sort((a, b) => {
+      // Sắp xếp: số trước, text sau
+      const aNum = /^\d/.test(a), bNum = /^\d/.test(b);
+      if (aNum && !bNum) return -1;
+      if (!aNum && bNum) return 1;
+      return a.localeCompare(b, undefined, {numeric: true});
+    });
+
+    // Xây dựng cây: chapter → sections → sub-sections
+    const treeMap = {};
+    values.forEach(v => {
+      const parts = v.split('-');
+      const chap = parts[0].trim();
+      if (!treeMap[chap]) treeMap[chap] = { chapter: chap, sections: [] };
+      if (parts.length > 1) treeMap[chap].sections.push(v);
+    });
+
+    const tree = Object.values(treeMap).sort((a, b) =>
+      a.chapter.localeCompare(b.chapter, undefined, {numeric: true}));
+
+    console.log(`%c[ATA] ✅ Tìm thấy ${values.length} values duy nhất từ ${j.value.length} records`, 'color:#3FB950');
+    console.log('%c[ATA] Raw values (copy JSON):', 'color:#D29922', JSON.stringify(values, null, 2));
+    console.log('%c[ATA] Tree structure:', 'color:#D29922', JSON.stringify(tree, null, 2));
+    console.log('%cTip: copy kết quả ở trên dán vào code làm static list', 'color:#A3AEB8;font-style:italic');
+    return { values, tree, total: j.value.length };
+  } catch(e) {
+    console.error('[ATA] ❌ Lỗi:', e.message);
+    return null;
+  }
+};
+
+window.probeGalileoTables = async function() {
+  console.log('%c[PROBE] Bắt đầu dò tìm bảng Galileo...', 'color:#58A6FF;font-weight:bold');
+  const candidates = [
+    // Ideagen-specific patterns
+    'dwanalytics_field_definition','dwanalytics_form_definition',
+    'dwanalytics_choice','dwanalytics_form_choice','dwanalytics_field_choice',
+    'dwanalytics_reference_data','dwanalytics_reference_item',
+    'dwanalytics_list','dwanalytics_items','dwanalytics_item',
+    'dwanalytics_form_option','dwanalytics_field_value_option',
+    // dwconfig_ prefix
+    'dwconfig_list_item','dwconfig_lookup','dwconfig_option',
+    'dwconfig_field','dwconfig_choice','dwconfig_reference',
+    // dwsetup_ prefix
+    'dwsetup_list_item','dwsetup_lookup','dwsetup_option',
+    'dwsetup_field','dwsetup_choice',
+    // dwmaster_ prefix
+    'dwmaster_ata_chapter','dwmaster_list_item','dwmaster_lookup',
+    'dwmaster_reference','dwmaster_choice',
+    // dwform_ prefix
+    'dwform_field','dwform_list_item','dwform_option',
+    // dw_ prefix
+    'dw_list_item','dw_lookup','dw_reference_data',
+    // No prefix
+    'ata_chapter','list_item','lookup_item','reference_data',
+    // Other patterns
+    'dwreporting_reference_data','dwreporting_choice',
+    'dwreporting_form_definition','dwreporting_field_definition',
+    'dwanalytics_report_field_option','dwanalytics_form_field_option',
+  ];
+
+  const ok = [], notFound = [], errored = [];
+
+  // Xử lý 5 bảng song song
+  for (let i = 0; i < candidates.length; i += 5) {
+    const batch = candidates.slice(i, i + 5);
+    await Promise.all(batch.map(async tbl => {
+      try {
+        const r = await fetch(G_URL + tbl + '?$top=2');
+        if (r.ok) {
+          const j = await r.json();
+          ok.push({ table: tbl, records: j.value?.length, fields: j.value?.[0] ? Object.keys(j.value[0]) : [] });
+        } else if (r.status === 404) {
+          notFound.push(tbl);
+        } else {
+          errored.push({ table: tbl, status: r.status });
+        }
+      } catch(e) { errored.push({ table: tbl, error: e.message }); }
+    }));
+  }
+
+  if (ok.length) {
+    console.log(`%c[PROBE] ✅ Tìm thấy ${ok.length} bảng!`, 'color:#3FB950;font-weight:bold');
+    ok.forEach(t => console.log(`  📋 ${t.table} — fields: [${t.fields.join(', ')}]`));
+  } else {
+    console.log('%c[PROBE] ❌ Không tìm thấy bảng nào trong số 35+ candidates', 'color:#f85149');
+  }
+  console.log(`%c[PROBE] 404: ${notFound.length} | Lỗi: ${errored.length}`, 'color:#A3AEB8');
+  if (errored.length) console.log('[PROBE] Errors:', errored);
+  return { ok, notFound, errored };
+};
+
 </script>
 
 <!-- Change Password Modal -->
