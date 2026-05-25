@@ -1834,7 +1834,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.25-r40';
+const APP_REV = '2026.05.25-r41';
 let sb;
 try {
   const { createClient } = supabase;
@@ -2379,11 +2379,11 @@ async function loadData(forceRefresh=false) {
   } finally { isLoading=false; }
 }
 
-async function fetchAll(url) {
+async function fetchAll(url, skipOv=false) {
   let res=[],next=url,p=0;
   while(next) {
     p++;
-    setOv(true,g('ovText').textContent,`Trang ${p} · ${res.length} records`);
+    if(!skipOv) setOv(true,g('ovText').textContent,`Trang ${p} · ${res.length} records`);
     const ctl=new AbortController();
     const tid=setTimeout(()=>ctl.abort(),30000);
     let r;
@@ -5035,7 +5035,7 @@ function renderDocGrouped(data) {
       : '<th>Số hiệu</th><th>Tiêu đề tài liệu</th><th>Rev</th><th>Trạng thái</th><th>Owner</th><th>Hiệu lực từ</th><th>Phát hành</th><th></th>';
 
     html += `<div class="doc-group" data-grpkey="${esc(groupKey)}">
-      <div class="doc-group-hdr" onclick="docToggleGroup(${JSON.stringify(groupKey)})">
+      <div class="doc-group-hdr" onclick="docToggleGroup(this.closest('.doc-group').dataset.grpkey)">
         <span class="doc-group-arrow ${isOpen?'open':''}">▶</span>
         <span class="doc-group-name">${icon} ${esc(groupKey)}</span>
         <span class="doc-group-cnt">${rows.length} tài liệu</span>
@@ -5163,12 +5163,13 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
   document.body.style.overflow='hidden';
 
   try {
-    // ── Fetch tasks — UUID không dùng quotes ──
+    // ── Fetch tasks — UUID không dùng quotes, disable main overlay ──
     let tasks = docTaskCache[revId];
     if(!tasks) {
       const raw = await fetchAll(
         G_URL + 'dwreporting_document_task' +
-        '?$filter=document_revision_id eq ' + revId
+        '?$filter=document_revision_id eq ' + revId,
+        true // skipOv = true: không update main overlay
       );
       tasks = raw;
       docTaskCache[revId] = tasks;
