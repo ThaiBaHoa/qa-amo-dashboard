@@ -2969,7 +2969,6 @@ function goPg(bodyId,p) {
     'auditBody':[TS.audit,renderAudit],
     'cmrBody':[TS.cmr,renderCmr],
     'ecarBody':[TS.ecar,renderEcar],
-    'docsBody':[TS.docs,renderDocs],
   };
   const [ts,fn]=map[bodyId]||[null,null]; if(!fn||p<1)return;
   ts.page=p; fn();
