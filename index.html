@@ -670,6 +670,46 @@ tr:last-child td{border-bottom:none}
               </table>
             </div>
           </div>
+
+          <!-- Row 5: ATA Chapter Comparison -->
+          <div class="chart-card" style="flex-shrink:0;margin-top:8px">
+            <div class="chart-head" style="margin-bottom:10px">
+              <div>
+                <div class="chart-title">CMR-CAR vs ECAR — Findings by ATA Chapter</div>
+                <div class="chart-sub">ECAR &gt; CMR-CAR tại cùng ATA → CMR-CAR chưa hiệu quả ở hệ thống đó</div>
+              </div>
+              <div style="display:flex;gap:6px;align-items:center">
+                <select class="sel" id="ataGroupLevel" onchange="renderATACompare()" style="font-size:11px">
+                  <option value="2">Chapter (XX)</option>
+                  <option value="4">Section (XX-XX)</option>
+                  <option value="6">Subject (XX-XX-XX)</option>
+                </select>
+                <select class="sel" id="ataCompareYear" onchange="renderATACompare()" style="font-size:11px;width:90px">
+                  <option value="">All Years</option>
+                </select>
+              </div>
+            </div>
+            <!-- Legend -->
+            <div style="display:flex;gap:16px;margin-bottom:10px;font-size:11px">
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#58A6FF;border-radius:2px;display:inline-block"></span>CMR-CAR</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#ff6b6b;border-radius:2px;display:inline-block"></span>ECAR</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:rgba(240,136,62,0.3);border:1px solid var(--orange);border-radius:2px;display:inline-block"></span>ECAR &gt; CMR-CAR (kém hiệu quả)</span>
+            </div>
+            <div class="ch-wrap" style="height:320px"><canvas id="cATACompare"></canvas></div>
+            <!-- Detail table -->
+            <div style="overflow-x:auto;margin-top:12px">
+              <table class="stat-tbl" id="ataCompareTable">
+                <thead><tr>
+                  <th>ATA Chapter</th>
+                  <th style="text-align:center;color:var(--blue)">CMR-CAR</th>
+                  <th style="text-align:center;color:#ff6b6b">ECAR</th>
+                  <th style="text-align:center">Ratio ECAR/CMR</th>
+                  <th style="text-align:center">Đánh giá</th>
+                </tr></thead>
+                <tbody id="ataCompareBody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
         <!-- ALL FORMS -->
@@ -771,6 +811,7 @@ tr:last-child td{border-bottom:none}
                 <option value="3">Q3 (Jul–Sep)</option>
                 <option value="4">Q4 (Oct–Dec)</option>
               </select>
+              <select class="sel" id="cmrAtaF" onchange="renderCmr()" style="max-width:200px;font-size:12px"><option value="">All ATA</option></select>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
                 <input class="srch" id="cmrSrch" placeholder="Search..." oninput="dRenderCmr()">
               </div>
@@ -813,6 +854,7 @@ tr:last-child td{border-bottom:none}
               <button class="pill qtr-pill" onclick="toggleEcarQtr(3,this)" disabled style="opacity:.5">Q3</button>
               <button class="pill qtr-pill" onclick="toggleEcarQtr(4,this)" disabled style="opacity:.5">Q4</button>
               <select class="sel" id="ecarIssuedByF" onchange="renderEcar()"><option value="">All Issued By</option></select>
+              <select class="sel" id="ecarAtaF" onchange="renderEcar()" style="max-width:200px;font-size:12px"><option value="">All ATA</option></select>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
                 <input class="srch" id="ecarSrch" placeholder="Search..." oninput="dRenderEcar()">
               </div>
@@ -1834,7 +1876,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.25-r42';
+const APP_REV = '2026.05.25-r43';
 let sb;
 try {
   const { createClient } = supabase;
@@ -2679,6 +2721,7 @@ function filterKpiYear() {
   const countEl = g('kpiYearCount');
   if(countEl) countEl.textContent = yr==='all' ? `${allData.length} records` : `${data.length} records for ${yr}`;
   buildKPICharts(data);
+  renderATACompare();
 }
 
 function buildKPICharts(data) {
@@ -2821,6 +2864,180 @@ function buildKPICharts(data) {
   charts['cOvForm']=new Chart(g('cOvForm'),{type:'bar',
     data:{labels:sovf.map(f=>f[0]),datasets:[{data:sovf.map(f=>f[1]),backgroundColor:'#ff6b6b',borderRadius:4}]},
     options:{...CO,indexAxis:'y',plugins:{legend:{display:false}}}});
+}
+
+// ── ATA COMPARE ──────────────────────────────────────────────
+function normalizeATA(raw, level) {
+  // level: 2 = "XX", 4 = "XX-XX", 6 = "XX-XX-XX"
+  if (!raw || raw === 'Other') return 'Other';
+  // Non-ATA text values
+  if (!/^\d/.test(raw.trim())) return 'Other';
+  const parts = raw.trim().split('-');
+  // Pad first part to 2 digits
+  parts[0] = parts[0].padStart(2,'0');
+  if (level === 2) return parts[0];
+  if (level === 4) return parts.length >= 2 ? parts[0]+'-'+parts[1] : parts[0];
+  if (level === 6) return parts.length >= 3 ? parts[0]+'-'+parts[1]+'-'+parts[2] : (parts.length >= 2 ? parts[0]+'-'+parts[1] : parts[0]);
+  return parts[0];
+}
+
+// ATA chapter label map (chapter 2 số)
+const ATA_LABELS = {
+  '05':'05 – Time Limits','06':'06 – Dimensions','07':'07 – Lifting & Shoring',
+  '08':'08 – Leveling','09':'09 – Towing','10':'10 – Parking',
+  '11':'11 – Placards','12':'12 – Servicing','20':'20 – Std Practices',
+  '21':'21 – Air Conditioning','22':'22 – Auto Flight','23':'23 – Communication',
+  '24':'24 – Electrical','25':'25 – Equipment','26':'26 – Fire Protection',
+  '27':'27 – Flight Controls','28':'28 – Fuel','29':'29 – Hydraulic',
+  '30':'30 – Ice & Rain','31':'31 – Indicating','32':'32 – Landing Gear',
+  '33':'33 – Lights','34':'34 – Navigation','35':'35 – Oxygen',
+  '36':'36 – Pneumatic','38':'38 – Water/Waste','44':'44 – Cabin Systems',
+  '45':'45 – OMS','46':'46 – Info Systems','47':'47','49':'49 – Aux Power',
+  '50':'50 – Cargo','51':'51 – Structures','52':'52 – Doors',
+  '53':'53 – Fuselage','54':'54 – Nacelles','55':'55 – Stabilizers',
+  '56':'56 – Windows','57':'57 – Wings','70':'70 – Std Practices Engine',
+  '71':'71 – Power Plant','72':'72 – Engine','73':'73 – Engine Fuel',
+  '74':'74 – Ignition','75':'75 – Bleed Air','76':'76 – Engine Controls',
+  '77':'77 – Engine Indicating','78':'78 – Exhaust','79':'79 – Oil','80':'80 – Starting',
+};
+
+function renderATACompare() {
+  if(!cmrLoaded && !ecarLoaded) return;
+  const level = parseInt(g('ataGroupLevel')?.value || '2');
+  const yr = g('ataCompareYear')?.value || '';
+
+  // Populate year filter
+  const yrEl = g('ataCompareYear');
+  if(yrEl && yrEl.options.length <= 1) {
+    const years = [...new Set([
+      ...cmrData.map(r=>r.raised_year),
+      ...ecarData.map(r=>r.raised_year)
+    ].filter(Boolean))].sort((a,b)=>b-a);
+    yrEl.innerHTML = '<option value="">All Years</option>' +
+      years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  }
+
+  // Filter by year
+  const cmrF = yr ? cmrData.filter(r=>String(r.raised_year)===yr) : cmrData;
+  const ecarF = yr ? ecarData.filter(r=>String(r.raised_year)===yr) : ecarData;
+
+  // Count by normalized ATA
+  const cmrCount = {}, ecarCount = {};
+
+  cmrF.forEach(r => {
+    // CMR có nhiều findings, mỗi finding có ATA riêng
+    if(r.findings && r.findings.length) {
+      // ATA từ finding-level — dùng ata_chapter của report
+    }
+    const ata = normalizeATA(r.ata_chapter, level);
+    if(!ata) return;
+    cmrCount[ata] = (cmrCount[ata]||0) + Math.max(r.finding_count||1,1);
+  });
+
+  ecarF.forEach(r => {
+    const ata = normalizeATA(r.ata_chapter, level);
+    if(!ata) return;
+    ecarCount[ata] = (ecarCount[ata]||0) + 1;
+  });
+
+  // Merge all ATA keys (exclude Other for chart, show in table)
+  const allATA = [...new Set([...Object.keys(cmrCount), ...Object.keys(ecarCount)])]
+    .filter(a => a !== 'Other')
+    .sort((a,b) => {
+      const na=parseInt(a), nb=parseInt(b);
+      return isNaN(na)||isNaN(nb) ? a.localeCompare(b) : na-nb;
+    });
+
+  const cmrVals = allATA.map(a => cmrCount[a]||0);
+  const ecarVals = allATA.map(a => ecarCount[a]||0);
+
+  // Bar colors: highlight where ECAR > CMR
+  const ecarColors = allATA.map((a,i) =>
+    ecarVals[i] > cmrVals[i] ? 'rgba(255,107,107,0.9)' : 'rgba(255,107,107,0.4)'
+  );
+  const cmrColors = allATA.map((a,i) =>
+    ecarVals[i] > cmrVals[i] ? 'rgba(88,166,255,0.4)' : 'rgba(88,166,255,0.9)'
+  );
+
+  // Labels: dùng ATA_LABELS nếu có, fallback về value
+  const labels = allATA.map(a => {
+    const ch = a.split('-')[0];
+    if(level===2 && ATA_LABELS[ch]) return ATA_LABELS[ch];
+    return a;
+  });
+
+  // Chart
+  dc('cATACompare');
+  const ctx = g('cATACompare');
+  if(ctx) {
+    charts['cATACompare'] = new Chart(ctx, {
+      type:'bar',
+      data:{
+        labels,
+        datasets:[
+          {label:'CMR-CAR',data:cmrVals,backgroundColor:cmrColors,borderRadius:3},
+          {label:'ECAR',data:ecarVals,backgroundColor:ecarColors,borderRadius:3},
+        ]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{
+          legend:{display:false},
+          tooltip:{callbacks:{
+            title: (ctx) => ctx[0].label,
+            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw} findings`
+          }}
+        },
+        scales:{
+          x:{ticks:{color:'#8B949E',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},
+          y:{ticks:{color:'#8B949E',font:{size:9}},grid:{color:'rgba(255,255,255,0.06)'},beginAtZero:true}
+        }
+      }
+    });
+  }
+
+  // Detail table
+  const tbody = g('ataCompareBody');
+  if(!tbody) return;
+  const rows = allATA.map(a => ({
+    ata: a,
+    cmr: cmrCount[a]||0,
+    ecar: ecarCount[a]||0,
+  })).sort((a,b) => (b.ecar+b.cmr)-(a.ecar+a.cmr));
+
+  // Add Other row at end
+  const otherCmr = cmrCount['Other']||0;
+  const otherEcar = ecarCount['Other']||0;
+
+  tbody.innerHTML = rows.map(({ata,cmr,ecar}) => {
+    const ratio = cmr > 0 ? (ecar/cmr).toFixed(2) : (ecar > 0 ? '∞' : '—');
+    const isIneffective = ecar > cmr && cmr > 0;
+    const isNoData = cmr === 0 && ecar > 0;
+    const label = level===2 && ATA_LABELS[ata] ? ATA_LABELS[ata] : ata;
+    let badge = '';
+    if(isIneffective) badge = `<span class="badge b-over" style="font-size:10px">⚠️ CMR kém hiệu quả</span>`;
+    else if(isNoData) badge = `<span class="badge b-late" style="font-size:10px">❓ CMR không có data</span>`;
+    else if(cmr > 0 && ecar === 0) badge = `<span class="badge b-on" style="font-size:10px">✅ CMR hiệu quả</span>`;
+    else badge = `<span style="color:var(--muted);font-size:10px">—</span>`;
+    return `<tr style="${isIneffective?'background:rgba(255,107,107,0.05)':''}">
+      <td style="font-size:11px;font-weight:500">${esc(label)}</td>
+      <td style="text-align:center;color:var(--blue);font-weight:600">${cmr||'—'}</td>
+      <td style="text-align:center;color:#ff6b6b;font-weight:600">${ecar||'—'}</td>
+      <td style="text-align:center;font-size:11px">${ratio}</td>
+      <td style="text-align:center">${badge}</td>
+    </tr>`;
+  }).join('');
+
+  // Other row
+  if(otherCmr > 0 || otherEcar > 0) {
+    tbody.innerHTML += `<tr style="border-top:1px solid var(--border);opacity:0.6">
+      <td style="font-size:11px;color:var(--muted)">Other / Non-ATA</td>
+      <td style="text-align:center;color:var(--blue)">${otherCmr||'—'}</td>
+      <td style="text-align:center;color:#ff6b6b">${otherEcar||'—'}</td>
+      <td style="text-align:center;font-size:11px">—</td>
+      <td style="text-align:center"><span style="color:var(--muted);font-size:10px">N/A</span></td>
+    </tr>`;
+  }
 }
 
 // ── TABLE: OPEN RFI ──────────────────────────────────────────
@@ -3137,6 +3354,7 @@ function renderCmr(){
   const ts=TS.cmr;
   const yr=(g('cmrYearF')?.value||'');
   const qr=(g('cmrQtrF')?.value||'');
+  const ata=(g('cmrAtaF')?.value||'');
   const srch=(g('cmrSrch')?.value||'').toLowerCase();
 
   // Populate year filter once
@@ -3145,7 +3363,23 @@ function renderCmr(){
   if(yrEl&&yrEl.options.length<=1)
     yrEl.innerHTML='<option value="">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
 
-
+  // Populate ATA filter from actual data values (sorted by ATA_CHAPTERS order)
+  const cmrAtaEl=g('cmrAtaF');
+  if(cmrAtaEl&&cmrAtaEl.options.length<=1){
+    const ataVals=[...new Set(cmrData.map(r=>r.ata_chapter).filter(Boolean))];
+    ataVals.sort((a,b)=>{
+      const ai=ATA_CHAPTERS.findIndex(x=>a===x.v||a.startsWith(x.v+' ')||a.startsWith(x.v+'-'));
+      const bi=ATA_CHAPTERS.findIndex(x=>b===x.v||b.startsWith(x.v+' ')||b.startsWith(x.v+'-'));
+      if(ai===-1&&bi===-1)return a.localeCompare(b);
+      if(ai===-1)return 1; if(bi===-1)return -1;
+      return ai-bi;
+    });
+    cmrAtaEl.innerHTML='<option value="">All ATA</option>'+
+      ataVals.map(v=>{
+        const ch=ATA_CHAPTERS.find(x=>v===x.v||v.startsWith(x.v+' ')||v.startsWith(x.v+'-'));
+        return `<option value="${esc(v)}">${esc(ch?ch.label:v)}</option>`;
+      }).join('');
+  }
 
   // Filter
   let data=cmrData.filter(r=>{
@@ -3153,8 +3387,9 @@ function renderCmr(){
     if(ts.sf!=='all'&&r.semantic_status!==ts.sf)return false;
     if(yr&&String(r.raised_year)!==yr)return false;
     if(qr&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(Math.ceil(m/3)!==parseInt(qr))return false;}
+    if(ata&&r.ata_chapter!==ata)return false;
     if(srch){
-      const t=[r.report_number,r.aircraft_reg,r.dept,r.issued_to,r.audit_ref,r.finding_desc].join(' ').toLowerCase();
+      const t=[r.report_number,r.aircraft_reg,r.dept,r.issued_to,r.audit_ref,r.finding_desc,r.ata_chapter].join(' ').toLowerCase();
       if(!t.includes(srch))return false;
     }
     return true;
@@ -3253,6 +3488,7 @@ function exportCmrPDF(){
   const ts=TS.cmr;
   const yr=g('cmrYearF')?.value||'';
   const qr=g('cmrQtrF')?.value||'';
+  const ataExport=g('cmrAtaF')?.value||'';
 
   // Re-apply current filters (same logic as renderCmr)
   let data=cmrData.filter(r=>{
@@ -3260,6 +3496,7 @@ function exportCmrPDF(){
     if(ts.sf!=='all'&&r.semantic_status!==ts.sf)return false;
     if(yr&&String(r.raised_year)!==yr)return false;
     if(qr&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(Math.ceil(m/3)!==parseInt(qr))return false;}
+    if(ataExport&&r.ata_chapter!==ataExport)return false;
     return true;
   });
   data=sortD(data,ts.sort,ts.asc);
@@ -3368,6 +3605,7 @@ async function loadEcar(){
       const ECAR_FF=
         "field_name eq 'Target date' or "+
         "field_name eq 'Aircraft Registration' or field_name eq 'Finding description' or "+
+        "field_name eq 'ATA Chapter' or "+
         "field_name eq 'Date completed' or field_name eq 'Issued by'";
       const fRaw=await fetchAll(
         G_URL+'dwanalytics_report_form_section_field'+
@@ -3403,6 +3641,7 @@ async function loadEcar(){
         findings:        f.findings||[],
         finding_count:   (f.findings||[]).length,
         finding_desc:    (f.findings||[])[0]||null,
+        ata_chapter:     f['ATA Chapter']||null,
         issued_by:       f['Issued by']||null,
         Target_date:     td,
         close_date:      cd,
@@ -3455,6 +3694,7 @@ function renderEcar(){
   const yr=g('ecarYearF')?.value||'';
   const qrs=ts.qrs;
   const issuedBy=g('ecarIssuedByF')?.value||'';
+  const ata=(g('ecarAtaF')?.value||'');
   const srch=(g('ecarSrch')?.value||'').toLowerCase();
 
   // Populate year filter once
@@ -3470,6 +3710,24 @@ function renderEcar(){
     ibEl.innerHTML='<option value="">All Issued By</option>'+issuers.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('');
   }
 
+  // Populate ATA filter from actual data values (sorted by ATA_CHAPTERS order)
+  const ecarAtaEl=g('ecarAtaF');
+  if(ecarAtaEl&&ecarAtaEl.options.length<=1){
+    const ataVals=[...new Set(ecarData.map(r=>r.ata_chapter).filter(Boolean))];
+    ataVals.sort((a,b)=>{
+      const ai=ATA_CHAPTERS.findIndex(x=>a===x.v||a.startsWith(x.v+' ')||a.startsWith(x.v+'-'));
+      const bi=ATA_CHAPTERS.findIndex(x=>b===x.v||b.startsWith(x.v+' ')||b.startsWith(x.v+'-'));
+      if(ai===-1&&bi===-1)return a.localeCompare(b);
+      if(ai===-1)return 1; if(bi===-1)return -1;
+      return ai-bi;
+    });
+    ecarAtaEl.innerHTML='<option value="">All ATA</option>'+
+      ataVals.map(v=>{
+        const ch=ATA_CHAPTERS.find(x=>v===x.v||v.startsWith(x.v+' ')||v.startsWith(x.v+'-'));
+        return `<option value="${esc(v)}">${esc(ch?ch.label:v)}</option>`;
+      }).join('');
+  }
+
   // Filter data
   let data=ecarData.filter(r=>{
     if(ts.ac!=='all'&&r.aircraft_reg!==ts.ac)return false;
@@ -3477,8 +3735,9 @@ function renderEcar(){
     if(yr&&String(r.raised_year)!==yr)return false;
     if(qrs.length&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(!qrs.includes(Math.ceil(m/3)))return false;}
     if(issuedBy&&r.issued_by!==issuedBy)return false;
+    if(ata&&r.ata_chapter!==ata)return false;
     if(srch){
-      const t=[r.report_number,r.aircraft_reg,r.issued_by,r.finding_desc].join(' ').toLowerCase();
+      const t=[r.report_number,r.aircraft_reg,r.issued_by,r.finding_desc,r.ata_chapter].join(' ').toLowerCase();
       if(!t.includes(srch))return false;
     }
     return true;
@@ -3695,13 +3954,14 @@ async function exportEcarPDF(){
   if(!ecarLoaded||!ecarData.length){toast('No ECAR data loaded','err');return;}
   setOv(true,'Generating PDF...','');
   try{
-    const ts=TS.ecar,yr=g('ecarYearF')?.value||'',qrs=ts.qrs,issuedBy=g('ecarIssuedByF')?.value||'';
+    const ts=TS.ecar,yr=g('ecarYearF')?.value||'',qrs=ts.qrs,issuedBy=g('ecarIssuedByF')?.value||'',ataExport=g('ecarAtaF')?.value||'';
     let data=ecarData.filter(r=>{
       if(ts.ac!=='all'&&r.aircraft_reg!==ts.ac)return false;
       if(ts.sf!=='all'&&r.semantic_status!==ts.sf)return false;
       if(yr&&String(r.raised_year)!==yr)return false;
       if(qrs.length&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(!qrs.includes(Math.ceil(m/3)))return false;}
       if(issuedBy&&r.issued_by!==issuedBy)return false;
+      if(ataExport&&r.ata_chapter!==ataExport)return false;
       return true;
     });
     let period='All';
@@ -3835,13 +4095,14 @@ function exportEcarExcel(){
   if(!ecarLoaded||!ecarData.length){toast('No ECAR data loaded','err');return;}
   setOv(true,'Exporting Excel...','');
   try{
-    const ts=TS.ecar,yr=g('ecarYearF')?.value||'',qrs=ts.qrs,issuedBy=g('ecarIssuedByF')?.value||'';
+    const ts=TS.ecar,yr=g('ecarYearF')?.value||'',qrs=ts.qrs,issuedBy=g('ecarIssuedByF')?.value||'',ataExportXl=g('ecarAtaF')?.value||'';
     let data=ecarData.filter(r=>{
       if(ts.ac!=='all'&&r.aircraft_reg!==ts.ac)return false;
       if(ts.sf!=='all'&&r.semantic_status!==ts.sf)return false;
       if(yr&&String(r.raised_year)!==yr)return false;
       if(qrs.length&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(!qrs.includes(Math.ceil(m/3)))return false;}
       if(issuedBy&&r.issued_by!==issuedBy)return false;
+      if(ataExportXl&&r.ata_chapter!==ataExportXl)return false;
       return true;
     });
     const wb=XLSX.utils.book_new();
@@ -4680,6 +4941,7 @@ function showPage(name,btn){
   if(name==='docs'){ if(!docData.length) loadDocuments(); else renderDocPage(); }
   if(name==='cmrcar'){ if(!cmrLoaded) loadCmr(); else renderCmr(); }
   if(name==='ecar'){ if(!ecarLoaded) loadEcar(); else renderEcar(); }
+  if(name==='kpi'){ filterKpiYear(); }
   if(name==='overview'){
     setTimeout(()=>{
       Object.values(charts).forEach(c=>{ try{c.resize()}catch(e){} });
@@ -6114,6 +6376,78 @@ function dbDeleteWidget(id) {
   toast('Đã xóa widget','info');
 }
 
+// ── ATA CHAPTERS ──────────────────────────────────────────────────────────
+// Source: dwreporting_list_item_hierarchy · list_id fa764cd5-741d-4ce9-9fcb-2468b542b8bd
+// "ATA Chapter" list · For use on CMR · 487 Active / 13 Archived · 2026-05-25
+// TOP-LEVEL only (no dash) — dùng cho filter dropdown CMR-CAR / ECAR
+// Sub-sections (XX-YY-ZZ, 487 items) có thể load động từ dwreporting_list_item_hierarchy
+const ATA_CHAPTERS = [
+  {v:'05', label:'05 – TIME LIMITS / MAINTENANCE CHECKS'},
+  {v:'06', label:'06 – DIMENSIONS AND AREAS'},
+  {v:'07', label:'07 – LIFTING AND SHORING'},
+  {v:'08', label:'08 – LEVELING AND WEIGHING'},
+  {v:'09', label:'09 – TOWING AND TAXIING'},
+  {v:'10', label:'10 – PARKING, MOORING, STORAGE AND RETURN TO SERVICE'},
+  {v:'11', label:'11 – PLACARDS AND MARKINGS'},
+  {v:'12', label:'12 – SERVICING'},
+  {v:'20', label:'20 – STANDARD PRACTICES - AIRFRAME'},
+  {v:'21', label:'21 – AIR CONDITIONING'},
+  {v:'22', label:'22 – AUTO FLIGHT'},
+  {v:'23', label:'23 – COMMUNICATION'},
+  {v:'24', label:'24 – ELECTRICAL POWER'},
+  {v:'25', label:'25 – EQUIPMENT /FURNISHINGS'},
+  {v:'26', label:'26 – FIRE PROTECTION'},
+  {v:'27', label:'27 – FLIGHT CONTROLS'},
+  {v:'28', label:'28 – FUEL'},
+  {v:'29', label:'29 – HYDRAULIC POWER'},
+  {v:'30', label:'30 – ICE AND RAIN PROTECTION'},
+  {v:'31', label:'31 – INDICATING / RECORDING SYSTEM'},
+  {v:'32', label:'32 – LANDING GEAR'},
+  {v:'33', label:'33 – LIGHTS'},
+  {v:'34', label:'34 – NAVIGATION'},
+  {v:'35', label:'35 – OXYGEN'},
+  {v:'36', label:'36 – PNEUMATIC'},
+  {v:'37', label:'37 – VACUUM'},
+  {v:'38', label:'38 – WATER / WASTE'},
+  {v:'44', label:'44 – CABIN SYSTEMS'},
+  {v:'45', label:'45 – ONBOARD MAINTENANCE SYSTEMS (OMS)'},
+  {v:'46', label:'46 – INFORMATION SYSTEMS'},
+  {v:'47', label:'47 – INERT GAS SYSTEM'},
+  {v:'49', label:'49 – AIRBORNE AUXILIARY POWER'},
+  {v:'50', label:'50 – CARGO AND ACCESSORY COMPARTMENTS'},
+  {v:'51', label:'51 – STANDARD PRACTICES AND STRUCTURES - GENERAL'},
+  {v:'52', label:'52 – DOORS'},
+  {v:'53', label:'53 – FUSELAGE'},
+  {v:'54', label:'54 – NACELLES/PYLONS'},
+  {v:'55', label:'55 – STABILIZERS'},
+  {v:'56', label:'56 – WINDOWS'},
+  {v:'57', label:'57 – WINGS'},
+  {v:'70', label:'70 – STANDARD PRACTICES - ENGINE'},
+  {v:'71', label:'71 – POWER PLANT'},
+  {v:'72', label:'72 – ENGINE'},
+  {v:'73', label:'73 – ENGINE - FUEL AND CONTROL'},
+  {v:'74', label:'74 – IGNITION'},
+  {v:'75', label:'75 – BLEED AIR'},
+  {v:'76', label:'76 – ENGINE CONTROLS'},
+  {v:'77', label:'77 – ENGINE INDICATING'},
+  {v:'78', label:'78 – EXHAUST'},
+  {v:'79', label:'79 – OIL'},
+  {v:'80', label:'80 – STARTING'},
+  // ── VietJet specific (from form data, Active) ─────────────────────────
+  {v:'Other',                                         label:'Other'},
+  {v:'Authorization',                                 label:'Authorization'},
+  {v:'Continuing Airworthiness Information (AD/SB…)', label:'Continuing Airworthiness Information (AD/SB…)'},
+  {v:'Documents onboard',                             label:'Documents onboard'},
+  {v:'Hard-time/LLP/OCCM',                           label:'Hard-time/LLP/OCCM'},
+  {v:'Maintenance Data',                              label:'Maintenance Data'},
+  {v:'Maintenance records',                           label:'Maintenance records'},
+  {v:'MEL, CDL, ADD',                                 label:'MEL, CDL, ADD'},
+  {v:'Task, JIC monitoring',                          label:'Task, JIC monitoring'},
+  {v:'Weigh & Balance',                               label:'Weigh & Balance'},
+  {v:'Work Package/WO issuance',                      label:'Work Package/WO issuance'},
+  // Archived (excluded): "Dent & Buckle Chart"
+];
+
 // ── GALILEO API DIAGNOSTIC TOOLS (Admin · DevTools Console) ───────────────
 // Gọi từ DevTools Console:
 //   await fetchATAChapters()       → lấy ATA values từ form data thực tế
@@ -6241,3 +6575,4 @@ window.probeGalileoTables = async function() {
 </div>
 </body>
 </html>
+
