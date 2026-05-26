@@ -3284,32 +3284,49 @@ async function loadCmr(){
         "field_name eq 'Final action taken' or field_name eq 'Issued to (person)' or "+
         "field_name eq 'Verified by (auditor)' or field_name eq 'Date completed' or "+
         "field_name eq 'RCA analysis'";
-      // Try with sequence_number for per-finding ATA correlation;
-      // fall back silently if this OData endpoint rejects the field (HTTP 400).
-      let fRaw;
-      try {
-        fRaw=await fetchAll(
-          G_URL+'dwanalytics_report_form_section_field'+
-          '?$select=report_id,field_name,text_value,sequence_number'+
-          '&$filter='+encodeURIComponent(CMR_FF)
-        );
-      } catch(e400){
-        if(!String(e400.message).includes('400'))throw e400;
-        fRaw=await fetchAll(
-          G_URL+'dwanalytics_report_form_section_field'+
-          '?$select=report_id,field_name,text_value'+
-          '&$filter='+encodeURIComponent(CMR_FF)
-        );
-      }
+      // Fetch WITHOUT $select so OData returns all columns including sequence_number
+      // (adding unknown fields to $select causes HTTP 400; omitting $select is safe).
+      const fRaw=await fetchAll(
+        G_URL+'dwanalytics_report_form_section_field'+
+        '?$filter='+encodeURIComponent(CMR_FF)
+      );
 
-      // Build fMap: repeating fields (Finding description, ATA Chapter, Finding level, NC Type)
-      // are grouped by sequence_number so each finding row gets its own ATA.
-      // Non-repeating fields are stored at report level.
+      // ── DEBUG: dump raw API rows for the first multi-finding report ──────────────
+      // Mục đích: xem thứ tự thực tế Finding description & ATA Chapter từ API
+      // và kiểm tra sequence_number có được trả về không.
+      // XOÁ ĐOẠN NÀY sau khi xác nhận logic đúng.
+      (()=>{
+        const _debugFields=['Finding description','ATA Chapter','Finding level','NC Type'];
+        // Tìm report đầu tiên có ≥2 findings để dễ quan sát
+        const _cnt={};
+        fRaw.forEach(f=>{if(f.field_name==='Finding description')_cnt[f.report_id]=(_cnt[f.report_id]||0)+1;});
+        const _debugId=Object.keys(_cnt).find(id=>_cnt[id]>=2)||null;
+        if(_debugId){
+          const _rows=fRaw.filter(f=>f.report_id==_debugId&&_debugFields.includes(f.field_name));
+          console.log(`%c[CMR DEBUG] report_id=${_debugId} — raw API order (${_rows.length} rows):`,
+            'color:#58A6FF;font-weight:bold');
+          console.table(_rows.map((f,i)=>({
+            '#':i,
+            field_name:f.field_name,
+            text_value:f.text_value,
+            sequence_number:f.sequence_number??'(không có)',
+            // In thêm tất cả keys lạ để biết API trả thêm field gì
+            extra_keys:Object.keys(f).filter(k=>!['report_id','field_name','text_value','sequence_number'].includes(k)).join(', ')||'—'
+          })));
+          // In toàn bộ keys của 1 row để biết API có field nào khác không
+          console.log('[CMR DEBUG] All keys in one row:',Object.keys(fRaw[0]||{}));
+        }
+      })();
+      // ── END DEBUG ────────────────────────────────────────────────────────────────
+
+      // If sequence_number is a column in this table it will appear in the response.
+      // Use it to correlate Finding description ↔ ATA Chapter within the same section row.
       const CMR_REPEATING = new Set(['Finding description','ATA Chapter','Finding level','NC Type']);
-      // Determine if API supports sequence_number (check first repeating-field row)
       const _cmrHasSeq = fRaw.some(f=>CMR_REPEATING.has(f.field_name)&&f.sequence_number!=null);
+      console.log('[CMR] sequence_number available:',_cmrHasSeq);
+
       if(_cmrHasSeq){
-        // ── Mode A: sequence_number available → group by it for exact per-row correlation ──
+        // ── Mode A: group by sequence_number → exact per-finding ATA correlation ──
         fRaw.forEach(f=>{
           if(!cmrIdSet.has(f.report_id))return;
           if(!fMap[f.report_id])fMap[f.report_id]={_seqRows:{}};
@@ -3336,29 +3353,37 @@ async function loadCmr(){
           if(!fm['ATA Chapter']&&rows.length)fm['ATA Chapter']=rows[0]['ATA Chapter']||null;
         });
       } else {
-        // ── Mode B: no sequence_number → collect arrays in API order, pair positionally ──
-        // Each repeating section in Galileo returns fields in form-row order;
-        // Finding description[i] corresponds to ATA Chapter[i] at the same position.
+        // ── Mode B: no sequence_number → keep API order for BOTH findings and ATAs,
+        //    then pair by finding number embedded in text (sort both arrays the same way).
         fRaw.forEach(f=>{
           if(!cmrIdSet.has(f.report_id))return;
-          if(!fMap[f.report_id])fMap[f.report_id]={_descs:[],_atas:[],_levels:[],_nctypes:[]};
+          if(!fMap[f.report_id])fMap[f.report_id]={_pairs:[],_atas:[],_levels:[],_nctypes:[],_findMap:{}};
           const fm=fMap[f.report_id];
-          if(f.field_name==='Finding description'&&f.text_value)fm._descs.push(f.text_value);
+          if(f.field_name==='Finding description'&&f.text_value)fm._pairs.push({desc:f.text_value,ata:null,level:null,nc_type:null});
           else if(f.field_name==='ATA Chapter'&&f.text_value)fm._atas.push(f.text_value);
           else if(f.field_name==='Finding level'&&f.text_value)fm._levels.push(f.text_value);
           else if(f.field_name==='NC Type'&&f.text_value)fm._nctypes.push(f.text_value);
           else if(!fm[f.field_name])fm[f.field_name]=f.text_value;
         });
         Object.values(fMap).forEach(fm=>{
-          // Sort findings numerically; ATAs keep their API order (positional match)
-          const descs=[...fm._descs||[]].sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)||a.localeCompare(b));
-          fm.findings=descs;
-          fm.findingRows=descs.map((desc,i)=>({
-            desc,
-            ata:     (fm._atas||[])[i]   ||fm['ATA Chapter']  ||null,
-            level:   (fm._levels||[])[i] ||fm['Finding level']||null,
-            nc_type: (fm._nctypes||[])[i]||fm['NC Type']      ||null,
-          }));
+          // Sort findings by embedded number; sort ATAs by same relative order they appeared
+          const pairs=fm._pairs||[];
+          pairs.sort((a,b)=>(parseInt(a.desc)||0)-(parseInt(b.desc)||0)||a.desc.localeCompare(b.desc));
+          // ATAs come in the SAME form-entry order as findings (both in API order before sort).
+          // Map: sorted finding index → ATA at same pre-sort position.
+          // Build a map from original position → sorted position to assign ATAs correctly.
+          const origOrder=(fm._pairs||[]).map((p,i)=>({desc:p.desc,origIdx:i}));
+          origOrder.sort((a,b)=>(parseInt(a.desc)||0)-(parseInt(b.desc)||0)||a.desc.localeCompare(b.desc));
+          fm.findings=pairs.map(p=>p.desc);
+          fm.findingRows=pairs.map((p,si)=>{
+            const origIdx=origOrder[si]?.origIdx??si;
+            return{
+              desc:p.desc,
+              ata:     (fm._atas||[])[origIdx]   ||fm['ATA Chapter']  ||null,
+              level:   (fm._levels||[])[origIdx] ||fm['Finding level']||null,
+              nc_type: (fm._nctypes||[])[origIdx]||fm['NC Type']      ||null,
+            };
+          });
           if(!fm['ATA Chapter']&&fm._atas&&fm._atas.length)fm['ATA Chapter']=fm._atas[0];
         });
       }
@@ -3686,29 +3711,18 @@ async function loadEcar(){
         "field_name eq 'Aircraft Registration' or field_name eq 'Finding description' or "+
         "field_name eq 'ATA Chapter' or "+
         "field_name eq 'Date completed' or field_name eq 'Issued by'";
-      // Try with sequence_number for per-finding ATA correlation;
-      // fall back silently if this OData endpoint rejects the field (HTTP 400).
-      let fRaw;
-      try {
-        fRaw=await fetchAll(
-          G_URL+'dwanalytics_report_form_section_field'+
-          '?$select=report_id,field_name,text_value,sequence_number'+
-          '&$filter='+encodeURIComponent(ECAR_FF)
-        );
-      } catch(e400){
-        if(!String(e400.message).includes('400'))throw e400;
-        fRaw=await fetchAll(
-          G_URL+'dwanalytics_report_form_section_field'+
-          '?$select=report_id,field_name,text_value'+
-          '&$filter='+encodeURIComponent(ECAR_FF)
-        );
-      }
+      // Fetch WITHOUT $select so OData returns all columns including sequence_number.
+      const fRaw=await fetchAll(
+        G_URL+'dwanalytics_report_form_section_field'+
+        '?$filter='+encodeURIComponent(ECAR_FF)
+      );
 
-      // Group repeating fields (Finding description, ATA Chapter) by sequence_number
-      // so each finding row is paired with its own ATA chapter.
       const ECAR_REPEATING = new Set(['Finding description','ATA Chapter']);
       const _ecarHasSeq = fRaw.some(f=>ECAR_REPEATING.has(f.field_name)&&f.sequence_number!=null);
+      console.log('[ECAR] sequence_number available:',_ecarHasSeq);
+
       if(_ecarHasSeq){
+        // ── Mode A: group by sequence_number ──
         fRaw.forEach(f=>{
           if(!ecarIdSet.has(f.report_id))return;
           if(!fMap[f.report_id])fMap[f.report_id]={_seqRows:{}};
@@ -3733,20 +3747,22 @@ async function loadEcar(){
           if(!fm['ATA Chapter']&&rows.length)fm['ATA Chapter']=rows[0]['ATA Chapter']||null;
         });
       } else {
+        // ── Mode B: pair by original API position (preserve pre-sort index) ──
         fRaw.forEach(f=>{
           if(!ecarIdSet.has(f.report_id))return;
-          if(!fMap[f.report_id])fMap[f.report_id]={_descs:[],_atas:[]};
+          if(!fMap[f.report_id])fMap[f.report_id]={_pairs:[],_atas:[]};
           const fm=fMap[f.report_id];
-          if(f.field_name==='Finding description'&&f.text_value)fm._descs.push(f.text_value);
+          if(f.field_name==='Finding description'&&f.text_value)fm._pairs.push({desc:f.text_value,ata:null});
           else if(f.field_name==='ATA Chapter'&&f.text_value)fm._atas.push(f.text_value);
           else if(!fm[f.field_name])fm[f.field_name]=f.text_value;
         });
         Object.values(fMap).forEach(fm=>{
-          const descs=[...fm._descs||[]].sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)||a.localeCompare(b));
-          fm.findings=descs;
-          fm.findingRows=descs.map((desc,i)=>({
-            desc,
-            ata:(fm._atas||[])[i]||fm['ATA Chapter']||null,
+          const origOrder=(fm._pairs||[]).map((p,i)=>({desc:p.desc,origIdx:i}));
+          origOrder.sort((a,b)=>(parseInt(a.desc)||0)-(parseInt(b.desc)||0)||a.desc.localeCompare(b.desc));
+          fm.findings=origOrder.map(o=>o.desc);
+          fm.findingRows=origOrder.map(o=>({
+            desc:o.desc,
+            ata:(fm._atas||[])[o.origIdx]||fm['ATA Chapter']||null,
           }));
           if(!fm['ATA Chapter']&&fm._atas&&fm._atas.length)fm['ATA Chapter']=fm._atas[0];
         });
