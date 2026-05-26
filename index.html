@@ -3286,48 +3286,45 @@ async function loadCmr(){
         "field_name eq 'RCA analysis'";
       const fRaw=await fetchAll(
         G_URL+'dwanalytics_report_form_section_field'+
-        '?$select=report_id,field_name,text_value,section_name'+
+        '?$select=report_id,field_name,text_value'+
         '&$filter='+encodeURIComponent(CMR_FF)
       );
 
-      // Build per-report, per-section map để correlate ATA + desc + level
-      // section_name phân biệt các finding rows trong repeating section
-      const sectionMap={}; // {report_id: {section_key: {desc,ata,level,nc_type}}}
+      // Collect multi-value fields per report in API order
+      // desc[], ata[], level[], nc_type[] — same index = same finding row
+      const rowBuf={}; // {report_id: {descs:[], atas:[], levels:[], ncs:[]}}
       fRaw.forEach(f=>{
         if(!cmrIdSet.has(f.report_id))return;
         if(!fMap[f.report_id])fMap[f.report_id]={};
-        const FINDING_FIELDS=['Finding description','ATA Chapter','Finding level','NC Type'];
-        if(FINDING_FIELDS.includes(f.field_name)){
-          // Group by section_name (or fallback key) để ghép desc+ata+level cùng row
-          const secKey=f.section_name||'__root__';
-          if(!sectionMap[f.report_id])sectionMap[f.report_id]={};
-          if(!sectionMap[f.report_id][secKey])sectionMap[f.report_id][secKey]={desc:null,ata:null,level:null,nc_type:null};
-          const sec=sectionMap[f.report_id][secKey];
-          if(f.field_name==='Finding description'&&f.text_value)sec.desc=f.text_value;
-          if(f.field_name==='ATA Chapter'&&f.text_value&&!sec.ata)sec.ata=f.text_value;
-          if(f.field_name==='Finding level'&&f.text_value&&!sec.level)sec.level=f.text_value;
-          if(f.field_name==='NC Type'&&f.text_value&&!sec.nc_type)sec.nc_type=f.text_value;
-        } else {
-          if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
-        }
+        if(!rowBuf[f.report_id])rowBuf[f.report_id]={descs:[],atas:[],levels:[],ncs:[]};
+        const rb=rowBuf[f.report_id];
+        if(f.field_name==='Finding description'){if(f.text_value)rb.descs.push(f.text_value);}
+        else if(f.field_name==='ATA Chapter'){if(f.text_value)rb.atas.push(f.text_value);}
+        else if(f.field_name==='Finding level'){if(f.text_value)rb.levels.push(f.text_value);}
+        else if(f.field_name==='NC Type'){if(f.text_value)rb.ncs.push(f.text_value);}
+        else{if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;}
       });
 
-      // Merge sectionMap → fMap.findingRows (sorted by desc numeric prefix)
-      Object.entries(sectionMap).forEach(([rid,sections])=>{
+      // Build findingRows: zip descs + atas by index (API preserves repeating-section order)
+      Object.entries(rowBuf).forEach(([rid,rb])=>{
         if(!fMap[rid])fMap[rid]={};
-        const rows=Object.values(sections).filter(s=>s.desc||s.ata);
-        rows.sort((a,b)=>{
-          const na=parseInt(a.desc)||0, nb=parseInt(b.desc)||0;
-          return na-nb||(a.desc||'').localeCompare(b.desc||'');
-        });
-        fMap[rid].findingRows=rows;
-        // Backward-compat: findings = array of desc strings
-        fMap[rid].findings=rows.map(s=>s.desc).filter(Boolean);
-        // Primary ATA = ATA của finding đầu tiên có ATA, fallback root ATA
-        if(!fMap[rid]['ATA Chapter']){
-          const firstAta=rows.find(s=>s.ata);
-          if(firstAta)fMap[rid]['ATA Chapter']=firstAta.ata;
+        // Sort descs numerically by leading prefix ("1. xxx", "2. xxx")
+        rb.descs.sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)||a.localeCompare(b));
+        // atas order matches descs order from Galileo repeating section
+        const rows=rb.descs.map((desc,i)=>({
+          desc,
+          ata:   rb.atas[i]   || rb.atas[0]   || null,
+          level: rb.levels[i] || rb.levels[0] || null,
+          nc_type: rb.ncs[i] || rb.ncs[0]   || null,
+        }));
+        // If no descs but atas exist, still build rows from atas
+        if(rows.length===0 && rb.atas.length>0){
+          rb.atas.forEach(ata=>rows.push({desc:null,ata,level:null,nc_type:null}));
         }
+        fMap[rid].findingRows=rows;
+        fMap[rid].findings=rb.descs; // already sorted
+        // Primary report-level ATA = first ata value
+        if(!fMap[rid]['ATA Chapter']&&rb.atas.length>0)fMap[rid]['ATA Chapter']=rb.atas[0];
       });
     }catch(e){console.warn('CMR fields error:',e);}
 
@@ -3655,42 +3652,35 @@ async function loadEcar(){
         "field_name eq 'Date completed' or field_name eq 'Issued by'";
       const fRaw=await fetchAll(
         G_URL+'dwanalytics_report_form_section_field'+
-        '?$select=report_id,field_name,text_value,section_name'+
+        '?$select=report_id,field_name,text_value'+
         '&$filter='+encodeURIComponent(ECAR_FF)
       );
 
-      // Build per-section map to correlate finding desc + ATA
-      const sectionMap={};
+      // Collect multi-value fields in API order, zip by index
+      const rowBuf={};
       fRaw.forEach(f=>{
         if(!ecarIdSet.has(f.report_id))return;
         if(!fMap[f.report_id])fMap[f.report_id]={};
-        const FINDING_FIELDS=['Finding description','ATA Chapter'];
-        if(FINDING_FIELDS.includes(f.field_name)){
-          const secKey=f.section_name||'__root__';
-          if(!sectionMap[f.report_id])sectionMap[f.report_id]={};
-          if(!sectionMap[f.report_id][secKey])sectionMap[f.report_id][secKey]={desc:null,ata:null};
-          const sec=sectionMap[f.report_id][secKey];
-          if(f.field_name==='Finding description'&&f.text_value)sec.desc=f.text_value;
-          if(f.field_name==='ATA Chapter'&&f.text_value&&!sec.ata)sec.ata=f.text_value;
-        } else {
-          if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
-        }
+        if(!rowBuf[f.report_id])rowBuf[f.report_id]={descs:[],atas:[]};
+        const rb=rowBuf[f.report_id];
+        if(f.field_name==='Finding description'){if(f.text_value)rb.descs.push(f.text_value);}
+        else if(f.field_name==='ATA Chapter'){if(f.text_value)rb.atas.push(f.text_value);}
+        else{if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;}
       });
 
-      // Merge sectionMap → fMap
-      Object.entries(sectionMap).forEach(([rid,sections])=>{
+      Object.entries(rowBuf).forEach(([rid,rb])=>{
         if(!fMap[rid])fMap[rid]={};
-        const rows=Object.values(sections).filter(s=>s.desc||s.ata);
-        rows.sort((a,b)=>{
-          const na=parseInt(a.desc)||0, nb=parseInt(b.desc)||0;
-          return na-nb||(a.desc||'').localeCompare(b.desc||'');
-        });
-        fMap[rid].findingRows=rows;
-        fMap[rid].findings=rows.map(s=>s.desc).filter(Boolean);
-        if(!fMap[rid]['ATA Chapter']){
-          const firstAta=rows.find(s=>s.ata);
-          if(firstAta)fMap[rid]['ATA Chapter']=firstAta.ata;
+        rb.descs.sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)||a.localeCompare(b));
+        const rows=rb.descs.map((desc,i)=>({
+          desc,
+          ata: rb.atas[i] || rb.atas[0] || null,
+        }));
+        if(rows.length===0 && rb.atas.length>0){
+          rb.atas.forEach(ata=>rows.push({desc:null,ata}));
         }
+        fMap[rid].findingRows=rows;
+        fMap[rid].findings=rb.descs;
+        if(!fMap[rid]['ATA Chapter']&&rb.atas.length>0)fMap[rid]['ATA Chapter']=rb.atas[0];
       });
     }catch(e){console.warn('ECAR fields error:',e);}
 
