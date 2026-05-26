@@ -1876,7 +1876,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.26-r44';
+const APP_REV = '2026.05.26-r45';
 let sb;
 try {
   const { createClient } = supabase;
@@ -3306,25 +3306,29 @@ async function loadCmr(){
       });
 
       // Build findingRows: zip descs + atas by index (API preserves repeating-section order)
+      // IMPORTANT: zip FIRST, then sort pairs — never sort descs alone before zipping
       Object.entries(rowBuf).forEach(([rid,rb])=>{
         if(!fMap[rid])fMap[rid]={};
-        // Sort descs numerically by leading prefix ("1. xxx", "2. xxx")
-        rb.descs.sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)||a.localeCompare(b));
-        // atas order matches descs order from Galileo repeating section
-        const rows=rb.descs.map((desc,i)=>({
-          desc,
-          ata:   rb.atas[i]   || rb.atas[0]   || null,
-          level: rb.levels[i] || rb.levels[0] || null,
-          nc_type: rb.ncs[i] || rb.ncs[0]   || null,
-        }));
-        // If no descs but atas exist, still build rows from atas
-        if(rows.length===0 && rb.atas.length>0){
-          rb.atas.forEach(ata=>rows.push({desc:null,ata,level:null,nc_type:null}));
+        // Zip arrays by index into pairs {desc, ata, level, nc_type}
+        const len=Math.max(rb.descs.length, rb.atas.length, rb.levels.length, rb.ncs.length);
+        const rows=[];
+        for(let i=0;i<len;i++){
+          rows.push({
+            desc:    rb.descs[i]  || null,
+            ata:     rb.atas[i]   || null,
+            level:   rb.levels[i] || null,
+            nc_type: rb.ncs[i]   || null,
+          });
         }
+        // Now sort pairs together by desc numeric prefix ("1. xxx" → 1)
+        rows.sort((a,b)=>(parseInt(a.desc)||0)-(parseInt(b.desc)||0)||(a.desc||'').localeCompare(b.desc||''));
         fMap[rid].findingRows=rows;
-        fMap[rid].findings=rb.descs; // already sorted
-        // Primary report-level ATA = first ata value
-        if(!fMap[rid]['ATA Chapter']&&rb.atas.length>0)fMap[rid]['ATA Chapter']=rb.atas[0];
+        fMap[rid].findings=rows.map(r=>r.desc).filter(Boolean);
+        // Primary report-level ATA = first non-null ata
+        if(!fMap[rid]['ATA Chapter']){
+          const first=rows.find(r=>r.ata);
+          if(first)fMap[rid]['ATA Chapter']=first.ata;
+        }
       });
     }catch(e){console.warn('CMR fields error:',e);}
 
@@ -3670,17 +3674,19 @@ async function loadEcar(){
 
       Object.entries(rowBuf).forEach(([rid,rb])=>{
         if(!fMap[rid])fMap[rid]={};
-        rb.descs.sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)||a.localeCompare(b));
-        const rows=rb.descs.map((desc,i)=>({
-          desc,
-          ata: rb.atas[i] || rb.atas[0] || null,
-        }));
-        if(rows.length===0 && rb.atas.length>0){
-          rb.atas.forEach(ata=>rows.push({desc:null,ata}));
+        // Zip by index first, then sort pairs — never sort descs alone
+        const len=Math.max(rb.descs.length, rb.atas.length);
+        const rows=[];
+        for(let i=0;i<len;i++){
+          rows.push({desc:rb.descs[i]||null, ata:rb.atas[i]||null});
         }
+        rows.sort((a,b)=>(parseInt(a.desc)||0)-(parseInt(b.desc)||0)||(a.desc||'').localeCompare(b.desc||''));
         fMap[rid].findingRows=rows;
-        fMap[rid].findings=rb.descs;
-        if(!fMap[rid]['ATA Chapter']&&rb.atas.length>0)fMap[rid]['ATA Chapter']=rb.atas[0];
+        fMap[rid].findings=rows.map(r=>r.desc).filter(Boolean);
+        if(!fMap[rid]['ATA Chapter']){
+          const first=rows.find(r=>r.ata);
+          if(first)fMap[rid]['ATA Chapter']=first.ata;
+        }
       });
     }catch(e){console.warn('ECAR fields error:',e);}
 
