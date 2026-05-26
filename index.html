@@ -704,6 +704,7 @@ tr:last-child td{border-bottom:none}
                   <th style="text-align:center;color:var(--blue)">CMR-CAR</th>
                   <th style="text-align:center;color:#ff6b6b">ECAR</th>
                   <th style="text-align:center">Ratio ECAR/CMR</th>
+                  <th style="text-align:center">KPI <span style="font-size:9px;color:var(--muted);font-weight:400">(=0 hoặc &lt;1 là đạt)</span></th>
                   <th style="text-align:center">Đánh giá</th>
                 </tr></thead>
                 <tbody id="ataCompareBody"></tbody>
@@ -815,6 +816,10 @@ tr:last-child td{border-bottom:none}
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
                 <input class="srch" id="cmrSrch" placeholder="Search..." oninput="dRenderCmr()">
               </div>
+              <select class="sel admin-only" id="cmrExportGroup" style="font-size:11px;display:none">
+                <option value="aircraft">Group by Aircraft</option>
+                <option value="ata">Group by ATA</option>
+              </select>
               <button class="btn-sm admin-only" onclick="exportCmrPDF()" style="white-space:nowrap;flex-shrink:0;display:none">⬇ PDF</button>
             </div>
             <div class="tbl-wrap">
@@ -858,6 +863,10 @@ tr:last-child td{border-bottom:none}
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
                 <input class="srch" id="ecarSrch" placeholder="Search..." oninput="dRenderEcar()">
               </div>
+              <select class="sel admin-only" id="ecarExportGroup" style="font-size:11px;display:none">
+                <option value="aircraft">Group by Aircraft</option>
+                <option value="ata">Group by ATA</option>
+              </select>
               <button class="btn-sm admin-only" onclick="exportEcarPDF()" style="white-space:nowrap;flex-shrink:0;display:none">⬇ PDF</button>
               <button class="btn-sm admin-only" onclick="exportEcarExcel()" style="white-space:nowrap;flex-shrink:0;background:#1D6F42;border-color:#1D6F42;display:none">⬇ Excel</button>
             </div>
@@ -2959,11 +2968,13 @@ function renderATACompare() {
     ecarVals[i] > cmrVals[i] ? 'rgba(88,166,255,0.4)' : 'rgba(88,166,255,0.9)'
   );
 
-  // Labels: dùng ATA_LABELS nếu có, fallback về value
+  // Labels: use full ATA value for level 4/6, ATA_LABELS only for level 2
   const labels = allATA.map(a => {
-    const ch = a.split('-')[0];
-    if(level===2 && ATA_LABELS[ch]) return ATA_LABELS[ch];
-    return a;
+    if(level===2) {
+      const ch = a.split('-')[0];
+      return ATA_LABELS[ch] || a;
+    }
+    return a; // level 4: "XX-XX", level 6: "XX-XX-XX" — show full value
   });
 
   // Chart
@@ -3010,20 +3021,41 @@ function renderATACompare() {
   const otherEcar = ecarCount['Other']||0;
 
   tbody.innerHTML = rows.map(({ata,cmr,ecar}) => {
-    const ratio = cmr > 0 ? (ecar/cmr).toFixed(2) : (ecar > 0 ? '∞' : '—');
+    const ratioNum = cmr > 0 ? ecar/cmr : null;
+    const ratio = ratioNum !== null ? ratioNum.toFixed(2) : (ecar > 0 ? '∞' : '—');
     const isIneffective = ecar > cmr && cmr > 0;
     const isNoData = cmr === 0 && ecar > 0;
     const label = level===2 && ATA_LABELS[ata] ? ATA_LABELS[ata] : ata;
+
+    // KPI pass/fail logic: ratio = 0 → pass (CMR hiệu quả), 0 < ratio < 1 → pass (CMR tốt hơn ECAR), ratio ≥ 1 → fail
+    let kpiBadge = '';
+    const isPass = ratioNum !== null && ratioNum < 1; // covers =0 and 0<x<1
+    const ratioDisplay = ratioNum !== null
+      ? `<span style="font-weight:600;color:${ratioNum===0?'var(--green)':ratioNum<1?'var(--green)':ratioNum<1.5?'var(--yellow)':'#ff6b6b'}">${ratio}</span>`
+      : `<span style="color:var(--muted)">${ratio}</span>`;
+
     let badge = '';
     if(isIneffective) badge = `<span class="badge b-over" style="font-size:10px">⚠️ CMR kém hiệu quả</span>`;
     else if(isNoData) badge = `<span class="badge b-late" style="font-size:10px">❓ CMR không có data</span>`;
     else if(cmr > 0 && ecar === 0) badge = `<span class="badge b-on" style="font-size:10px">✅ CMR hiệu quả</span>`;
     else badge = `<span style="color:var(--muted);font-size:10px">—</span>`;
+
+    // KPI status: =0 or 0<ratio<1 → Đạt; else không đạt or N/A
+    let kpiStatus = '';
+    if(ratioNum === null && ecar === 0 && cmr === 0) {
+      kpiStatus = `<span style="color:var(--muted);font-size:10px">N/A</span>`;
+    } else if(ratioNum !== null && ratioNum < 1) {
+      kpiStatus = `<span style="background:rgba(63,185,80,.15);color:var(--green);padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600">✅ Đạt</span>`;
+    } else {
+      kpiStatus = `<span style="background:rgba(227,6,19,.12);color:#ff6b6b;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600">❌ Không đạt</span>`;
+    }
+
     return `<tr style="${isIneffective?'background:rgba(255,107,107,0.05)':''}">
       <td style="font-size:11px;font-weight:500">${esc(label)}</td>
       <td style="text-align:center;color:var(--blue);font-weight:600">${cmr||'—'}</td>
       <td style="text-align:center;color:#ff6b6b;font-weight:600">${ecar||'—'}</td>
-      <td style="text-align:center;font-size:11px">${ratio}</td>
+      <td style="text-align:center;font-size:11px">${ratioDisplay}</td>
+      <td style="text-align:center">${kpiStatus}</td>
       <td style="text-align:center">${badge}</td>
     </tr>`;
   }).join('');
@@ -3035,6 +3067,7 @@ function renderATACompare() {
       <td style="text-align:center;color:var(--blue)">${otherCmr||'—'}</td>
       <td style="text-align:center;color:#ff6b6b">${otherEcar||'—'}</td>
       <td style="text-align:center;font-size:11px">—</td>
+      <td style="text-align:center"><span style="color:var(--muted);font-size:10px">N/A</span></td>
       <td style="text-align:center"><span style="color:var(--muted);font-size:10px">N/A</span></td>
     </tr>`;
   }
@@ -3508,6 +3541,7 @@ function exportCmrPDF(){
   else if(qr)period=`Q${qr} (all years)`;
   const acLabel=ts.ac==='all'?'All Aircraft':ts.ac;
 
+  const groupBy = g('cmrExportGroup')?.value || 'aircraft';
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
 
@@ -3515,14 +3549,31 @@ function exportCmrPDF(){
   doc.setFontSize(14);doc.setFont(undefined,'bold');
   doc.text('CMR-CAR Findings Report',14,14);
   doc.setFontSize(9);doc.setFont(undefined,'normal');
-  doc.text(pdfSafe(`Period: ${period}  |  Aircraft: ${acLabel}  |  Total: ${data.length} findings`),14,21);
+  const groupLabel = groupBy==='ata' ? 'Grouped by ATA Chapter' : `Aircraft: ${acLabel}`;
+  doc.text(pdfSafe(`Period: ${period}  |  ${groupLabel}  |  Total: ${data.length} findings`),14,21);
   doc.text(`Exported: ${new Date().toLocaleDateString('en-GB')}`,14,26);
 
-  // Group by aircraft
-  const acGroups={};
+  // Build groups
+  const groups={};
   data.forEach(r=>{
-    if(!acGroups[r.aircraft_reg])acGroups[r.aircraft_reg]=[];
-    acGroups[r.aircraft_reg].push(r);
+    let key;
+    if(groupBy==='ata'){
+      key = r.ata_chapter ? normalizeATA(r.ata_chapter,2) : 'No ATA';
+      if(key==='Other') key='No ATA / Other';
+    } else {
+      key = r.aircraft_reg||'Unknown';
+    }
+    if(!groups[key])groups[key]=[];
+    groups[key].push(r);
+  });
+
+  // Sort groups
+  const sortedKeys = Object.keys(groups).sort((a,b)=>{
+    if(groupBy==='ata'){
+      const na=parseInt(a),nb=parseInt(b);
+      if(!isNaN(na)&&!isNaN(nb))return na-nb;
+    }
+    return a.localeCompare(b);
   });
 
   let y=32;
@@ -3531,33 +3582,45 @@ function exportCmrPDF(){
     'On-time Closed':[63,185,80],'Lately Closed':[210,153,34],'Closed':[110,118,129]
   };
 
-  Object.entries(acGroups).forEach(([ac,rows])=>{
+  sortedKeys.forEach((grpKey,idx)=>{
+    const rows=groups[grpKey];
+    const grpLabel = groupBy==='ata'
+      ? `ATA: ${grpKey}${ATA_LABELS[grpKey]?' — '+ATA_LABELS[grpKey]:''}  (${rows.length} findings)`
+      : `Aircraft: ${grpKey}  (${rows.length} findings)`;
+
     doc.autoTable({
       startY:y,
-      head:[[{content:pdfSafe(`Aircraft: ${ac}  (${rows.length} findings)`),colSpan:7}]],
+      head:[[{content:pdfSafe(grpLabel),colSpan:groupBy==='ata'?8:7}]],
       headStyles:{fillColor:[30,35,45],textColor:[140,160,200],fontStyle:'bold',fontSize:9},
       theme:'plain',margin:{left:14,right:14},
     });
     y=doc.lastAutoTable.finalY;
 
+    const head = groupBy==='ata'
+      ? [['Report No','Aircraft','Status','Raised','Target','Dept','ATA','Finding Description']]
+      : [['Report No','Aircraft','Status','Raised','Target','Dept','Finding Description']];
+
     doc.autoTable({
       startY:y,
-      head:[['Report No','Aircraft','Status','Raised','Target','Dept','Finding Description']],
-      body:rows.map(r=>[
-        pdfSafe(r.report_number||'-'),
-        pdfSafe(r.aircraft_reg||'-'),
-        pdfSafe(r.semantic_status||'-'),
-        fd(r.raised_date),
-        fd(r.Target_date),
-        pdfSafe(r.dept||'-'),
-        pdfSafe((r.findings||[]).join('\n\n')||'-'),
-      ]),
+      head,
+      body:rows.map(r=>{
+        const base=[
+          pdfSafe(r.report_number||'-'),
+          pdfSafe(r.aircraft_reg||'-'),
+          pdfSafe(r.semantic_status||'-'),
+          fd(r.raised_date),
+          fd(r.Target_date),
+          pdfSafe(r.dept||'-'),
+        ];
+        if(groupBy==='ata') base.push(pdfSafe(r.ata_chapter||'-'));
+        base.push(pdfSafe((r.findings||[]).join('\n\n')||'-'));
+        return base;
+      }),
       headStyles:{fillColor:[22,27,34],textColor:[139,148,158],fontSize:8,fontStyle:'bold'},
       bodyStyles:{fontSize:7.5,valign:'top'},
-      columnStyles:{
-        0:{cellWidth:24},1:{cellWidth:22},2:{cellWidth:22},
-        3:{cellWidth:18},4:{cellWidth:18},5:{cellWidth:22},6:{cellWidth:'auto'},
-      },
+      columnStyles:groupBy==='ata'
+        ? {0:{cellWidth:22},1:{cellWidth:20},2:{cellWidth:20},3:{cellWidth:16},4:{cellWidth:16},5:{cellWidth:20},6:{cellWidth:16},7:{cellWidth:'auto'}}
+        : {0:{cellWidth:24},1:{cellWidth:22},2:{cellWidth:22},3:{cellWidth:18},4:{cellWidth:18},5:{cellWidth:22},6:{cellWidth:'auto'}},
       didParseCell:function(d){
         if(d.section==='body'&&d.column.index===2){
           const sc=statusColor[d.cell.raw];
@@ -3569,12 +3632,11 @@ function exportCmrPDF(){
       margin:{left:14,right:14},
     });
     y=doc.lastAutoTable.finalY+4;
-    if(y>185&&Object.keys(acGroups).indexOf(ac)<Object.keys(acGroups).length-1){
-      doc.addPage();y=14;
-    }
+    if(y>185&&idx<sortedKeys.length-1){doc.addPage();y=14;}
   });
 
-  const fname=`CMR-CAR_${yr||'all'}_${qr?'Q'+qr:'allQ'}_${new Date().toISOString().slice(0,10)}.pdf`;
+  const grpSuffix = groupBy==='ata'?'_byATA':'_byAC';
+  const fname=`CMR-CAR_${yr||'all'}_${qr?'Q'+qr:'allQ'}${grpSuffix}_${new Date().toISOString().slice(0,10)}.pdf`;
   doc.save(fname);
   toast(`Exported ${fname}`,'ok');
 }
@@ -4061,30 +4123,58 @@ async function exportEcarPDF(){
     y=doc.lastAutoTable.finalY+8;
     if(y>175){doc.addPage();y=14;}
 
-    // Findings by aircraft
-    const acGroups={};
-    data.forEach(r=>{if(!acGroups[r.aircraft_reg])acGroups[r.aircraft_reg]=[];acGroups[r.aircraft_reg].push(r);});
+    // Findings grouped by aircraft or ATA
+    const ecarGroupBy = g('ecarExportGroup')?.value || 'aircraft';
+    const ecarGroups={};
+    data.forEach(r=>{
+      let key;
+      if(ecarGroupBy==='ata'){
+        key = r.ata_chapter ? normalizeATA(r.ata_chapter,2) : 'No ATA';
+        if(key==='Other') key='No ATA / Other';
+      } else {
+        key = r.aircraft_reg||'Unknown';
+      }
+      if(!ecarGroups[key])ecarGroups[key]=[];
+      ecarGroups[key].push(r);
+    });
+    const ecarSortedKeys=Object.keys(ecarGroups).sort((a,b)=>{
+      if(ecarGroupBy==='ata'){const na=parseInt(a),nb=parseInt(b);if(!isNaN(na)&&!isNaN(nb))return na-nb;}
+      return a.localeCompare(b);
+    });
     const sc={'Open':[30,80,220],'Overdue':[185,28,28],'On-time Closed':[21,128,61],'Lately Closed':[161,98,7],'Closed':[100,100,100]};
-    Object.entries(acGroups).forEach(([ac,rows],idx)=>{
+    ecarSortedKeys.forEach((grpKey,idx)=>{
+      const rows=ecarGroups[grpKey];
+      const grpLabel = ecarGroupBy==='ata'
+        ? `ATA: ${grpKey}${ATA_LABELS[grpKey]?' — '+ATA_LABELS[grpKey]:''}  (${rows.length} findings)`
+        : `Aircraft: ${grpKey}  (${rows.length} findings)`;
       if(idx>0&&y>175){doc.addPage();y=14;}
+      const ecarHead = ecarGroupBy==='ata'
+        ? [[{content:pdfSafe(grpLabel),colSpan:7}],['Report No','Aircraft','Status','Raised','Target','Days','Finding Description']]
+        : [[{content:pdfSafe(grpLabel),colSpan:6}],['Report No','Status','Raised','Target','Days','Finding Description']];
       doc.autoTable({startY:y,
-        head:[[{content:pdfSafe(`Aircraft: ${ac}  (${rows.length} findings)`),colSpan:6}],
-              ['Report No','Status','Raised','Target','Days','Finding Description']],
-        body:rows.map(r=>[pdfSafe(r.report_number||'-'),pdfSafe(r.semantic_status||'-'),
-          fd(r.raised_date),fd(r.Target_date),r.report_ageing??'-',
-          pdfSafe((r.findings||[]).join('\n\n')||'-')]),
+        head:ecarHead,
+        body:rows.map(r=>{
+          const base=[pdfSafe(r.report_number||'-')];
+          if(ecarGroupBy==='ata') base.push(pdfSafe(r.aircraft_reg||'-'));
+          base.push(pdfSafe(r.semantic_status||'-'),fd(r.raised_date),fd(r.Target_date),r.report_ageing??'-',
+            pdfSafe((r.findings||[]).join('\n\n')||'-'));
+          return base;
+        }),
         headStyles:{fillColor:[30,64,175],textColor:[255,255,255],fontSize:8,fontStyle:'bold'},
         bodyStyles:{fontSize:7.5,valign:'top',textColor:[30,30,30]},
-        columnStyles:{0:{cellWidth:26},1:{cellWidth:26},2:{cellWidth:18},3:{cellWidth:18},4:{cellWidth:12},5:{cellWidth:'auto'}},
-        didParseCell(d){if(d.section==='body'&&d.column.index===1){const c=sc[d.cell.raw];if(c)d.cell.styles.textColor=c;}},
+        columnStyles:ecarGroupBy==='ata'
+          ? {0:{cellWidth:22},1:{cellWidth:20},2:{cellWidth:22},3:{cellWidth:16},4:{cellWidth:16},5:{cellWidth:10},6:{cellWidth:'auto'}}
+          : {0:{cellWidth:26},1:{cellWidth:26},2:{cellWidth:18},3:{cellWidth:18},4:{cellWidth:12},5:{cellWidth:'auto'}},
+        didParseCell(d){const ci=ecarGroupBy==='ata'?2:1;if(d.section==='body'&&d.column.index===ci){const c=sc[d.cell.raw];if(c)d.cell.styles.textColor=c;}},
         alternateRowStyles:{fillColor:[245,247,250]},
         styles:{fillColor:[255,255,255],lineColor:[209,213,219],lineWidth:.2},
         margin:{left:M,right:M}});
       y=doc.lastAutoTable.finalY+6;
     });
 
+    const grpSuffix = ecarGroupBy==='ata'?'_byATA':'_byAC';
     const qFname=qrs.length?qrs.slice().sort((a,b)=>a-b).map(q=>'Q'+q).join(''):'allQ';
-    const fname=`ECAR_${yr||'all'}_${qFname}_${new Date().toISOString().slice(0,10)}.pdf`;
+    const fname=`ECAR_${yr||'all'}_${qFname}${grpSuffix}_${new Date().toISOString().slice(0,10)}.pdf`;
     doc.save(fname);toast(`Exported ${fname}`,'ok');
   }catch(e){toast('PDF error: '+e.message,'err');}
   finally{setOv(false);}
@@ -6575,4 +6665,3 @@ window.probeGalileoTables = async function() {
 </div>
 </body>
 </html>
-
