@@ -3286,33 +3286,74 @@ async function loadCmr(){
         "field_name eq 'RCA analysis'";
       const fRaw=await fetchAll(
         G_URL+'dwanalytics_report_form_section_field'+
-        '?$select=report_id,field_name,text_value'+
+        '?$select=report_id,field_name,text_value,sequence_number'+
         '&$filter='+encodeURIComponent(CMR_FF)
       );
 
-      // Galileo EAV API does not expose row-level correlation between fields.
-      // ATA Chapter is treated as report-level; findings are collected as array.
-      fRaw.forEach(f=>{
-        if(!cmrIdSet.has(f.report_id))return;
-        if(!fMap[f.report_id])fMap[f.report_id]={};
-        if(f.field_name==='Finding description'){
-          if(!fMap[f.report_id].findings)fMap[f.report_id].findings=[];
-          if(f.text_value)fMap[f.report_id].findings.push(f.text_value);
-        } else {
-          if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
-        }
-      });
-      // Sort findings numerically; build findingRows with shared report-level ATA
-      Object.values(fMap).forEach(fm=>{
-        if(fm.findings&&fm.findings.length>1)
-          fm.findings.sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)||a.localeCompare(b));
-        fm.findingRows=(fm.findings||[]).map(desc=>({
-          desc,
-          ata:   fm['ATA Chapter']  ||null,
-          level: fm['Finding level']||null,
-          nc_type: fm['NC Type']    ||null,
-        }));
-      });
+      // DEBUG: verify sequence_number field from API (remove after confirming)
+      const _seqSample=fRaw.find(f=>f.field_name==='Finding description'||f.field_name==='ATA Chapter');
+      if(_seqSample)console.log('[CMR] sequence_number sample:',_seqSample.sequence_number,'(null = field not supported by API)');
+
+      // Build fMap: repeating fields (Finding description, ATA Chapter, Finding level, NC Type)
+      // are grouped by sequence_number so each finding row gets its own ATA.
+      // Non-repeating fields are stored at report level.
+      const CMR_REPEATING = new Set(['Finding description','ATA Chapter','Finding level','NC Type']);
+      // Determine if API supports sequence_number (check first repeating-field row)
+      const _cmrHasSeq = fRaw.some(f=>CMR_REPEATING.has(f.field_name)&&f.sequence_number!=null);
+      if(_cmrHasSeq){
+        // ── Mode A: sequence_number available → group by it for exact per-row correlation ──
+        fRaw.forEach(f=>{
+          if(!cmrIdSet.has(f.report_id))return;
+          if(!fMap[f.report_id])fMap[f.report_id]={_seqRows:{}};
+          const fm=fMap[f.report_id];
+          if(CMR_REPEATING.has(f.field_name)){
+            const seq=String(f.sequence_number);
+            if(!fm._seqRows[seq])fm._seqRows[seq]={};
+            fm._seqRows[seq][f.field_name]=f.text_value;
+          } else {
+            if(!fm[f.field_name])fm[f.field_name]=f.text_value;
+          }
+        });
+        Object.values(fMap).forEach(fm=>{
+          const rows=Object.values(fm._seqRows||{}).filter(r=>r['Finding description']);
+          rows.sort((a,b)=>(parseInt(a['Finding description'])||0)-(parseInt(b['Finding description'])||0)
+                          ||(a['Finding description']||'').localeCompare(b['Finding description']||''));
+          fm.findings=rows.map(r=>r['Finding description']);
+          fm.findingRows=rows.map(r=>({
+            desc:    r['Finding description'],
+            ata:     r['ATA Chapter']   ||fm['ATA Chapter']  ||null,
+            level:   r['Finding level'] ||fm['Finding level']||null,
+            nc_type: r['NC Type']       ||fm['NC Type']      ||null,
+          }));
+          if(!fm['ATA Chapter']&&rows.length)fm['ATA Chapter']=rows[0]['ATA Chapter']||null;
+        });
+      } else {
+        // ── Mode B: no sequence_number → collect arrays in API order, pair positionally ──
+        // Each repeating section in Galileo returns fields in form-row order;
+        // Finding description[i] corresponds to ATA Chapter[i] at the same position.
+        fRaw.forEach(f=>{
+          if(!cmrIdSet.has(f.report_id))return;
+          if(!fMap[f.report_id])fMap[f.report_id]={_descs:[],_atas:[],_levels:[],_nctypes:[]};
+          const fm=fMap[f.report_id];
+          if(f.field_name==='Finding description'&&f.text_value)fm._descs.push(f.text_value);
+          else if(f.field_name==='ATA Chapter'&&f.text_value)fm._atas.push(f.text_value);
+          else if(f.field_name==='Finding level'&&f.text_value)fm._levels.push(f.text_value);
+          else if(f.field_name==='NC Type'&&f.text_value)fm._nctypes.push(f.text_value);
+          else if(!fm[f.field_name])fm[f.field_name]=f.text_value;
+        });
+        Object.values(fMap).forEach(fm=>{
+          // Sort findings numerically; ATAs keep their API order (positional match)
+          const descs=[...fm._descs||[]].sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)||a.localeCompare(b));
+          fm.findings=descs;
+          fm.findingRows=descs.map((desc,i)=>({
+            desc,
+            ata:     (fm._atas||[])[i]   ||fm['ATA Chapter']  ||null,
+            level:   (fm._levels||[])[i] ||fm['Finding level']||null,
+            nc_type: (fm._nctypes||[])[i]||fm['NC Type']      ||null,
+          }));
+          if(!fm['ATA Chapter']&&fm._atas&&fm._atas.length)fm['ATA Chapter']=fm._atas[0];
+        });
+      }
     }catch(e){console.warn('CMR fields error:',e);}
 
     cmrData=summary.map(r=>{
@@ -3639,30 +3680,57 @@ async function loadEcar(){
         "field_name eq 'Date completed' or field_name eq 'Issued by'";
       const fRaw=await fetchAll(
         G_URL+'dwanalytics_report_form_section_field'+
-        '?$select=report_id,field_name,text_value'+
+        '?$select=report_id,field_name,text_value,sequence_number'+
         '&$filter='+encodeURIComponent(ECAR_FF)
       );
 
-      // Galileo EAV API does not expose row-level correlation between fields.
-      // ATA Chapter is treated as report-level; findings are collected as array.
-      fRaw.forEach(f=>{
-        if(!ecarIdSet.has(f.report_id))return;
-        if(!fMap[f.report_id])fMap[f.report_id]={};
-        if(f.field_name==='Finding description'){
-          if(!fMap[f.report_id].findings)fMap[f.report_id].findings=[];
-          if(f.text_value)fMap[f.report_id].findings.push(f.text_value);
-        } else {
-          if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
-        }
-      });
-      Object.values(fMap).forEach(fm=>{
-        if(fm.findings&&fm.findings.length>1)
-          fm.findings.sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)||a.localeCompare(b));
-        fm.findingRows=(fm.findings||[]).map(desc=>({
-          desc,
-          ata: fm['ATA Chapter']||null,
-        }));
-      });
+      // Group repeating fields (Finding description, ATA Chapter) by sequence_number
+      // so each finding row is paired with its own ATA chapter.
+      const ECAR_REPEATING = new Set(['Finding description','ATA Chapter']);
+      const _ecarHasSeq = fRaw.some(f=>ECAR_REPEATING.has(f.field_name)&&f.sequence_number!=null);
+      if(_ecarHasSeq){
+        fRaw.forEach(f=>{
+          if(!ecarIdSet.has(f.report_id))return;
+          if(!fMap[f.report_id])fMap[f.report_id]={_seqRows:{}};
+          const fm=fMap[f.report_id];
+          if(ECAR_REPEATING.has(f.field_name)){
+            const seq=String(f.sequence_number);
+            if(!fm._seqRows[seq])fm._seqRows[seq]={};
+            fm._seqRows[seq][f.field_name]=f.text_value;
+          } else {
+            if(!fm[f.field_name])fm[f.field_name]=f.text_value;
+          }
+        });
+        Object.values(fMap).forEach(fm=>{
+          const rows=Object.values(fm._seqRows||{}).filter(r=>r['Finding description']);
+          rows.sort((a,b)=>(parseInt(a['Finding description'])||0)-(parseInt(b['Finding description'])||0)
+                          ||(a['Finding description']||'').localeCompare(b['Finding description']||''));
+          fm.findings=rows.map(r=>r['Finding description']);
+          fm.findingRows=rows.map(r=>({
+            desc: r['Finding description'],
+            ata:  r['ATA Chapter']||fm['ATA Chapter']||null,
+          }));
+          if(!fm['ATA Chapter']&&rows.length)fm['ATA Chapter']=rows[0]['ATA Chapter']||null;
+        });
+      } else {
+        fRaw.forEach(f=>{
+          if(!ecarIdSet.has(f.report_id))return;
+          if(!fMap[f.report_id])fMap[f.report_id]={_descs:[],_atas:[]};
+          const fm=fMap[f.report_id];
+          if(f.field_name==='Finding description'&&f.text_value)fm._descs.push(f.text_value);
+          else if(f.field_name==='ATA Chapter'&&f.text_value)fm._atas.push(f.text_value);
+          else if(!fm[f.field_name])fm[f.field_name]=f.text_value;
+        });
+        Object.values(fMap).forEach(fm=>{
+          const descs=[...fm._descs||[]].sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)||a.localeCompare(b));
+          fm.findings=descs;
+          fm.findingRows=descs.map((desc,i)=>({
+            desc,
+            ata:(fm._atas||[])[i]||fm['ATA Chapter']||null,
+          }));
+          if(!fm['ATA Chapter']&&fm._atas&&fm._atas.length)fm['ATA Chapter']=fm._atas[0];
+        });
+      }
     }catch(e){console.warn('ECAR fields error:',e);}
 
     ecarData=summary.map(r=>{
