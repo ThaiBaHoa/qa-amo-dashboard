@@ -1876,7 +1876,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.26-r45';
+const APP_REV = '2026.05.26-r46';
 let sb;
 try {
   const { createClient } = supabase;
@@ -3290,45 +3290,28 @@ async function loadCmr(){
         '&$filter='+encodeURIComponent(CMR_FF)
       );
 
-      // Collect multi-value fields per report in API order
-      // desc[], ata[], level[], nc_type[] — same index = same finding row
-      const rowBuf={}; // {report_id: {descs:[], atas:[], levels:[], ncs:[]}}
+      // Galileo EAV API does not expose row-level correlation between fields.
+      // ATA Chapter is treated as report-level; findings are collected as array.
       fRaw.forEach(f=>{
         if(!cmrIdSet.has(f.report_id))return;
         if(!fMap[f.report_id])fMap[f.report_id]={};
-        if(!rowBuf[f.report_id])rowBuf[f.report_id]={descs:[],atas:[],levels:[],ncs:[]};
-        const rb=rowBuf[f.report_id];
-        if(f.field_name==='Finding description'){if(f.text_value)rb.descs.push(f.text_value);}
-        else if(f.field_name==='ATA Chapter'){if(f.text_value)rb.atas.push(f.text_value);}
-        else if(f.field_name==='Finding level'){if(f.text_value)rb.levels.push(f.text_value);}
-        else if(f.field_name==='NC Type'){if(f.text_value)rb.ncs.push(f.text_value);}
-        else{if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;}
+        if(f.field_name==='Finding description'){
+          if(!fMap[f.report_id].findings)fMap[f.report_id].findings=[];
+          if(f.text_value)fMap[f.report_id].findings.push(f.text_value);
+        } else {
+          if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
+        }
       });
-
-      // Build findingRows: zip descs + atas by index (API preserves repeating-section order)
-      // IMPORTANT: zip FIRST, then sort pairs — never sort descs alone before zipping
-      Object.entries(rowBuf).forEach(([rid,rb])=>{
-        if(!fMap[rid])fMap[rid]={};
-        // Zip arrays by index into pairs {desc, ata, level, nc_type}
-        const len=Math.max(rb.descs.length, rb.atas.length, rb.levels.length, rb.ncs.length);
-        const rows=[];
-        for(let i=0;i<len;i++){
-          rows.push({
-            desc:    rb.descs[i]  || null,
-            ata:     rb.atas[i]   || null,
-            level:   rb.levels[i] || null,
-            nc_type: rb.ncs[i]   || null,
-          });
-        }
-        // Now sort pairs together by desc numeric prefix ("1. xxx" → 1)
-        rows.sort((a,b)=>(parseInt(a.desc)||0)-(parseInt(b.desc)||0)||(a.desc||'').localeCompare(b.desc||''));
-        fMap[rid].findingRows=rows;
-        fMap[rid].findings=rows.map(r=>r.desc).filter(Boolean);
-        // Primary report-level ATA = first non-null ata
-        if(!fMap[rid]['ATA Chapter']){
-          const first=rows.find(r=>r.ata);
-          if(first)fMap[rid]['ATA Chapter']=first.ata;
-        }
+      // Sort findings numerically; build findingRows with shared report-level ATA
+      Object.values(fMap).forEach(fm=>{
+        if(fm.findings&&fm.findings.length>1)
+          fm.findings.sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)||a.localeCompare(b));
+        fm.findingRows=(fm.findings||[]).map(desc=>({
+          desc,
+          ata:   fm['ATA Chapter']  ||null,
+          level: fm['Finding level']||null,
+          nc_type: fm['NC Type']    ||null,
+        }));
       });
     }catch(e){console.warn('CMR fields error:',e);}
 
@@ -3660,33 +3643,25 @@ async function loadEcar(){
         '&$filter='+encodeURIComponent(ECAR_FF)
       );
 
-      // Collect multi-value fields in API order, zip by index
-      const rowBuf={};
+      // Galileo EAV API does not expose row-level correlation between fields.
+      // ATA Chapter is treated as report-level; findings are collected as array.
       fRaw.forEach(f=>{
         if(!ecarIdSet.has(f.report_id))return;
         if(!fMap[f.report_id])fMap[f.report_id]={};
-        if(!rowBuf[f.report_id])rowBuf[f.report_id]={descs:[],atas:[]};
-        const rb=rowBuf[f.report_id];
-        if(f.field_name==='Finding description'){if(f.text_value)rb.descs.push(f.text_value);}
-        else if(f.field_name==='ATA Chapter'){if(f.text_value)rb.atas.push(f.text_value);}
-        else{if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;}
+        if(f.field_name==='Finding description'){
+          if(!fMap[f.report_id].findings)fMap[f.report_id].findings=[];
+          if(f.text_value)fMap[f.report_id].findings.push(f.text_value);
+        } else {
+          if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
+        }
       });
-
-      Object.entries(rowBuf).forEach(([rid,rb])=>{
-        if(!fMap[rid])fMap[rid]={};
-        // Zip by index first, then sort pairs — never sort descs alone
-        const len=Math.max(rb.descs.length, rb.atas.length);
-        const rows=[];
-        for(let i=0;i<len;i++){
-          rows.push({desc:rb.descs[i]||null, ata:rb.atas[i]||null});
-        }
-        rows.sort((a,b)=>(parseInt(a.desc)||0)-(parseInt(b.desc)||0)||(a.desc||'').localeCompare(b.desc||''));
-        fMap[rid].findingRows=rows;
-        fMap[rid].findings=rows.map(r=>r.desc).filter(Boolean);
-        if(!fMap[rid]['ATA Chapter']){
-          const first=rows.find(r=>r.ata);
-          if(first)fMap[rid]['ATA Chapter']=first.ata;
-        }
+      Object.values(fMap).forEach(fm=>{
+        if(fm.findings&&fm.findings.length>1)
+          fm.findings.sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)||a.localeCompare(b));
+        fm.findingRows=(fm.findings||[]).map(desc=>({
+          desc,
+          ata: fm['ATA Chapter']||null,
+        }));
       });
     }catch(e){console.warn('ECAR fields error:',e);}
 
