@@ -3284,15 +3284,23 @@ async function loadCmr(){
         "field_name eq 'Final action taken' or field_name eq 'Issued to (person)' or "+
         "field_name eq 'Verified by (auditor)' or field_name eq 'Date completed' or "+
         "field_name eq 'RCA analysis'";
-      const fRaw=await fetchAll(
-        G_URL+'dwanalytics_report_form_section_field'+
-        '?$select=report_id,field_name,text_value,sequence_number'+
-        '&$filter='+encodeURIComponent(CMR_FF)
-      );
-
-      // DEBUG: verify sequence_number field from API (remove after confirming)
-      const _seqSample=fRaw.find(f=>f.field_name==='Finding description'||f.field_name==='ATA Chapter');
-      if(_seqSample)console.log('[CMR] sequence_number sample:',_seqSample.sequence_number,'(null = field not supported by API)');
+      // Try with sequence_number for per-finding ATA correlation;
+      // fall back silently if this OData endpoint rejects the field (HTTP 400).
+      let fRaw;
+      try {
+        fRaw=await fetchAll(
+          G_URL+'dwanalytics_report_form_section_field'+
+          '?$select=report_id,field_name,text_value,sequence_number'+
+          '&$filter='+encodeURIComponent(CMR_FF)
+        );
+      } catch(e400){
+        if(!String(e400.message).includes('400'))throw e400;
+        fRaw=await fetchAll(
+          G_URL+'dwanalytics_report_form_section_field'+
+          '?$select=report_id,field_name,text_value'+
+          '&$filter='+encodeURIComponent(CMR_FF)
+        );
+      }
 
       // Build fMap: repeating fields (Finding description, ATA Chapter, Finding level, NC Type)
       // are grouped by sequence_number so each finding row gets its own ATA.
@@ -3678,11 +3686,23 @@ async function loadEcar(){
         "field_name eq 'Aircraft Registration' or field_name eq 'Finding description' or "+
         "field_name eq 'ATA Chapter' or "+
         "field_name eq 'Date completed' or field_name eq 'Issued by'";
-      const fRaw=await fetchAll(
-        G_URL+'dwanalytics_report_form_section_field'+
-        '?$select=report_id,field_name,text_value,sequence_number'+
-        '&$filter='+encodeURIComponent(ECAR_FF)
-      );
+      // Try with sequence_number for per-finding ATA correlation;
+      // fall back silently if this OData endpoint rejects the field (HTTP 400).
+      let fRaw;
+      try {
+        fRaw=await fetchAll(
+          G_URL+'dwanalytics_report_form_section_field'+
+          '?$select=report_id,field_name,text_value,sequence_number'+
+          '&$filter='+encodeURIComponent(ECAR_FF)
+        );
+      } catch(e400){
+        if(!String(e400.message).includes('400'))throw e400;
+        fRaw=await fetchAll(
+          G_URL+'dwanalytics_report_form_section_field'+
+          '?$select=report_id,field_name,text_value'+
+          '&$filter='+encodeURIComponent(ECAR_FF)
+        );
+      }
 
       // Group repeating fields (Finding description, ATA Chapter) by sequence_number
       // so each finding row is paired with its own ATA chapter.
