@@ -631,15 +631,15 @@ tr:last-child td{border-bottom:none}
               <div class="kpi-lbl">Audits</div><div class="kpi-val" id="kk-audits" style="color:var(--yellow)">—</div>
             </div>
           </div>
-          <!-- Row 2: Overdue Aging (compact, beside row 3) -->
+          <!-- Row 2: Overdue Aging + On-time Rate -->
           <div style="display:grid;grid-template-columns:1fr 3fr;gap:8px;margin-bottom:8px;flex-shrink:0">
             <div class="chart-card">
               <div class="chart-head"><div><div class="chart-title">Overdue Aging</div><div class="chart-sub">CAT I / II / III</div></div></div>
-              <div class="ch-wrap" style="height:170px"><canvas id="cKpiAging"></canvas></div>
+              <div class="ch-wrap" style="height:110px"><canvas id="cKpiAging"></canvas></div>
             </div>
             <div class="chart-card">
               <div class="chart-head"><div><div class="chart-title">On-time Close Rate by Month</div><div class="chart-sub">Target: 70%</div></div></div>
-              <div class="ch-wrap" style="height:170px"><canvas id="cOnM"></canvas></div>
+              <div class="ch-wrap" style="height:110px"><canvas id="cOnM"></canvas></div>
             </div>
           </div>
           <!-- Row 3: Finding Level -->
@@ -666,7 +666,7 @@ tr:last-child td{border-bottom:none}
                 <select class="sel" id="ataCompareYear" onchange="renderATACompare()" style="font-size:11px;width:90px">
                   <option value="">All Years</option>
                 </select>
-                <button class="btn-sm admin-only" onclick="exportATACompare()" style="white-space:nowrap;flex-shrink:0">⬇ Excel</button>
+                <button class="btn-sm admin-only" onclick="exportATAComparePDF()" style="white-space:nowrap;flex-shrink:0">⬇ PDF</button>
               </div>
             </div>
             <!-- Legend -->
@@ -1863,7 +1863,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.27-r55';
+const APP_REV = '2026.05.27-r56';
 
 // Build findingRows from EAV rows.
 // Collect Finding description and ATA Chapter values separately, each sorted by
@@ -2987,16 +2987,13 @@ function renderATACompare() {
 
   tbody.innerHTML = rows.map(({ata,cmr,ecar}) => {
     const ratio = cmr > 0 ? (ecar/cmr).toFixed(2) : (ecar > 0 ? '∞' : '—');
-    const isIneffective = ecar > cmr && cmr > 0;
-    const isNoData = cmr === 0 && ecar > 0;
-    const label = level===2 && ATA_LABELS[ata] ? ATA_LABELS[ata] : ata;
+    const isBad  = (ecar > cmr && cmr > 0) || (cmr === 0 && ecar > 0);
+    const label  = level===2 && ATA_LABELS[ata] ? ATA_LABELS[ata] : ata;
     let badge = '';
-    if(isIneffective) badge = `<span class="badge b-over" style="font-size:10px">⚠️ CMR kém hiệu quả</span>`;
-    else if(isNoData) badge = `<span class="badge b-late" style="font-size:10px">❓ CMR không có data</span>`;
-    else if(cmr > 0 && ecar === 0) badge = `<span class="badge b-on" style="font-size:10px">✅ CMR hiệu quả</span>`;
-    else if(cmr > 0 && ecar > 0 && ecar < cmr) badge = `<span class="badge b-on" style="font-size:10px">✅ Đạt</span>`;
-    else badge = `<span style="color:var(--muted);font-size:10px">—</span>`;
-    return `<tr style="${isIneffective?'background:rgba(255,107,107,0.05)':''}">
+    if(isBad)                          badge = `<span class="badge b-over" style="font-size:10px">❌ Không hiệu quả</span>`;
+    else if(cmr > 0 && ecar < cmr)     badge = `<span class="badge b-on"   style="font-size:10px">✅ Đạt</span>`;
+    else                               badge = `<span style="color:var(--muted);font-size:10px">—</span>`;
+    return `<tr style="${isBad?'background:rgba(255,107,107,0.05)':''}">
       <td style="font-size:11px;font-weight:500">${esc(label)}</td>
       <td style="text-align:center;color:var(--blue);font-weight:600">${cmr||'—'}</td>
       <td style="text-align:center;color:#ff6b6b;font-weight:600">${ecar||'—'}</td>
@@ -3062,29 +3059,74 @@ function renderOpen() {
     </tr>`);
 }
 
-function exportATACompare() {
+async function exportATAComparePDF() {
   if(!curUser||curUser.role!=='admin'){toast('Chỉ admin mới có quyền xuất báo cáo','err');return;}
-  const level = parseInt(g('ataGroupLevel')?.value||'2');
-  const yr    = g('ataCompareYear')?.value||'';
-  const rows  = [];
+  toast('Đang tạo PDF...','info');
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const W=doc.internal.pageSize.getWidth(), M=10;
+  const level=parseInt(g('ataGroupLevel')?.value||'2');
+  const yr=g('ataCompareYear')?.value||'';
+  const lvlLabel=level===2?'Chapter':level===4?'Section':'Subject';
+
+  // Header bar
+  doc.setFillColor(13,17,23);
+  doc.rect(0,0,W,16,'F');
+  doc.setFontSize(11);doc.setFont(undefined,'bold');doc.setTextColor(230,237,243);
+  doc.text('CMR-CAR vs ECAR — Findings by ATA '+lvlLabel,M,11);
+  doc.setFontSize(8);doc.setFont(undefined,'normal');doc.setTextColor(163,174,184);
+  doc.text('Năm: '+(yr||'Tất cả'),W/2,11,{align:'center'});
+  doc.text('Rev '+APP_REV,W-M,11,{align:'right'});
+
+  let y=20;
+
+  // Embed chart
+  const canvas=g('cATACompare');
+  if(canvas){
+    try{
+      const img=await html2canvas(canvas,{scale:2,backgroundColor:'#161B22',logging:false});
+      const chartH=70;
+      doc.addImage(img.toDataURL('image/png'),'PNG',M,y,W-2*M,chartH);
+      y+=chartH+6;
+    }catch(e){console.warn('Chart capture:',e);}
+  }
+
+  // Table
+  const tRows=[];
   g('ataCompareBody').querySelectorAll('tr').forEach(tr=>{
     const tds=[...tr.querySelectorAll('td')];
     if(tds.length<5)return;
-    const ata   = tds[0].textContent.trim();
-    const cmr   = tds[1].textContent.trim();
-    const ecar  = tds[2].textContent.trim();
-    const ratio = tds[3].textContent.trim();
-    const badge = tds[4].textContent.trim();
-    rows.push({ATA:ata,'CMR-CAR':cmr,'ECAR':ecar,'Ratio ECAR/CMR':ratio,'Đánh giá':badge});
+    tRows.push([tds[0].textContent.trim(),tds[1].textContent.trim(),
+                tds[2].textContent.trim(),tds[3].textContent.trim(),
+                tds[4].textContent.trim()]);
   });
-  if(!rows.length){toast('Không có dữ liệu','err');return;}
-  const ws=XLSX.utils.json_to_sheet(rows);
-  ws['!cols']=[{wch:28},{wch:10},{wch:10},{wch:16},{wch:22}];
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'ATA Compare');
-  const lvlLabel=level===2?'Chapter':level===4?'Section':'Subject';
-  XLSX.writeFile(wb,`ATA_Compare_${lvlLabel}_${yr||'All'}_${new Date().toISOString().slice(0,10)}.xlsx`);
-  toast('Đã xuất file Excel','ok');
+
+  const statusColor={
+    '✅ Đạt':[63,185,80],
+    '❌ Không hiệu quả':[227,6,19],
+  };
+
+  doc.autoTable({
+    startY:y,
+    head:[['ATA Chapter','CMR-CAR','ECAR','Ratio ECAR/CMR','Đánh giá']],
+    body:tRows,
+    headStyles:{fillColor:[30,64,175],textColor:[255,255,255],fontSize:8,fontStyle:'bold'},
+    bodyStyles:{fontSize:7.5,valign:'middle',textColor:[30,30,30]},
+    columnStyles:{0:{cellWidth:65},1:{cellWidth:20,halign:'center'},2:{cellWidth:20,halign:'center'},3:{cellWidth:28,halign:'center'},4:{cellWidth:'auto',halign:'center'}},
+    didParseCell(d){
+      if(d.section==='body'&&d.column.index===4){
+        const c=statusColor[d.cell.raw];
+        if(c){d.cell.styles.textColor=c;d.cell.styles.fontStyle='bold';}
+      }
+    },
+    alternateRowStyles:{fillColor:[245,247,250]},
+    styles:{lineColor:[209,213,219],lineWidth:.2,fillColor:[255,255,255]},
+    margin:{left:M,right:M},
+  });
+
+  const fname=`ATA_Compare_${lvlLabel}_${yr||'All'}_${new Date().toISOString().slice(0,10)}.pdf`;
+  doc.save(fname);
+  toast('Đã xuất '+fname,'ok');
 }
 
 // ── TABLE: OVERDUE ────────────────────────────────────────────
