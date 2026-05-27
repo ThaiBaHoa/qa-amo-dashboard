@@ -6,6 +6,7 @@
 <title>QA AMO · VietJet Air</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -302,9 +303,9 @@ tr:last-child td{border-bottom:none}
     </div>
     <div id="loginForm">
       <div class="form-group"><label class="form-label">Email</label>
-        <input class="form-input" id="lUsername" type="email" placeholder="email@vietjetair.com" autocomplete="email"></div>
+        <input class="form-input" id="lUsername" type="email" placeholder="email@vietjetair.com" autocomplete="username"></div>
       <div class="form-group"><label class="form-label">Password</label>
-        <input class="form-input" id="lPass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"></div>
+        <input class="form-input" id="lPass" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
       <button class="btn-primary" id="btnLogin" onclick="doLogin()">Login</button>
       <div class="auth-alert" id="loginAlert"></div>
       <div style="text-align:center;margin-top:10px">
@@ -322,13 +323,13 @@ tr:last-child td{border-bottom:none}
     </div>
     <div id="registerForm" style="display:none">
       <div class="form-group"><label class="form-label">Full Name</label>
-        <input class="form-input" id="rName" type="text" placeholder="e.g. Nguyen Van A"></div>
+        <input class="form-input" id="rName" type="text" placeholder="e.g. Nguyen Van A" autocomplete="name"></div>
       <div class="form-group"><label class="form-label">Email</label>
-        <input class="form-input" id="rEmail" type="email" placeholder="email@vietjetair.com" autocomplete="email"></div>
+        <input class="form-input" id="rEmail" type="email" placeholder="email@vietjetair.com" autocomplete="username"></div>
       <div class="form-group"><label class="form-label">Password</label>
-        <input class="form-input" id="rPass" type="password" placeholder="Minimum 8 characters"></div>
+        <input class="form-input" id="rPass" type="password" placeholder="Min 8 chars, 1 uppercase, 1 number" autocomplete="new-password"></div>
       <div class="form-group"><label class="form-label">Confirm Password</label>
-        <input class="form-input" id="rPass2" type="password" placeholder="Repeat password" onkeydown="if(event.key==='Enter')doRegister()"></div>
+        <input class="form-input" id="rPass2" type="password" placeholder="Repeat password" autocomplete="new-password" onkeydown="if(event.key==='Enter')doRegister()"></div>
       <button class="btn-primary" id="btnRegister" onclick="doRegister()">Submit Registration</button>
       <div class="auth-alert" id="registerAlert"></div>
     </div>
@@ -1863,7 +1864,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.27-r57';
+const APP_REV = '2026.05.27-r58';
 
 // Build findingRows from EAV rows.
 // Collect Finding description and ATA Chapter values separately, each sorted by
@@ -1915,6 +1916,9 @@ let sb;
 try {
   const { createClient } = supabase;
   sb = createClient(SUPA_URL, SUPA_KEY, {
+    // Use sessionStorage so the auth token is cleared when the browser/tab is closed.
+    // Prevents automatic re-login across separate browser sessions.
+    auth: { storage: sessionStorage, persistSession: true, autoRefreshToken: true },
     realtime: { params: { eventsPerSecond: 0 } },
     global: { headers: {} }
   });
@@ -1948,15 +1952,28 @@ function switchAuth(tab) {
   document.querySelectorAll('.auth-tab').forEach((t,i)=>t.classList.toggle('active',(i===0)===login));
 }
 
+// Login rate-limiting: lock after 5 failures for 60 seconds
+let _loginFails=0, _loginLockUntil=0;
+
 async function doLogin() {
+  const al=g('loginAlert'); showAl(al,'','');
+  const now=Date.now();
+  if(now<_loginLockUntil){
+    const s=Math.ceil((_loginLockUntil-now)/1000);
+    showAl(al,'error',`Too many failed attempts. Try again in ${s}s.`);
+    return;
+  }
   const email=g('lUsername').value.trim().toLowerCase(), pass=g('lPass').value;
-  const al=g('loginAlert'); showAl(al,'',''); g('btnLogin').disabled=true;
+  g('btnLogin').disabled=true;
   if(!email||!pass){showAl(al,'error','Please enter email and password.');g('btnLogin').disabled=false;return;}
   try {
-    // Supabase Auth — bcrypt server-side, password never leaves the server
     const {data:auth,error:authErr}=await sb.auth.signInWithPassword({email,password:pass});
-    if(authErr||!auth.user) throw new Error('Incorrect email or password.');
-    // RLS ensures we only read our own profile
+    if(authErr||!auth.user){
+      _loginFails++;
+      if(_loginFails>=5){_loginLockUntil=Date.now()+60000;_loginFails=0;}
+      throw new Error('Incorrect email or password.');
+    }
+    _loginFails=0; _loginLockUntil=0;
     const {data:profile,error:profErr}=await sb.from('users').select('id,email,full_name,role').eq('supabase_id',auth.user.id).single();
     if(profErr||!profile) throw new Error('Account profile not found.');
     if(profile.role==='pending'){g('loginForm').style.display='none';g('authTabs').style.display='none';g('pendingBox').style.display='';return;}
@@ -1976,6 +1993,8 @@ async function doRegister() {
   if(!name||!email||!pass){showAl(al,'error','Please fill in all fields.');return;}
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){showAl(al,'error','Please enter a valid email address.');return;}
   if(pass.length<8){showAl(al,'error','Password must be at least 8 characters.');return;}
+  if(!/[A-Z]/.test(pass)){showAl(al,'error','Password must contain at least one uppercase letter.');return;}
+  if(!/[0-9]/.test(pass)){showAl(al,'error','Password must contain at least one number.');return;}
   if(pass!==pass2){showAl(al,'error','Passwords do not match.');return;}
   g('btnRegister').disabled=true; showAl(al,'info','Submitting...');
   try {
@@ -2055,8 +2074,10 @@ async function doChangePass() {
 }
 
 async function doLogout() {
-  await sb.auth.signOut(); // Invalidate JWT server-side
-  sessionStorage.clear(); curUser=null; allData=[];
+  await sb.auth.signOut();
+  sessionStorage.clear();
+  localStorage.removeItem(CACHE_KEY); // Clear report data cache so next user starts fresh
+  curUser=null; allData=[];
   g('authWrap').style.display='flex'; g('app').style.display='none';
   g('loginForm').style.display=''; g('registerForm').style.display='none';
   g('authTabs').style.display=''; switchAuth('login');
@@ -4983,7 +5004,7 @@ function setUF(f,btn){
 async function loadUsers() {
   if(!curUser||curUser.role!=='admin')return;
   try {
-    let q=sb.from('users').select('*').order('created_at',{ascending:false});
+    let q=sb.from('users').select('id,email,full_name,contact_email,role,created_at,approved_by').order('created_at',{ascending:false});
     if(userFilter!=='all')q=q.eq('role',userFilter);
     const {data,error}=await q; if(error)throw error;
     s('userCnt',(data||[]).length+' users');
