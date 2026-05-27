@@ -3290,26 +3290,32 @@ async function loadCmr(){
         '&$filter='+encodeURIComponent(CMR_FF)
       );
 
-      // Galileo EAV API does not expose row-level correlation between fields.
-      // ATA Chapter is treated as report-level; findings are collected as array.
+      // API trả về EAV rows theo thứ tự section — collect ATA Chapter thành mảng
+      // rồi ghép cặp (desc, ata) theo index trước khi sort để đúng ATA Chapter cho mỗi finding.
       fRaw.forEach(f=>{
         if(!cmrIdSet.has(f.report_id))return;
         if(!fMap[f.report_id])fMap[f.report_id]={};
         if(f.field_name==='Finding description'){
           if(!fMap[f.report_id].findings)fMap[f.report_id].findings=[];
           if(f.text_value)fMap[f.report_id].findings.push(f.text_value);
+        } else if(f.field_name==='ATA Chapter'){
+          if(!fMap[f.report_id].ataList)fMap[f.report_id].ataList=[];
+          if(f.text_value)fMap[f.report_id].ataList.push(f.text_value);
         } else {
           if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
         }
       });
-      // Sort findings numerically; build findingRows with shared report-level ATA
+      // Ghép cặp (desc, ata) theo index, sort cặp theo số thứ tự finding, rồi tách ra
       Object.values(fMap).forEach(fm=>{
-        if(fm.findings&&fm.findings.length>1)
-          fm.findings.sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)||a.localeCompare(b));
-        fm.findingRows=(fm.findings||[]).map(desc=>({
-          desc,
-          ata:   fm['ATA Chapter']  ||null,
-          level: fm['Finding level']||null,
+        const descs=fm.findings||[], atas=fm.ataList||[];
+        let pairs=descs.map((desc,i)=>({desc,ata:atas[i]||null}));
+        if(pairs.length>1)pairs.sort((a,b)=>(parseInt(a.desc)||0)-(parseInt(b.desc)||0)||a.desc.localeCompare(b.desc));
+        fm.findings=pairs.map(p=>p.desc);
+        fm['ATA Chapter']=pairs[0]?.ata||atas[0]||null;
+        fm.findingRows=pairs.map(p=>({
+          desc:    p.desc,
+          ata:     p.ata||null,
+          level:   fm['Finding level']||null,
           nc_type: fm['NC Type']    ||null,
         }));
       });
@@ -3633,24 +3639,30 @@ async function loadEcar(){
         '&$filter='+encodeURIComponent(ECAR_FF)
       );
 
-      // Galileo EAV API does not expose row-level correlation between fields.
-      // ATA Chapter is treated as report-level; findings are collected as array.
+      // API trả về EAV rows theo thứ tự section — collect ATA Chapter thành mảng
+      // rồi ghép cặp (desc, ata) theo index trước khi sort để đúng ATA Chapter cho mỗi finding.
       fRaw.forEach(f=>{
         if(!ecarIdSet.has(f.report_id))return;
         if(!fMap[f.report_id])fMap[f.report_id]={};
         if(f.field_name==='Finding description'){
           if(!fMap[f.report_id].findings)fMap[f.report_id].findings=[];
           if(f.text_value)fMap[f.report_id].findings.push(f.text_value);
+        } else if(f.field_name==='ATA Chapter'){
+          if(!fMap[f.report_id].ataList)fMap[f.report_id].ataList=[];
+          if(f.text_value)fMap[f.report_id].ataList.push(f.text_value);
         } else {
           if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
         }
       });
       Object.values(fMap).forEach(fm=>{
-        if(fm.findings&&fm.findings.length>1)
-          fm.findings.sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)||a.localeCompare(b));
-        fm.findingRows=(fm.findings||[]).map(desc=>({
-          desc,
-          ata: fm['ATA Chapter']||null,
+        const descs=fm.findings||[], atas=fm.ataList||[];
+        let pairs=descs.map((desc,i)=>({desc,ata:atas[i]||null}));
+        if(pairs.length>1)pairs.sort((a,b)=>(parseInt(a.desc)||0)-(parseInt(b.desc)||0)||a.desc.localeCompare(b.desc));
+        fm.findings=pairs.map(p=>p.desc);
+        fm['ATA Chapter']=pairs[0]?.ata||atas[0]||null;
+        fm.findingRows=pairs.map(p=>({
+          desc: p.desc,
+          ata:  p.ata||null,
         }));
       });
     }catch(e){console.warn('ECAR fields error:',e);}
