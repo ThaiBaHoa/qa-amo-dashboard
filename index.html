@@ -1884,7 +1884,89 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.27-r48';
+const APP_REV = '2026.05.27-r49';
+
+// Cache tên column dùng để nhận diện section trong EAV table (probe 1 lần duy nhất)
+let _eavSecKey = undefined; // undefined=chưa probe; null=không có; string=tên field
+
+async function getEavSectionKey() {
+  if (_eavSecKey !== undefined) return _eavSecKey;
+  try {
+    const r = await fetch(G_URL + 'dwanalytics_report_form_section_field?$top=1');
+    if (!r.ok) { _eavSecKey = null; return null; }
+    const j = await r.json();
+    const cols = j.value?.[0] ? Object.keys(j.value[0]) : [];
+    const candidates = ['section_id','form_section_id','report_section_id','section_row_id','section_row','row_id'];
+    _eavSecKey = candidates.find(k => cols.includes(k)) || null;
+    console.log('[EAV] columns:', cols, '→ section key:', _eavSecKey);
+  } catch(e) { _eavSecKey = null; }
+  return _eavSecKey;
+}
+
+// Xây findingRows từ EAV rows.
+// Nếu có secKey (section_id hoặc tương đương): group theo section để pair đúng desc↔ata.
+// Fallback: index-based (không đảm bảo chính xác nếu API trả theo thứ tự khác).
+function buildFindingRowsFromEAV(fRaw, reportIdSet, secKey, perSectionFields) {
+  const fMap = {};
+  const perSet = new Set(perSectionFields);
+
+  if (secKey && fRaw.some(f => f[secKey] != null)) {
+    fRaw.forEach(f => {
+      if (!reportIdSet.has(f.report_id)) return;
+      if (!fMap[f.report_id]) fMap[f.report_id] = { _sec: {} };
+      if (perSet.has(f.field_name)) {
+        const sid = f[secKey];
+        if (!fMap[f.report_id]._sec[sid]) fMap[f.report_id]._sec[sid] = {};
+        fMap[f.report_id]._sec[sid][f.field_name] = f.text_value;
+      } else {
+        if (!fMap[f.report_id][f.field_name]) fMap[f.report_id][f.field_name] = f.text_value;
+      }
+    });
+    Object.values(fMap).forEach(fm => {
+      const secs = Object.values(fm._sec || {}).filter(s => s['Finding description']);
+      secs.sort((a,b) => (parseInt(a['Finding description'])||0)-(parseInt(b['Finding description'])||0)||(a['Finding description']||'').localeCompare(b['Finding description']||''));
+      fm.findings       = secs.map(s => s['Finding description']);
+      fm['ATA Chapter'] = secs[0]?.['ATA Chapter'] || null;
+      fm.findingRows    = secs.map(s => ({
+        desc:    s['Finding description'] || null,
+        ata:     s['ATA Chapter']         || null,
+        level:   s['Finding level']       || fm['Finding level'] || null,
+        nc_type: s['NC Type']             || fm['NC Type']       || null,
+      }));
+      delete fm._sec;
+    });
+  } else {
+    console.warn('[EAV] no section key — ATA/finding pairing may be inaccurate');
+    fRaw.forEach(f => {
+      if (!reportIdSet.has(f.report_id)) return;
+      if (!fMap[f.report_id]) fMap[f.report_id] = {};
+      if (f.field_name === 'Finding description') {
+        if (!fMap[f.report_id].findings) fMap[f.report_id].findings = [];
+        if (f.text_value) fMap[f.report_id].findings.push(f.text_value);
+      } else if (f.field_name === 'ATA Chapter') {
+        if (!fMap[f.report_id].ataList) fMap[f.report_id].ataList = [];
+        if (f.text_value) fMap[f.report_id].ataList.push(f.text_value);
+      } else {
+        if (!fMap[f.report_id][f.field_name]) fMap[f.report_id][f.field_name] = f.text_value;
+      }
+    });
+    Object.values(fMap).forEach(fm => {
+      const descs = fm.findings||[], atas = fm.ataList||[];
+      let pairs = descs.map((desc,i) => ({desc, ata: atas[i]||null}));
+      if (pairs.length > 1) pairs.sort((a,b) => (parseInt(a.desc)||0)-(parseInt(b.desc)||0)||a.desc.localeCompare(b.desc));
+      fm.findings       = pairs.map(p => p.desc);
+      fm['ATA Chapter'] = pairs[0]?.ata || atas[0] || null;
+      fm.findingRows    = pairs.map(p => ({
+        desc:    p.desc,
+        ata:     p.ata           || null,
+        level:   fm['Finding level'] || null,
+        nc_type: fm['NC Type']       || null,
+      }));
+    });
+  }
+  return fMap;
+}
+
 let sb;
 try {
   const { createClient } = supabase;
@@ -3292,41 +3374,15 @@ async function loadCmr(){
         "field_name eq 'Final action taken' or field_name eq 'Issued to (person)' or "+
         "field_name eq 'Verified by (auditor)' or field_name eq 'Date completed' or "+
         "field_name eq 'RCA analysis'";
+      const secKey = await getEavSectionKey();
+      const secSelect = secKey ? ','+secKey : '';
       const fRaw=await fetchAll(
         G_URL+'dwanalytics_report_form_section_field'+
-        '?$select=report_id,field_name,text_value'+
+        '?$select=report_id,field_name,text_value'+secSelect+
         '&$filter='+encodeURIComponent(CMR_FF)
       );
-
-      // API trả về EAV rows theo thứ tự section — collect ATA Chapter thành mảng
-      // rồi ghép cặp (desc, ata) theo index trước khi sort để đúng ATA Chapter cho mỗi finding.
-      fRaw.forEach(f=>{
-        if(!cmrIdSet.has(f.report_id))return;
-        if(!fMap[f.report_id])fMap[f.report_id]={};
-        if(f.field_name==='Finding description'){
-          if(!fMap[f.report_id].findings)fMap[f.report_id].findings=[];
-          if(f.text_value)fMap[f.report_id].findings.push(f.text_value);
-        } else if(f.field_name==='ATA Chapter'){
-          if(!fMap[f.report_id].ataList)fMap[f.report_id].ataList=[];
-          if(f.text_value)fMap[f.report_id].ataList.push(f.text_value);
-        } else {
-          if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
-        }
-      });
-      // Ghép cặp (desc, ata) theo index, sort cặp theo số thứ tự finding, rồi tách ra
-      Object.values(fMap).forEach(fm=>{
-        const descs=fm.findings||[], atas=fm.ataList||[];
-        let pairs=descs.map((desc,i)=>({desc,ata:atas[i]||null}));
-        if(pairs.length>1)pairs.sort((a,b)=>(parseInt(a.desc)||0)-(parseInt(b.desc)||0)||a.desc.localeCompare(b.desc));
-        fm.findings=pairs.map(p=>p.desc);
-        fm['ATA Chapter']=pairs[0]?.ata||atas[0]||null;
-        fm.findingRows=pairs.map(p=>({
-          desc:    p.desc,
-          ata:     p.ata||null,
-          level:   fm['Finding level']||null,
-          nc_type: fm['NC Type']    ||null,
-        }));
-      });
+      fMap = buildFindingRowsFromEAV(fRaw, cmrIdSet, secKey,
+        ['Finding description','ATA Chapter','Finding level','NC Type','Defect Classification']);
     }catch(e){console.warn('CMR fields error:',e);}
 
     cmrData=summary.map(r=>{
@@ -3667,38 +3723,15 @@ async function loadEcar(){
         "field_name eq 'Aircraft Registration' or field_name eq 'Finding description' or "+
         "field_name eq 'ATA Chapter' or "+
         "field_name eq 'Date completed' or field_name eq 'Issued by'";
+      const secKey = await getEavSectionKey();
+      const secSelect = secKey ? ','+secKey : '';
       const fRaw=await fetchAll(
         G_URL+'dwanalytics_report_form_section_field'+
-        '?$select=report_id,field_name,text_value'+
+        '?$select=report_id,field_name,text_value'+secSelect+
         '&$filter='+encodeURIComponent(ECAR_FF)
       );
-
-      // API trả về EAV rows theo thứ tự section — collect ATA Chapter thành mảng
-      // rồi ghép cặp (desc, ata) theo index trước khi sort để đúng ATA Chapter cho mỗi finding.
-      fRaw.forEach(f=>{
-        if(!ecarIdSet.has(f.report_id))return;
-        if(!fMap[f.report_id])fMap[f.report_id]={};
-        if(f.field_name==='Finding description'){
-          if(!fMap[f.report_id].findings)fMap[f.report_id].findings=[];
-          if(f.text_value)fMap[f.report_id].findings.push(f.text_value);
-        } else if(f.field_name==='ATA Chapter'){
-          if(!fMap[f.report_id].ataList)fMap[f.report_id].ataList=[];
-          if(f.text_value)fMap[f.report_id].ataList.push(f.text_value);
-        } else {
-          if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
-        }
-      });
-      Object.values(fMap).forEach(fm=>{
-        const descs=fm.findings||[], atas=fm.ataList||[];
-        let pairs=descs.map((desc,i)=>({desc,ata:atas[i]||null}));
-        if(pairs.length>1)pairs.sort((a,b)=>(parseInt(a.desc)||0)-(parseInt(b.desc)||0)||a.desc.localeCompare(b.desc));
-        fm.findings=pairs.map(p=>p.desc);
-        fm['ATA Chapter']=pairs[0]?.ata||atas[0]||null;
-        fm.findingRows=pairs.map(p=>({
-          desc: p.desc,
-          ata:  p.ata||null,
-        }));
-      });
+      fMap = buildFindingRowsFromEAV(fRaw, ecarIdSet, secKey,
+        ['Finding description','ATA Chapter']);
     }catch(e){console.warn('ECAR fields error:',e);}
 
     ecarData=summary.map(r=>{
