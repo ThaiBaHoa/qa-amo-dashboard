@@ -815,6 +815,10 @@ tr:last-child td{border-bottom:none}
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
                 <input class="srch" id="cmrSrch" placeholder="Search..." oninput="dRenderCmr()">
               </div>
+              <select class="sel admin-only" id="cmrExportGroup" style="font-size:12px;display:none">
+                <option value="aircraft">Group: Aircraft</option>
+                <option value="ata">Group: ATA</option>
+              </select>
               <button class="btn-sm admin-only" onclick="exportCmrPDF()" style="white-space:nowrap;flex-shrink:0;display:none">⬇ PDF</button>
             </div>
             <div class="tbl-wrap">
@@ -858,6 +862,10 @@ tr:last-child td{border-bottom:none}
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
                 <input class="srch" id="ecarSrch" placeholder="Search..." oninput="dRenderEcar()">
               </div>
+              <select class="sel admin-only" id="ecarExportGroup" style="font-size:12px;display:none">
+                <option value="aircraft">Group: Aircraft</option>
+                <option value="ata">Group: ATA</option>
+              </select>
               <button class="btn-sm admin-only" onclick="exportEcarPDF()" style="white-space:nowrap;flex-shrink:0;display:none">⬇ PDF</button>
               <button class="btn-sm admin-only" onclick="exportEcarExcel()" style="white-space:nowrap;flex-shrink:0;background:#1D6F42;border-color:#1D6F42;display:none">⬇ Excel</button>
             </div>
@@ -1876,7 +1884,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.26-r47';
+const APP_REV = '2026.05.27-r48';
 let sb;
 try {
   const { createClient } = supabase;
@@ -3479,11 +3487,11 @@ function showCmrDetail(report_id){
       </div>
     </div>
     <div style="margin-top:4px;border-top:1px solid var(--border);padding-top:12px">
-      ${(r.findings&&r.findings.length)?`<div style="margin-bottom:10px">
-        <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Findings (${r.findings.length})</div>
-        ${r.findings.map((desc,i)=>`<div style="margin-bottom:8px;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--blue)">
-          <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:4px">FINDING ${i+1}</div>
-          <div style="font-size:12px;color:var(--text);white-space:pre-wrap;line-height:1.5">${esc(desc)}</div>
+      ${(r.findingRows&&r.findingRows.length||r.findings&&r.findings.length)?`<div style="margin-bottom:10px">
+        <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Findings (${(r.findingRows&&r.findingRows.length?r.findingRows:r.findings).length})</div>
+        ${(r.findingRows&&r.findingRows.length?r.findingRows.map(fr=>({desc:fr.desc,ata:fr.ata})):r.findings.map(d=>({desc:d,ata:null}))).map((fr,i)=>`<div style="margin-bottom:8px;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--blue)">
+          <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:4px">FINDING ${i+1}${fr.ata?' · <span style="color:var(--blue)">ATA '+esc(fr.ata)+'</span>':''}</div>
+          <div style="font-size:12px;color:var(--text);white-space:pre-wrap;line-height:1.5">${esc(fr.desc||'')}</div>
         </div>`).join('')}
       </div>`:''}
       ${row('Corrective Action Plan',r.cap)}
@@ -3537,19 +3545,14 @@ function exportCmrPDF(){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
 
+  const cmrGroupBy=g('cmrExportGroup')?.value||'aircraft';
+
   // Header
   doc.setFontSize(14);doc.setFont(undefined,'bold');
   doc.text('CMR-CAR Findings Report',14,14);
   doc.setFontSize(9);doc.setFont(undefined,'normal');
-  doc.text(pdfSafe(`Period: ${period}  |  Aircraft: ${acLabel}  |  Total: ${data.length} findings`),14,21);
+  doc.text(pdfSafe(`Period: ${period}  |  Aircraft: ${acLabel}  |  Total: ${data.length} reports`),14,21);
   doc.text(`Exported: ${new Date().toLocaleDateString('en-GB')}`,14,26);
-
-  // Group by aircraft
-  const acGroups={};
-  data.forEach(r=>{
-    if(!acGroups[r.aircraft_reg])acGroups[r.aircraft_reg]=[];
-    acGroups[r.aircraft_reg].push(r);
-  });
 
   let y=32;
   const statusColor={
@@ -3557,50 +3560,81 @@ function exportCmrPDF(){
     'On-time Closed':[63,185,80],'Lately Closed':[210,153,34],'Closed':[110,118,129]
   };
 
-  Object.entries(acGroups).forEach(([ac,rows])=>{
-    doc.autoTable({
-      startY:y,
-      head:[[{content:pdfSafe(`Aircraft: ${ac}  (${rows.length} findings)`),colSpan:7}]],
-      headStyles:{fillColor:[30,35,45],textColor:[140,160,200],fontStyle:'bold',fontSize:9},
-      theme:'plain',margin:{left:14,right:14},
+  if(cmrGroupBy==='aircraft'){
+    const acGroups={};
+    data.forEach(r=>{
+      const k=r.aircraft_reg||'Unknown';
+      if(!acGroups[k])acGroups[k]=[];
+      acGroups[k].push(r);
     });
-    y=doc.lastAutoTable.finalY;
-
-    doc.autoTable({
-      startY:y,
-      head:[['Report No','Aircraft','Status','Raised','Target','Dept','Finding Description']],
-      body:rows.map(r=>[
-        pdfSafe(r.report_number||'-'),
-        pdfSafe(r.aircraft_reg||'-'),
-        pdfSafe(r.semantic_status||'-'),
-        fd(r.raised_date),
-        fd(r.Target_date),
-        pdfSafe(r.dept||'-'),
-        pdfSafe((r.findings||[]).join('\n\n')||'-'),
-      ]),
-      headStyles:{fillColor:[22,27,34],textColor:[139,148,158],fontSize:8,fontStyle:'bold'},
-      bodyStyles:{fontSize:7.5,valign:'top'},
-      columnStyles:{
-        0:{cellWidth:24},1:{cellWidth:22},2:{cellWidth:22},
-        3:{cellWidth:18},4:{cellWidth:18},5:{cellWidth:22},6:{cellWidth:'auto'},
-      },
-      didParseCell:function(d){
-        if(d.section==='body'&&d.column.index===2){
-          const sc=statusColor[d.cell.raw];
-          if(sc)d.cell.styles.textColor=sc;
-        }
-      },
-      alternateRowStyles:{fillColor:[22,27,34]},
-      styles:{fillColor:[16,20,28],textColor:[201,209,217],lineColor:[48,54,63],lineWidth:.2},
-      margin:{left:14,right:14},
+    Object.entries(acGroups).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([ac,rows])=>{
+      doc.autoTable({
+        startY:y,
+        head:[[{content:pdfSafe(`Aircraft: ${ac}  (${rows.length} reports)`),colSpan:7}]],
+        headStyles:{fillColor:[30,35,45],textColor:[140,160,200],fontStyle:'bold',fontSize:9},
+        theme:'plain',margin:{left:14,right:14},
+      });
+      y=doc.lastAutoTable.finalY;
+      doc.autoTable({
+        startY:y,
+        head:[['Report No','Aircraft','Status','Raised','Target','Dept','Finding Description']],
+        body:rows.map(r=>{
+          const txt=r.findingRows&&r.findingRows.length
+            ?r.findingRows.map(fr=>`[ATA ${fr.ata||'—'}] ${fr.desc||''}`.trim()).join('\n\n')
+            :(r.findings||[]).join('\n\n')||'-';
+          return[pdfSafe(r.report_number||'-'),pdfSafe(r.aircraft_reg||'-'),pdfSafe(r.semantic_status||'-'),fd(r.raised_date),fd(r.Target_date),pdfSafe(r.dept||'-'),pdfSafe(txt)];
+        }),
+        headStyles:{fillColor:[22,27,34],textColor:[139,148,158],fontSize:8,fontStyle:'bold'},
+        bodyStyles:{fontSize:7.5,valign:'top'},
+        columnStyles:{0:{cellWidth:24},1:{cellWidth:22},2:{cellWidth:22},3:{cellWidth:18},4:{cellWidth:18},5:{cellWidth:22},6:{cellWidth:'auto'}},
+        didParseCell:function(d){if(d.section==='body'&&d.column.index===2){const sc=statusColor[d.cell.raw];if(sc)d.cell.styles.textColor=sc;}},
+        alternateRowStyles:{fillColor:[22,27,34]},
+        styles:{fillColor:[16,20,28],textColor:[201,209,217],lineColor:[48,54,63],lineWidth:.2},
+        margin:{left:14,right:14},
+      });
+      y=doc.lastAutoTable.finalY+4;
+      if(y>185)doc.addPage(),y=14;
     });
-    y=doc.lastAutoTable.finalY+4;
-    if(y>185&&Object.keys(acGroups).indexOf(ac)<Object.keys(acGroups).length-1){
-      doc.addPage();y=14;
-    }
-  });
+  } else {
+    // Group by ATA — explode findingRows so each finding is its own row
+    const findingItems=[];
+    data.forEach(r=>{
+      if(r.findingRows&&r.findingRows.length){
+        r.findingRows.forEach(fr=>{
+          findingItems.push({report_number:r.report_number,aircraft_reg:r.aircraft_reg,semantic_status:r.semantic_status,raised_date:r.raised_date,Target_date:r.Target_date,dept:r.dept,ata_raw:fr.ata||r.ata_chapter||null,finding_desc:fr.desc||null});
+        });
+      } else {
+        findingItems.push({report_number:r.report_number,aircraft_reg:r.aircraft_reg,semantic_status:r.semantic_status,raised_date:r.raised_date,Target_date:r.Target_date,dept:r.dept,ata_raw:r.ata_chapter||null,finding_desc:(r.findings||[]).join('\n')||null});
+      }
+    });
+    const ataGroups={};
+    findingItems.forEach(fi=>{
+      const norm=normalizeATA(fi.ata_raw,2);
+      const k=(norm==='Other'||!fi.ata_raw)?'No ATA / Other':norm;
+      if(!ataGroups[k])ataGroups[k]=[];
+      ataGroups[k].push(fi);
+    });
+    Object.keys(ataGroups).sort((a,b)=>{const na=parseInt(a),nb=parseInt(b);if(!isNaN(na)&&!isNaN(nb))return na-nb;if(!isNaN(na))return -1;if(!isNaN(nb))return 1;return a.localeCompare(b);}).forEach((ataKey,idx)=>{
+      const rows=ataGroups[ataKey];
+      const lbl=ATA_LABELS&&ATA_LABELS[ataKey]?`${ataKey} — ${ATA_LABELS[ataKey]}`:ataKey;
+      if(idx>0&&y>175)doc.addPage(),y=14;
+      doc.autoTable({startY:y,
+        head:[[{content:pdfSafe(`ATA: ${lbl}  (${rows.length} findings)`),colSpan:6}],
+              ['Report No','Aircraft','Status','Raised','Dept','Finding Description']],
+        body:rows.map(fi=>[pdfSafe(fi.report_number||'-'),pdfSafe(fi.aircraft_reg||'-'),pdfSafe(fi.semantic_status||'-'),fd(fi.raised_date),pdfSafe(fi.dept||'-'),pdfSafe(fi.finding_desc||'-')]),
+        headStyles:{fillColor:[30,64,175],textColor:[255,255,255],fontSize:8,fontStyle:'bold'},
+        bodyStyles:{fontSize:7.5,valign:'top',textColor:[30,30,30]},
+        columnStyles:{0:{cellWidth:26},1:{cellWidth:22},2:{cellWidth:24},3:{cellWidth:18},4:{cellWidth:22},5:{cellWidth:'auto'}},
+        didParseCell(d){if(d.section==='body'&&d.column.index===2){const c=statusColor[d.cell.raw];if(c)d.cell.styles.textColor=c;}},
+        alternateRowStyles:{fillColor:[245,247,250]},
+        styles:{fillColor:[255,255,255],lineColor:[209,213,219],lineWidth:.2},
+        margin:{left:14,right:14}});
+      y=doc.lastAutoTable.finalY+6;
+    });
+  }
 
-  const fname=`CMR-CAR_${yr||'all'}_${qr?'Q'+qr:'allQ'}_${new Date().toISOString().slice(0,10)}.pdf`;
+  const grpSuffix=cmrGroupBy==='ata'?'_byATA':'_byAC';
+  const fname=`CMR-CAR_${yr||'all'}_${qr?'Q'+qr:'allQ'}${grpSuffix}_${new Date().toISOString().slice(0,10)}.pdf`;
   doc.save(fname);
   toast(`Exported ${fname}`,'ok');
 }
