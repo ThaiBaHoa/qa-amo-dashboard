@@ -1876,7 +1876,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.26-r46';
+const APP_REV = '2026.05.26-r47';
 let sb;
 try {
   const { createClient } = supabase;
@@ -3284,109 +3284,35 @@ async function loadCmr(){
         "field_name eq 'Final action taken' or field_name eq 'Issued to (person)' or "+
         "field_name eq 'Verified by (auditor)' or field_name eq 'Date completed' or "+
         "field_name eq 'RCA analysis'";
-      // Fetch WITHOUT $select so OData returns all columns including sequence_number
-      // (adding unknown fields to $select causes HTTP 400; omitting $select is safe).
       const fRaw=await fetchAll(
         G_URL+'dwanalytics_report_form_section_field'+
-        '?$filter='+encodeURIComponent(CMR_FF)
+        '?$select=report_id,field_name,text_value'+
+        '&$filter='+encodeURIComponent(CMR_FF)
       );
 
-      // ── DEBUG: dump raw API rows for the first multi-finding report ──────────────
-      // Mục đích: xem thứ tự thực tế Finding description & ATA Chapter từ API
-      // và kiểm tra sequence_number có được trả về không.
-      // XOÁ ĐOẠN NÀY sau khi xác nhận logic đúng.
-      (()=>{
-        const _debugFields=['Finding description','ATA Chapter','Finding level','NC Type'];
-        // Tìm report đầu tiên có ≥2 findings để dễ quan sát
-        const _cnt={};
-        fRaw.forEach(f=>{if(f.field_name==='Finding description')_cnt[f.report_id]=(_cnt[f.report_id]||0)+1;});
-        const _debugId=Object.keys(_cnt).find(id=>_cnt[id]>=2)||null;
-        if(_debugId){
-          const _rows=fRaw.filter(f=>f.report_id==_debugId&&_debugFields.includes(f.field_name));
-          console.log(`%c[CMR DEBUG] report_id=${_debugId} — raw API order (${_rows.length} rows):`,
-            'color:#58A6FF;font-weight:bold');
-          console.table(_rows.map((f,i)=>({
-            '#':i,
-            field_name:f.field_name,
-            text_value:f.text_value,
-            sequence_number:f.sequence_number??'(không có)',
-            // In thêm tất cả keys lạ để biết API trả thêm field gì
-            extra_keys:Object.keys(f).filter(k=>!['report_id','field_name','text_value','sequence_number'].includes(k)).join(', ')||'—'
-          })));
-          // In toàn bộ keys của 1 row để biết API có field nào khác không
-          console.log('[CMR DEBUG] All keys in one row:',Object.keys(fRaw[0]||{}));
+      // Galileo EAV API does not expose row-level correlation between fields.
+      // ATA Chapter is treated as report-level; findings are collected as array.
+      fRaw.forEach(f=>{
+        if(!cmrIdSet.has(f.report_id))return;
+        if(!fMap[f.report_id])fMap[f.report_id]={};
+        if(f.field_name==='Finding description'){
+          if(!fMap[f.report_id].findings)fMap[f.report_id].findings=[];
+          if(f.text_value)fMap[f.report_id].findings.push(f.text_value);
+        } else {
+          if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
         }
-      })();
-      // ── END DEBUG ────────────────────────────────────────────────────────────────
-
-      // If sequence_number is a column in this table it will appear in the response.
-      // Use it to correlate Finding description ↔ ATA Chapter within the same section row.
-      const CMR_REPEATING = new Set(['Finding description','ATA Chapter','Finding level','NC Type']);
-      const _cmrHasSeq = fRaw.some(f=>CMR_REPEATING.has(f.field_name)&&f.sequence_number!=null);
-      console.log('[CMR] sequence_number available:',_cmrHasSeq);
-
-      if(_cmrHasSeq){
-        // ── Mode A: group by sequence_number → exact per-finding ATA correlation ──
-        fRaw.forEach(f=>{
-          if(!cmrIdSet.has(f.report_id))return;
-          if(!fMap[f.report_id])fMap[f.report_id]={_seqRows:{}};
-          const fm=fMap[f.report_id];
-          if(CMR_REPEATING.has(f.field_name)){
-            const seq=String(f.sequence_number);
-            if(!fm._seqRows[seq])fm._seqRows[seq]={};
-            fm._seqRows[seq][f.field_name]=f.text_value;
-          } else {
-            if(!fm[f.field_name])fm[f.field_name]=f.text_value;
-          }
-        });
-        Object.values(fMap).forEach(fm=>{
-          const rows=Object.values(fm._seqRows||{}).filter(r=>r['Finding description']);
-          rows.sort((a,b)=>(parseInt(a['Finding description'])||0)-(parseInt(b['Finding description'])||0)
-                          ||(a['Finding description']||'').localeCompare(b['Finding description']||''));
-          fm.findings=rows.map(r=>r['Finding description']);
-          fm.findingRows=rows.map(r=>({
-            desc:    r['Finding description'],
-            ata:     r['ATA Chapter']   ||fm['ATA Chapter']  ||null,
-            level:   r['Finding level'] ||fm['Finding level']||null,
-            nc_type: r['NC Type']       ||fm['NC Type']      ||null,
-          }));
-          if(!fm['ATA Chapter']&&rows.length)fm['ATA Chapter']=rows[0]['ATA Chapter']||null;
-        });
-      } else {
-        // ── Mode B: no sequence_number → keep API order for BOTH findings and ATAs,
-        //    then pair by finding number embedded in text (sort both arrays the same way).
-        fRaw.forEach(f=>{
-          if(!cmrIdSet.has(f.report_id))return;
-          if(!fMap[f.report_id])fMap[f.report_id]={_pairs:[],_atas:[],_levels:[],_nctypes:[],_findMap:{}};
-          const fm=fMap[f.report_id];
-          if(f.field_name==='Finding description'&&f.text_value)fm._pairs.push({desc:f.text_value,ata:null,level:null,nc_type:null});
-          else if(f.field_name==='ATA Chapter'&&f.text_value)fm._atas.push(f.text_value);
-          else if(f.field_name==='Finding level'&&f.text_value)fm._levels.push(f.text_value);
-          else if(f.field_name==='NC Type'&&f.text_value)fm._nctypes.push(f.text_value);
-          else if(!fm[f.field_name])fm[f.field_name]=f.text_value;
-        });
-        Object.values(fMap).forEach(fm=>{
-          // Sort findings by embedded number; sort ATAs by same relative order they appeared
-          const pairs=fm._pairs||[];
-          pairs.sort((a,b)=>(parseInt(a.desc)||0)-(parseInt(b.desc)||0)||a.desc.localeCompare(b.desc));
-          // ATAs come in the SAME form-entry order as findings (both in API order before sort).
-          // Map: sorted finding index → ATA at same pre-sort position.
-          // Build a map from original position → sorted position to assign ATAs correctly.
-          const origOrder=(fm._pairs||[]).map((p,i)=>({desc:p.desc,origIdx:i}));
-          origOrder.sort((a,b)=>(parseInt(a.desc)||0)-(parseInt(b.desc)||0)||a.desc.localeCompare(b.desc));
-          fm.findings=pairs.map(p=>p.desc);
-          fm.findingRows=pairs.map((p,si)=>{
-            const origIdx=origOrder[si]?.origIdx??si;
-            return{
-              desc:p.desc,
-              ata:     (fm._atas||[])[origIdx]   ||fm['ATA Chapter']  ||null,
-              level:   (fm._levels||[])[origIdx] ||fm['Finding level']||null,
-              nc_type: (fm._nctypes||[])[origIdx]||fm['NC Type']      ||null,
-            };
-          });
-          if(!fm['ATA Chapter']&&fm._atas&&fm._atas.length)fm['ATA Chapter']=fm._atas[0];
-        });
-      }
+      });
+      // Sort findings numerically; build findingRows with shared report-level ATA
+      Object.values(fMap).forEach(fm=>{
+        if(fm.findings&&fm.findings.length>1)
+          fm.findings.sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)||a.localeCompare(b));
+        fm.findingRows=(fm.findings||[]).map(desc=>({
+          desc,
+          ata:   fm['ATA Chapter']  ||null,
+          level: fm['Finding level']||null,
+          nc_type: fm['NC Type']    ||null,
+        }));
+      });
     }catch(e){console.warn('CMR fields error:',e);}
 
     cmrData=summary.map(r=>{
@@ -3547,17 +3473,7 @@ function showCmrDetail(report_id){
       </div>
     </div>
     <div style="margin-top:4px;border-top:1px solid var(--border);padding-top:12px">
-      ${(r.findingRows&&r.findingRows.length)?`<div style="margin-bottom:10px">
-        <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Findings (${r.findingRows.length})</div>
-        ${r.findingRows.map((fr,i)=>`<div style="margin-bottom:8px;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--blue)">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-            <div style="font-size:10px;color:var(--muted);font-weight:600">FINDING ${i+1}</div>
-            ${fr.ata?`<span style="font-size:10px;background:rgba(88,166,255,0.12);color:var(--blue);padding:1px 6px;border-radius:3px;font-weight:600">${esc(fr.ata)}</span>`:''}
-            ${fr.level?`<span style="font-size:10px;color:var(--muted)">${esc(fr.level)}</span>`:''}
-          </div>
-          <div style="font-size:12px;color:var(--text);white-space:pre-wrap;line-height:1.5">${esc(fr.desc||'—')}</div>
-        </div>`).join('')}
-      </div>`:(r.findings&&r.findings.length)?`<div style="margin-bottom:10px">
+      ${(r.findings&&r.findings.length)?`<div style="margin-bottom:10px">
         <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Findings (${r.findings.length})</div>
         ${r.findings.map((desc,i)=>`<div style="margin-bottom:8px;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--blue)">
           <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:4px">FINDING ${i+1}</div>
@@ -3711,62 +3627,32 @@ async function loadEcar(){
         "field_name eq 'Aircraft Registration' or field_name eq 'Finding description' or "+
         "field_name eq 'ATA Chapter' or "+
         "field_name eq 'Date completed' or field_name eq 'Issued by'";
-      // Fetch WITHOUT $select so OData returns all columns including sequence_number.
       const fRaw=await fetchAll(
         G_URL+'dwanalytics_report_form_section_field'+
-        '?$filter='+encodeURIComponent(ECAR_FF)
+        '?$select=report_id,field_name,text_value'+
+        '&$filter='+encodeURIComponent(ECAR_FF)
       );
 
-      const ECAR_REPEATING = new Set(['Finding description','ATA Chapter']);
-      const _ecarHasSeq = fRaw.some(f=>ECAR_REPEATING.has(f.field_name)&&f.sequence_number!=null);
-      console.log('[ECAR] sequence_number available:',_ecarHasSeq);
-
-      if(_ecarHasSeq){
-        // ── Mode A: group by sequence_number ──
-        fRaw.forEach(f=>{
-          if(!ecarIdSet.has(f.report_id))return;
-          if(!fMap[f.report_id])fMap[f.report_id]={_seqRows:{}};
-          const fm=fMap[f.report_id];
-          if(ECAR_REPEATING.has(f.field_name)){
-            const seq=String(f.sequence_number);
-            if(!fm._seqRows[seq])fm._seqRows[seq]={};
-            fm._seqRows[seq][f.field_name]=f.text_value;
-          } else {
-            if(!fm[f.field_name])fm[f.field_name]=f.text_value;
-          }
-        });
-        Object.values(fMap).forEach(fm=>{
-          const rows=Object.values(fm._seqRows||{}).filter(r=>r['Finding description']);
-          rows.sort((a,b)=>(parseInt(a['Finding description'])||0)-(parseInt(b['Finding description'])||0)
-                          ||(a['Finding description']||'').localeCompare(b['Finding description']||''));
-          fm.findings=rows.map(r=>r['Finding description']);
-          fm.findingRows=rows.map(r=>({
-            desc: r['Finding description'],
-            ata:  r['ATA Chapter']||fm['ATA Chapter']||null,
-          }));
-          if(!fm['ATA Chapter']&&rows.length)fm['ATA Chapter']=rows[0]['ATA Chapter']||null;
-        });
-      } else {
-        // ── Mode B: pair by original API position (preserve pre-sort index) ──
-        fRaw.forEach(f=>{
-          if(!ecarIdSet.has(f.report_id))return;
-          if(!fMap[f.report_id])fMap[f.report_id]={_pairs:[],_atas:[]};
-          const fm=fMap[f.report_id];
-          if(f.field_name==='Finding description'&&f.text_value)fm._pairs.push({desc:f.text_value,ata:null});
-          else if(f.field_name==='ATA Chapter'&&f.text_value)fm._atas.push(f.text_value);
-          else if(!fm[f.field_name])fm[f.field_name]=f.text_value;
-        });
-        Object.values(fMap).forEach(fm=>{
-          const origOrder=(fm._pairs||[]).map((p,i)=>({desc:p.desc,origIdx:i}));
-          origOrder.sort((a,b)=>(parseInt(a.desc)||0)-(parseInt(b.desc)||0)||a.desc.localeCompare(b.desc));
-          fm.findings=origOrder.map(o=>o.desc);
-          fm.findingRows=origOrder.map(o=>({
-            desc:o.desc,
-            ata:(fm._atas||[])[o.origIdx]||fm['ATA Chapter']||null,
-          }));
-          if(!fm['ATA Chapter']&&fm._atas&&fm._atas.length)fm['ATA Chapter']=fm._atas[0];
-        });
-      }
+      // Galileo EAV API does not expose row-level correlation between fields.
+      // ATA Chapter is treated as report-level; findings are collected as array.
+      fRaw.forEach(f=>{
+        if(!ecarIdSet.has(f.report_id))return;
+        if(!fMap[f.report_id])fMap[f.report_id]={};
+        if(f.field_name==='Finding description'){
+          if(!fMap[f.report_id].findings)fMap[f.report_id].findings=[];
+          if(f.text_value)fMap[f.report_id].findings.push(f.text_value);
+        } else {
+          if(!fMap[f.report_id][f.field_name])fMap[f.report_id][f.field_name]=f.text_value;
+        }
+      });
+      Object.values(fMap).forEach(fm=>{
+        if(fm.findings&&fm.findings.length>1)
+          fm.findings.sort((a,b)=>(parseInt(a)||0)-(parseInt(b)||0)||a.localeCompare(b));
+        fm.findingRows=(fm.findings||[]).map(desc=>({
+          desc,
+          ata: fm['ATA Chapter']||null,
+        }));
+      });
     }catch(e){console.warn('ECAR fields error:',e);}
 
     ecarData=summary.map(r=>{
@@ -6741,6 +6627,34 @@ window.probeGalileoTables = async function() {
   console.log(`%c[PROBE] 404: ${notFound.length} | Lỗi: ${errored.length}`, 'color:#A3AEB8');
   if (errored.length) console.log('[PROBE] Errors:', errored);
   return { ok, notFound, errored };
+};
+
+// ── DEBUG: xem ALL fields của 1 report để tìm row correlation key ──────────
+window.debugFindingRaw = async function(reportRef) {
+  const r = cmrData.find(x=>x.report_number===reportRef) || ecarData.find(x=>x.report_number===reportRef);
+  if(!r){console.error('Không tìm thấy report:', reportRef); return;}
+  console.log('%c[DEBUG] report_id: '+r.report_id, 'color:#58A6FF');
+
+  // Fetch ALL columns available for this report — no $select filter
+  const url = G_URL+'dwanalytics_report_form_section_field'
+    +'?$top=1&$filter='+encodeURIComponent(`report_id eq ${r.report_id}`);
+  const probe = await (await fetch(url)).json();
+  console.log('%c[DEBUG] All available columns:', 'color:#3FB950;font-weight:bold');
+  if(probe.value[0]) console.log(Object.keys(probe.value[0]));
+
+  // Fetch full data with ALL columns
+  const url2 = G_URL+'dwanalytics_report_form_section_field'
+    +'?$filter='+encodeURIComponent(`report_id eq ${r.report_id}`)
+    +'&$top=200';
+  const j = await (await fetch(url2)).json();
+  console.log('%c[DEBUG] Full rows (tất cả columns):', 'color:#D29922;font-weight:bold');
+  console.table(j.value.map((row,i)=>({
+    i,
+    ...row,
+    text_value: (row.text_value||'').slice(0,50)
+  })));
+  console.log('%c[DEBUG] JSON đầy đủ:', 'color:#A3AEB8', JSON.stringify(j.value[0],null,2));
+  return j.value;
 };
 
 </script>
