@@ -1884,88 +1884,43 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.27-r52';
+const APP_REV = '2026.05.27-r53';
 
-// Probe EAV table schema một lần để tìm section key và order key
-let _eavMeta = undefined; // undefined=chưa probe; sau probe = {secKey, orderKey}
-
-async function getEavMeta() {
-  if (_eavMeta !== undefined) return _eavMeta;
-  try {
-    const r = await fetch(G_URL + 'dwanalytics_report_form_section_field?$top=1');
-    if (!r.ok) { _eavMeta = {secKey:null,orderKey:null}; return _eavMeta; }
-    const j = await r.json();
-    const cols = (j.value && j.value[0]) ? Object.keys(j.value[0]) : [];
-    const SEC  = ['repeater_section_id','section_id','form_section_id','report_section_id','section_row_id','section_row','row_id'];
-    const ORD  = ['id','record_id','field_id','dw_id','seq','sequence','sort_order'];
-    _eavMeta = {
-      secKey:   SEC.find(k => cols.includes(k)) || null,
-      orderKey: ORD.find(k => cols.includes(k)) || null,
-    };
-    console.log('[EAV] cols:', cols, '| secKey:', _eavMeta.secKey, '| orderKey:', _eavMeta.orderKey);
-  } catch(e) { _eavMeta = {secKey:null,orderKey:null}; }
-  return _eavMeta;
-}
-
-// Xây findingRows từ EAV rows.
-// Nếu có secKey (section_id hoặc tương đương): group theo section để pair đúng desc↔ata.
-// Fallback: index-based (không đảm bảo chính xác nếu API trả theo thứ tự khác).
-// fRaw phải được fetch với $orderby=secKey,orderKey để sequential tracking hoạt động đúng
-function buildFindingRowsFromEAV(fRaw, reportIdSet, secKey, perSectionFields) {
-  const fMap  = {};
-  const perSet = new Set(perSectionFields);
+// Build findingRows from EAV rows using report_field_created_date as grouping key.
+// Finding description + ATA Chapter created at the SAME timestamp → same finding row.
+function buildFindingRowsByTimestamp(fRaw, reportIdSet, findingFields) {
+  const fMap = {};
+  const tsMap = {}; // {report_id: {ts: {desc, ata, level, nc_type, ts}}}
+  const fldSet = new Set(findingFields);
 
   fRaw.forEach(f => {
     if (!reportIdSet.has(f.report_id)) return;
-    if (!fMap[f.report_id]) fMap[f.report_id] = {
-      _sec: {},      // section_id → fields  (for non-null section_id)
-      _seq: [],      // [{desc,ata,...}]      (sequential for null section_id)
-      _cur: null,    // current pending sequential section
-    };
-    const fm = fMap[f.report_id];
-
-    if (!perSet.has(f.field_name)) {
-      if (!fm[f.field_name]) fm[f.field_name] = f.text_value;
-      return;
-    }
-
-    const sid = secKey ? f[secKey] : null;
-    if (sid != null) {
-      // Non-null section_id → group by it (reliable)
-      if (!fm._sec[sid]) fm._sec[sid] = {};
-      fm._sec[sid][f.field_name] = f.text_value;
+    if (!fMap[f.report_id]) fMap[f.report_id] = {};
+    if (fldSet.has(f.field_name)) {
+      const ts = f.report_field_created_date || ('__' + Math.random());
+      if (!tsMap[f.report_id]) tsMap[f.report_id] = {};
+      if (!tsMap[f.report_id][ts]) tsMap[f.report_id][ts] = {desc:null,ata:null,level:null,nc_type:null,ts};
+      const slot = tsMap[f.report_id][ts];
+      if (f.field_name === 'Finding description' && f.text_value) slot.desc = f.text_value;
+      if (f.field_name === 'ATA Chapter'          && f.text_value) slot.ata  = f.text_value;
+      if (f.field_name === 'Finding level'         && f.text_value) slot.level   = f.text_value;
+      if (f.field_name === 'NC Type'               && f.text_value) slot.nc_type = f.text_value;
     } else {
-      // Null section_id → sequential tracking (requires $orderby insertion order)
-      // A new "Finding description" marks the start of a new section
-      if (f.field_name === 'Finding description') {
-        if (fm._cur) fm._seq.push(fm._cur);
-        fm._cur = {'Finding description': f.text_value};
-      } else if (fm._cur) {
-        fm._cur[f.field_name] = f.text_value;
-      }
+      if (!fMap[f.report_id][f.field_name]) fMap[f.report_id][f.field_name] = f.text_value;
     }
   });
 
-  Object.values(fMap).forEach(fm => {
-    // Finalize last sequential section
-    if (fm._cur) { fm._seq.push(fm._cur); fm._cur = null; }
-
-    const secSecs = Object.values(fm._sec).filter(s => s['Finding description']);
-    const src = secSecs.length > 0 ? secSecs : fm._seq;
-
-    src.sort((a,b) => (parseInt(a['Finding description'])||0)-(parseInt(b['Finding description'])||0)||(a['Finding description']||'').localeCompare(b['Finding description']||''));
-
-    const pairs = src.map(s => ({
-      desc:    s['Finding description'] || null,
-      ata:     s['ATA Chapter']         || null,
-      level:   s['Finding level']       || fm['Finding level'] || null,
-      nc_type: s['NC Type']             || fm['NC Type']       || null,
-    }));
-
-    fm.findings       = pairs.map(p => p.desc);
-    fm['ATA Chapter'] = pairs[0] ? pairs[0].ata : null;
-    fm.findingRows    = pairs;
-    delete fm._sec; delete fm._seq; delete fm._cur;
+  Object.entries(tsMap).forEach(([rid, slots]) => {
+    if (!fMap[rid]) fMap[rid] = {};
+    const rows = Object.values(slots)
+      .filter(s => s.desc || s.ata)
+      .sort((a, b) => a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : (parseInt(a.desc)||999) - (parseInt(b.desc)||999));
+    fMap[rid].findingRows = rows;
+    fMap[rid].findings = rows.map(r => r.desc).filter(Boolean);
+    if (!fMap[rid]['ATA Chapter']) {
+      const first = rows.find(r => r.ata);
+      if (first) fMap[rid]['ATA Chapter'] = first.ata;
+    }
   });
   return fMap;
 }
@@ -3377,17 +3332,13 @@ async function loadCmr(){
         "field_name eq 'Final action taken' or field_name eq 'Issued to (person)' or "+
         "field_name eq 'Verified by (auditor)' or field_name eq 'Date completed' or "+
         "field_name eq 'RCA analysis'";
-      const {secKey,orderKey} = await getEavMeta();
-      const extraSel = [secKey,orderKey].filter(Boolean).map(k=>','+k).join('');
-      const orderBy  = [secKey,orderKey].filter(Boolean).join(',');
       const fRaw=await fetchAll(
         G_URL+'dwanalytics_report_form_section_field'+
-        '?$select=report_id,field_name,text_value'+extraSel+
-        '&$filter='+encodeURIComponent(CMR_FF)+
-        (orderBy ? '&$orderby='+encodeURIComponent(orderBy) : '')
+        '?$select=report_id,field_name,text_value,report_field_created_date'+
+        '&$filter='+encodeURIComponent(CMR_FF)
       );
-      fMap = buildFindingRowsFromEAV(fRaw, cmrIdSet, secKey,
-        ['Finding description','ATA Chapter','Finding level','NC Type','Defect Classification']);
+      fMap = buildFindingRowsByTimestamp(fRaw, cmrIdSet,
+        ['Finding description','ATA Chapter','Finding level','NC Type']);
     }catch(e){console.warn('CMR fields error:',e);}
 
     cmrData=summary.map(r=>{
@@ -3728,16 +3679,12 @@ async function loadEcar(){
         "field_name eq 'Aircraft Registration' or field_name eq 'Finding description' or "+
         "field_name eq 'ATA Chapter' or "+
         "field_name eq 'Date completed' or field_name eq 'Issued by'";
-      const {secKey,orderKey} = await getEavMeta();
-      const extraSel = [secKey,orderKey].filter(Boolean).map(k=>','+k).join('');
-      const orderBy  = [secKey,orderKey].filter(Boolean).join(',');
       const fRaw=await fetchAll(
         G_URL+'dwanalytics_report_form_section_field'+
-        '?$select=report_id,field_name,text_value'+extraSel+
-        '&$filter='+encodeURIComponent(ECAR_FF)+
-        (orderBy ? '&$orderby='+encodeURIComponent(orderBy) : '')
+        '?$select=report_id,field_name,text_value,report_field_created_date'+
+        '&$filter='+encodeURIComponent(ECAR_FF)
       );
-      fMap = buildFindingRowsFromEAV(fRaw, ecarIdSet, secKey,
+      fMap = buildFindingRowsByTimestamp(fRaw, ecarIdSet,
         ['Finding description','ATA Chapter']);
     }catch(e){console.warn('ECAR fields error:',e);}
 
