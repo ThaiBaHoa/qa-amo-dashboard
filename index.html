@@ -631,47 +631,26 @@ tr:last-child td{border-bottom:none}
               <div class="kpi-lbl">Audits</div><div class="kpi-val" id="kk-audits" style="color:var(--yellow)">—</div>
             </div>
           </div>
-          <!-- Row 2: 3 charts -->
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;flex-shrink:0">
-            <div class="chart-card">
-              <div class="chart-head"><div><div class="chart-title">Findings by Form</div><div class="chart-sub">Stacked: Open / Overdue / Closed</div></div></div>
-              <div class="ch-wrap" style="height:200px"><canvas id="cKpiForm"></canvas></div>
-            </div>
-            <div class="chart-card">
-              <div class="chart-head"><div><div class="chart-title">Monthly Trend</div><div class="chart-sub">Stacked by status per month</div></div></div>
-              <div class="ch-wrap" style="height:200px"><canvas id="cKpiMonth"></canvas></div>
-            </div>
+          <!-- Row 2: Overdue Aging (compact, beside row 3) -->
+          <div style="display:grid;grid-template-columns:1fr 3fr;gap:8px;margin-bottom:8px;flex-shrink:0">
             <div class="chart-card">
               <div class="chart-head"><div><div class="chart-title">Overdue Aging</div><div class="chart-sub">CAT I / II / III</div></div></div>
-              <div class="ch-wrap" style="height:200px"><canvas id="cKpiAging"></canvas></div>
+              <div class="ch-wrap" style="height:170px"><canvas id="cKpiAging"></canvas></div>
             </div>
-          </div>
-          <!-- Row 3: 2 charts -->
-          <div style="display:grid;grid-template-columns:3fr 2fr;gap:8px;margin-bottom:8px;flex-shrink:0">
             <div class="chart-card">
               <div class="chart-head"><div><div class="chart-title">On-time Close Rate by Month</div><div class="chart-sub">Target: 70%</div></div></div>
               <div class="ch-wrap" style="height:170px"><canvas id="cOnM"></canvas></div>
             </div>
+          </div>
+          <!-- Row 3: Finding Level -->
+          <div style="margin-bottom:8px;flex-shrink:0;max-width:280px">
             <div class="chart-card">
               <div class="chart-head"><div><div class="chart-title">Finding Level</div><div class="chart-sub">Distribution by level</div></div></div>
-              <div class="ch-wrap" style="height:170px"><canvas id="cKpiLevel"></canvas></div>
-            </div>
-          </div>
-          <!-- Row 4: Performance by Form table -->
-          <div class="chart-card" style="flex-shrink:0">
-            <div class="chart-title" style="margin-bottom:10px">Performance by Form</div>
-            <div style="overflow-x:auto">
-              <table class="stat-tbl" id="kk-perf-table">
-                <thead><tr>
-                  <th>Form</th><th>Total</th><th>Open</th><th>Overdue</th>
-                  <th>On-time</th><th>Lately</th><th>On-time Rate</th><th>CAT III</th>
-                </tr></thead>
-                <tbody id="kk-perf-body"></tbody>
-              </table>
+              <div class="ch-wrap" style="height:160px"><canvas id="cKpiLevel"></canvas></div>
             </div>
           </div>
 
-          <!-- Row 5: ATA Chapter Comparison -->
+          <!-- Row 4: ATA Chapter Comparison -->
           <div class="chart-card" style="flex-shrink:0;margin-top:8px">
             <div class="chart-head" style="margin-bottom:10px">
               <div>
@@ -687,6 +666,7 @@ tr:last-child td{border-bottom:none}
                 <select class="sel" id="ataCompareYear" onchange="renderATACompare()" style="font-size:11px;width:90px">
                   <option value="">All Years</option>
                 </select>
+                <button class="btn-sm admin-only" onclick="exportATACompare()" style="white-space:nowrap;flex-shrink:0">⬇ Excel</button>
               </div>
             </div>
             <!-- Legend -->
@@ -1883,7 +1863,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.27-r54';
+const APP_REV = '2026.05.27-r55';
 
 // Build findingRows from EAV rows.
 // Collect Finding description and ATA Chapter values separately, each sorted by
@@ -2794,50 +2774,7 @@ function buildKPICharts(data) {
   s('kk-rate',closed>0?pct(onTime/closed):'—');
   s('kk-cat3',cat3); s('kk-audits',audits);
 
-  // ── Chart 1: Findings by Form (stacked horizontal bar) ────
-  const formMap={};
-  data.forEach(r=>{
-    const f=r.report_title||'?';
-    if(!formMap[f])formMap[f]={open:0,over:0,closed:0};
-    if(r.semantic_status==='Open')formMap[f].open++;
-    else if(r.semantic_status==='Overdue')formMap[f].over++;
-    else if(CLOSED_S.includes(r.semantic_status)||r.semantic_status==='Closed')formMap[f].closed++;
-  });
-  const formEntries=Object.entries(formMap).sort((a,b)=>(b[1].open+b[1].over+b[1].closed)-(a[1].open+a[1].over+a[1].closed)).slice(0,12);
-  const fLabels=formEntries.map(e=>e[0]);
-  dc('cKpiForm');
-  charts['cKpiForm']=new Chart(g('cKpiForm'),{type:'bar',
-    data:{labels:fLabels,datasets:[
-      {label:'Open',data:formEntries.map(e=>e[1].open),backgroundColor:'#58A6FF',borderRadius:2},
-      {label:'Overdue',data:formEntries.map(e=>e[1].over),backgroundColor:'#ff6b6b',borderRadius:2},
-      {label:'Closed',data:formEntries.map(e=>e[1].closed),backgroundColor:'#3FB950',borderRadius:2}]},
-    options:{...CO,indexAxis:'y',scales:{
-      x:{stacked:true,ticks:{color:'#8B949E',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}},
-      y:{stacked:true,ticks:{color:'#8B949E',font:{size:9},callback:v=>v.length>18?v.slice(0,18)+'…':v},grid:{display:false}}}}});
-
-  // ── Chart 2: Monthly Trend (stacked bar) ──────────────────
-  const mMap={};
-  data.forEach(r=>{
-    if(!r.raised_ym)return;
-    if(!mMap[r.raised_ym])mMap[r.raised_ym]={open:0,over:0,ontime:0,late:0};
-    if(r.semantic_status==='Open')mMap[r.raised_ym].open++;
-    else if(r.semantic_status==='Overdue')mMap[r.raised_ym].over++;
-    else if(r.semantic_status==='On-time Closed')mMap[r.raised_ym].ontime++;
-    else if(r.semantic_status==='Lately Closed')mMap[r.raised_ym].late++;
-  });
-  const mKeys=Object.keys(mMap).sort();
-  dc('cKpiMonth');
-  charts['cKpiMonth']=new Chart(g('cKpiMonth'),{type:'bar',
-    data:{labels:mKeys,datasets:[
-      {label:'Open',data:mKeys.map(k=>mMap[k].open),backgroundColor:'#58A6FF',borderRadius:2},
-      {label:'Overdue',data:mKeys.map(k=>mMap[k].over),backgroundColor:'#ff6b6b',borderRadius:2},
-      {label:'On-time',data:mKeys.map(k=>mMap[k].ontime),backgroundColor:'#3FB950',borderRadius:2},
-      {label:'Lately',data:mKeys.map(k=>mMap[k].late),backgroundColor:'#D29922',borderRadius:2}]},
-    options:{...CO,scales:{
-      x:{stacked:true,ticks:{color:'#8B949E',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}},
-      y:{stacked:true,ticks:{color:'#8B949E',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}}}}});
-
-  // ── Chart 3: Overdue Aging by CAT (doughnut) ──────────────
+  // ── Chart 1: Overdue Aging by CAT (doughnut) ─────────────
   const cats={'CAT I':0,'CAT II':0,'CAT III':0};
   data.filter(r=>r.semantic_status==='Overdue').forEach(r=>{if(r.overdue_cat)cats[r.overdue_cat]++});
   dc('cKpiAging');
@@ -2874,35 +2811,6 @@ function buildKPICharts(data) {
   charts['cKpiLevel']=new Chart(g('cKpiLevel'),{type:'doughnut',
     data:{labels:lvlEntries.map(e=>e[0]),datasets:[{data:lvlEntries.map(e=>e[1]),backgroundColor:lvlColors.slice(0,lvlEntries.length),borderWidth:0}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#8B949E',font:{size:9},boxWidth:8}}}}});
-
-  // ── Row 4: Performance by Form table ─────────────────────
-  const perfMap={};
-  data.forEach(r=>{
-    const f=r.report_title||'?';
-    if(!perfMap[f])perfMap[f]={total:0,open:0,over:0,ontime:0,late:0,cat3:0};
-    perfMap[f].total++;
-    if(r.semantic_status==='Open')perfMap[f].open++;
-    else if(r.semantic_status==='Overdue')perfMap[f].over++;
-    else if(r.semantic_status==='On-time Closed')perfMap[f].ontime++;
-    else if(r.semantic_status==='Lately Closed')perfMap[f].late++;
-    if(r.overdue_cat==='CAT III')perfMap[f].cat3++;
-  });
-  const perfEntries=Object.entries(perfMap).sort((a,b)=>b[1].total-a[1].total);
-  const perfBody=g('kk-perf-body');
-  if(perfBody) perfBody.innerHTML=perfEntries.map(([f,v])=>{
-    const cl=v.ontime+v.late;
-    const rate=cl>0?pct(v.ontime/cl):'—';
-    return`<tr>
-      <td style="font-size:11px">${esc(f)}</td>
-      <td><b>${v.total}</b></td>
-      <td style="color:var(--blue)">${v.open}</td>
-      <td style="color:#ff6b6b">${v.over}</td>
-      <td style="color:var(--green)">${v.ontime}</td>
-      <td style="color:var(--yellow)">${v.late}</td>
-      <td><b>${rate}</b></td>
-      <td style="color:#cc0000">${v.cat3||'—'}</td>
-    </tr>`;
-  }).join('');
 
   // ── Overdue page charts (always use global allData) ───────
   dc('cCat');
@@ -3086,6 +2994,7 @@ function renderATACompare() {
     if(isIneffective) badge = `<span class="badge b-over" style="font-size:10px">⚠️ CMR kém hiệu quả</span>`;
     else if(isNoData) badge = `<span class="badge b-late" style="font-size:10px">❓ CMR không có data</span>`;
     else if(cmr > 0 && ecar === 0) badge = `<span class="badge b-on" style="font-size:10px">✅ CMR hiệu quả</span>`;
+    else if(cmr > 0 && ecar > 0 && ecar < cmr) badge = `<span class="badge b-on" style="font-size:10px">✅ Đạt</span>`;
     else badge = `<span style="color:var(--muted);font-size:10px">—</span>`;
     return `<tr style="${isIneffective?'background:rgba(255,107,107,0.05)':''}">
       <td style="font-size:11px;font-weight:500">${esc(label)}</td>
@@ -3151,6 +3060,31 @@ function renderOpen() {
       <td>${r.is_rep?'<span style="color:var(--yellow)">⚠ Yes</span>':'—'}</td>
       <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)">${esc(r.audit_title)||'—'}</td>
     </tr>`);
+}
+
+function exportATACompare() {
+  if(!curUser||curUser.role!=='admin'){toast('Chỉ admin mới có quyền xuất báo cáo','err');return;}
+  const level = parseInt(g('ataGroupLevel')?.value||'2');
+  const yr    = g('ataCompareYear')?.value||'';
+  const rows  = [];
+  g('ataCompareBody').querySelectorAll('tr').forEach(tr=>{
+    const tds=[...tr.querySelectorAll('td')];
+    if(tds.length<5)return;
+    const ata   = tds[0].textContent.trim();
+    const cmr   = tds[1].textContent.trim();
+    const ecar  = tds[2].textContent.trim();
+    const ratio = tds[3].textContent.trim();
+    const badge = tds[4].textContent.trim();
+    rows.push({ATA:ata,'CMR-CAR':cmr,'ECAR':ecar,'Ratio ECAR/CMR':ratio,'Đánh giá':badge});
+  });
+  if(!rows.length){toast('Không có dữ liệu','err');return;}
+  const ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=[{wch:28},{wch:10},{wch:10},{wch:16},{wch:22}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'ATA Compare');
+  const lvlLabel=level===2?'Chapter':level===4?'Section':'Subject';
+  XLSX.writeFile(wb,`ATA_Compare_${lvlLabel}_${yr||'All'}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast('Đã xuất file Excel','ok');
 }
 
 // ── TABLE: OVERDUE ────────────────────────────────────────────
