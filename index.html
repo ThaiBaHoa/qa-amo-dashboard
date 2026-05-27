@@ -632,14 +632,14 @@ tr:last-child td{border-bottom:none}
             </div>
           </div>
           <!-- Row 2: Overdue Aging + On-time Rate -->
-          <div style="display:grid;grid-template-columns:1fr 3fr;gap:8px;margin-bottom:8px;flex-shrink:0">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;flex-shrink:0">
             <div class="chart-card">
               <div class="chart-head"><div><div class="chart-title">Overdue Aging</div><div class="chart-sub">CAT I / II / III</div></div></div>
-              <div class="ch-wrap" style="height:110px"><canvas id="cKpiAging"></canvas></div>
+              <div class="ch-wrap" style="height:150px"><canvas id="cKpiAging"></canvas></div>
             </div>
             <div class="chart-card">
               <div class="chart-head"><div><div class="chart-title">On-time Close Rate by Month</div><div class="chart-sub">Target: 70%</div></div></div>
-              <div class="ch-wrap" style="height:110px"><canvas id="cOnM"></canvas></div>
+              <div class="ch-wrap" style="height:150px"><canvas id="cOnM"></canvas></div>
             </div>
           </div>
           <!-- Row 3: Finding Level -->
@@ -1863,7 +1863,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.27-r56';
+const APP_REV = '2026.05.27-r57';
 
 // Build findingRows from EAV rows.
 // Collect Finding description and ATA Chapter values separately, each sorted by
@@ -3060,8 +3060,8 @@ function renderOpen() {
 }
 
 async function exportATAComparePDF() {
-  if(!curUser||curUser.role!=='admin'){toast('Chỉ admin mới có quyền xuất báo cáo','err');return;}
-  toast('Đang tạo PDF...','info');
+  if(!curUser||curUser.role!=='admin'){toast('Chi admin moi co quyen xuat bao cao','err');return;}
+  toast('Dang tao PDF...','info');
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
   const W=doc.internal.pageSize.getWidth(), M=10;
@@ -3069,54 +3069,64 @@ async function exportATAComparePDF() {
   const yr=g('ataCompareYear')?.value||'';
   const lvlLabel=level===2?'Chapter':level===4?'Section':'Subject';
 
-  // Header bar
+  // Header bar — ASCII only (jsPDF default font: no Vietnamese/emoji)
   doc.setFillColor(13,17,23);
   doc.rect(0,0,W,16,'F');
   doc.setFontSize(11);doc.setFont(undefined,'bold');doc.setTextColor(230,237,243);
-  doc.text('CMR-CAR vs ECAR — Findings by ATA '+lvlLabel,M,11);
+  doc.text('CMR-CAR vs ECAR - Findings by ATA '+lvlLabel,M,11);
   doc.setFontSize(8);doc.setFont(undefined,'normal');doc.setTextColor(163,174,184);
-  doc.text('Năm: '+(yr||'Tất cả'),W/2,11,{align:'center'});
+  doc.text('Year: '+(yr||'All'),W/2,11,{align:'center'});
   doc.text('Rev '+APP_REV,W-M,11,{align:'right'});
 
   let y=20;
 
-  // Embed chart
+  // Embed chart at 3× scale for sharp rendering
   const canvas=g('cATACompare');
   if(canvas){
     try{
-      const img=await html2canvas(canvas,{scale:2,backgroundColor:'#161B22',logging:false});
-      const chartH=70;
+      const img=await html2canvas(canvas,{scale:3,backgroundColor:'#161B22',logging:false});
+      const chartH=80;
       doc.addImage(img.toDataURL('image/png'),'PNG',M,y,W-2*M,chartH);
       y+=chartH+6;
     }catch(e){console.warn('Chart capture:',e);}
   }
 
-  // Table
+  // Rebuild table rows from DOM — strip emojis, transliterate Vietnamese
+  const BADGE={
+    'Dat'    :{color:[39,174,96],  text:'Dat'},
+    'Khong'  :{color:[227,6,19],   text:'Khong hieu qua'},
+  };
   const tRows=[];
   g('ataCompareBody').querySelectorAll('tr').forEach(tr=>{
     const tds=[...tr.querySelectorAll('td')];
     if(tds.length<5)return;
-    tRows.push([tds[0].textContent.trim(),tds[1].textContent.trim(),
-                tds[2].textContent.trim(),tds[3].textContent.trim(),
-                tds[4].textContent.trim()]);
+    const raw=tds[4].textContent.replace(/[^\x00-\x7F]/g,'').trim();
+    const key=raw.includes('at')?'Dat':raw.includes('ng')||raw.includes('hieu')||raw.length===0&&tds[3].textContent.trim()==='*'?'Khong':'';
+    // Simpler: check if the cell contains the green or red badge
+    const cell4=tds[4];
+    const isGreen=cell4.querySelector('.b-on')!=null;
+    const isRed  =cell4.querySelector('.b-over')!=null;
+    const badge  =isGreen?'Dat':isRed?'Khong hieu qua':'-';
+    tRows.push([
+      pdfSafe(tds[0].textContent.trim()),
+      tds[1].textContent.trim(),
+      tds[2].textContent.trim(),
+      tds[3].textContent.trim(),
+      badge,
+    ]);
   });
-
-  const statusColor={
-    '✅ Đạt':[63,185,80],
-    '❌ Không hiệu quả':[227,6,19],
-  };
 
   doc.autoTable({
     startY:y,
-    head:[['ATA Chapter','CMR-CAR','ECAR','Ratio ECAR/CMR','Đánh giá']],
+    head:[['ATA Chapter','CMR-CAR','ECAR','Ratio ECAR/CMR','Ket qua']],
     body:tRows,
     headStyles:{fillColor:[30,64,175],textColor:[255,255,255],fontSize:8,fontStyle:'bold'},
     bodyStyles:{fontSize:7.5,valign:'middle',textColor:[30,30,30]},
     columnStyles:{0:{cellWidth:65},1:{cellWidth:20,halign:'center'},2:{cellWidth:20,halign:'center'},3:{cellWidth:28,halign:'center'},4:{cellWidth:'auto',halign:'center'}},
     didParseCell(d){
       if(d.section==='body'&&d.column.index===4){
-        const c=statusColor[d.cell.raw];
-        if(c){d.cell.styles.textColor=c;d.cell.styles.fontStyle='bold';}
+        if(d.cell.raw==='Dat'){d.cell.styles.textColor=[39,174,96];d.cell.styles.fontStyle='bold';}
+        else if(d.cell.raw==='Khong hieu qua'){d.cell.styles.textColor=[227,6,19];d.cell.styles.fontStyle='bold';}
       }
     },
     alternateRowStyles:{fillColor:[245,247,250]},
@@ -3126,7 +3136,7 @@ async function exportATAComparePDF() {
 
   const fname=`ATA_Compare_${lvlLabel}_${yr||'All'}_${new Date().toISOString().slice(0,10)}.pdf`;
   doc.save(fname);
-  toast('Đã xuất '+fname,'ok');
+  toast('Da xuat '+fname,'ok');
 }
 
 // ── TABLE: OVERDUE ────────────────────────────────────────────
