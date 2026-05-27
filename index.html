@@ -1884,7 +1884,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.27-r49';
+const APP_REV = '2026.05.27-r50';
 
 // Cache tên column dùng để nhận diện section trong EAV table (probe 1 lần duy nhất)
 let _eavSecKey = undefined; // undefined=chưa probe; null=không có; string=tên field
@@ -1910,60 +1910,57 @@ function buildFindingRowsFromEAV(fRaw, reportIdSet, secKey, perSectionFields) {
   const fMap = {};
   const perSet = new Set(perSectionFields);
 
-  if (secKey && fRaw.some(f => f[secKey] != null)) {
-    fRaw.forEach(f => {
-      if (!reportIdSet.has(f.report_id)) return;
-      if (!fMap[f.report_id]) fMap[f.report_id] = { _sec: {} };
-      if (perSet.has(f.field_name)) {
-        const sid = f[secKey];
-        if (!fMap[f.report_id]._sec[sid]) fMap[f.report_id]._sec[sid] = {};
-        fMap[f.report_id]._sec[sid][f.field_name] = f.text_value;
+  // Single pass: per record, use section grouping when section_id is non-null,
+  // otherwise fall back to flat index-based lists.
+  fRaw.forEach(f => {
+    if (!reportIdSet.has(f.report_id)) return;
+    if (!fMap[f.report_id]) fMap[f.report_id] = { _sec: {}, _finds: [], _atas: [] };
+    const fm = fMap[f.report_id];
+    if (perSet.has(f.field_name)) {
+      const sid = secKey ? f[secKey] : null;
+      if (sid != null) {
+        // Proper section_id — group by it
+        if (!fm._sec[sid]) fm._sec[sid] = {};
+        fm._sec[sid][f.field_name] = f.text_value;
       } else {
-        if (!fMap[f.report_id][f.field_name]) fMap[f.report_id][f.field_name] = f.text_value;
+        // null section_id — collect flat for index-based fallback
+        if (f.field_name === 'Finding description' && f.text_value) fm._finds.push(f.text_value);
+        else if (f.field_name === 'ATA Chapter'     && f.text_value) fm._atas.push(f.text_value);
+        else if (f.text_value && !fm[f.field_name])                  fm[f.field_name] = f.text_value;
       }
-    });
-    Object.values(fMap).forEach(fm => {
-      const secs = Object.values(fm._sec || {}).filter(s => s['Finding description']);
+    } else {
+      if (!fm[f.field_name]) fm[f.field_name] = f.text_value;
+    }
+  });
+
+  Object.values(fMap).forEach(fm => {
+    // Use section-based data if any sections have a finding description
+    const secs = Object.values(fm._sec).filter(s => s['Finding description']);
+    let pairs;
+    if (secs.length > 0) {
       secs.sort((a,b) => (parseInt(a['Finding description'])||0)-(parseInt(b['Finding description'])||0)||(a['Finding description']||'').localeCompare(b['Finding description']||''));
-      fm.findings       = secs.map(s => s['Finding description']);
-      fm['ATA Chapter'] = secs[0]?.['ATA Chapter'] || null;
-      fm.findingRows    = secs.map(s => ({
+      pairs = secs.map(s => ({
         desc:    s['Finding description'] || null,
         ata:     s['ATA Chapter']         || null,
         level:   s['Finding level']       || fm['Finding level'] || null,
         nc_type: s['NC Type']             || fm['NC Type']       || null,
       }));
-      delete fm._sec;
-    });
-  } else {
-    console.warn('[EAV] no section key — ATA/finding pairing may be inaccurate');
-    fRaw.forEach(f => {
-      if (!reportIdSet.has(f.report_id)) return;
-      if (!fMap[f.report_id]) fMap[f.report_id] = {};
-      if (f.field_name === 'Finding description') {
-        if (!fMap[f.report_id].findings) fMap[f.report_id].findings = [];
-        if (f.text_value) fMap[f.report_id].findings.push(f.text_value);
-      } else if (f.field_name === 'ATA Chapter') {
-        if (!fMap[f.report_id].ataList) fMap[f.report_id].ataList = [];
-        if (f.text_value) fMap[f.report_id].ataList.push(f.text_value);
-      } else {
-        if (!fMap[f.report_id][f.field_name]) fMap[f.report_id][f.field_name] = f.text_value;
-      }
-    });
-    Object.values(fMap).forEach(fm => {
-      const descs = fm.findings||[], atas = fm.ataList||[];
-      let pairs = descs.map((desc,i) => ({desc, ata: atas[i]||null}));
-      if (pairs.length > 1) pairs.sort((a,b) => (parseInt(a.desc)||0)-(parseInt(b.desc)||0)||a.desc.localeCompare(b.desc));
-      fm.findings       = pairs.map(p => p.desc);
-      fm['ATA Chapter'] = pairs[0]?.ata || atas[0] || null;
-      fm.findingRows    = pairs.map(p => ({
-        desc:    p.desc,
-        ata:     p.ata           || null,
+    } else {
+      // Fallback: index-based on flat lists
+      const descs = fm._finds, atas = fm._atas;
+      pairs = descs.map((desc,i) => ({
+        desc,
+        ata:     atas[i]             || null,
         level:   fm['Finding level'] || null,
         nc_type: fm['NC Type']       || null,
       }));
-    });
-  }
+      if (pairs.length > 1) pairs.sort((a,b) => (parseInt(a.desc)||0)-(parseInt(b.desc)||0)||a.desc.localeCompare(b.desc));
+    }
+    fm.findings       = pairs.map(p => p.desc);
+    fm['ATA Chapter'] = pairs[0]?.ata || null;
+    fm.findingRows    = pairs;
+    delete fm._sec; delete fm._finds; delete fm._atas;
+  });
   return fMap;
 }
 
