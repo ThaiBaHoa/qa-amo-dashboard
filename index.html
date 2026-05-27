@@ -828,7 +828,6 @@ tr:last-child td{border-bottom:none}
                   <th onclick="cmrSort('aircraft_reg')">Aircraft ↕</th>
                   <th onclick="cmrSort('semantic_status')">Status ↕</th>
                   <th onclick="cmrSort('finding_count')" style="text-align:center;white-space:nowrap">Findings ↕</th>
-                  <th>Finding Description</th>
                   <th>Department</th>
                   <th onclick="cmrSort('raised_date')" style="white-space:nowrap">Raised Date ↕</th>
                   <th onclick="cmrSort('Target_date')" style="white-space:nowrap">Target Date ↕</th>
@@ -1884,37 +1883,44 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.27-r53';
+const APP_REV = '2026.05.27-r54';
 
-// Build findingRows from EAV rows using report_field_created_date as grouping key.
-// Finding description + ATA Chapter created at the SAME timestamp → same finding row.
-function buildFindingRowsByTimestamp(fRaw, reportIdSet, findingFields) {
+// Build findingRows from EAV rows.
+// Collect Finding description and ATA Chapter values separately, each sorted by
+// report_field_created_date (creation order), then pair by index.
+// This works because users fill findings sequentially, so desc[i] pairs with ata[i].
+function buildFindingRowsByIndex(fRaw, reportIdSet, findingFields) {
   const fMap = {};
-  const tsMap = {}; // {report_id: {ts: {desc, ata, level, nc_type, ts}}}
+  const byRpt = {}; // {report_id: {descs, atas, levels, ncs}}
   const fldSet = new Set(findingFields);
 
   fRaw.forEach(f => {
     if (!reportIdSet.has(f.report_id)) return;
     if (!fMap[f.report_id]) fMap[f.report_id] = {};
-    if (fldSet.has(f.field_name)) {
-      const ts = f.report_field_created_date || ('__' + Math.random());
-      if (!tsMap[f.report_id]) tsMap[f.report_id] = {};
-      if (!tsMap[f.report_id][ts]) tsMap[f.report_id][ts] = {desc:null,ata:null,level:null,nc_type:null,ts};
-      const slot = tsMap[f.report_id][ts];
-      if (f.field_name === 'Finding description' && f.text_value) slot.desc = f.text_value;
-      if (f.field_name === 'ATA Chapter'          && f.text_value) slot.ata  = f.text_value;
-      if (f.field_name === 'Finding level'         && f.text_value) slot.level   = f.text_value;
-      if (f.field_name === 'NC Type'               && f.text_value) slot.nc_type = f.text_value;
-    } else {
+    if (fldSet.has(f.field_name) && f.text_value) {
+      if (!byRpt[f.report_id]) byRpt[f.report_id] = {descs:[],atas:[],levels:[],ncs:[]};
+      const ts = f.report_field_created_date || '9999-99-99';
+      const e = {text: f.text_value, ts};
+      if (f.field_name === 'Finding description') byRpt[f.report_id].descs.push(e);
+      else if (f.field_name === 'ATA Chapter')    byRpt[f.report_id].atas.push(e);
+      else if (f.field_name === 'Finding level')  byRpt[f.report_id].levels.push(e);
+      else if (f.field_name === 'NC Type')        byRpt[f.report_id].ncs.push(e);
+    } else if (!fldSet.has(f.field_name)) {
       if (!fMap[f.report_id][f.field_name]) fMap[f.report_id][f.field_name] = f.text_value;
     }
   });
 
-  Object.entries(tsMap).forEach(([rid, slots]) => {
-    if (!fMap[rid]) fMap[rid] = {};
-    const rows = Object.values(slots)
-      .filter(s => s.desc || s.ata)
-      .sort((a, b) => a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : (parseInt(a.desc)||999) - (parseInt(b.desc)||999));
+  const srt = arr => arr.sort((a,b) => a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0);
+
+  Object.entries(byRpt).forEach(([rid, {descs, atas, levels, ncs}]) => {
+    const sd = srt(descs), sa = srt(atas), sl = srt(levels), sn = srt(ncs);
+    const count = Math.max(sd.length, sa.length);
+    const rows = Array.from({length: count}, (_, i) => ({
+      desc:    sd[i]?.text || null,
+      ata:     sa[i]?.text || null,
+      level:   sl[i]?.text || null,
+      nc_type: sn[i]?.text || null,
+    }));
     fMap[rid].findingRows = rows;
     fMap[rid].findings = rows.map(r => r.desc).filter(Boolean);
     if (!fMap[rid]['ATA Chapter']) {
@@ -3337,7 +3343,7 @@ async function loadCmr(){
         '?$select=report_id,field_name,text_value,report_field_created_date'+
         '&$filter='+encodeURIComponent(CMR_FF)
       );
-      fMap = buildFindingRowsByTimestamp(fRaw, cmrIdSet,
+      fMap = buildFindingRowsByIndex(fRaw, cmrIdSet,
         ['Finding description','ATA Chapter','Finding level','NC Type']);
     }catch(e){console.warn('CMR fields error:',e);}
 
@@ -3394,7 +3400,7 @@ let _dCmr;function dRenderCmr(){clearTimeout(_dCmr);_dCmr=setTimeout(()=>{TS.cmr
 
 function renderCmr(){
   if(!cmrLoaded||!cmrData.length){
-    g('cmrBody').innerHTML='<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted)">No data</td></tr>';
+    g('cmrBody').innerHTML='<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--muted)">No data</td></tr>';
     return;
   }
   const ts=TS.cmr;
@@ -3461,7 +3467,6 @@ function renderCmr(){
       <td style="font-size:11px;font-weight:500">✈️ ${esc(r.aircraft_reg)||'—'}</td>
       <td>${sBadge(r.semantic_status)}</td>
       <td style="text-align:center"><b style="color:var(--blue)">${r.finding_count||0}</b></td>
-      <td style="font-size:11px;color:var(--muted);max-width:320px"><div style="overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(r.finding_desc)||'—'}</div></td>
       <td style="font-size:11px">${esc(r.dept)||'—'}</td>
       <td style="font-size:11px;color:var(--muted);white-space:nowrap">${fd(r.raised_date)}</td>
       <td style="font-size:11px;white-space:nowrap">${fd(r.Target_date)}</td>
@@ -3684,7 +3689,7 @@ async function loadEcar(){
         '?$select=report_id,field_name,text_value,report_field_created_date'+
         '&$filter='+encodeURIComponent(ECAR_FF)
       );
-      fMap = buildFindingRowsByTimestamp(fRaw, ecarIdSet,
+      fMap = buildFindingRowsByIndex(fRaw, ecarIdSet,
         ['Finding description','ATA Chapter']);
     }catch(e){console.warn('ECAR fields error:',e);}
 
