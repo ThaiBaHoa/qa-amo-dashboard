@@ -1438,7 +1438,7 @@ tr:last-child td{border-bottom:none}
             </div>
             <div class="tbl-wrap">
               <table>
-                <thead><tr><th>Full Name</th><th>Username</th><th>Role</th><th>Registered</th><th>Approved by</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Full Name</th><th>Username</th><th>Role</th><th>Registered</th><th>Actions</th></tr></thead>
                 <tbody id="userBody"></tbody>
               </table>
             </div>
@@ -1864,7 +1864,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.27-r63';
+const APP_REV = '2026.05.27-r64';
 
 // Build findingRows from EAV rows.
 // Collect desc/ATA/level/NC each sorted by report_field_created_date, pair by index.
@@ -1904,20 +1904,10 @@ function buildFindingRowsByIndex(fRaw, reportIdSet, findingFields) {
   return fMap;
 }
 
-// Overlay: re-pair ATA↔Finding using section_id from dwanalytics_report_field.
-// section_id uniquely identifies each Finding Detail repeater row, so ATA Chapter
-// and Finding description sharing one section_id are guaranteed to be paired.
-// Overrides findingRows in fMap in-place only when real section_id data is found.
-// ATA value: value_text (Checklist field); if null, keeps the index-based value.
-async function tryImproveWithSectionId(fMap, reportIdSet, repeaterFields) {
-  const filter = repeaterFields.map(n => `field_name eq '${n}'`).join(' or ');
-  const rfRaw = await fetchAll(
-    G_URL + 'dwanalytics_report_field' +
-    '?$select=report_id,field_name,value_text,section_id,report_field_created_date' +
-    '&$filter=' + encodeURIComponent(filter),
-    true
-  );
-
+// Apply section_id-based pairing from pre-fetched dwanalytics_report_field rows.
+// Filters out empty slots (value_text null for all fields in a section).
+// Only updates ATA Chapter when overlay finds a non-null value.
+function applySecIdOverlay(fMap, rfRaw, reportIdSet) {
   const bySec = {};
   let secCount = 0;
   rfRaw.forEach(f => {
@@ -1946,16 +1936,16 @@ async function tryImproveWithSectionId(fMap, reportIdSet, repeaterFields) {
     if (!fMap[rid]) fMap[rid] = {};
     const rows = Object.values(sections)
       .sort((a, b) => a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0)
+      .filter(s => s.desc || s.ata || s.level || s.nc_type) // drop fully-null slots
       .map(s => ({desc:s.desc, ata:s.ata, level:s.level, nc_type:s.nc_type}));
+    if (rows.length === 0) return;
     fMap[rid].findingRows = rows;
     fMap[rid].findings = rows.map(r => r.desc).filter(Boolean);
-    // Only update ATA Chapter if overlay found a non-null value;
-    // otherwise keep the existing index-based value (value_text may be null for Checklist).
     const ovrAta = rows.find(r => r.ata)?.ata;
     if (ovrAta) fMap[rid]['ATA Chapter'] = ovrAta;
     improved++;
   });
-  console.log(`section_id overlay applied to ${improved} reports`);
+  console.log(`section_id overlay: ${improved} reports improved`);
   return true;
 }
 
@@ -3392,17 +3382,21 @@ async function loadCmr(){
         "field_name eq 'Final action taken' or field_name eq 'Issued to (person)' or "+
         "field_name eq 'Verified by (auditor)' or field_name eq 'Date completed' or "+
         "field_name eq 'RCA analysis'";
-      const fRaw=await fetchAll(
-        G_URL+'dwanalytics_report_form_section_field'+
-        '?$select=report_id,field_name,text_value,report_field_created_date'+
-        '&$filter='+encodeURIComponent(CMR_FF)
-      );
+      const CMR_RF="field_name eq 'Finding description' or field_name eq 'ATA Chapter' or "+
+        "field_name eq 'Finding level' or field_name eq 'NC Type'";
+      // Fetch both views in parallel: form_section_field for metadata, report_field for section_id pairing
+      const [fRaw, rfRaw]=await Promise.all([
+        fetchAll(G_URL+'dwanalytics_report_form_section_field'+
+          '?$select=report_id,field_name,text_value,report_field_created_date'+
+          '&$filter='+encodeURIComponent(CMR_FF)),
+        fetchAll(G_URL+'dwanalytics_report_field'+
+          '?$select=report_id,field_name,value_text,section_id,report_field_created_date'+
+          '&$filter='+encodeURIComponent(CMR_RF), true)
+          .catch(e=>{console.warn('CMR report_field fetch failed:',e);return[];})
+      ]);
       fMap = buildFindingRowsByIndex(fRaw, cmrIdSet,
         ['Finding description','ATA Chapter','Finding level','NC Type']);
-      try {
-        await tryImproveWithSectionId(fMap, cmrIdSet,
-          ['Finding description','ATA Chapter','Finding level','NC Type']);
-      } catch(e) { console.warn('CMR section_id overlay failed:', e); }
+      applySecIdOverlay(fMap, rfRaw, cmrIdSet);
     }catch(e){console.warn('CMR fields error:',e);}
 
     cmrData=summary.map(r=>{
@@ -3742,17 +3736,20 @@ async function loadEcar(){
         "field_name eq 'Aircraft Registration' or field_name eq 'Finding description' or "+
         "field_name eq 'ATA Chapter' or "+
         "field_name eq 'Date completed' or field_name eq 'Issued by'";
-      const fRaw=await fetchAll(
-        G_URL+'dwanalytics_report_form_section_field'+
-        '?$select=report_id,field_name,text_value,report_field_created_date'+
-        '&$filter='+encodeURIComponent(ECAR_FF)
-      );
+      const ECAR_RF="field_name eq 'Finding description' or field_name eq 'ATA Chapter'";
+      // Fetch both views in parallel
+      const [fRaw, rfRaw]=await Promise.all([
+        fetchAll(G_URL+'dwanalytics_report_form_section_field'+
+          '?$select=report_id,field_name,text_value,report_field_created_date'+
+          '&$filter='+encodeURIComponent(ECAR_FF)),
+        fetchAll(G_URL+'dwanalytics_report_field'+
+          '?$select=report_id,field_name,value_text,section_id,report_field_created_date'+
+          '&$filter='+encodeURIComponent(ECAR_RF), true)
+          .catch(e=>{console.warn('ECAR report_field fetch failed:',e);return[];})
+      ]);
       fMap = buildFindingRowsByIndex(fRaw, ecarIdSet,
         ['Finding description','ATA Chapter']);
-      try {
-        await tryImproveWithSectionId(fMap, ecarIdSet,
-          ['Finding description','ATA Chapter']);
-      } catch(e) { console.warn('ECAR section_id overlay failed:', e); }
+      applySecIdOverlay(fMap, rfRaw, ecarIdSet);
     }catch(e){console.warn('ECAR fields error:',e);}
 
     ecarData=summary.map(r=>{
@@ -5060,18 +5057,17 @@ function setUF(f,btn){
 async function loadUsers() {
   if(!curUser||curUser.role!=='admin')return;
   try {
-    let q=sb.from('users').select('id,email,full_name,role,created_at,approved_by').order('created_at',{ascending:false});
+    let q=sb.from('users').select('id,email,full_name,role,created_at').order('created_at',{ascending:false});
     if(userFilter!=='all')q=q.eq('role',userFilter);
     const {data,error}=await q; if(error)throw error;
     s('userCnt',(data||[]).length+' users');
     safeHTML(g('userBody'),(data||[]).length===0
-      ?'<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--muted)">Không có user</td></tr>'
+      ?'<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">Không có user</td></tr>'
       :data.map(u=>`<tr>
         <td><b>${esc(u.full_name)}</b></td>
         <td style="color:var(--muted)">${esc(u.email)}</td>
         <td>${rBadge(u.role)}</td>
         <td style="font-size:11px;color:var(--muted)">${fd(u.created_at)}</td>
-        <td style="font-size:11px;color:var(--muted)">${esc(u.approved_by)||'—'}</td>
         <td><div class="admin-actions">
           ${u.role==='pending'?`<button class="btn-approve" onclick="approveUser('${esc(u.id)}','${esc(u.email)}')">✓ Approve</button><button class="btn-reject" onclick="rejectUser('${esc(u.id)}')">✗ Reject</button>`:''}
           ${u.role==='approved'&&u.email!==curUser.email?`<button class="btn-make-admin" onclick="makeAdmin('${esc(u.id)}')">★ Admin</button><button class="btn-reject" onclick="rejectUser('${esc(u.id)}')">✗ Revoke</button>`:''}
