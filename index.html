@@ -1864,7 +1864,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.27-r64';
+const APP_REV = '2026.05.27-r65';
 
 // Build findingRows from EAV rows.
 // Collect desc/ATA/level/NC each sorted by report_field_created_date, pair by index.
@@ -1896,7 +1896,7 @@ function buildFindingRowsByIndex(fRaw, reportIdSet, findingFields) {
     const rows=Array.from({length:count},(_,i)=>({
       desc:sd[i]?.text||null, ata:sa[i]?.text||null,
       level:sl[i]?.text||null, nc_type:sn[i]?.text||null,
-    }));
+    })).filter(r=>r.desc||r.ata); // drop slots where both desc and ATA are null
     fMap[rid].findingRows=rows;
     fMap[rid].findings=rows.map(r=>r.desc).filter(Boolean);
     if(!fMap[rid]['ATA Chapter']){const first=rows.find(r=>r.ata);if(first)fMap[rid]['ATA Chapter']=first.ata;}
@@ -1936,7 +1936,7 @@ function applySecIdOverlay(fMap, rfRaw, reportIdSet) {
     if (!fMap[rid]) fMap[rid] = {};
     const rows = Object.values(sections)
       .sort((a, b) => a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0)
-      .filter(s => s.desc || s.ata || s.level || s.nc_type) // drop fully-null slots
+      .filter(s => s.desc || s.ata) // drop slots where both desc and ATA are null
       .map(s => ({desc:s.desc, ata:s.ata, level:s.level, nc_type:s.nc_type}));
     if (rows.length === 0) return;
     fMap[rid].findingRows = rows;
@@ -3557,8 +3557,8 @@ function showCmrDetail(report_id){
     </div>
     <div style="margin-top:4px;border-top:1px solid var(--border);padding-top:12px">
       ${(r.findingRows&&r.findingRows.length||r.findings&&r.findings.length)?`<div style="margin-bottom:10px">
-        <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Findings (${(r.findingRows&&r.findingRows.length?r.findingRows:r.findings).length})</div>
-        ${(r.findingRows&&r.findingRows.length?r.findingRows.map(fr=>({desc:fr.desc,ata:fr.ata})):r.findings.map(d=>({desc:d,ata:null}))).map((fr,i)=>`<div style="margin-bottom:8px;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--blue)">
+        <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Findings (${(r.findingRows&&r.findingRows.length?r.findingRows.filter(fr=>fr.desc||fr.ata):r.findings).length})</div>
+        ${(r.findingRows&&r.findingRows.length?r.findingRows.filter(fr=>fr.desc||fr.ata).map(fr=>({desc:fr.desc,ata:fr.ata})):r.findings.map(d=>({desc:d,ata:null}))).map((fr,i)=>`<div style="margin-bottom:8px;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--blue)">
           <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:4px">FINDING ${i+1}${fr.ata?' · <span style="color:var(--blue)">ATA '+esc(fr.ata)+'</span>':''}</div>
           <div style="font-size:12px;color:var(--text);white-space:pre-wrap;line-height:1.5">${esc(fr.desc||'')}</div>
         </div>`).join('')}
@@ -5061,7 +5061,9 @@ async function loadUsers() {
     if(userFilter!=='all')q=q.eq('role',userFilter);
     const {data,error}=await q; if(error)throw error;
     s('userCnt',(data||[]).length+' users');
-    safeHTML(g('userBody'),(data||[]).length===0
+    // Use innerHTML directly — all user data is run through esc() so no XSS risk.
+    // safeHTML/DOMPurify can misparse table fragments (tr/td without a parent table).
+    g('userBody').innerHTML=(data||[]).length===0
       ?'<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">Không có user</td></tr>'
       :data.map(u=>`<tr>
         <td><b>${esc(u.full_name)}</b></td>
@@ -5073,7 +5075,7 @@ async function loadUsers() {
           ${u.role==='approved'&&u.email!==curUser.email?`<button class="btn-make-admin" onclick="makeAdmin('${esc(u.id)}')">★ Admin</button><button class="btn-reject" onclick="rejectUser('${esc(u.id)}')">✗ Revoke</button>`:''}
           ${u.role==='rejected'?`<button class="btn-approve" onclick="approveUser('${esc(u.id)}','${esc(u.email)}')">✓ Re-approve</button>`:''}
           ${u.role==='admin'?'<span style="font-size:11px;color:var(--muted)">—</span>':''}
-        </div></td></tr>`).join(''));
+        </div></td></tr>`).join('');
   } catch(e){toast('Error loading users: '+e.message,'err');}
 }
 
