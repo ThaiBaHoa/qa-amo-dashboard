@@ -1864,7 +1864,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.27-r58';
+const APP_REV = '2026.05.27-r59';
 
 // Build findingRows from EAV rows.
 // Collect Finding description and ATA Chapter values separately, each sorted by
@@ -4486,7 +4486,8 @@ async function showAuditDetail(auditId) {
         G_URL + 'dwreporting_audit_workflow' +
         '?$select=audit_id,stage_id,stage_title,stage_status,stage_owner,' +
         'stage_target_date,stage_started_date,stage_completed_date' +
-        '&$filter=audit_id eq \'' + auditId + '\''
+        '&$filter=audit_id eq \'' + auditId + '\'',
+        true  // skipOv — don't show/leave main loading overlay from a modal fetch
       );
       const stageMap = {};
       wfRaw.forEach(s => {
