@@ -1438,7 +1438,7 @@ tr:last-child td{border-bottom:none}
             </div>
             <div class="tbl-wrap">
               <table>
-                <thead><tr><th>Full Name</th><th>Username</th><th>Email</th><th>Role</th><th>Registered</th><th>Approved by</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Full Name</th><th>Username</th><th>Role</th><th>Registered</th><th>Approved by</th><th>Actions</th></tr></thead>
                 <tbody id="userBody"></tbody>
               </table>
             </div>
@@ -1864,7 +1864,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.27-r59';
+const APP_REV = '2026.05.27-r60';
 
 // Build findingRows from EAV rows.
 // Collect Finding description and ATA Chapter values separately, each sorted by
@@ -5005,7 +5005,7 @@ function setUF(f,btn){
 async function loadUsers() {
   if(!curUser||curUser.role!=='admin')return;
   try {
-    let q=sb.from('users').select('id,email,full_name,contact_email,role,created_at,approved_by').order('created_at',{ascending:false});
+    let q=sb.from('users').select('id,email,full_name,role,created_at,approved_by').order('created_at',{ascending:false});
     if(userFilter!=='all')q=q.eq('role',userFilter);
     const {data,error}=await q; if(error)throw error;
     s('userCnt',(data||[]).length+' users');
@@ -5014,7 +5014,6 @@ async function loadUsers() {
       :data.map(u=>`<tr>
         <td><b>${esc(u.full_name)}</b></td>
         <td style="color:var(--muted)">${esc(u.email)}</td>
-        <td style="color:var(--muted);font-size:11px">${esc(u.contact_email)||'—'}</td>
         <td>${rBadge(u.role)}</td>
         <td style="font-size:11px;color:var(--muted)">${fd(u.created_at)}</td>
         <td style="font-size:11px;color:var(--muted)">${esc(u.approved_by)||'—'}</td>
