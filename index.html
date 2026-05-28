@@ -1864,7 +1864,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.27-r62';
+const APP_REV = '2026.05.27-r63';
 
 // Build findingRows from EAV rows.
 // Collect desc/ATA/level/NC each sorted by report_field_created_date, pair by index.
@@ -1905,9 +1905,10 @@ function buildFindingRowsByIndex(fRaw, reportIdSet, findingFields) {
 }
 
 // Overlay: re-pair ATA↔Finding using section_id from dwanalytics_report_field.
-// That view exposes section_id (unique per Finding Detail row) and value_text.
-// If section_id data is present, overrides findingRows in fMap in-place.
-// Returns true if improvement was applied.
+// section_id uniquely identifies each Finding Detail repeater row, so ATA Chapter
+// and Finding description sharing one section_id are guaranteed to be paired.
+// Overrides findingRows in fMap in-place only when real section_id data is found.
+// ATA value: value_text (Checklist field); if null, keeps the index-based value.
 async function tryImproveWithSectionId(fMap, reportIdSet, repeaterFields) {
   const filter = repeaterFields.map(n => `field_name eq '${n}'`).join(' or ');
   const rfRaw = await fetchAll(
@@ -1940,6 +1941,7 @@ async function tryImproveWithSectionId(fMap, reportIdSet, repeaterFields) {
 
   if (secCount === 0) return false;
 
+  let improved = 0;
   Object.entries(bySec).forEach(([rid, sections]) => {
     if (!fMap[rid]) fMap[rid] = {};
     const rows = Object.values(sections)
@@ -1947,8 +1949,13 @@ async function tryImproveWithSectionId(fMap, reportIdSet, repeaterFields) {
       .map(s => ({desc:s.desc, ata:s.ata, level:s.level, nc_type:s.nc_type}));
     fMap[rid].findingRows = rows;
     fMap[rid].findings = rows.map(r => r.desc).filter(Boolean);
-    fMap[rid]['ATA Chapter'] = rows.find(r => r.ata)?.ata || null;
+    // Only update ATA Chapter if overlay found a non-null value;
+    // otherwise keep the existing index-based value (value_text may be null for Checklist).
+    const ovrAta = rows.find(r => r.ata)?.ata;
+    if (ovrAta) fMap[rid]['ATA Chapter'] = ovrAta;
+    improved++;
   });
+  console.log(`section_id overlay applied to ${improved} reports`);
   return true;
 }
 
