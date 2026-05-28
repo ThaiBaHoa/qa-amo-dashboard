@@ -1864,15 +1864,72 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.27-r60';
+const APP_REV = '2026.05.27-r61';
 
-// Build findingRows from EAV rows.
-// Collect Finding description and ATA Chapter values separately, each sorted by
-// report_field_created_date (creation order), then pair by index.
-// This works because users fill findings sequentially, so desc[i] pairs with ata[i].
+// Build findingRows using repeater_section_id as the join key.
+// Each Finding Detail row in the repeater shares one section_id, so ATA Chapter
+// and Finding description with the same section_id are guaranteed to be paired.
+// Falls back to index-based pairing if no section_id values are found.
+function buildFindingRowsBySectionId(fRaw, reportIdSet, findingFields) {
+  const fMap = {};
+  const bySec = {}; // {report_id: {section_id: slot}}
+  const fldSet = new Set(findingFields);
+  let secCount = 0;
+
+  fRaw.forEach(f => {
+    if (!reportIdSet.has(f.report_id)) return;
+    if (!fMap[f.report_id]) fMap[f.report_id] = {};
+
+    if (fldSet.has(f.field_name)) {
+      const sid = f.repeater_section_id;
+      if (sid) {
+        secCount++;
+        if (!bySec[f.report_id]) bySec[f.report_id] = {};
+        if (!bySec[f.report_id][sid]) {
+          bySec[f.report_id][sid] = {
+            desc: null, ata: null, level: null, nc_type: null,
+            ts: f.report_field_created_date || '9999-99-99'
+          };
+        }
+        const slot = bySec[f.report_id][sid];
+        // Track earliest timestamp for ordering sections within a report
+        if (f.report_field_created_date && f.report_field_created_date < slot.ts)
+          slot.ts = f.report_field_created_date;
+        if (f.field_name === 'Finding description' && f.text_value) slot.desc = f.text_value;
+        else if (f.field_name === 'ATA Chapter'    && f.text_value) slot.ata  = f.text_value;
+        else if (f.field_name === 'Finding level'  && f.text_value) slot.level = f.text_value;
+        else if (f.field_name === 'NC Type'        && f.text_value) slot.nc_type = f.text_value;
+      }
+    } else {
+      if (!fMap[f.report_id][f.field_name]) fMap[f.report_id][f.field_name] = f.text_value;
+    }
+  });
+
+  // Fallback: if repeater_section_id was absent in all rows, use index-based pairing
+  if (secCount === 0) {
+    console.warn('repeater_section_id not found — falling back to index-based pairing');
+    return buildFindingRowsByIndex(fRaw, reportIdSet, findingFields);
+  }
+
+  Object.entries(bySec).forEach(([rid, sections]) => {
+    const rows = Object.values(sections)
+      .sort((a, b) => a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0)
+      .map(s => ({desc: s.desc, ata: s.ata, level: s.level, nc_type: s.nc_type}));
+    fMap[rid].findingRows = rows;
+    fMap[rid].findings = rows.map(r => r.desc).filter(Boolean);
+    if (!fMap[rid]['ATA Chapter']) {
+      const first = rows.find(r => r.ata);
+      if (first) fMap[rid]['ATA Chapter'] = first.ata;
+    }
+  });
+
+  return fMap;
+}
+
+// Legacy index-based pairing (kept as fallback).
 function buildFindingRowsByIndex(fRaw, reportIdSet, findingFields) {
   const fMap = {};
-  const byRpt = {}; // {report_id: {descs, atas, levels, ncs}}
+  const byRpt = {};
   const fldSet = new Set(findingFields);
 
   fRaw.forEach(f => {
@@ -1892,22 +1949,16 @@ function buildFindingRowsByIndex(fRaw, reportIdSet, findingFields) {
   });
 
   const srt = arr => arr.sort((a,b) => a.ts < b.ts ? -1 : a.ts > b.ts ? 1 : 0);
-
   Object.entries(byRpt).forEach(([rid, {descs, atas, levels, ncs}]) => {
-    const sd = srt(descs), sa = srt(atas), sl = srt(levels), sn = srt(ncs);
-    const count = Math.max(sd.length, sa.length);
-    const rows = Array.from({length: count}, (_, i) => ({
-      desc:    sd[i]?.text || null,
-      ata:     sa[i]?.text || null,
-      level:   sl[i]?.text || null,
-      nc_type: sn[i]?.text || null,
+    const sd=srt(descs), sa=srt(atas), sl=srt(levels), sn=srt(ncs);
+    const count=Math.max(sd.length, sa.length);
+    const rows=Array.from({length:count},(_,i)=>({
+      desc:sd[i]?.text||null, ata:sa[i]?.text||null,
+      level:sl[i]?.text||null, nc_type:sn[i]?.text||null,
     }));
-    fMap[rid].findingRows = rows;
-    fMap[rid].findings = rows.map(r => r.desc).filter(Boolean);
-    if (!fMap[rid]['ATA Chapter']) {
-      const first = rows.find(r => r.ata);
-      if (first) fMap[rid]['ATA Chapter'] = first.ata;
-    }
+    fMap[rid].findingRows=rows;
+    fMap[rid].findings=rows.map(r=>r.desc).filter(Boolean);
+    if(!fMap[rid]['ATA Chapter']){const first=rows.find(r=>r.ata);if(first)fMap[rid]['ATA Chapter']=first.ata;}
   });
   return fMap;
 }
@@ -3347,10 +3398,10 @@ async function loadCmr(){
         "field_name eq 'RCA analysis'";
       const fRaw=await fetchAll(
         G_URL+'dwanalytics_report_form_section_field'+
-        '?$select=report_id,field_name,text_value,report_field_created_date'+
+        '?$select=report_id,field_name,text_value,report_field_created_date,repeater_section_id'+
         '&$filter='+encodeURIComponent(CMR_FF)
       );
-      fMap = buildFindingRowsByIndex(fRaw, cmrIdSet,
+      fMap = buildFindingRowsBySectionId(fRaw, cmrIdSet,
         ['Finding description','ATA Chapter','Finding level','NC Type']);
     }catch(e){console.warn('CMR fields error:',e);}
 
@@ -3693,10 +3744,10 @@ async function loadEcar(){
         "field_name eq 'Date completed' or field_name eq 'Issued by'";
       const fRaw=await fetchAll(
         G_URL+'dwanalytics_report_form_section_field'+
-        '?$select=report_id,field_name,text_value,report_field_created_date'+
+        '?$select=report_id,field_name,text_value,report_field_created_date,repeater_section_id'+
         '&$filter='+encodeURIComponent(ECAR_FF)
       );
-      fMap = buildFindingRowsByIndex(fRaw, ecarIdSet,
+      fMap = buildFindingRowsBySectionId(fRaw, ecarIdSet,
         ['Finding description','ATA Chapter']);
     }catch(e){console.warn('ECAR fields error:',e);}
 
