@@ -962,7 +962,6 @@ tr:last-child td{border-bottom:none}
                 <button class="pill on" id="ap-cat-all" onclick="setAuditWfCat('all',this)">Tất cả</button>
                 <button class="pill" id="ap-cat-Audit" onclick="setAuditWfCat('Audit',this)">Audit</button>
                 <button class="pill" id="ap-cat-Inspection" onclick="setAuditWfCat('Inspection',this)">Inspection</button>
-                <button class="pill" id="ap-cat-CMR" onclick="setAuditWfCat('CMR',this)">CMR</button>
               </div>
 
               <div class="filter-sep"></div>
@@ -1983,7 +1982,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.27-r67';
+const APP_REV = '2026.05.29-r68';
 
 // Build findingRows from EAV rows.
 // Collect desc/ATA/level/NC each sorted by report_field_created_date, pair by index.
@@ -5083,25 +5082,32 @@ function renderAuditTimeline(audit) {
     const bg     = done ? 'rgba(63,185,80,.08)' : prog ? 'rgba(88,166,255,.1)' : 'rgba(255,255,255,.03)';
     const border = done ? 'rgba(63,185,80,.25)' : prog ? 'rgba(88,166,255,.3)' : 'var(--border)';
 
+    const now = new Date();
+    const isOverdue = !done && s.stage_target_date && new Date(s.stage_target_date) < now;
+    const overdueCol = isOverdue ? '#c0392b' : col;
+    const overdueBg  = isOverdue ? 'rgba(192,57,43,.10)' : bg;
+    const overdueBorder = isOverdue ? 'rgba(192,57,43,.4)' : border;
+
     const dateParts = [];
     if (s.scheduled_start_date) dateParts.push('Planned: '+fd(s.scheduled_start_date)+
       (s.scheduled_end_date?' → '+fd(s.scheduled_end_date):''));
     if (s.actual_start_date)    dateParts.push('Actual: '+fd(s.actual_start_date)+
       (s.actual_end_date?' → '+fd(s.actual_end_date):''));
     if (s.stage_completed_date) dateParts.push('Completed: '+fd(s.stage_completed_date));
-    if (!done && s.stage_target_date) dateParts.push('Target: '+fd(s.stage_target_date));
+    if (s.stage_target_date && !done) dateParts.push('Due: '+fd(s.stage_target_date));
 
     const sep = i < sorted.length-1
       ? '<div style="width:2px;height:10px;background:var(--border);margin:2px 0 2px 14px"></div>' : '';
-    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:8px;background:${bg};border:1px solid ${border}">
-      <span style="font-size:15px;color:${col};flex-shrink:0;margin-top:1px">${icon}</span>
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:8px;background:${overdueBg};border:1px solid ${overdueBorder}">
+      <span style="font-size:15px;color:${overdueCol};flex-shrink:0;margin-top:1px">${icon}</span>
       <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:600;color:${prog?'var(--text)':'var(--muted)'}">${s.stage_type}
-          ${prog?'<span style="font-size:10px;color:var(--blue);font-weight:400;margin-left:6px">● Đang thực hiện</span>':''}
+        <div style="font-size:12px;font-weight:600;color:${prog||isOverdue?'var(--text)':'var(--muted)'}">${esc(s.stage_type)}
+          ${isOverdue?'<span style="font-size:10px;color:#c0392b;font-weight:600;margin-left:6px">⚠ Quá hạn</span>':''}
+          ${prog&&!isOverdue?'<span style="font-size:10px;color:var(--blue);font-weight:400;margin-left:6px">● Đang thực hiện</span>':''}
           ${done?'<span style="font-size:10px;color:var(--green);font-weight:400;margin-left:6px">Completed</span>':''}
         </div>
-        ${s.stage_owner_name?`<div style="font-size:10px;color:var(--muted);margin-top:1px">👤 ${s.stage_owner_name}</div>`:''}
-        ${dateParts.length?`<div style="font-size:10px;color:var(--muted);margin-top:2px">${dateParts.join(' · ')}</div>`:''}
+        ${s.stage_owner_name?`<div style="font-size:10px;color:var(--muted);margin-top:1px">👤 ${esc(s.stage_owner_name)}</div>`:''}
+        ${dateParts.length?`<div style="font-size:10px;color:${isOverdue?'#e74c3c':'var(--muted)'};margin-top:2px">${dateParts.join(' · ')}</div>`:''}
       </div>
     </div>${sep}`;
   }).join('');
@@ -5119,8 +5125,8 @@ function renderWfSteps(stages) {
     const col  = done ? 'var(--green)' : prog ? 'var(--blue)' : 'var(--muted)';
     const icon = done ? '✓' : prog ? '●' : '○';
     const dateStr = s.stage_completed_date
-      ? ' ('+new Date(s.stage_completed_date).toLocaleDateString('en-GB')+')'
-      : s.stage_target_date ? ' →'+new Date(s.stage_target_date).toLocaleDateString('en-GB') : '';
+      ? ' ('+fd(s.stage_completed_date)+')'
+      : s.stage_target_date ? ' →'+fd(s.stage_target_date) : '';
     const sep = i>0 ? '<span style="color:var(--border);margin:0 3px">›</span>' : '';
     return `${sep}<span title="${s.stage_type}: ${s.stage_status}${dateStr}" style="color:${col};font-size:11px;white-space:nowrap">${icon} ${s.stage_type.replace(/([A-Z])/g,' $1').trim()}</span>`;
   }).join('');
@@ -5213,11 +5219,10 @@ async function showAuditDetail(auditId) {
     'Closed':        '<span class="badge b-on">Closed</span>',
   };
 
-  safeHTML(g('adBody'), findings.length === 0
+  g('adBody').innerHTML = findings.length === 0
     ? `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted)">Không có finding</td></tr>`
     : findings.sort((a,b)=>(a.report_number||'').localeCompare(b.report_number||'')).map(r=>{
-      return `
-    <tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
       <td style="padding:7px 12px;white-space:nowrap"><b style="color:var(--blue)">${esc(r.report_number)||'—'}</b></td>
       <td style="padding:7px 12px;font-size:11px;color:var(--muted)">${esc(r.report_title)||'—'}</td>
       <td style="padding:7px 12px">${SM[r.semantic_status]||`<span class="badge b-with">${esc(r.semantic_status)||'—'}</span>`}</td>
@@ -5225,7 +5230,7 @@ async function showAuditDetail(auditId) {
       <td style="padding:7px 12px;font-size:11px;white-space:nowrap">${fd(r.Target_date)}</td>
       <td style="padding:7px 12px;font-size:11px;color:var(--muted);white-space:nowrap">${esc(r.owner_name)||'—'}</td>
       <td style="padding:7px 12px">${renderWfSteps(r.wf_stages)}</td>
-    </tr>`; }).join(''));
+    </tr>`; }).join('');
 
   g('auditModal').classList.add('show');
 }
