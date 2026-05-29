@@ -280,6 +280,65 @@ tr:last-child td{border-bottom:none}
   .auth-box { padding: 24px 14px; }
   .topbar-title { font-size: 13px; }
 }
+
+/* ── AUDIT PLAN ENHANCEMENTS (r67) ──────────────────────────── */
+.audit-kpi-row{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:8px;flex-shrink:0}
+.audit-kpi-row .kpi{min-width:0}
+.filter-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.filter-group-label{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.filter-sep{width:1px;height:20px;background:var(--border);margin:0 2px;flex-shrink:0}
+
+/* Bottleneck collapsible panel */
+.bottleneck-panel{background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;flex-shrink:0;overflow:hidden}
+.bottleneck-panel summary{padding:10px 16px;font-size:12px;font-weight:600;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:8px;user-select:none;list-style:none}
+.bottleneck-panel summary::-webkit-details-marker{display:none}
+.bottleneck-panel summary::before{content:'▶';font-size:9px;color:var(--muted);transition:transform .2s;flex-shrink:0}
+.bottleneck-panel[open] summary::before{transform:rotate(90deg)}
+.bottleneck-panel-body{padding:12px 16px 14px;border-top:1px solid var(--border)}
+.bottleneck-bar-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11px}
+.bottleneck-bar-label{width:160px;flex-shrink:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bottleneck-bar-track{flex:1;height:10px;background:rgba(255,255,255,.06);border-radius:5px;overflow:hidden;display:flex}
+.bottleneck-bar-completed{height:100%;background:var(--green);border-radius:5px 0 0 5px}
+.bottleneck-bar-inprogress{height:100%;background:var(--blue)}
+.bottleneck-bar-notstarted{height:100%;background:rgba(255,255,255,.12)}
+.bottleneck-bar-other{height:100%;background:var(--orange)}
+.bottleneck-bar-count{width:40px;text-align:right;color:var(--muted);flex-shrink:0}
+
+/* Stage pipeline dots */
+.stage-pipeline{display:flex;align-items:center;gap:3px}
+.stage-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;transition:transform .15s}
+.stage-dot:hover{transform:scale(1.4)}
+.stage-dot-done{background:var(--green)}
+.stage-dot-active{background:var(--blue);box-shadow:0 0 4px var(--blue)}
+.stage-dot-pending{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25)}
+.stage-dot-skip{background:rgba(255,107,107,.4)}
+.stage-pipeline-line{width:12px;height:1px;background:rgba(255,255,255,.15);flex-shrink:0}
+
+/* Stage timing table in modal */
+.stage-timing-table{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px}
+.stage-timing-table th{padding:5px 10px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
+.stage-timing-table td{padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.04)}
+.duration-bar-wrap{display:flex;align-items:center;gap:6px}
+.duration-bar{height:6px;border-radius:3px;background:var(--blue);min-width:2px;max-width:120px}
+.duration-bar.over{background:var(--orange)}
+.duration-bar.late{background:#ff6b6b}
+
+/* KPI tone variants */
+.kpi-tone-green{--accent:var(--green)}
+.kpi-tone-blue{--accent:var(--blue)}
+.kpi-tone-orange{--accent:var(--orange)}
+.kpi-tone-yellow{--accent:var(--yellow)}
+.kpi-tone-purple{--accent:#BC8CFF}
+.kpi-tone-red{--accent:#ff6b6b}
+.kpi-tone-muted{--accent:var(--muted)}
+
+@media (max-width: 1180px) {
+  .audit-kpi-row { grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 767px) {
+  .audit-kpi-row { grid-template-columns: repeat(2, 1fr); }
+  .bottleneck-bar-label { width: 100px; }
+}
 </style>
 </head>
 <body>
@@ -364,7 +423,7 @@ tr:last-child td{border-bottom:none}
         <button class="nav-item" onclick="showPage('pavoi',this)"><span class="nav-icon">🔍</span>PAVOI Detail</button>
         <button class="nav-item" onclick="showPage('cmrcar',this)"><span class="nav-icon">✈️</span>CMR-CAR</button>
         <button class="nav-item" onclick="showPage('ecar',this)"><span class="nav-icon">🔧</span>ECAR</button>
-        <button class="nav-item" onclick="showPage('auditplan',this)"><span class="nav-icon">📅</span>Audit Plan</button>
+        <button class="nav-item" onclick="showAuditPlanPage(this)"><span class="nav-icon">📅</span>Audit Plan</button>
         <button class="nav-item" onclick="showPage('docs',this)"><span class="nav-icon">📁</span>Documents</button>
         <button class="nav-item admin-only" id="reportsNav" onclick="showPage('reports',this)" style="display:none"><span class="nav-icon">📊</span>Export Reports</button>
         <button class="nav-item" onclick="showPage('help',this)"><span class="nav-icon">❓</span>User Guide</button>
@@ -870,42 +929,75 @@ tr:last-child td{border-bottom:none}
 
         <!-- AUDIT PLAN -->
         <div class="page" id="page-auditplan">
-          <div class="kpi-grid" id="auditKPIs">
-            <div class="kpi" style="--accent:var(--blue)"><div class="kpi-lbl">Total Audits</div><div class="kpi-val" id="ak-total">—</div><div class="kpi-sub">QA AMO</div></div>
-            <div class="kpi" style="--accent:#BC8CFF"><div class="kpi-lbl">Internal Audit</div><div class="kpi-val" id="ak-internal">—</div><div class="kpi-sub">MNT Internal</div></div>
-            <div class="kpi" style="--accent:var(--blue)"><div class="kpi-lbl">Inspection</div><div class="kpi-val" id="ak-inspection">—</div><div class="kpi-sub">Surveillance/Spot check</div></div>
-            <div class="kpi" style="--accent:var(--green)"><div class="kpi-lbl">Closed</div><div class="kpi-val" id="ak-closed">—</div><div class="kpi-sub">Completed</div></div>
-            <div class="kpi" style="--accent:var(--orange)"><div class="kpi-lbl">In Progress</div><div class="kpi-val" id="ak-open">—</div><div class="kpi-sub">Ongoing</div></div>
-            <div class="kpi" style="--accent:var(--yellow)"><div class="kpi-lbl">Scheduled</div><div class="kpi-val" id="ak-sched">—</div><div class="kpi-sub">Not started</div></div>
-          </div>
+          <!-- KPI row (7 cards, rendered by renderAuditKpi) -->
+          <div class="audit-kpi-row" id="auditKpiRow"></div>
+
+          <!-- Bottleneck panel (lazy loaded) -->
+          <details class="bottleneck-panel" id="bottleneckPanel" ontoggle="if(this.open)renderBottleneckPanel()">
+            <summary>📊 Phân tích tắc nghẽn — Stage Status Aggregate <span id="bottleneckSubtitle" style="font-size:10px;color:var(--muted);font-weight:400;margin-left:6px"></span></summary>
+            <div class="bottleneck-panel-body" id="bottleneckBody"><span style="color:var(--muted);font-size:12px">Đang tải dữ liệu…</span></div>
+          </details>
+
           <div class="tbl-card">
             <div class="tbl-bar">
-              <div><div class="tbl-title">Audit Plan — QA AMO</div><div class="tbl-count" id="auditCnt">—</div></div>
-              <button class="pill on" onclick="setAuditF('all','status',this)">All</button>
-              <button class="pill" onclick="setAuditF('Internal Audit','type',this)">📋 Internal Audit</button>
-              <button class="pill" onclick="setAuditF('Inspection','type',this)">🔍 Inspection</button>
-              <button class="pill" onclick="setAuditF('Closed','status',this)">Closed</button>
-              <button class="pill" onclick="setAuditF('Performed','status',this)">Performed</button>
-              <button class="pill" onclick="setAuditF('Scheduled','status',this)">Scheduled</button>
-              <button class="pill" onclick="setAuditF('InProgress','status',this)">In Progress</button>
-              <select class="sel" id="auditYearF" onchange="renderAudit()"><option value="">All Years</option></select>
-              <div class="srch-wrap"><span class="srch-icon">🔍</span>
-                <input class="srch" id="auditSrch" placeholder="Search..." oninput="dRenderAudit()">
+              <div><div class="tbl-title">Kế hoạch Audit — QA AMO</div><div class="tbl-count" id="auditCnt">—</div></div>
+
+              <!-- Filter group 1: Scope -->
+              <div class="filter-group">
+                <span class="filter-group-label">Phạm vi</span>
+                <button class="pill on" id="ap-scope-qa-amo" onclick="setAuditPrefix('qa-amo',this)">QA AMO</button>
+                <button class="pill" id="ap-scope-all" onclick="setAuditPrefix('all',this)">Tất cả</button>
+                <button class="pill" id="ap-scope-MNT" onclick="setAuditPrefix('MNT',this)">MNT</button>
+                <button class="pill" id="ap-scope-CMR" onclick="setAuditPrefix('CMR',this)">CMR</button>
+                <button class="pill" id="ap-scope-MPS" onclick="setAuditPrefix('MPS',this)">MPS</button>
+                <button class="pill" id="ap-scope-AIR" onclick="setAuditPrefix('AIR',this)">AIR</button>
+                <button class="pill" id="ap-scope-CoA" onclick="setAuditPrefix('CoA',this)">CoA</button>
               </div>
+
+              <div class="filter-sep"></div>
+
+              <!-- Filter group 2: Loại -->
+              <div class="filter-group">
+                <span class="filter-group-label">Loại</span>
+                <button class="pill on" id="ap-cat-all" onclick="setAuditWfCat('all',this)">Tất cả</button>
+                <button class="pill" id="ap-cat-Audit" onclick="setAuditWfCat('Audit',this)">Audit</button>
+                <button class="pill" id="ap-cat-Inspection" onclick="setAuditWfCat('Inspection',this)">Inspection</button>
+                <button class="pill" id="ap-cat-CMR" onclick="setAuditWfCat('CMR',this)">CMR</button>
+              </div>
+
+              <div class="filter-sep"></div>
+
+              <!-- Filter group 3: Status pills (existing) -->
+              <div class="filter-group">
+                <span class="filter-group-label">Trạng thái</span>
+                <button class="pill on" id="ap-sf-all" onclick="setAuditF('all','status',this)">Tất cả</button>
+                <button class="pill" onclick="setAuditF('Closed','status',this)">Closed</button>
+                <button class="pill" onclick="setAuditF('Performed','status',this)">Performed</button>
+                <button class="pill" onclick="setAuditF('Scheduled','status',this)">Scheduled</button>
+                <button class="pill" onclick="setAuditF('InProgress','status',this)">In Progress</button>
+              </div>
+
+              <select class="sel" id="auditYearF" onchange="renderAudit()"><option value="">Tất cả năm</option></select>
+              <div class="srch-wrap"><span class="srch-icon">🔍</span>
+                <input class="srch" id="auditSrch" placeholder="Tìm kiếm..." oninput="dRenderAudit()">
+              </div>
+              <button class="btn-sm" onclick="exportAuditExcel()" title="Xuất Excel">⬇ Excel</button>
+              <button class="btn-sm" onclick="resetAuditFilters()" title="Xóa bộ lọc">↺ Reset</button>
             </div>
             <div class="tbl-wrap">
               <table>
                 <thead><tr>
-                  <th onclick="auditSort('number')">MNT No ↕</th>
-                  <th onclick="auditSort('title')">Audit Title ↕</th>
-                  <th onclick="auditSort('audit_type')">Type ↕</th>
-                  <th onclick="auditSort('status')">Status ↕</th>
-                  <th onclick="auditSort('scheduled_start_date')">Scheduled ↕</th>
-                  <th>Lead Auditor</th>
-                  <th onclick="auditSort('location_name')" style="cursor:pointer">Location ↕</th>
+                  <th onclick="auditSort('number')">Số Audit ↕</th>
+                  <th onclick="auditSort('title')">Tiêu đề ↕</th>
+                  <th onclick="auditSort('workflow_category')">Loại ↕</th>
+                  <th onclick="auditSort('status')">Trạng thái ↕</th>
+                  <th onclick="auditSort('scheduled_start_date')">Kế hoạch ↕</th>
+                  <th>Trưởng đoàn</th>
+                  <th onclick="auditSort('location_name')">Địa điểm ↕</th>
                   <th onclick="auditSort('finding_count')">Findings ↕</th>
                   <th>Open</th>
                   <th>Overdue</th>
+                  <th>Pipeline</th>
                   <th>Workflow</th>
                 </tr></thead>
                 <tbody id="auditBody"></tbody>
@@ -1802,8 +1894,10 @@ tr:last-child td{border-bottom:none}
     <div id="adSummary" style="padding:10px 18px;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-shrink:0;flex-wrap:wrap;align-items:center"></div>
     <!-- Audit Workflow Timeline -->
     <div style="padding:12px 18px;border-bottom:1px solid var(--border);flex-shrink:0">
-      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Audit Workflow Progress</div>
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Tiến độ Workflow</div>
       <div id="adTimeline" style="display:flex;flex-direction:column;gap:0"></div>
+      <!-- Stage timing analysis -->
+      <div id="adStageTiming"></div>
     </div>
     <!-- Findings Table -->
     <div style="flex-shrink:0;padding:10px 18px 4px">
@@ -1889,7 +1983,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.27-r66';
+const APP_REV = '2026.05.27-r67';
 
 // Build findingRows from EAV rows.
 // Collect desc/ATA/level/NC each sorted by report_field_created_date, pair by index.
@@ -2000,7 +2094,7 @@ const TS = {
   ov:     { page:1, sort:'report_ageing', asc:true, ff:'', cat:'' },
   af:     { page:1, sort:'report_ageing', asc:true, sf:'all', ff:'', yr:'', srch:'' },
   pavoi:  { page:1, sort:'report_ageing', asc:true, sf:'all', yr:'', srch:'' },
-  audit:  { page:1, sort:'scheduled_start_date', asc:false, sf:'all', typeF:'all', yr:'', srch:'' },
+  audit:  { page:1, sort:'scheduled_start_date', asc:false, sf:'all', typeF:'all', yr:'', srch:'', prefixF:'qa-amo', wfCatF:'all' },
   docs:   { page:1, sort:'document_number', asc:true, typeF:'', yr:'', srch:'' },
   cmr:    { page:1, sort:'raised_date', asc:false, sf:'all', ac:'all', yr:'', qr:'', srch:'' },
   ecar:   { page:1, sort:'raised_date', asc:false, sf:'all', ac:'all', yr:'', qrs:[], issuedBy:'', srch:'' },
@@ -2249,6 +2343,7 @@ function cacheLoad() {
     if (!c.ts || !c.a || Date.now() - c.ts > CACHE_TTL) return false;
     allData   = c.a;
     auditData = c.b || [];
+    if (c.sa) stageAggregate = c.sa;
     if (c.dtf) {
       docTypeFlat = c.dtf;
       buildDocTypeTree();
@@ -2266,12 +2361,12 @@ function cacheLoad() {
 
 function cacheSave() {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), a:allData, b:auditData, dtf:docTypeFlat}));
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), a:allData, b:auditData, dtf:docTypeFlat, sa:stageAggregate}));
     updateCacheAge(Date.now());
   } catch {
     try {
       const slim = allData.map(r=>({...r,wf_stages:[]}));
-      localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), a:slim, b:auditData}));
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), a:slim, b:auditData, sa:stageAggregate}));
       updateCacheAge(Date.now());
     } catch { /* quota exceeded */ }
   }
@@ -2519,6 +2614,18 @@ async function loadData(forceRefresh=false) {
         };
       });
 
+      // Enrich auditData with prefix, scope, year, workflow_category
+      auditData = auditData.map(a => {
+        const prefix = extractAuditPrefix(a.number);
+        return {
+          ...a,
+          prefix,
+          is_qa_amo_scope: QA_AMO_PREFIXES.includes(prefix),
+          sched_year: a.scheduled_start_date ? String(a.scheduled_start_date).slice(0,4) : null,
+          workflow_category: deriveWorkflowCategory(a),
+        };
+      });
+
       // Also update allData with audit number
       const auNumMap = {};
       auditData.forEach(a => { auNumMap[a.audit_id] = a.number; });
@@ -2649,9 +2756,7 @@ function populateFilters() {
   const kpiYEl=g('kpiYear'); if(kpiYEl) kpiYEl.innerHTML=kpiYOpts;
 
   // Audit year filter
-  const auYears=[...new Set(auditData.map(a=>a.sched_year).filter(Boolean))].sort((a,b)=>b-a);
-  const auYOpts='<option value="">All Years</option>'+auYears.map(y=>`<option value="${y}">${y}</option>`).join('');
-  const auYEl=g('auditYearF'); if(auYEl) auYEl.innerHTML=auYOpts;
+  populateAuditYearFilter();
 }
 
 function filterOverviewYear() {
@@ -4339,56 +4444,495 @@ function exportEcarExcel(){
 }
 
 // ── TABLE: AUDIT PLAN ─────────────────────────────────────────
-function setAuditF(val,filterType,btn){
-  if(filterType==='type'){
-    TS.audit.typeF = TS.audit.typeF===val ? 'all' : val;
-    TS.audit.sf = 'all';
-  } else {
-    TS.audit.sf = val;
-    TS.audit.typeF = 'all';
-  }
-  TS.audit.page=1;
-  document.querySelectorAll('#page-auditplan .pill').forEach(p=>p.classList.remove('on'));
-  btn.classList.add('on'); renderAudit();
+
+// Helper: extract uppercase prefix from audit number (e.g. "MNT-2024-001" → "MNT")
+function extractAuditPrefix(number) {
+  if (!number) return '';
+  const m = String(number).match(/^([A-Z]+)/);
+  return m ? m[1] : '';
 }
-function auditSort(col){TS.audit.asc=TS.audit.sort===col?!TS.audit.asc:true;TS.audit.sort=col;TS.audit.page=1;renderAudit();}
 
+// Helper: normalize stage title via alias map
+function normalizeStageTitle(t) {
+  if (!t) return '';
+  return STAGE_TITLE_ALIAS[t] || t;
+}
+
+// Helper: derive workflow category from audit type / audit_type field
+function deriveWorkflowCategory(audit) {
+  const at = (audit.audit_type || '').toLowerCase();
+  if (at.includes('cmr')) return 'CMR';
+  if (at.includes('inspection')) return 'Inspection';
+  if (at.includes('audit')) return 'Audit';
+  // fallback: check number prefix
+  const prefix = extractAuditPrefix(audit.number);
+  if (prefix === 'CMR') return 'CMR';
+  return 'Other';
+}
+
+// Populate audit year filter (called from populateFilters)
+function populateAuditYearFilter() {
+  const auYears = [...new Set(auditData.map(a => a.sched_year).filter(Boolean))].sort((a,b) => b-a);
+  const auYOpts = '<option value="">Tất cả năm</option>' + auYears.map(y => `<option value="${y}">${y}</option>`).join('');
+  const auYEl = g('auditYearF'); if (auYEl) auYEl.innerHTML = auYOpts;
+}
+
+// Get the currently visible filtered audits (for bottleneck panel / export)
+function getCurrentlyFilteredAudits() {
+  return window._lastAuditFiltered || auditData;
+}
+
+// Status filter pill (also handles clearing other filter group's active state)
+function setAuditF(val, filterType, btn) {
+  if (filterType === 'status') {
+    TS.audit.sf = val;
+  }
+  TS.audit.page = 1;
+  // Only toggle within status filter group
+  const statusPills = ['ap-sf-all'];
+  document.querySelectorAll('#page-auditplan .filter-group').forEach(fg => {
+    const pills = fg.querySelectorAll('.pill');
+    if ([...pills].some(p => p === btn)) {
+      pills.forEach(p => p.classList.remove('on'));
+      btn.classList.add('on');
+    }
+  });
+  renderAudit();
+}
+
+// Scope (prefix) filter
+function setAuditPrefix(prefix, btn) {
+  TS.audit.prefixF = prefix;
+  TS.audit.page = 1;
+  // Toggle pills in the Scope filter group only
+  if (btn) {
+    const fg = btn.closest('.filter-group');
+    if (fg) { fg.querySelectorAll('.pill').forEach(p => p.classList.remove('on')); btn.classList.add('on'); }
+  }
+  renderAudit();
+}
+
+// Workflow category filter
+function setAuditWfCat(cat, btn) {
+  TS.audit.wfCatF = cat;
+  TS.audit.page = 1;
+  if (btn) {
+    const fg = btn.closest('.filter-group');
+    if (fg) { fg.querySelectorAll('.pill').forEach(p => p.classList.remove('on')); btn.classList.add('on'); }
+  }
+  renderAudit();
+}
+
+// Reset all audit filters to default
+function resetAuditFilters() {
+  TS.audit.sf      = 'all';
+  TS.audit.typeF   = 'all';
+  TS.audit.prefixF = 'qa-amo';
+  TS.audit.wfCatF  = 'all';
+  TS.audit.page    = 1;
+  const yr = g('auditYearF'); if (yr) yr.value = '';
+  const srch = g('auditSrch'); if (srch) srch.value = '';
+  // Reset pills: activate default buttons
+  ['ap-scope-qa-amo','ap-cat-all','ap-sf-all'].forEach(id => {
+    const el = g(id);
+    if (!el) return;
+    const fg = el.closest('.filter-group');
+    if (fg) fg.querySelectorAll('.pill').forEach(p => p.classList.remove('on'));
+    el.classList.add('on');
+  });
+  renderAudit();
+}
+
+function auditSort(col){ TS.audit.asc = TS.audit.sort===col ? !TS.audit.asc : true; TS.audit.sort = col; TS.audit.page = 1; renderAudit(); }
+
+// ── KPI card helper
+function kpiCard(label, val, sub, toneClass) {
+  return `<div class="kpi ${toneClass||''}"><div class="kpi-lbl">${label}</div><div class="kpi-val">${val}</div><div class="kpi-sub">${sub||''}</div></div>`;
+}
+
+// Render 7 KPI cards for audit plan page
+function renderAuditKpi(data) {
+  const el = g('auditKpiRow'); if (!el) return;
+  const total    = data.length;
+  const closed   = data.filter(a => a.status === 'Closed').length;
+  const open     = data.filter(a => ['InProgress','Performed','Scheduled'].includes(a.status)).length;
+  const rate     = total ? Math.round(closed/total*100) : 0;
+  const inCar    = data.filter(a => {
+    const stages = a.audit_stages || [];
+    return stages.some(s => {
+      const t = normalizeStageTitle(s.stage_type);
+      return (t === 'Follow up CAR' || t === 'Finding follow up') && s.stage_status === 'InProgress';
+    });
+  }).length;
+  // Bottleneck stage: most common InProgress stage across filtered data
+  let bottleneckStage = '—';
+  const stageCounts = {};
+  data.forEach(a => {
+    (a.audit_stages||[]).forEach(s => {
+      if (s.stage_status === 'InProgress') {
+        const t = normalizeStageTitle(s.stage_type);
+        stageCounts[t] = (stageCounts[t]||0) + 1;
+      }
+    });
+  });
+  const topStage = Object.entries(stageCounts).sort((a,b) => b[1]-a[1])[0];
+  if (topStage) bottleneckStage = `${topStage[0]} (${topStage[1]})`;
+
+  const years = [...new Set(data.map(a => a.sched_year).filter(Boolean))].sort();
+  const yearsStr = years.length ? (years.length <= 3 ? years.join(', ') : `${years[0]}–${years[years.length-1]}`) : '—';
+
+  el.innerHTML = [
+    kpiCard('Tổng Audit',    total,   'Đã lọc', 'kpi-tone-blue'),
+    kpiCard('Đã đóng',       closed,  'Closed',   'kpi-tone-green'),
+    kpiCard('Đang mở',       open,    'In Progress / Scheduled', 'kpi-tone-orange'),
+    kpiCard('Tỷ lệ đóng',   rate+'%','Closure rate', rate>=80?'kpi-tone-green':rate>=50?'kpi-tone-yellow':'kpi-tone-red'),
+    kpiCard('Theo dõi CAR',  inCar,   'In CAR Follow-up', 'kpi-tone-purple'),
+    kpiCard('Tắc nghẽn',    bottleneckStage.split(' (')[0]||'—', topStage?topStage[1]+' audit':'—', 'kpi-tone-muted'),
+    kpiCard('Năm',          yearsStr, `${years.length} năm`, 'kpi-tone-muted'),
+  ].join('');
+}
+
+// ── STAGE AGGREGATE FUNCTIONS ─────────────────────────────────
+
+async function loadStageAggregate() {
+  if (stageAggregate) { renderBottleneckPanel(); return; }
+  try {
+    const rows = await fetchAll(
+      G_URL + 'dwreporting_audit_workflow' +
+      '?$apply=groupby((stage_title,stage_status,workflow_title),aggregate($count as cnt))',
+      true  // skipOv
+    );
+    stageAggregate = buildStageAggregate(rows);
+    renderBottleneckPanel();
+    cacheSave();
+  } catch(e) {
+    console.warn('[StageAggregate] load error:', e.message);
+    const bd = g('bottleneckBody');
+    if (bd) bd.innerHTML = `<span style="color:#ff6b6b;font-size:12px">Không thể tải dữ liệu: ${esc(e.message)}</span>`;
+  }
+}
+
+function buildStageAggregate(rows) {
+  const agg = {};
+  rows.forEach(r => {
+    const title = normalizeStageTitle(r.stage_title || '?');
+    const status = r.stage_status || 'Unknown';
+    const cnt = Number(r.cnt) || 0;
+    if (!agg[title]) agg[title] = { total:0, completed:0, inprogress:0, notStarted:0, deleted:0, pendingSignOff:0, byWorkflow:{} };
+    agg[title].total += cnt;
+    const st = status.toLowerCase();
+    if (st === 'completed')              agg[title].completed    += cnt;
+    else if (st === 'inprogress')        agg[title].inprogress   += cnt;
+    else if (st === 'notstarted')        agg[title].notStarted   += cnt;
+    else if (st === 'deleted')           agg[title].deleted      += cnt;
+    else if (st === 'pendingsignoff')    agg[title].pendingSignOff += cnt;
+    if (r.workflow_title) {
+      agg[title].byWorkflow[r.workflow_title] = (agg[title].byWorkflow[r.workflow_title]||0) + cnt;
+    }
+  });
+  return agg;
+}
+
+function renderBottleneckPanel() {
+  const bd = g('bottleneckBody'); if (!bd) return;
+  if (!stageAggregate) {
+    bd.innerHTML = '<span style="color:var(--muted);font-size:12px">Đang tải…</span>';
+    return;
+  }
+  // Sort by inprogress count desc, take top 12
+  const entries = Object.entries(stageAggregate)
+    .filter(([,v]) => v.total > 0)
+    .sort((a,b) => (b[1].inprogress + b[1].pendingSignOff) - (a[1].inprogress + a[1].pendingSignOff))
+    .slice(0, 12);
+  if (!entries.length) { bd.innerHTML = '<span style="color:var(--muted);font-size:12px">Không có dữ liệu</span>'; return; }
+
+  const maxTotal = Math.max(...entries.map(([,v]) => v.total), 1);
+  const sub = g('bottleneckSubtitle');
+  if (sub) sub.textContent = `${entries.length} stages · ${Object.values(stageAggregate).reduce((s,v)=>s+v.total,0)} records`;
+
+  const legend = `<div style="display:flex;gap:14px;margin-bottom:10px;font-size:10px;color:var(--muted)">
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--green);margin-right:4px"></span>Completed</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--blue);margin-right:4px"></span>InProgress</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);margin-right:4px"></span>NotStarted</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--orange);margin-right:4px"></span>Other</span>
+  </div>`;
+
+  const rows = entries.map(([title, v]) => {
+    const barW = Math.round(v.total / maxTotal * 100);
+    const compPct = v.total ? Math.round(v.completed    / v.total * 100) : 0;
+    const progPct = v.total ? Math.round(v.inprogress   / v.total * 100) : 0;
+    const nsPct   = v.total ? Math.round(v.notStarted   / v.total * 100) : 0;
+    const othPct  = Math.max(0, 100 - compPct - progPct - nsPct);
+    return `<div class="bottleneck-bar-row">
+      <div class="bottleneck-bar-label" title="${esc(title)}">${esc(title)}</div>
+      <div class="bottleneck-bar-track" style="max-width:${Math.max(barW,5)}%">
+        <div class="bottleneck-bar-completed"  style="width:${compPct}%"></div>
+        <div class="bottleneck-bar-inprogress" style="width:${progPct}%"></div>
+        <div class="bottleneck-bar-notstarted" style="width:${nsPct}%"></div>
+        <div class="bottleneck-bar-other"      style="width:${othPct}%"></div>
+      </div>
+      <div class="bottleneck-bar-count">${v.total}</div>
+      <div style="font-size:10px;color:var(--muted);min-width:80px">
+        ${v.inprogress ? `<span style="color:var(--blue)">${v.inprogress} active</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  bd.innerHTML = legend + rows;
+}
+
+// ── STAGE PIPELINE MINI-DOTS ──────────────────────────────────
+
+function getStagesForCategory(category) {
+  if (category === 'CMR') {
+    return ['Preplanning','Perform','Audit Report','Follow up CAR','CMR Audit Closure'];
+  }
+  if (category === 'Inspection') {
+    return ['Preplanning','Perform','Inspection Report','Finding follow up','Inspection closure'];
+  }
+  // Default: Audit
+  return ['Preplanning','Perform','Audit Report','Follow up CAR','Audit closure'];
+}
+
+function getCurrentStageIdx(audit, stages) {
+  const auditStages = auditStageCache[audit.audit_id] || audit.audit_stages || [];
+  if (!auditStages.length) {
+    // Heuristic from audit.status
+    const statusMap = { Scheduled:0, InProgress:1, Performed:3, Closed:5 };
+    return statusMap[audit.status] ?? -1;
+  }
+  // Find the last InProgress stage, else last Completed
+  const sorted = auditStages.slice().sort((a,b) => {
+    const ia = AUDIT_STAGE_ORDER.indexOf(normalizeStageTitle(a.stage_type));
+    const ib = AUDIT_STAGE_ORDER.indexOf(normalizeStageTitle(b.stage_type));
+    return (ia===-1?99:ia) - (ib===-1?99:ib);
+  });
+  const prog = sorted.filter(s => s.stage_status === 'InProgress');
+  if (prog.length) {
+    const t = normalizeStageTitle(prog[0].stage_type);
+    const idx = stages.indexOf(t);
+    return idx !== -1 ? idx : stages.findIndex(s => STAGE_TITLE_ALIAS[s] === t || STAGE_TITLE_ALIAS[t] === s);
+  }
+  // Last completed
+  const done = sorted.filter(s => s.stage_status === 'Completed');
+  if (done.length) {
+    const t = normalizeStageTitle(done[done.length-1].stage_type);
+    const idx = stages.indexOf(t);
+    if (idx !== -1) return idx + 1; // Next stage is current
+    return -1;
+  }
+  return 0;
+}
+
+function renderMiniStagePipeline(audit) {
+  const cat    = audit.workflow_category || 'Audit';
+  const stages = getStagesForCategory(cat);
+  const curIdx = getCurrentStageIdx(audit, stages);
+  const isClosed = audit.status === 'Closed';
+  const isCancel = audit.status === 'Cancelled';
+
+  const dots = stages.map((name, i) => {
+    let cls, title;
+    if (isCancel) {
+      cls = 'stage-dot stage-dot-skip'; title = name + ': Cancelled';
+    } else if (isClosed || i < curIdx) {
+      cls = 'stage-dot stage-dot-done'; title = name + ': Completed';
+    } else if (i === curIdx) {
+      cls = 'stage-dot stage-dot-active'; title = name + ': In Progress';
+    } else {
+      cls = 'stage-dot stage-dot-pending'; title = name + ': Pending';
+    }
+    return `<div class="${cls}" title="${esc(title)}"></div>`;
+  });
+  const withLines = dots.flatMap((d, i) => i < dots.length-1 ? [d, '<div class="stage-pipeline-line"></div>'] : [d]);
+  return `<div class="stage-pipeline">${withLines.join('')}</div>`;
+}
+
+// ── STAGE TIMING ANALYSIS ─────────────────────────────────────
+
+// Benchmarks in days per stage title
+const STAGE_BENCHMARKS = {
+  'Preplanning':        7,
+  'Perform':            5,
+  'Physical inspection':5,
+  'Inspection Report':  7,
+  'Audit Report':       14,
+  'Approval':           5,
+  'Follow up CAR':      30,
+  'Finding follow up':  30,
+  'CMR Audit Closure':  7,
+  'Audit closure':      7,
+  'Inspection closure': 7,
+};
+
+function estimateMedianDuration(title) {
+  const norm = normalizeStageTitle(title);
+  return STAGE_BENCHMARKS[norm] || STAGE_BENCHMARKS[title] || 14;
+}
+
+function buildStageTimingData(audit_stages) {
+  return audit_stages.map(s => {
+    const title    = normalizeStageTitle(s.stage_type || '');
+    const start    = s.actual_start_date || s.stage_started_date || null;
+    const end      = s.actual_end_date   || s.stage_completed_date || null;
+    const status   = s.stage_status || 'Unknown';
+    let duration   = null;
+    if (start && end) {
+      const ms = new Date(end) - new Date(start);
+      if (ms >= 0) duration = Math.round(ms / 86400000);
+    }
+    const benchmark = estimateMedianDuration(title);
+    return { title, status, start, end, duration, benchmark };
+  }).sort((a,b) => {
+    const ia = AUDIT_STAGE_ORDER.indexOf(normalizeStageTitle(a.title));
+    const ib = AUDIT_STAGE_ORDER.indexOf(normalizeStageTitle(b.title));
+    return (ia===-1?99:ia) - (ib===-1?99:ib);
+  });
+}
+
+function renderStageTimingTable(timing) {
+  if (!timing || !timing.length) return '';
+  const maxDur = Math.max(...timing.map(t => t.duration||0).filter(Boolean), 1);
+  const rows = timing.map(t => {
+    const statusBadge = {
+      'Completed':    '<span class="badge b-on">Completed</span>',
+      'InProgress':   '<span class="badge b-open">InProgress</span>',
+      'NotStarted':   '<span class="badge b-with">Not Started</span>',
+      'Deleted':      '<span class="badge b-with">Deleted</span>',
+    }[t.status] || `<span class="badge b-with">${esc(t.status)}</span>`;
+
+    const durCell = t.duration !== null
+      ? (() => {
+          const over = t.duration > t.benchmark * 1.5;
+          const warn = t.duration > t.benchmark;
+          const barCls = over ? 'duration-bar late' : warn ? 'duration-bar over' : 'duration-bar';
+          const barW   = Math.min(Math.round(t.duration / maxDur * 120), 120);
+          const col    = over ? '#ff6b6b' : warn ? 'var(--orange)' : 'var(--text)';
+          return `<div class="duration-bar-wrap">
+            <div class="${barCls}" style="width:${barW}px"></div>
+            <span style="color:${col};font-size:11px">${t.duration}d</span>
+            <span style="color:var(--muted);font-size:10px">/ ${t.benchmark}d</span>
+          </div>`;
+        })()
+      : '<span style="color:var(--muted);font-size:11px">—</span>';
+
+    return `<tr>
+      <td>${esc(t.title)}</td>
+      <td>${statusBadge}</td>
+      <td style="font-size:11px;color:var(--muted)">${t.start ? fd(t.start) : '—'}</td>
+      <td style="font-size:11px;color:var(--muted)">${t.end   ? fd(t.end)   : '—'}</td>
+      <td>${durCell}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div style="margin-top:12px">
+    <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Phân tích thời gian Stage</div>
+    <table class="stage-timing-table">
+      <thead><tr>
+        <th>Stage</th><th>Trạng thái</th><th>Bắt đầu</th><th>Kết thúc</th><th>Thời gian</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+// ── SHOW AUDIT PLAN PAGE ──────────────────────────────────────
+
+function showAuditPlanPage(navBtn) {
+  // Use existing showPage but pass the nav item button
+  const activeBtn = navBtn || document.querySelector('.nav-item.active');
+  showPage('auditplan', activeBtn || document.querySelector('[onclick*="showAuditPlanPage"]'));
+  renderAudit();
+  // Lazy-load stage aggregate in background
+  if (!stageAggregate) {
+    loadStageAggregate();
+  }
+}
+
+// ── EXPORT AUDIT EXCEL ────────────────────────────────────────
+
+function exportAuditExcel() {
+  try {
+    const data = getCurrentlyFilteredAudits();
+    if (!data.length) { toast('Không có dữ liệu để xuất','info'); return; }
+    const wb = XLSX.utils.book_new();
+    const headers = ['Số Audit','Tiêu đề','Loại WF','Audit Type','Trạng thái','Kế hoạch','Lead Auditor','Địa điểm','Findings','Open','Overdue','Prefix','Năm'];
+    const rows = [headers];
+    data.forEach(a => rows.push([
+      a.number||'',
+      a.title||'',
+      a.workflow_category||'',
+      a.audit_type||'',
+      a.status||'',
+      a.scheduled_start_date ? fd(a.scheduled_start_date) : '',
+      a.lead_auditor_name||'',
+      a.location_name||'',
+      a.finding_count||0,
+      a.open_count||0,
+      a.overdue_count||0,
+      a.prefix||'',
+      a.sched_year||'',
+    ]));
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{wch:18},{wch:40},{wch:16},{wch:20},{wch:14},{wch:14},{wch:24},{wch:20},{wch:10},{wch:8},{wch:10},{wch:8},{wch:8}];
+    XLSX.utils.book_append_sheet(wb, ws, 'Audit Plan');
+    const fname = `AuditPlan_${new Date().toISOString().slice(0,10)}.xlsx`;
+    XLSX.writeFile(wb, fname);
+    toast('Xuất Excel thành công!', 'ok');
+  } catch(e) { toast('Lỗi xuất Excel: '+e.message, 'err'); }
+}
+
+// Main renderAudit — filters, KPIs, table
 function renderAudit() {
-  const yr=(g('auditYearF')?.value||'');
-  const srch=(g('auditSrch')?.value||'').toLowerCase();
-  const ts=TS.audit;
+  const yr   = (g('auditYearF')?.value || '');
+  const srch = (g('auditSrch')?.value  || '').toLowerCase();
+  const ts   = TS.audit;
 
-  let data=auditData.filter(a=>{
-    if(ts.sf!=='all' && a.status!==ts.sf) return false;
-    if(ts.typeF!=='all' && a.audit_type!==ts.typeF) return false;
-    if(yr && String(a.sched_year)!==yr) return false;
-    if(srch){
-      const t=[a.number,a.title,a.audit_type,a.status,a.lead_auditor_name,a.primary_scope_item_name].join(' ').toLowerCase();
-      if(!t.includes(srch))return false;
+  let data = auditData.filter(a => {
+    // 1. Scope / prefix filter
+    if (ts.prefixF === 'qa-amo') {
+      if (!a.is_qa_amo_scope) return false;
+    } else if (ts.prefixF !== 'all') {
+      if (a.prefix !== ts.prefixF) return false;
+    }
+    // 2. Workflow category
+    if (ts.wfCatF !== 'all' && a.workflow_category !== ts.wfCatF) return false;
+    // 3. Status pill
+    if (ts.sf !== 'all' && a.status !== ts.sf) return false;
+    // 4. Year
+    if (yr && String(a.sched_year) !== yr) return false;
+    // 5. Search
+    if (srch) {
+      const t = [a.number,a.title,a.audit_type,a.workflow_category,a.status,a.lead_auditor_name,a.primary_scope_item_name,a.prefix].join(' ').toLowerCase();
+      if (!t.includes(srch)) return false;
     }
     return true;
   });
 
-  data=sortD(data,ts.sort,ts.asc);
+  data = sortD(data, ts.sort, ts.asc);
 
-  // KPIs — từ toàn bộ auditData (không filter)
-  s('ak-total',     auditData.length);
-  s('ak-internal',  auditData.filter(a=>a.audit_type==='Internal Audit').length);
-  s('ak-inspection',auditData.filter(a=>a.audit_type==='Inspection').length);
-  s('ak-closed',    auditData.filter(a=>a.status==='Closed').length);
-  s('ak-open',      auditData.filter(a=>['InProgress','Performed'].includes(a.status)).length);
-  s('ak-sched',     auditData.filter(a=>a.status==='Scheduled').length);
+  // Store filtered result for bottleneck / export
+  window._lastAuditFiltered = data;
 
-  const STATUS_COLOR={
+  // Render KPI cards
+  renderAuditKpi(data);
+
+  const STATUS_COLOR = {
     'Closed':'b-on','Performed':'b-late','Scheduled':'b-open',
     'InProgress':'b-open','Cancelled':'b-with'
   };
+  const WF_CAT_BADGE = {
+    'Audit':      '<span class="badge b-admin">Audit</span>',
+    'Inspection': '<span class="badge b-open">Inspection</span>',
+    'CMR':        '<span class="badge b-c1">CMR</span>',
+    'Other':      '<span class="badge b-with">Other</span>',
+  };
 
-  renderPaged('auditBody','auditInfo','auditPg','auditCnt',data,ts,a=>`
+  renderPaged('auditBody','auditInfo','auditPg','auditCnt', data, ts, a => `
     <tr style="cursor:pointer" onclick="showAuditDetail('${a.audit_id}')">
       <td><b style="color:var(--blue)">${esc(a.number)||'—'}</b></td>
-      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${esc(a.title)||'—'}</td>
-      <td>${a.audit_type==='Internal Audit'?'<span class="badge b-admin">Internal Audit</span>':'<span class="badge b-open">Inspection</span>'}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">${esc(a.title)||'—'}</td>
+      <td>${WF_CAT_BADGE[a.workflow_category] || `<span class="badge b-with">${esc(a.workflow_category||'—')}</span>`}</td>
       <td><span class="badge ${STATUS_COLOR[a.status]||'b-with'}">${esc(a.status)||'—'}</span></td>
       <td style="font-size:11px">${fdYM(a.scheduled_start_date)}</td>
       <td style="font-size:11px;color:var(--muted)">${esc(a.lead_auditor_name)||'—'}</td>
@@ -4396,6 +4940,7 @@ function renderAudit() {
       <td style="text-align:center"><b>${a.finding_count||0}</b></td>
       <td style="text-align:center;color:var(--blue)">${a.open_count||0}</td>
       <td style="text-align:center;color:#ff6b6b">${a.overdue_count||0}</td>
+      <td>${renderMiniStagePipeline(a)}</td>
       <td style="font-size:11px">${renderAuditWfSummary(a.audit_id)}</td>
     </tr>`);
 }
@@ -4409,18 +4954,52 @@ function fdYM(d){
   }catch{return d}
 }
 
-// ── AUDIT DETAIL MODAL ────────────────────────────────────────
+// ── AUDIT PLAN CONSTANTS (r67) ────────────────────────────────
 
-// Thứ tự chuẩn của các stage — so sánh với stage_type (= stage_title gốc từ API)
 const AUDIT_STAGE_ORDER = [
-  'Preplanning',
-  'Perform',
-  'Inspection Report', 'InspectionReport',
-  'Audit Report',      'AuditReport',
-  'Finding follow up', 'FindingFollowUp',
+  'Preplanning','Perform','Physical inspection',
+  'Inspection Report','InspectionReport',
+  'Audit Report','Audit report','AuditReport',
+  'Approval',
+  'Follow up CAR','CAR follow up','Finding follow up','FindingFollowUp',
+  'CMR Audit Closure',
+  'Audit closure','AuditClosure',
   'Inspection closure','InspectionClosure',
-  'Audit closure',     'AuditClosure',
 ];
+
+const STAGE_TITLE_ALIAS = {
+  'Audit report':    'Audit Report',
+  'CAR follow up':   'Follow up CAR',
+  'AuditReport':     'Audit Report',
+  'InspectionReport':'Inspection Report',
+  'FindingFollowUp': 'Finding follow up',
+  'AuditClosure':    'Audit closure',
+  'InspectionClosure':'Inspection closure',
+};
+
+const WORKFLOW_CATEGORY = {
+  'Onsite Audit Management':              'Audit',
+  'Offsite Audit Management':             'Audit',
+  'MQA Onsite Audit Management':          'Audit',
+  'CAAV CoA Audit Management':            'Audit',
+  'MARI CAAV':                            'Audit',
+  'SQA Authority & External Org Audit':   'Audit',
+  'Authorities Workflow (Remote/Onsite)': 'Audit',
+  'MQA Inspection Management':            'Inspection',
+  'SQA Inspection Management':            'Inspection',
+  'TQA Inspection Management':            'Inspection',
+  'Inspection Management':                'Inspection',
+  'CMR':                                  'CMR',
+  'Project Workflow':                     'Other',
+  'Security Audit Workflow':              'Other',
+};
+
+const QA_AMO_PREFIXES = ['CMR','MNT','MPS','AIR','CoA','MARI'];
+
+let stageAggregate = null;
+let auditStageCache = {};   // audit_id → stage details
+
+// ── AUDIT DETAIL MODAL ────────────────────────────────────────
 
 function auditStageIdx(s) {
   const name = s.stage_type || '';
@@ -4557,7 +5136,7 @@ async function showAuditDetail(auditId) {
     audit.audit_type, audit.status,
     audit.lead_auditor_name ? '👤 '+audit.lead_auditor_name : null,
     audit.primary_scope_item_name,
-    audit.scheduled_start_date ? 'Scheduled: '+new Date(audit.scheduled_start_date).toLocaleDateString('en-GB') : null
+    audit.scheduled_start_date ? 'Kế hoạch: '+fd(audit.scheduled_start_date) : null
   ].filter(Boolean).join(' · '));
 
   // Lazy load audit workflow stages nếu chưa có
@@ -4598,8 +5177,21 @@ async function showAuditDetail(auditId) {
     }
   }
 
+  // Cache loaded stages for pipeline rendering
+  if (audit.audit_stages && audit.audit_stages.length) {
+    auditStageCache[audit.audit_id] = audit.audit_stages;
+  }
+
   // Audit workflow timeline
   g('adTimeline').innerHTML = renderAuditTimeline(audit);
+
+  // Stage timing analysis
+  if (audit.audit_stages && audit.audit_stages.length) {
+    const timing = buildStageTimingData(audit.audit_stages);
+    if (g('adStageTiming')) g('adStageTiming').innerHTML = renderStageTimingTable(timing);
+  } else {
+    if (g('adStageTiming')) g('adStageTiming').innerHTML = '';
+  }
 
   // Finding summary chips
   const open = findings.filter(r=>r.semantic_status==='Open').length;
