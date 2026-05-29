@@ -1978,7 +1978,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.29-r71';
+const APP_REV = '2026.05.29-r72';
 
 // Build findingRows from EAV rows.
 // Collect desc/ATA/level/NC each sorted by report_field_created_date, pair by index.
@@ -2610,6 +2610,7 @@ async function loadData(forceRefresh=false) {
       });
 
       // Enrich auditData with prefix, scope, year, workflow_category
+      // Loại bỏ hoàn toàn prefix MPS khỏi Audit Plan
       auditData = auditData.map(a => {
         const prefix = extractAuditPrefix(a.number);
         return {
@@ -2619,7 +2620,7 @@ async function loadData(forceRefresh=false) {
           sched_year: a.scheduled_start_date ? String(a.scheduled_start_date).slice(0,4) : null,
           workflow_category: deriveWorkflowCategory(a),
         };
-      });
+      }).filter(a => a.prefix !== 'MPS');
 
       // Also update allData with audit number
       const auNumMap = {};
