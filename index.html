@@ -691,31 +691,28 @@ tr:last-child td{border-bottom:none}
               <div class="kpi-lbl">Audits</div><div class="kpi-val" id="kk-audits" style="color:var(--yellow)">—</div>
             </div>
           </div>
-          <!-- Row 2: Overdue Aging + On-time Rate -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;flex-shrink:0">
+          <!-- Row 2: 3 charts balanced -->
+          <div style="display:grid;grid-template-columns:220px 1fr 220px;gap:8px;margin-bottom:8px;flex-shrink:0">
             <div class="chart-card">
               <div class="chart-head"><div><div class="chart-title">Overdue Aging</div><div class="chart-sub">CAT I / II / III</div></div></div>
-              <div class="ch-wrap" style="height:150px"><canvas id="cKpiAging"></canvas></div>
+              <div class="ch-wrap" style="height:160px"><canvas id="cKpiAging"></canvas></div>
             </div>
             <div class="chart-card">
               <div class="chart-head"><div><div class="chart-title">On-time Close Rate by Month</div><div class="chart-sub">Target: 70%</div></div></div>
-              <div class="ch-wrap" style="height:150px"><canvas id="cOnM"></canvas></div>
+              <div class="ch-wrap" style="height:160px"><canvas id="cOnM"></canvas></div>
             </div>
-          </div>
-          <!-- Row 3: Finding Level -->
-          <div style="margin-bottom:8px;flex-shrink:0;max-width:280px">
             <div class="chart-card">
               <div class="chart-head"><div><div class="chart-title">Finding Level</div><div class="chart-sub">Distribution by level</div></div></div>
               <div class="ch-wrap" style="height:160px"><canvas id="cKpiLevel"></canvas></div>
             </div>
           </div>
 
-          <!-- Row 4: ATA Chapter Comparison -->
+          <!-- Row 3: ATA Chapter Comparison -->
           <div class="chart-card" style="flex-shrink:0;margin-top:8px">
             <div class="chart-head" style="margin-bottom:10px">
               <div>
                 <div class="chart-title">CMR-CAR vs ECAR — Findings by ATA Chapter</div>
-                <div class="chart-sub">ECAR &gt; CMR-CAR tại cùng ATA → CMR-CAR chưa hiệu quả ở hệ thống đó</div>
+                <div class="chart-sub">Top 15 ATA · ECAR &gt; CMR-CAR → CMR-CAR chưa phát hiện đủ ở hệ thống đó</div>
               </div>
               <div style="display:flex;gap:6px;align-items:center">
                 <select class="sel" id="ataGroupLevel" onchange="renderATACompare()" style="font-size:11px">
@@ -733,9 +730,9 @@ tr:last-child td{border-bottom:none}
             <div style="display:flex;gap:16px;margin-bottom:10px;font-size:11px">
               <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#58A6FF;border-radius:2px;display:inline-block"></span>CMR-CAR</span>
               <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#ff6b6b;border-radius:2px;display:inline-block"></span>ECAR</span>
-              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:rgba(240,136,62,0.3);border:1px solid var(--orange);border-radius:2px;display:inline-block"></span>ECAR &gt; CMR-CAR (kém hiệu quả)</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:rgba(240,136,62,0.5);border:1px solid var(--orange);border-radius:2px;display:inline-block"></span>ECAR &gt; CMR-CAR (kém hiệu quả)</span>
             </div>
-            <div class="ch-wrap" style="height:320px"><canvas id="cATACompare"></canvas></div>
+            <div class="ch-wrap" style="height:380px"><canvas id="cATACompare"></canvas></div>
             <!-- Detail table -->
             <div style="overflow-x:auto;margin-top:12px">
               <table class="stat-tbl" id="ataCompareTable">
@@ -1978,7 +1975,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.29-r72';
+const APP_REV = '2026.05.29-r73';
 
 // Build findingRows from EAV rows.
 // Collect desc/ATA/level/NC each sorted by report_field_created_date, pair by index.
@@ -3105,33 +3102,32 @@ function renderATACompare() {
     }
   });
 
-  // Merge all ATA keys (exclude Other for chart, show in table)
+  // Merge all ATA keys (exclude Other), sort by CMR-CAR desc, take top 15
   const allATA = [...new Set([...Object.keys(cmrCount), ...Object.keys(ecarCount)])]
     .filter(a => a !== 'Other')
-    .sort((a,b) => {
-      const na=parseInt(a), nb=parseInt(b);
-      return isNaN(na)||isNaN(nb) ? a.localeCompare(b) : na-nb;
-    });
+    .sort((a,b) => (cmrCount[b]||0) - (cmrCount[a]||0))
+    .slice(0, 15)
+    .reverse(); // reverse so highest is at top of horizontal chart
 
   const cmrVals = allATA.map(a => cmrCount[a]||0);
   const ecarVals = allATA.map(a => ecarCount[a]||0);
 
-  // Bar colors: highlight where ECAR > CMR
-  const ecarColors = allATA.map((a,i) =>
-    ecarVals[i] > cmrVals[i] ? 'rgba(255,107,107,0.9)' : 'rgba(255,107,107,0.4)'
-  );
+  // Colors: dim CMR when ECAR > CMR (ineffective), highlight ECAR orange-red
   const cmrColors = allATA.map((a,i) =>
-    ecarVals[i] > cmrVals[i] ? 'rgba(88,166,255,0.4)' : 'rgba(88,166,255,0.9)'
+    ecarVals[i] > cmrVals[i] ? 'rgba(88,166,255,0.4)' : 'rgba(88,166,255,0.85)'
+  );
+  const ecarColors = allATA.map((a,i) =>
+    ecarVals[i] > cmrVals[i] ? 'rgba(240,136,62,0.9)' : 'rgba(255,107,107,0.5)'
   );
 
-  // Labels: dùng ATA_LABELS nếu có, fallback về value
+  // Labels: full ATA name
   const labels = allATA.map(a => {
     const ch = a.split('-')[0];
     if(level===2 && ATA_LABELS[ch]) return ATA_LABELS[ch];
     return a;
   });
 
-  // Chart
+  // Horizontal grouped bar chart
   dc('cATACompare');
   const ctx = g('cATACompare');
   if(ctx) {
@@ -3140,22 +3136,23 @@ function renderATACompare() {
       data:{
         labels,
         datasets:[
-          {label:'CMR-CAR',data:cmrVals,backgroundColor:cmrColors,borderRadius:3},
-          {label:'ECAR',data:ecarVals,backgroundColor:ecarColors,borderRadius:3},
+          {label:'CMR-CAR',data:cmrVals,backgroundColor:cmrColors,borderRadius:3,barPercentage:0.6},
+          {label:'ECAR',data:ecarVals,backgroundColor:ecarColors,borderRadius:3,barPercentage:0.6},
         ]
       },
       options:{
+        indexAxis:'y',
         responsive:true,maintainAspectRatio:false,
         plugins:{
           legend:{display:false},
           tooltip:{callbacks:{
-            title: (ctx) => ctx[0].label,
-            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.raw} findings`
+            title: (items) => items[0].label,
+            label: (item) => ` ${item.dataset.label}: ${item.raw.toLocaleString('vi-VN')} findings`
           }}
         },
         scales:{
-          x:{ticks:{color:'#8B949E',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},
-          y:{ticks:{color:'#8B949E',font:{size:9}},grid:{color:'rgba(255,255,255,0.06)'},beginAtZero:true}
+          x:{ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'},beginAtZero:true},
+          y:{ticks:{color:'#C9D1D9',font:{size:11}},grid:{display:false}}
         }
       }
     });
