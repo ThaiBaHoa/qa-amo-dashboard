@@ -918,78 +918,47 @@ tr:last-child td{border-bottom:none}
 
         <!-- DOCUMENTS PAGE -->
         <div class="page" id="page-docs">
-          <style>
-            .doc-type-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 13px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--muted);font-size:11px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap;flex-shrink:0}
-            .doc-type-chip:hover{border-color:var(--blue);color:var(--text)}
-            .doc-type-chip.active{background:rgba(88,166,255,.15);border-color:var(--blue);color:var(--blue);font-weight:600}
-            .doc-type-chip .chip-cnt{background:rgba(255,255,255,.1);border-radius:4px;padding:1px 6px;font-size:10px}
-            .doc-type-chip.active .chip-cnt{background:rgba(88,166,255,.25)}
-          </style>
-          <!-- Documents header bar -->
-          <div class="chart-card" style="padding:10px 12px;margin-bottom:8px;flex-shrink:0">
-            <div style="display:flex;align-items:center;justify-content:space-between">
-              <span style="font-size:13px;font-weight:700">📂 Documents</span>
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                <!-- Dropdown chọn nhóm -->
-                <select class="sel" id="docGroupF" onchange="docGroupFilter=this.value;renderDocPage()" style="max-width:230px;font-size:12px">
-                  <option value="">🗂️ Tất cả nhóm</option>
-                  <option value="AOC / OpsSpec / FAOC">📋 AOC / OpsSpec / FAOC</option>
-                  <option value="Approved Maintenance Organization">🔧 Approved Maintenance Org.</option>
-                  <option value="Engineering">⚙️ Engineering</option>
-                  <option value="External">🌐 External</option>
-                  <option value="Flight Crew Safety Bulletin">📰 Flight Crew Safety Bulletin</option>
-                  <option value="Flight Operations">✈️ Flight Operations</option>
-                  <option value="Ground Operations">🛬 Ground Operations</option>
-                  <option value="Safety & Quality Assurance">🛡️ Safety & Quality Assurance</option>
-                  <option value="Security">🔒 Security</option>
-                  <option value="VietJet Aviation Academy">🎓 VietJet Aviation Academy</option>
-                </select>
-                <button class="btn-sm" onclick="docExpandAll()">⊞ Mở tất cả</button>
-                <button class="btn-sm" onclick="docCollapseAll()">⊟ Thu gọn</button>
-                <select class="sel" id="docYearF" onchange="renderDocPage()"><option value="">All Years</option></select>
-                <div class="srch-wrap"><span class="srch-icon">🔍</span>
-                  <input class="srch" id="docSrch" placeholder="Search number, title..." oninput="dRenderDoc()">
-                </div>
-                <div class="tbl-count" id="docCnt">—</div>
-                <button class="btn-sm" id="docRefreshBtn" onclick="loadDocuments(true)">↻ Reload</button>
+          <!-- KPI row -->
+          <div class="doc-kpi-row" id="docKpiRow"></div>
+          <!-- Main layout -->
+          <div class="doc-layout">
+            <!-- Tree -->
+            <aside class="doc-tree-pane">
+              <div class="tree-header">
+                <input type="text" id="treeSearch" placeholder="🔍 Tìm nhóm…" oninput="filterDocTree(this.value)"/>
+                <button class="btn-mini" onclick="expandAllTree()">⊕</button>
+                <button class="btn-mini" onclick="collapseAllTree()">⊖</button>
               </div>
-            </div>
+              <div id="docTreeRoot" class="tree-root"></div>
+              <div class="tree-footer">Tổng: <span id="treeTotalDocs">—</span> tài liệu</div>
+            </aside>
+            <!-- Content -->
+            <main class="doc-content-pane">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-shrink:0">
+                <div class="doc-breadcrumb" id="docBreadcrumb" style="border:none;margin:0;padding:0;flex:1">Tất cả tài liệu</div>
+                <div style="display:flex;gap:6px;flex-shrink:0">
+                  <button class="btn-sm" onclick="selectMyDepartment()">⭐ My Dept</button>
+                  <button class="btn-sm" onclick="clearDocFilters()">✕ Xóa filter</button>
+                  <button class="btn-sm" id="docRefreshBtn" onclick="loadDocuments(true)">↻ Reload</button>
+                </div>
+              </div>
+              <div class="doc-toolbar">
+                <input type="text" id="docSearch" placeholder="🔍 Số / Tên / Owner" oninput="renderDocPage()"/>
+                <select id="docStatusFilter" onchange="renderDocPage()"><option value="">Tất cả trạng thái</option><option value="Active">Active</option><option value="Obsolete">Obsolete</option></select>
+                <select id="docYearFilter" onchange="renderDocPage()"></select>
+                <select id="docOwnerFilter" onchange="renderDocPage()"></select>
+                <select id="docReviewDueFilter" onchange="renderDocPage()"><option value="">Review: tất cả</option><option value="overdue">Quá hạn</option><option value="30d">≤ 30 ngày</option><option value="90d">≤ 90 ngày</option><option value="ok">Còn xa hạn</option></select>
+              </div>
+              <div class="doc-table-wrap">
+                <table class="doc-tbl" id="docTable">
+                  <thead><tr>
+                    <th>Số hiệu</th><th>Tiêu đề</th><th>Loại tài liệu</th><th>Rev</th><th>Trạng thái</th><th>Owner</th><th>Review date</th><th>Distributed</th><th></th>
+                  </tr></thead>
+                  <tbody id="docTableBody"></tbody>
+                </table>
+              </div>
+            </main>
           </div>
-          <!-- KPI cards -->
-          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:8px;flex-shrink:0">
-            <div class="chart-card" style="text-align:center;padding:10px 8px">
-              <div class="kpi-lbl">Total Docs</div><div class="kpi-val" id="dk-total" style="color:var(--blue)">—</div>
-            </div>
-            <div class="chart-card" style="text-align:center;padding:10px 8px">
-              <div class="kpi-lbl">Active</div><div class="kpi-val" id="dk-active" style="color:var(--green)">—</div>
-            </div>
-            <div class="chart-card" style="text-align:center;padding:10px 8px">
-              <div class="kpi-lbl">Distributed</div><div class="kpi-val" id="dk-dist" style="color:var(--blue)">—</div>
-            </div>
-            <div class="chart-card" style="text-align:center;padding:10px 8px">
-              <div class="kpi-lbl">Overdue</div><div class="kpi-val" id="dk-over" style="color:#ff6b6b">—</div><div class="kpi-sub" style="font-size:10px;color:var(--muted)">from loaded tasks</div>
-            </div>
-            <div class="chart-card" style="text-align:center;padding:10px 8px">
-              <div class="kpi-lbl">Completed Early</div><div class="kpi-val" id="dk-early" style="color:var(--green)">—</div><div class="kpi-sub" style="font-size:10px;color:var(--muted)">from loaded tasks</div>
-            </div>
-          </div>
-          <!-- Grouped document list -->
-          <style>
-            .doc-group{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:8px;flex-shrink:0}
-            .doc-group-hdr{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background .15s;user-select:none}
-            .doc-group-hdr:hover{background:rgba(255,255,255,.04)}
-            .doc-group-arrow{font-size:11px;color:var(--muted);width:12px;flex-shrink:0;transition:transform .2s}
-            .doc-group-arrow.open{transform:rotate(90deg)}
-            .doc-group-name{font-size:13px;font-weight:600;flex:1}
-            .doc-group-cnt{font-size:11px;color:var(--muted);background:var(--card2);padding:2px 10px;border-radius:20px}
-            .doc-group-body{border-top:1px solid var(--border)}
-            .doc-group-body table{width:100%;border-collapse:collapse;font-size:11px}
-            .doc-group-body th{padding:7px 12px;text-align:left;font-size:10px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
-            .doc-group-body td{padding:7px 12px;border-bottom:1px solid rgba(255,255,255,.04)}
-            .doc-group-body tr:last-child td{border-bottom:none}
-            .doc-group-body tr:hover td{background:rgba(255,255,255,.03)}
-          </style>
-          <div id="docGrouped" style="flex:1;overflow-y:auto;min-height:0"></div>
         </div>
 
         <!-- REPORTS PAGE -->
@@ -1662,6 +1631,58 @@ tr:last-child td{border-bottom:none}
             .db-panel-btn{background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);font-size:11px;cursor:pointer;padding:2px 8px;border-radius:5px;transition:all .15s;line-height:1.4}
             .db-panel-btn:hover{color:var(--text);background:rgba(255,255,255,.1)}
           </style>
+<style>
+/* Documents — Tree layout */
+.doc-layout{display:grid;grid-template-columns:320px 1fr;gap:16px;height:calc(100vh - 280px);min-height:600px}
+.doc-tree-pane{background:var(--card);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;overflow:hidden}
+.tree-header{padding:12px;border-bottom:1px solid var(--border);display:flex;gap:6px;align-items:center}
+.tree-header input{flex:1;padding:6px 8px;font-size:12px;background:var(--card2);border:1px solid var(--border);border-radius:4px;color:var(--text)}
+.btn-mini{padding:4px 8px;font-size:11px;background:transparent;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text)}
+.btn-mini:hover{background:var(--hover)}
+.tree-root{flex:1;overflow-y:auto;padding:8px 0}
+.tree-node{padding:4px 12px;cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px;font-size:13px;border-left:3px solid transparent;transition:background .1s}
+.tree-node:hover{background:var(--hover)}
+.tree-node.selected{background:rgba(255,79,79,.12);border-left-color:var(--accent);font-weight:600}
+.tree-node.has-zero{opacity:.55}
+.tree-toggle{width:14px;font-size:10px;color:var(--muted);flex-shrink:0}
+.tree-toggle.empty{visibility:hidden}
+.tree-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tree-count{font-size:11px;color:var(--muted);background:var(--hover);padding:1px 6px;border-radius:8px;min-width:20px;text-align:center;flex-shrink:0}
+.tree-node.root-node{font-weight:600;font-size:13.5px}
+.tree-children{padding-left:16px}
+.tree-children.collapsed{display:none}
+.tree-footer{padding:8px 12px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted);background:var(--bg)}
+.doc-content-pane{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;overflow:auto;display:flex;flex-direction:column;min-height:0}
+.doc-breadcrumb{font-size:12px;color:var(--muted);padding:4px 0 12px 0;border-bottom:1px solid var(--border);margin-bottom:12px}
+.doc-breadcrumb .crumb-active{color:var(--accent);font-weight:600}
+.doc-toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.doc-toolbar input,.doc-toolbar select{padding:6px 10px;font-size:12.5px;background:var(--card2);border:1px solid var(--border);border-radius:4px;color:var(--text)}
+.doc-toolbar input{min-width:180px}
+.doc-table-wrap{flex:1;overflow:auto}
+.doc-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.doc-tbl th{position:sticky;top:0;background:var(--card);z-index:1;padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)}
+.doc-tbl td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.04)}
+.doc-tbl tr:hover td{background:rgba(255,255,255,.03)}
+.doc-kpi-row{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:12px;flex-shrink:0}
+.doc-kpi-card{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 8px;text-align:center}
+.doc-kpi-card .kpi-lbl{font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px}
+.doc-kpi-card .kpi-val{font-size:20px;font-weight:700}
+.badge-review-overdue{background:#c0392b;color:white}
+.badge-review-30d{background:#e67e22;color:white}
+.badge-review-90d{background:#f1c40f;color:#333}
+/* Workflow modal tab */
+.modal-tabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid var(--border)}
+.modal-tab{padding:8px 16px;cursor:pointer;border-bottom:2px solid transparent;font-size:13px;color:var(--muted)}
+.modal-tab.active{border-bottom-color:var(--accent);color:var(--accent);font-weight:600}
+.modal-pane{display:none}
+.modal-pane.active{display:block}
+.wf-stage-card{border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-bottom:8px;background:var(--bg)}
+.wf-stage-card.completed{border-left:3px solid #27ae60}
+.wf-stage-card.inprogress{border-left:3px solid #f1c40f}
+.wf-stage-card.overdue{border-left:3px solid #c0392b}
+.wf-stage-card .stage-head{display:flex;justify-content:space-between;align-items:center;font-weight:600;margin-bottom:6px}
+.wf-stage-card .stage-meta{font-size:11.5px;color:var(--muted);display:grid;grid-template-columns:1fr 1fr;gap:4px 16px}
+</style>
 
           <!-- Toolbar -->
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-shrink:0">
@@ -1714,36 +1735,40 @@ tr:last-child td{border-bottom:none}
       </div>
       <button onclick="closeDocModal()" style="background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);font-size:16px;cursor:pointer;padding:3px 10px;border-radius:6px;flex-shrink:0;margin-left:12px">✕</button>
     </div>
-    <!-- Task KPI summary -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px 18px;flex-shrink:0;border-bottom:1px solid var(--border)">
-      <div class="chart-card" style="text-align:center;padding:8px">
-        <div class="kpi-lbl">Total</div><div class="kpi-val" id="dtk-total" style="color:var(--blue)">—</div>
-      </div>
-      <div class="chart-card" style="text-align:center;padding:8px">
-        <div class="kpi-lbl">On Time</div><div class="kpi-val" id="dtk-done" style="color:var(--green)">—</div>
-      </div>
-      <div class="chart-card" style="text-align:center;padding:8px">
-        <div class="kpi-lbl">Late</div><div class="kpi-val" id="dtk-late" style="color:var(--yellow)">—</div>
-      </div>
-      <div class="chart-card" style="text-align:center;padding:8px">
-        <div class="kpi-lbl">Overdue</div><div class="kpi-val" id="dtk-over" style="color:#ff6b6b">—</div>
+    <div style="padding:0 18px;flex-shrink:0">
+      <div class="modal-tabs">
+        <div class="modal-tab active" data-tab="copyholder" onclick="switchDocTab('copyholder')">👥 Copyholders</div>
+        <div class="modal-tab" data-tab="workflow" onclick="switchDocTab('workflow')">🔁 Workflow stages</div>
       </div>
     </div>
-    <!-- Task table -->
-    <div style="overflow:auto;flex:1;min-height:0">
-      <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed">
-        <colgroup><col style="width:28%"><col style="width:16%"><col style="width:16%"><col style="width:20%"><col style="width:20%"></colgroup>
-        <thead style="position:sticky;top:0;background:var(--card);z-index:1"><tr>
-          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Staff</th>
-          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Distribution Date</th>
-          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Due Date</th>
-          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Acknowledged Date</th>
-          <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Status</th>
-        </tr></thead>
-        <tbody id="docTaskBody"></tbody>
-      </table>
+    <div style="overflow:auto;flex:1;min-height:0;padding:0 18px 18px">
+      <!-- Copyholder pane -->
+      <div class="modal-pane active" data-pane="copyholder">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+          <div class="chart-card" style="text-align:center;padding:8px"><div class="kpi-lbl">Total</div><div class="kpi-val" id="dtk-total" style="color:var(--blue)">—</div></div>
+          <div class="chart-card" style="text-align:center;padding:8px"><div class="kpi-lbl">On Time</div><div class="kpi-val" id="dtk-done" style="color:var(--green)">—</div></div>
+          <div class="chart-card" style="text-align:center;padding:8px"><div class="kpi-lbl">Late</div><div class="kpi-val" id="dtk-late" style="color:var(--yellow)">—</div></div>
+          <div class="chart-card" style="text-align:center;padding:8px"><div class="kpi-lbl">Overdue</div><div class="kpi-val" id="dtk-over" style="color:#ff6b6b">—</div></div>
+        </div>
+        <div id="docTaskLoading" style="text-align:center;padding:24px;color:var(--muted);font-size:13px;display:none">Loading copyholders...</div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed">
+          <colgroup><col style="width:28%"><col style="width:16%"><col style="width:16%"><col style="width:20%"><col style="width:20%"></colgroup>
+          <thead style="position:sticky;top:0;background:var(--card);z-index:1"><tr>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Staff</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Distribution Date</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Due Date</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Acknowledged Date</th>
+            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Status</th>
+          </tr></thead>
+          <tbody id="docTaskBody"></tbody>
+        </table>
+      </div>
+      <!-- Workflow pane -->
+      <div class="modal-pane" data-pane="workflow">
+        <div id="docWorkflowLoading" style="text-align:center;padding:24px;color:var(--muted);display:none">Đang tải workflow…</div>
+        <div id="docWorkflowBody"></div>
+      </div>
     </div>
-    <div id="docTaskLoading" style="text-align:center;padding:24px;color:var(--muted);font-size:13px;display:none">Loading copyholders...</div>
   </div>
 </div>
 
@@ -1864,7 +1889,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.27-r65';
+const APP_REV = '2026.05.27-r66';
 
 // Build findingRows from EAV rows.
 // Collect desc/ATA/level/NC each sorted by report_field_created_date, pair by index.
@@ -1965,6 +1990,7 @@ try {
 
 // ── STATE ────────────────────────────────────────────────────
 let curUser = null, allData = [], auditData = [], docData = [], cmrData = [], ecarData = [], docTaskCache = {}, charts = {}, userFilter = 'all', isLoading = false;
+let docTypeTree=[], docTypeFlat=[], docTypeIndex={}, docTypeByTitle={}, selectedTypeId=null, docWorkflowCache={}, expandedTreeNodes=new Set(), currentDocRevId=null;
 let cmrLoaded = false, ecarLoaded = false;
 const PS = 25; // page size
 
@@ -2223,6 +2249,11 @@ function cacheLoad() {
     if (!c.ts || !c.a || Date.now() - c.ts > CACHE_TTL) return false;
     allData   = c.a;
     auditData = c.b || [];
+    if (c.dtf) {
+      docTypeFlat = c.dtf;
+      buildDocTypeTree();
+      countDocsPerType();
+    }
     renderAll();
     g('liveBadge').style.display = '';
     g('recCount').textContent = allData.length;
@@ -2235,15 +2266,14 @@ function cacheLoad() {
 
 function cacheSave() {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), a:allData, b:auditData}));
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), a:allData, b:auditData, dtf:docTypeFlat}));
     updateCacheAge(Date.now());
   } catch {
-    // Quota exceeded — thử lưu không có wf_stages
     try {
       const slim = allData.map(r=>({...r,wf_stages:[]}));
       localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), a:slim, b:auditData}));
       updateCacheAge(Date.now());
-    } catch { /* bỏ qua nếu vẫn quá lớn */ }
+    } catch { /* quota exceeded */ }
   }
 }
 
@@ -5109,7 +5139,7 @@ function showPage(name,btn){
   if(name==='querybuilder')qbInit();
   if(name==='mydashboard')dbInit();
   if(name==='reports'){initReportFilters();generateReport();}
-  if(name==='docs'){ if(!docData.length) loadDocuments(); else renderDocPage(); }
+  if(name==='docs'){ if(!docData.length) loadDocuments(); else { if(!docTypeFlat.length){buildDocTypeTree();countDocsPerType();} renderDocTree();populateDocFilters();renderDocKpi();renderDocPage(); } }
   if(name==='cmrcar'){ if(!cmrLoaded) loadCmr(); else renderCmr(); }
   if(name==='ecar'){ if(!ecarLoaded) loadEcar(); else renderEcar(); }
   if(name==='kpi'){ filterKpiYear(); }
@@ -5208,28 +5238,37 @@ let docLoading = false;
 
 async function loadDocuments(force=false) {
   if(docLoading){toast('Loading documents...','info');return;}
-  if(docData.length && !force){renderDocPage();return;}
+  if(docData.length && !force){
+    if(!docTypeFlat.length) { buildDocTypeTree(); countDocsPerType(); }
+    renderDocTree(); populateDocFilters(); renderDocKpi(); renderDocPage();
+    return;
+  }
   docLoading=true;
   const btn=g('docRefreshBtn'); if(btn)btn.disabled=true;
   setOv(true,'Loading documents...','');
   try {
-    const raw = await fetchAll(G_URL + 'dwreporting_document_summary');
-    if(raw.length > 0) {
-      console.log('[Docs] Fields:', JSON.stringify(Object.keys(raw[0])));
-      console.log('[Docs] Record[0]:', JSON.stringify(raw[0]));
-    }
-    // Filter Active client-side
-    const active = raw.filter(r => r.document_revision_status === 'Active');
+    const [raw, typesRaw] = await Promise.all([
+      fetchAll(G_URL + 'dwreporting_document_summary'),
+      fetchAll(G_URL + 'dwreporting_document_type_hierarchy' +
+        '?$select=type_id,title,parent_id,doc_type_hierarchy,is_archived')
+    ]);
     // Dedup by document_revision_id — keep newest by modified_date
     const dedupMap = {};
-    active.forEach(r => {
+    raw.forEach(r => {
       const id = r.document_revision_id;
       if(!id) return;
       const ex = dedupMap[id];
       if(!ex || (r.modified_date||'') > (ex.modified_date||'')) dedupMap[id] = r;
     });
     docData = Object.values(dedupMap);
-    toast(`✓ Loaded ${docData.length} documents (from ${raw.length} records)`,'ok');
+    docTypeFlat = typesRaw.filter(t => !t.is_archived);
+    buildDocTypeTree();
+    countDocsPerType();
+    cacheSave();
+    toast(`✓ ${docData.length} tài liệu, ${docTypeFlat.length} loại`,'ok');
+    renderDocTree();
+    populateDocFilters();
+    renderDocKpi();
     renderDocPage();
   } catch(e) {
     toast('Error loading documents: '+e.message,'err');
@@ -5486,53 +5525,45 @@ function renderDocGrouped(data) {
 
 function renderDocPage() {
   if(!docData.length) return;
-  const ts = TS.docs;
-  const yearF = g('docYearF')?.value||'';
-  const srch  = (g('docSrch')?.value||'').toLowerCase();
-
-  // Populate year dropdown (once)
-  const years = [...new Set(docData.map(r=>r.created_date?new Date(r.created_date).getFullYear():null).filter(Boolean))].sort((a,b)=>b-a);
-  const yearEl = g('docYearF');
-  if(yearEl && yearEl.options.length <= 1) {
-    yearEl.innerHTML = '<option value="">All Years</option>' +
-      years.map(y=>`<option value="${y}">${y}</option>`).join('');
-    if(yearF) yearEl.value = yearF;
-  }
-
-  // Filter (theo group dropdown + year + search)
-  let data = docData.filter(r => {
-    if(docGroupFilter && getDocGroupForType(r.document_type) !== docGroupFilter) return false;
-    if(yearF && String(new Date(r.created_date||0).getFullYear()) !== yearF) return false;
-    if(srch){
-      const t = [r.document_number, r.document_revision_title, r.document_type].join(' ').toLowerCase();
-      if(!t.includes(srch)) return false;
-    }
+  let rows = getDocsInBranch(selectedTypeId);
+  const q = (g('docSearch')?.value||'').trim().toLowerCase();
+  const stFilter = g('docStatusFilter')?.value||'';
+  const yrFilter = g('docYearFilter')?.value||'';
+  const ownFilter = g('docOwnerFilter')?.value||'';
+  const revFilter = g('docReviewDueFilter')?.value||'';
+  const today = new Date();
+  rows = rows.filter(d => {
+    if(q){const h=`${d.document_number||''} ${d.document_revision_title||''} ${d.owner_name||''}`.toLowerCase();if(!h.includes(q))return false;}
+    if(stFilter && d.document_revision_status!==stFilter) return false;
+    if(yrFilter && (d.created_date||'').slice(0,4)!==yrFilter) return false;
+    if(ownFilter && d.owner_name!==ownFilter) return false;
+    if(revFilter && reviewDueCategory(d.review_date,today)!==revFilter) return false;
     return true;
   });
-
-  // KPI cards (use full docData)
-  s('dk-total', docData.length);
-  s('dk-active', docData.filter(r=>r.document_revision_status==='Active').length);
-  s('dk-dist',  docData.filter(r=>r.has_been_distributed===true).length);
-  // Overdue & Early from cached tasks
-  let overCnt=0, earlyCnt=0;
-  Object.values(docTaskCache).forEach(tasks=>{
-    tasks.forEach(t=>{
-      if(t.task_delivery_status==='overdue') overCnt++;
-      if(t.task_delivery_status==='completed early') earlyCnt++;
-    });
-  });
-  s('dk-over', overCnt||'—'); s('dk-early', earlyCnt||'—');
-
-  // Sort
-  data = sortD(data, ts.sort, ts.asc);
-  s('docCnt', data.length + ' documents');
-
-  // Build charts
-  buildDocCharts(data);
-
-  // Grouped accordion view
-  renderDocGrouped(data);
+  const tbody = g('docTableBody');
+  if(!rows.length){
+    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted)">Không có tài liệu phù hợp</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(d=>{
+    const node = docTypeIndex[d.type_id];
+    const pathDisplay = node ? lastTwoLevels(node.path||node.title) : (d.document_type||'—');
+    const reviewBadge = renderReviewBadge(d.review_date, today);
+    const stBadge = d.document_revision_status==='Active'
+      ? `<span class="badge b-on">Active</span>`
+      : `<span class="badge b-off">${esc(d.document_revision_status||'—')}</span>`;
+    return `<tr>
+      <td>${esc(d.document_number||'—')}</td>
+      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(d.document_revision_title||'')}">${esc(d.document_revision_title||'—')}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(node?node.path||node.title:'')}">${esc(pathDisplay)}</td>
+      <td>${esc(d.revision_number||'—')}</td>
+      <td>${stBadge}</td>
+      <td style="white-space:nowrap">${esc(d.owner_name||'—')}</td>
+      <td style="white-space:nowrap">${fd(d.review_date)}${reviewBadge}</td>
+      <td style="text-align:center">${d.has_been_distributed?'✅':'—'}</td>
+      <td><button class="btn-mini" onclick="showDocDetail('${d.document_revision_id}','${esc(d.document_number||'')}','${esc((d.document_revision_title||'').replace(/'/g,"\\'"))}','${d.valid_from||''}')">👁 Chi tiết</button></td>
+    </tr>`;
+  }).join('');
 }
 
 function buildDocCharts(data) {
@@ -5588,6 +5619,8 @@ let dRenderDocT;
 function dRenderDoc(){ clearTimeout(dRenderDocT); dRenderDocT=setTimeout(()=>{ TS.docs.page=1; renderDocPage(); },250); }
 
 async function showDocDetail(revId, docNum, docTitle, validFrom) {
+  currentDocRevId = revId;
+  switchDocTab('copyholder');
   const modal = g('docModal');
   s('docModalTitle', docNum||'—');
   s('docModalSub', docTitle||'—');
@@ -5681,6 +5714,225 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
     g('docTaskBody').innerHTML=`<tr><td colspan="5" style="text-align:center;padding:24px;color:#ff6b6b">Error: ${esc(e.message)}</td></tr>`;
     console.error('[DocTask] Error:', e);
   }
+}
+
+// ── Document Type Tree ──────────────────────────────────────────
+const ROOT_ORDER=['APPROVED MAINTENANCE ORGANIZATION','SAFETY AND QUALITY ASSURANCE','ENGINEERING','FLIGHT OPERATIONS','GROUND OPERATIONS','SECURITY','COMMERCIAL','VIETJET GROUND SERVICES (VJGS) - NBA','VIETJET GROUND SERVICES (VJGS) - TSN','VIETJET AVIATION ACADEMY','PROJECTS','DOCUMENT CONTROL CENTER','CEO OFFICE','AOC/ OpsSpec/ FAOC','EXTERNAL'];
+function sortRootGroups(a,b){const ai=ROOT_ORDER.indexOf(a.title),bi=ROOT_ORDER.indexOf(b.title);if(ai===-1&&bi===-1)return a.title.localeCompare(b.title);if(ai===-1)return 1;if(bi===-1)return -1;return ai-bi;}
+
+function buildDocTypeTree(){
+  docTypeIndex={};docTypeByTitle={};
+  docTypeFlat.forEach(t=>{
+    docTypeIndex[t.type_id]={type_id:t.type_id,title:t.title,parent_id:t.parent_id,path:t.doc_type_hierarchy,children:[],doc_count:0,direct_count:0};
+    if(!docTypeByTitle[t.title])docTypeByTitle[t.title]=[];
+    docTypeByTitle[t.title].push(t.type_id);
+  });
+  docTypeTree=[];
+  Object.values(docTypeIndex).forEach(node=>{
+    if(node.parent_id&&docTypeIndex[node.parent_id])docTypeIndex[node.parent_id].children.push(node);
+    else docTypeTree.push(node);
+  });
+  docTypeTree.sort(sortRootGroups);
+  Object.values(docTypeIndex).forEach(n=>n.children.sort((a,b)=>a.title.localeCompare(b.title)));
+}
+
+function countDocsPerType(){
+  Object.values(docTypeIndex).forEach(n=>{n.doc_count=0;n.direct_count=0;});
+  docData.forEach(d=>{const n=docTypeIndex[d.type_id];if(n){n.direct_count++;n.doc_count++;}});
+  function rollUp(node){let s=node.direct_count;node.children.forEach(c=>{s+=rollUp(c);});node.doc_count=s;return s;}
+  docTypeTree.forEach(rollUp);
+}
+
+function getDocsInBranch(typeId){
+  if(!typeId)return docData;
+  const ids=new Set();
+  function collect(node){ids.add(node.type_id);node.children.forEach(collect);}
+  const root=docTypeIndex[typeId];if(!root)return[];
+  collect(root);
+  return docData.filter(d=>ids.has(d.type_id));
+}
+
+function renderDocTree(){
+  const root=g('docTreeRoot');if(!root)return;
+  if(g('treeTotalDocs'))g('treeTotalDocs').textContent=(docData.length).toLocaleString('vi-VN');
+  let html=`<div class="tree-node${selectedTypeId===null?' selected':''}" onclick="selectTreeNode(null)" style="padding-left:12px">
+    <span class="tree-toggle empty"></span>
+    <span class="tree-title">📁 Tất cả tài liệu</span>
+    <span class="tree-count">${docData.length}</span>
+  </div>`;
+  docTypeTree.forEach(node=>{html+=renderTreeNode(node,0);});
+  root.innerHTML=html;
+}
+
+function renderTreeNode(node,depth){
+  const isExp=expandedTreeNodes.has(node.type_id);
+  const hasCh=node.children.length>0;
+  const isSel=selectedTypeId===node.type_id;
+  const toggleIcon=hasCh?(isExp?'▼':'▶'):'';
+  const cls=['tree-node',depth===0?'root-node':'',isSel?'selected':'',node.doc_count===0?'has-zero':''].filter(Boolean).join(' ');
+  let html=`<div class="${cls}" data-id="${node.type_id}" style="padding-left:${12+depth*14}px">
+    <span class="tree-toggle${!hasCh?' empty':''}" onclick="event.stopPropagation();toggleTreeNode('${node.type_id}')">${toggleIcon}</span>
+    <span class="tree-title" onclick="selectTreeNode('${node.type_id}')" title="${esc(node.path||node.title)}">${esc(node.title)}</span>
+    <span class="tree-count">${node.doc_count}</span>
+  </div>`;
+  if(hasCh){html+=`<div class="tree-children${isExp?'':' collapsed'}">`;node.children.forEach(c=>{html+=renderTreeNode(c,depth+1);});html+='</div>';}
+  return html;
+}
+
+function toggleTreeNode(typeId){
+  if(expandedTreeNodes.has(typeId))expandedTreeNodes.delete(typeId);else expandedTreeNodes.add(typeId);
+  renderDocTree();
+}
+function selectTreeNode(typeId){
+  selectedTypeId=(typeId==='null'||typeId===null)?null:typeId;
+  updateDocBreadcrumb();populateDocFilters();renderDocKpi();renderDocPage();renderDocTree();
+}
+function updateDocBreadcrumb(){
+  const bc=g('docBreadcrumb');if(!bc)return;
+  if(!selectedTypeId){bc.innerHTML='Tất cả tài liệu';return;}
+  const node=docTypeIndex[selectedTypeId];if(!node){bc.innerHTML='—';return;}
+  const parts=(node.path||node.title).split(' | ').map(p=>p.trim());
+  bc.innerHTML=parts.map((p,i)=>i===parts.length-1?`<span class="crumb-active">${esc(p)}</span>`:esc(p)).join(' › ')
+    +` <span style="color:var(--muted)">(${node.doc_count} tài liệu)</span>`;
+}
+function expandAllTree(){Object.keys(docTypeIndex).forEach(id=>expandedTreeNodes.add(id));renderDocTree();}
+function collapseAllTree(){expandedTreeNodes.clear();renderDocTree();}
+function filterDocTree(q){
+  const query=(q||'').trim().toLowerCase();
+  if(!query){renderDocTree();return;}
+  Object.values(docTypeIndex).forEach(n=>{
+    if(n.title.toLowerCase().includes(query)||(n.path&&n.path.toLowerCase().includes(query))){
+      let cur=n;
+      while(cur.parent_id&&docTypeIndex[cur.parent_id]){cur=docTypeIndex[cur.parent_id];expandedTreeNodes.add(cur.type_id);}
+    }
+  });
+  renderDocTree();
+}
+function selectMyDepartment(){
+  const titles=['MAINTENANCE QUALITY ASSURANCE','SAFETY AND QUALITY ASSURANCE'];
+  const ids=[];
+  titles.forEach(title=>(docTypeByTitle[title]||[]).forEach(id=>{
+    function collect(node){ids.push(node.type_id);node.children.forEach(collect);}
+    if(docTypeIndex[id])collect(docTypeIndex[id]);
+  }));
+  const allowed=new Set(ids);
+  const filtered=docData.filter(d=>allowed.has(d.type_id));
+  const tbody=g('docTableBody');
+  if(!filtered.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted)">Không có tài liệu phù hợp</td></tr>';return;}
+  const today=new Date();
+  tbody.innerHTML=filtered.map(d=>{
+    const node=docTypeIndex[d.type_id];
+    const pathDisplay=node?lastTwoLevels(node.path||node.title):(d.document_type||'—');
+    return `<tr>
+      <td>${esc(d.document_number||'—')}</td>
+      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.document_revision_title||'—')}</td>
+      <td>${esc(pathDisplay)}</td>
+      <td>${esc(d.revision_number||'—')}</td>
+      <td>${d.document_revision_status==='Active'?'<span class="badge b-on">Active</span>':'<span class="badge b-off">'+esc(d.document_revision_status||'—')+'</span>'}</td>
+      <td>${esc(d.owner_name||'—')}</td>
+      <td>${fd(d.review_date)}${renderReviewBadge(d.review_date,today)}</td>
+      <td style="text-align:center">${d.has_been_distributed?'✅':'—'}</td>
+      <td><button class="btn-mini" onclick="showDocDetail('${d.document_revision_id}','${esc(d.document_number||'')}','${esc((d.document_revision_title||'').replace(/'/g,"\\'"))}','${d.valid_from||''}')">👁 Chi tiết</button></td>
+    </tr>`;
+  }).join('');
+  const bc=g('docBreadcrumb');if(bc)bc.innerHTML='<span class="crumb-active">⭐ My Department · MQA + SQA</span>';
+  selectedTypeId=null;renderDocTree();
+}
+function clearDocFilters(){
+  selectedTypeId=null;
+  ['docSearch','docStatusFilter','docYearFilter','docOwnerFilter','docReviewDueFilter'].forEach(id=>{const el=g(id);if(el)el.value='';});
+  updateDocBreadcrumb();renderDocTree();populateDocFilters();renderDocKpi();renderDocPage();
+}
+function populateDocFilters(){
+  const docs=getDocsInBranch(selectedTypeId);
+  const years=[...new Set(docs.map(d=>(d.created_date||'').slice(0,4)).filter(Boolean))].sort().reverse();
+  const yrSel=g('docYearFilter');
+  if(yrSel)yrSel.innerHTML='<option value="">Tất cả năm</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  const owners=[...new Set(docs.map(d=>d.owner_name).filter(Boolean))].sort();
+  const ownSel=g('docOwnerFilter');
+  if(ownSel)ownSel.innerHTML='<option value="">Tất cả owner</option>'+owners.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('');
+}
+function renderDocKpi(){
+  const kpiRow=g('docKpiRow');if(!kpiRow)return;
+  const today=new Date();
+  const docs=getDocsInBranch(selectedTypeId);
+  const total=docs.length;
+  const active=docs.filter(d=>d.document_revision_status==='Active').length;
+  const distributed=docs.filter(d=>d.has_been_distributed).length;
+  const revOverdue=docs.filter(d=>reviewDueCategory(d.review_date,today)==='overdue').length;
+  const rev30d=docs.filter(d=>reviewDueCategory(d.review_date,today)==='30d').length;
+  const owners=new Set(docs.map(d=>d.owner_name).filter(Boolean)).size;
+  const types=new Set(docs.map(d=>d.type_id).filter(Boolean)).size;
+  const card=(label,val,color)=>`<div class="doc-kpi-card"><div class="kpi-lbl">${label}</div><div class="kpi-val"${color?` style="color:${color}"`:''}>${val.toLocaleString('vi-VN')}</div></div>`;
+  kpiRow.innerHTML=card('Tổng tài liệu',total,'var(--blue)')+card('Active',active,'var(--green)')+card('Đã phân phối',distributed,'var(--blue)')+card('Review quá hạn',revOverdue,'#ff6b6b')+card('Review ≤ 30d',rev30d,'#e67e22')+card('Owner',owners,'')+card('Số loại',types,'');
+}
+function reviewDueCategory(reviewDate,today){
+  if(!reviewDate)return'ok';
+  const days=(new Date(reviewDate)-today)/86400000;
+  if(days<0)return'overdue';if(days<=30)return'30d';if(days<=90)return'90d';return'ok';
+}
+function renderReviewBadge(reviewDate,today){
+  if(!reviewDate)return'';
+  const cat=reviewDueCategory(reviewDate,today);
+  if(cat==='overdue')return` <span class="badge badge-review-overdue" style="font-size:10px">🔴 Quá hạn</span>`;
+  if(cat==='30d')return` <span class="badge badge-review-30d" style="font-size:10px">🟠 ≤30d</span>`;
+  if(cat==='90d')return` <span class="badge badge-review-90d" style="font-size:10px">🟡 ≤90d</span>`;
+  return'';
+}
+function lastTwoLevels(path){
+  if(!path)return'—';
+  const parts=path.split(' | ').map(p=>p.trim());
+  return parts.length<=2?parts.join(' › '):'… › '+parts.slice(-2).join(' › ');
+}
+
+// ── Workflow tab ────────────────────────────────────────────────
+function switchDocTab(tab){
+  document.querySelectorAll('#docModal .modal-tab').forEach(el=>el.classList.toggle('active',el.dataset.tab===tab));
+  document.querySelectorAll('#docModal .modal-pane').forEach(el=>el.classList.toggle('active',el.dataset.pane===tab));
+  if(tab==='workflow'&&currentDocRevId)loadDocWorkflow(currentDocRevId);
+}
+async function loadDocWorkflow(revId){
+  const body=g('docWorkflowBody');
+  if(docWorkflowCache[revId]){renderDocWorkflow(docWorkflowCache[revId]);return;}
+  const loading=g('docWorkflowLoading');if(loading)loading.style.display='block';
+  if(body)body.innerHTML='';
+  try{
+    const raw=await fetchAll(G_URL+'dwreporting_document_workflow?$filter=document_revision_id eq '+revId,true);
+    docWorkflowCache[revId]=raw;
+    if(loading)loading.style.display='none';
+    renderDocWorkflow(raw);
+  }catch(e){
+    if(loading)loading.style.display='none';
+    if(body)body.innerHTML='<div style="color:var(--muted);padding:16px;text-align:center">Không tải được workflow.</div>';
+    console.error('[DocWorkflow]',e);
+  }
+}
+function renderDocWorkflow(rows){
+  const body=g('docWorkflowBody');if(!body)return;
+  if(!rows.length){body.innerHTML='<div style="color:var(--muted);padding:16px;text-align:center">Không có workflow nào.</div>';return;}
+  const stageMap={};
+  rows.forEach(r=>{
+    if(!stageMap[r.stage_id]){
+      stageMap[r.stage_id]={stage_id:r.stage_id,stage_type:r.stage_type,stage_title:r.stage_title,stage_status:r.stage_status,stage_target_date:r.stage_target_date,stage_started_date:r.stage_started_date,stage_completed_date:r.stage_completed_date,stage_completed_by:r.stage_completed_by,acceptable_response_time:r.stage_acceptable_response_time,workflow_title:r.workflow_title,workflow_status:r.workflow_status,tasks:[]};
+    }
+    if(r.task_id)stageMap[r.stage_id].tasks.push({task_owner:r.task_owner,task_status:r.task_status,task_target_date:r.task_target_date});
+  });
+  body.innerHTML=Object.values(stageMap).map(st=>{
+    const s=(st.stage_status||'').toLowerCase();
+    const cls=s.includes('complet')?'completed':s.includes('progress')?'inprogress':s.includes('overdue')?'overdue':'';
+    return`<div class="wf-stage-card ${cls}">
+      <div class="stage-head"><div>${esc(st.stage_title||st.stage_type||'—')} <span style="color:var(--muted);font-weight:normal;font-size:11px">· ${esc(st.workflow_title||'')}</span></div><span class="badge">${esc(st.stage_status||'—')}</span></div>
+      <div class="stage-meta">
+        <div>Type: <b>${esc(st.stage_type||'—')}</b></div>
+        <div>Response: <b>${st.acceptable_response_time!=null?st.acceptable_response_time+' ngày':'—'}</b></div>
+        <div>Bắt đầu: ${fd(st.stage_started_date)}</div>
+        <div>Hạn: ${fd(st.stage_target_date)}</div>
+        <div>Hoàn thành: ${fd(st.stage_completed_date)}</div>
+        <div>By: ${esc(st.stage_completed_by||'—')}</div>
+        <div style="grid-column:1/-1">Tasks: <b>${st.tasks.length}</b></div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function closeDocModal(e) {
