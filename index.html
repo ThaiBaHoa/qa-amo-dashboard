@@ -1975,7 +1975,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.29-r73';
+const APP_REV = '2026.05.29-r74';
 
 // Build findingRows from EAV rows.
 // Collect desc/ATA/level/NC each sorted by report_field_created_date, pair by index.
@@ -3102,12 +3102,17 @@ function renderATACompare() {
     }
   });
 
-  // Merge all ATA keys (exclude Other), sort by CMR-CAR desc, take top 15
-  const allATA = [...new Set([...Object.keys(cmrCount), ...Object.keys(ecarCount)])]
+  // Full list for table (all ATA, sorted by total desc)
+  const allATAFull = [...new Set([...Object.keys(cmrCount), ...Object.keys(ecarCount)])]
     .filter(a => a !== 'Other')
+    .sort((a,b) => ((cmrCount[b]||0)+(ecarCount[b]||0)) - ((cmrCount[a]||0)+(ecarCount[a]||0)));
+
+  // Top 15 for chart (sorted by CMR-CAR desc, reversed so highest is at top of horizontal bar)
+  const allATA = allATAFull
+    .slice()
     .sort((a,b) => (cmrCount[b]||0) - (cmrCount[a]||0))
     .slice(0, 15)
-    .reverse(); // reverse so highest is at top of horizontal chart
+    .reverse();
 
   const cmrVals = allATA.map(a => cmrCount[a]||0);
   const ecarVals = allATA.map(a => ecarCount[a]||0);
@@ -3161,11 +3166,11 @@ function renderATACompare() {
   // Detail table
   const tbody = g('ataCompareBody');
   if(!tbody) return;
-  const rows = allATA.map(a => ({
+  const rows = allATAFull.map(a => ({
     ata: a,
     cmr: cmrCount[a]||0,
     ecar: ecarCount[a]||0,
-  })).sort((a,b) => (b.ecar+b.cmr)-(a.ecar+a.cmr));
+  }));
 
   // Add Other row at end
   const otherCmr = cmrCount['Other']||0;
