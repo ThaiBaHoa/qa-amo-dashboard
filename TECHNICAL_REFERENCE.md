@@ -71,8 +71,11 @@ GET dwanalytics_report_form_section_field
         or field_name eq 'Report Reference'
         or field_name eq 'Verification Result'
         or field_name eq 'Department'
+        or field_name eq 'Finding description'
+        or field_name eq 'Nature of finding'
 ```
 → Build `fMap[report_id][field_name] = text_value`. Giữ giá trị đầu tiên (không ghi đè).
+→ `Finding description` → `r.finding_desc`, `Nature of finding` → `r.nature_raw` (dùng cho KPI 2 và cột mô tả ở 2 trang AMO-ECAR/MCAR). Xem [§7 KPI 2](#7-kpi-2--early-detection-ghép-cặp-mcaramo-ecar).
 
 **Bước 5 — Audit Summary**
 ```
@@ -204,6 +207,82 @@ created_at  timestamptz
 
 ---
 
+### 7. KPI 2 — Early Detection (ghép cặp MCAR↔AMO-ECAR)
+
+**Định nghĩa KPI (con số chính thức ở trang Early Detection — `renderKpi2()`):**
+```
+KPI 2 = (số finding AMO-ECAR đã được xác nhận ghép cặp với 1 MCAR
+         phát hiện SỚM hơn & TRÙNG NỘI DUNG)
+        ÷ (tổng số finding AMO-ECAR trong kỳ) × 100%
+```
+> ⚠️ Tử số KHÔNG phải là tổng MCAR. Chỉ những AMO-ECAR có cặp `status='confirmed'`
+> trong bảng `kpi2_match` mới tính vào tử số. (Bản cũ chia `MCAR ÷ AMO-ECAR` cho ra
+> tỷ lệ thường >100%, vô nghĩa về nghiệp vụ — đã bỏ.)
+
+**Nguồn dữ liệu:** chỉ `report_title eq 'AMO ECAR'` (mẫu số) và `'MCAR'` (nguồn phát
+hiện sớm), cả hai từ `allData` (org `'QA AMO'`). KHÔNG liên quan report `'ECAR'` của TQA.
+
+**Lấy `Nature of finding` (gom nhóm) — bảng KHÁC với loadData:**
+```
+GET dwanalytics_report_field          ← KHÁC dwanalytics_report_form_section_field
+  $select: report_id, field_name, value_text   ← cột value_text (không phải text_value)
+  $filter: field_name eq 'Nature of finding'
+```
+→ Một report có thể có **nhiều** dòng Nature (đa giá trị, xuyên section, gồm cả nhãn
+cha lẫn con) → gom vào `Set` mỗi report, KHÔNG chỉ lấy giá trị đầu.
+
+**Chuẩn hóa về nhóm cha** (hằng `NATURE_PARENT` + `natureParent()` / `natureGroups()`):
+- `NATURE_PARENT[child] = parent` — cây cha–con lấy từ danh mục gốc Galileo
+  `dwreporting_general_lists` (list "Nature of finding").
+- Nhãn cấp 1 không có trong map (vd `Not comply with Procedure`, `RII`, `Safety`)
+  tự giữ nguyên làm nhóm cha. `Other` và rỗng → loại.
+- `loadKpi2()` build `kpi2Rows`: mỗi record có `natureGroups[]` (mảng nhóm cha) +
+  `finding_desc` để hiển thị/so khớp.
+
+**Engine ghép cặp bán tự động:**
+- `kpi2Candidates()` gợi ý cặp khi: cùng ≥1 nhóm cha Nature **và** `MCAR.raised_date
+  < AMO-ECAR.raised_date`. Xếp hạng bằng `descSim()` (overlap từ khóa của
+  `Finding description`, 0..1) — chỉ để **gợi ý**, không tự xác nhận.
+- `kpi2Confirm(ecarId, mcarId, group)` / `kpi2Reject(...)` → ghi `kpi2_match` (upsert
+  theo `onConflict: ecar_report_id,mcar_report_id`). Cặp đã confirmed/rejected bị loại
+  khỏi danh sách gợi ý lần sau.
+- UI khu "Cặp gợi ý cần xác nhận" chỉ hiện cho `curUser.role === 'admin'` (class
+  `admin-only`). Người role `approved` chỉ xem được tỷ lệ.
+
+**Bảng Supabase `public.kpi2_match`:**
+```sql
+id                 uuid PRIMARY KEY default gen_random_uuid()
+ecar_report_id     uuid NOT NULL      -- report_id của AMO-ECAR ("ecar" = AMO-ECAR)
+ecar_report_number text
+ecar_raised_date   timestamptz
+mcar_report_id     uuid NOT NULL
+mcar_report_number text
+mcar_raised_date   timestamptz
+nature_group       text               -- nhóm cha Nature đã khớp
+status             text NOT NULL default 'confirmed'   -- confirmed | rejected
+matched_by         text               -- curUser.email
+matched_at         timestamptz default now()
+note               text
+UNIQUE (ecar_report_id, mcar_report_id)
+```
+
+**RLS policies (`kpi2_match`):**
+- `kpi2_match_read` (`for select to authenticated`): cho phép khi
+  `exists(users u where u.supabase_id = auth.uid() and u.role in ('admin','approved'))`.
+- `kpi2_match_admin_write` (`for all to authenticated`, cả `using` + `with check`):
+  chỉ khi `u.role = 'admin'`.
+- RLS ghép permissive policy bằng **OR** → admin đọc+ghi, approved chỉ đọc.
+
+**Hai chỉ số khác nhau — đừng nhầm:**
+| | `renderKpi2()` (trang Early Detection) | `buildKPI2()` (biểu đồ trang KPI Charts) |
+|---|---|---|
+| Ý nghĩa | **% phát hiện sớm chính thức** | Khối lượng MCAR vs AMO-ECAR theo Nature |
+| Tử số | AMO-ECAR đã ghép `confirmed` | (không có — vẽ số lượng MCAR & AMO-ECAR mỗi nhóm) |
+| Trục/nhóm | bảng group theo nhóm cha Nature | cột theo nhóm cha Nature (top 12) + đường Rate% |
+| Phụ thuộc | `kpi2_match` | chỉ `kpi2Rows` (Nature), không cần ghép cặp |
+
+---
+
 ## Giới hạn OData (KHÔNG được vượt qua)
 
 | Giới hạn | Giá trị | Lý do |
@@ -250,3 +329,7 @@ const ALLOWED_ORIGINS = [
 3. **Không đổi `ORG_UNIT`** — ảnh hưởng tất cả pages chính
 4. **Không bật `ALLOWED_ORIGINS = '*'`** trong Worker
 5. **Không xóa `SECURITY DEFINER`** khỏi `get_my_role()` — sẽ gây infinite recursion RLS
+6. **KPI 2 — Nature dùng bảng `dwanalytics_report_field` (cột `value_text`)**, KHÁC
+   `dwanalytics_report_form_section_field` (cột `text_value`) của `loadData()`. Đừng gộp nhầm.
+7. **KPI 2 — không dùng `localStorage`** cho cặp xác nhận: phải ghi Supabase `kpi2_match`.
+   Tử số KPI 2 = AMO-ECAR có cặp `status='confirmed'`, KHÔNG phải tổng MCAR.
