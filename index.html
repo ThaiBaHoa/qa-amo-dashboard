@@ -763,7 +763,7 @@ tr:last-child td{border-bottom:none}
             <div class="chart-head">
               <div>
                 <div class="chart-title">KPI 2 — Early Detection (Internal vs Authority)</div>
-                <div class="chart-sub">MCAR (internal) vs AMO-ECAR (authority) findings by quarter · early-detection % = Phase 2</div>
+                <div class="chart-sub">MCAR (internal) ÷ AMO-ECAR (authority) × 100% · by quarter</div>
               </div>
               <div style="display:flex;gap:6px;align-items:center">
                 <select class="sel" id="kpi2Year" onchange="buildKPI2()" style="font-size:11px;width:90px"><option value="">All Years</option></select>
@@ -821,35 +821,29 @@ tr:last-child td{border-bottom:none}
 
         <!-- ALL FORMS -->
         <div class="page" id="page-kpi2">
-          <div class="kpi-3" style="grid-template-columns:repeat(4,1fr)">
-            <div class="chart-card" style="text-align:center;padding:12px"><div class="kpi-lbl">Early-detection rate</div><div class="kpi-val" id="k2-rate" style="color:var(--green)">—</div><div class="kpi-sub" id="k2-rate-sub" style="font-size:10px">confirmed ÷ AMO-ECAR</div></div>
-            <div class="chart-card" style="text-align:center;padding:12px"><div class="kpi-lbl">Confirmed (numerator)</div><div class="kpi-val" id="k2-num" style="color:var(--green)">—</div></div>
-            <div class="chart-card" style="text-align:center;padding:12px"><div class="kpi-lbl">AMO-ECAR finding-lines</div><div class="kpi-val" id="k2-den" style="color:var(--blue)">—</div></div>
-            <div class="chart-card" style="text-align:center;padding:12px"><div class="kpi-lbl">Candidate pairs</div><div class="kpi-val" id="k2-cand" style="color:var(--yellow)">—</div></div>
+          <div class="kpi-3" style="grid-template-columns:repeat(3,1fr)">
+            <div class="chart-card" style="text-align:center;padding:14px"><div class="kpi-lbl">Early-detection rate</div><div class="kpi-val" id="k2-rate" style="color:var(--green);font-size:30px">—</div><div class="kpi-sub" style="font-size:10px">MCAR ÷ AMO-ECAR × 100%</div></div>
+            <div class="chart-card" style="text-align:center;padding:14px"><div class="kpi-lbl">MCAR (internal) findings</div><div class="kpi-val" id="k2-num" style="color:var(--green)">—</div></div>
+            <div class="chart-card" style="text-align:center;padding:14px"><div class="kpi-lbl">AMO-ECAR (authority) findings</div><div class="kpi-val" id="k2-den" style="color:var(--blue)">—</div></div>
           </div>
           <div class="tbl-card">
             <div class="tbl-bar">
-              <div><div class="tbl-title">Early-detection matching — AMO-ECAR finding-lines vs earlier MCAR</div><div class="tbl-count" id="k2cnt">—</div></div>
+              <div><div class="tbl-title">Early detection — MCAR vs AMO-ECAR by group</div><div class="tbl-count" id="k2cnt">—</div></div>
+              <span style="font-size:11px;color:var(--muted)">Group by</span>
+              <select class="sel" id="k2Group" onchange="renderKpi2()"><option value="nature">Nature of finding</option><option value="scope">Scope / audit area</option><option value="quarter">Quarter</option><option value="year">Year</option></select>
               <select class="sel" id="k2Year" onchange="renderKpi2()"><option value="">All Years</option></select>
-              <select class="sel" id="k2Qtr" onchange="renderKpi2()"><option value="">All Q</option><option value="1">Q1</option><option value="2">Q2</option><option value="3">Q3</option><option value="4">Q4</option></select>
-              <select class="sel" id="k2Status" onchange="renderKpi2()"><option value="">All status</option><option value="confirmed">Confirmed</option><option value="pending">Pending (has candidate)</option><option value="rejected">Rejected</option><option value="none">No candidate</option></select>
-              <input class="sel" id="k2Srch" oninput="renderKpi2()" placeholder="🔍 Search ref / standard..." style="min-width:170px">
+              <input class="sel" id="k2Srch" oninput="renderKpi2()" placeholder="\ud83d\udd0d Search group..." style="min-width:150px">
               <button class="btn-sm" onclick="loadKpi2(true)">↻ Reload</button>
             </div>
             <div class="tbl-wrap">
-              <table>
-                <thead><tr>
-                  <th style="width:18%">AMO-ECAR (authority)</th>
-                  <th style="width:20%">Standard / Nature</th>
-                  <th style="width:30%">Best earlier MCAR candidate</th>
-                  <th style="width:7%">Score</th>
-                  <th style="width:12%">Status</th>
-                  <th style="width:13%">Action</th>
-                </tr></thead>
-                <tbody id="k2Body"></tbody>
-              </table>
+              <table><thead><tr>
+                <th>Group</th>
+                <th style="text-align:right">MCAR (internal)</th>
+                <th style="text-align:right">AMO-ECAR (authority)</th>
+                <th style="text-align:right">Rate %</th>
+              </tr></thead><tbody id="k2Body"></tbody></table>
             </div>
-            <div class="tbl-foot"><span id="k2Info">—</span><div class="pg-btns" id="k2Pg"></div></div>
+            <div class="tbl-foot"><span id="k2Info" style="font-size:11px;color:var(--muted)"></span></div>
           </div>
         </div>
 
@@ -3577,10 +3571,9 @@ function amoSort(c){const t=TS.amoecar;if(t.sort===c)t.asc=!t.asc;else{t.sort=c;
 function mcarSort(c){const t=TS.mcar;if(t.sort===c)t.asc=!t.asc;else{t.sort=c;t.asc=true;}renderMcar();}
 
 // ── KPI 2: Early Detection (Internal vs Authority) ──
-// Automatic phase: compare MCAR (internal) vs AMO-ECAR (authority) finding volume
-// by quarter, with its own Year/Quarter filter. The early-detection RATE (MCAR
-// findings confirmed to predate a matching AMO-ECAR finding) needs the Supabase
-// `kpi2_match` table + matching engine (Phase 2) → shown only once matches exist.
+// Rate = MCAR (internal audit findings) ÷ AMO-ECAR (authority findings) × 100%,
+// plotted by quarter with its own Year/Quarter filter. The grouped breakdown
+// (by Nature of finding / scope) lives on the dedicated "Early Detection" page.
 async function buildKPI2(){
   const amoAll=allData.filter(r=>r.report_title==='AMO ECAR');
   const mcarAll=allData.filter(r=>r.report_title==='MCAR');
@@ -3611,22 +3604,8 @@ async function buildKPI2(){
   const mcarArr=keys.map(k=>mcarQ[k]||0), amoArr=keys.map(k=>amoQ[k]||0);
   const totAmo=amo.length, totMcar=mcar.length;
 
-  // numerator: confirmed early-detection matches (Phase 2 — 0 until kpi2_match exists)
-  let confirmed=0;
-  try{
-    if(typeof sb!=='undefined' && sb){
-      const {data:rows,error}=await sb.from('kpi2_match').select('status').eq('status','confirmed');
-      if(!error && rows) confirmed=rows.length;
-    }
-  }catch(e){/* kpi2_match table not yet created */}
-
-  if(confirmed>0 && totAmo>0){
-    s('kpi2-val', Math.round(confirmed/totAmo*100)+'%');
-    s('kpi2-frac', confirmed+' / '+totAmo+' early-detected');
-  } else {
-    s('kpi2-val', totMcar+' : '+totAmo);
-    s('kpi2-frac', 'MCAR : AMO-ECAR (count)');
-  }
+  s('kpi2-val', totAmo>0 ? Math.round(totMcar/totAmo*100)+'%' : 'N/A');
+  s('kpi2-frac', 'MCAR '+totMcar+' ÷ AMO-ECAR '+totAmo);
 
   if(!g('cKpi2'))return;
   dc('cKpi2');
@@ -3640,191 +3619,51 @@ async function buildKPI2(){
       y:{beginAtZero:true,ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}}}}});
 }
 
-// ════════ KPI 2 — Early Detection: matching engine + admin queue (Phase 2) ════════
-let kpi2Loaded=false, kpi2Ecar=[], kpi2Mcar=[], kpi2Cand={}, kpi2Matches={};
-
-// Pivot dwanalytics_report_field rows into finding-lines keyed by (report_id, section_id).
-// A finding-line must carry a 'Finding description'. Pulls the KPI-2 axis fields.
-function pivotKpi2Lines(raw, idSet, summaryArr){
-  const sumById={}; summaryArr.forEach(r=>sumById[r.report_id]=r);
-  const bySec={};
-  raw.forEach(f=>{
-    if(!idSet.has(f.report_id) || !f.section_id) return;
-    const key=f.report_id+'|'+f.section_id;
-    if(!bySec[key]) bySec[key]={report_id:f.report_id, section_id:f.section_id, fields:{}};
-    if(f.value_text && !bySec[key].fields[f.field_name]) bySec[key].fields[f.field_name]=f.value_text;
-  });
-  const lines=[];
-  Object.values(bySec).forEach(sec=>{
-    const F=sec.fields, desc=F['Finding description'];
-    if(!desc) return;
-    const sum=sumById[sec.report_id]||{};
-    const area=F['Area of standard']||null, ref=F['Reference details']||null;
-    lines.push({
-      report_id:sec.report_id, section_id:sec.section_id,
-      report_number:sum.report_number||null, raised_date:sum.raised_date||null, raised_year:sum.raised_year||null,
-      desc, area, nature:F['Nature of finding']||null, nc_type:F['NC Type']||null,
-      audit_ref:F['Audit Ref. No']||null, issued_by:F['Issued by']||null, source:F['Initial Source of the Event']||null,
-      level:F['Finding level']||null,
-      stdRefs: extractStdRefs([area, desc, ref].filter(Boolean).join(' '))
-    });
-  });
-  return lines;
-}
-
-// Extract normalised standard/clause references (spec §4.2).
-function extractStdRefs(text){
-  if(!text) return [];
-  const T=' '+String(text).toUpperCase().replace(/\s+/g,' ')+' ';
-  const refs=new Set();
-  (T.match(/\b\d{3}\.[A-Z]\.\d+/g)||[]).forEach(m=>refs.add(m));            // 145.A.55
-  if(/PART[- ]?145/.test(T)) refs.add('PART-145');
-  ['AMM','AMP','MOPM','AMOTPM','AMO SMSM','BSPM','AMOS SOP','BASE MAINTENANCE SOP','AMCP','CAB','MOE'].forEach(fam=>{
-    const re=new RegExp('\\b'+fam.replace(/ /g,'\\s+')+'\\s*([0-9]+(?:\\.[0-9]+)*)','g');
-    let m; while((m=re.exec(T))) refs.add((fam+' '+m[1]).replace(/\.$/,''));
-  });
-  return [...refs];
-}
-function k2norm(s){return String(s||'').toUpperCase().replace(/\s+/g,' ').replace(/\.$/,'').trim();}
-function k2kw(a,b){
-  const stop=new Set(['THE','AND','FOR','WAS','WITH','THAT','THIS','HAS','ARE','NOT','FROM','HAVE','FOUND','DURING','WERE','HAD']);
-  const set=t=>new Set(String(t||'').toUpperCase().split(/[^A-Z0-9]+/).filter(w=>w.length>3&&!stop.has(w)));
-  const A=set(a),B=set(b); let n=0; A.forEach(w=>{if(B.has(w))n++;}); return n;
-}
-// Score one AMO-ECAR finding-line against one MCAR finding-line.
-// Hard condition: MCAR must predate AMO-ECAR. Returns null if not a candidate.
-function scoreMatch(ec, mc){
-  if(!ec.raised_date || !mc.raised_date) return null;
-  if(!(new Date(mc.raised_date) < new Date(ec.raised_date))) return null;   // MCAR detected earlier
-  let score=0; const reasons=[];
-  const shared=ec.stdRefs.filter(r=>mc.stdRefs.includes(r));
-  if(shared.length){ score+=60+(shared.length-1)*10; reasons.push('Std '+shared.join(', ')); }
-  if(ec.nature && mc.nature && k2norm(ec.nature)!=='OTHER' && k2norm(ec.nature)===k2norm(mc.nature)){ score+=20; reasons.push('Nature '+ec.nature); }
-  const ov=k2kw(ec.desc, mc.desc);
-  if(ov>=3){ score+=Math.min(ov*3,20); reasons.push(ov+' kw'); }
-  if(score<=0) return null;
-  return {score, reasons, matched_std:shared[0]||null};
-}
-function buildKpi2Candidates(ecarLines, mcarLines){
-  const out={};
-  ecarLines.forEach(ec=>{
-    const cands=[];
-    mcarLines.forEach(mc=>{ const sc=scoreMatch(ec,mc); if(sc) cands.push({mc, ...sc}); });
-    cands.sort((a,b)=>b.score-a.score);
-    if(cands.length) out[ec.section_id]=cands.slice(0,5);
-  });
-  return out;
-}
-async function loadKpi2Matches(){
-  kpi2Matches={};
-  try{
-    if(typeof sb!=='undefined' && sb){
-      const {data,error}=await sb.from('kpi2_match').select('*');
-      if(!error && data) data.forEach(m=>kpi2Matches[m.ecar_section_id]=m);
-    }
-  }catch(e){/* kpi2_match table not created yet */}
-}
+// ════════ KPI 2 — Early Detection (simple): MCAR ÷ AMO-ECAR, grouped ════════
+let kpi2Loaded=false, kpi2Rows=[];
+function k2scope(t){ const s=String(t||'').trim(); if(!s) return '(none)'; return (s.replace(/^\d+[.\)]?\s*/,'').slice(0,40))||s; }
+function k2quarter(d){ if(!d) return '(none)'; const dt=new Date(d); return dt.getUTCFullYear()+'-Q'+(Math.floor(dt.getUTCMonth()/3)+1); }
 async function loadKpi2(force){
   if(kpi2Loaded && !force){ renderKpi2(); return; }
-  setOv(true,'Loading KPI 2 — AMO-ECAR + MCAR finding-lines...','');
+  setOv(true,'Loading KPI 2 (Nature of finding)...','');
   try{
-    const amoSum=allData.filter(r=>r.report_title==='AMO ECAR');
-    const mcarSum=allData.filter(r=>r.report_title==='MCAR');
-    const amoIds=new Set(amoSum.map(r=>r.report_id));
-    const mcarIds=new Set(mcarSum.map(r=>r.report_id));
-    const FIELDS=['Finding description','Area of standard','Nature of finding','NC Type','Audit Ref. No','Issued by','Initial Source of the Event','Reference details','Finding level','Department'];
-    const flt=FIELDS.map(f=>`field_name eq '${f.replace(/'/g,"''")}'`).join(' or ');
-    const raw=await fetchAll(G_URL+'dwanalytics_report_field?$select=report_id,section_id,section_name,field_name,value_text&$filter='+encodeURIComponent(flt), true);
-    kpi2Ecar=pivotKpi2Lines(raw, amoIds, amoSum);
-    kpi2Mcar=pivotKpi2Lines(raw, mcarIds, mcarSum);
-    kpi2Cand=buildKpi2Candidates(kpi2Ecar, kpi2Mcar);
-    await loadKpi2Matches();
+    const amo=allData.filter(r=>r.report_title==='AMO ECAR');
+    const mcar=allData.filter(r=>r.report_title==='MCAR');
+    const ids=new Set([...amo,...mcar].map(r=>r.report_id));
+    const nat={};
+    try{
+      const raw=await fetchAll(G_URL+"dwanalytics_report_field?$select=report_id,field_name,value_text&$filter="+encodeURIComponent("field_name eq 'Nature of finding'"), true);
+      raw.forEach(f=>{ if(ids.has(f.report_id) && f.value_text && !nat[f.report_id]) nat[f.report_id]=f.value_text; });
+    }catch(e){ console.warn('[KPI2] Nature fetch failed (grouping by Nature unavailable):',e); }
+    const mk=(r,type)=>({type, raised_year:r.raised_year, raised_date:r.raised_date, nature:nat[r.report_id]||'(none)', scope:k2scope(r.audit_title)});
+    kpi2Rows=[...amo.map(r=>mk(r,'amo')), ...mcar.map(r=>mk(r,'mcar'))];
     kpi2Loaded=true;
-    console.log(`[KPI2] AMO-ECAR lines=${kpi2Ecar.length} · MCAR lines=${kpi2Mcar.length} · lines with candidate=${Object.keys(kpi2Cand).length}`);
+    console.log(`[KPI2] AMO-ECAR=${amo.length} · MCAR=${mcar.length}`);
   }catch(e){ console.error('[KPI2] load error',e); toast('Error loading KPI 2: '+e.message,'err'); }
-  setOv(false);
-  renderKpi2();
-}
-function k2statusOf(l){
-  const m=kpi2Matches[l.section_id];
-  if(m) return m.status;
-  return (kpi2Cand[l.section_id]||[]).length ? 'pending' : 'none';
+  setOv(false); renderKpi2();
 }
 function renderKpi2(){
   const yrEl=g('k2Year');
   if(yrEl && !yrEl.dataset.built){
-    const years=[...new Set(kpi2Ecar.map(l=>l.raised_year).filter(Boolean))].sort((a,b)=>b-a);
+    const years=[...new Set(kpi2Rows.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
     if(years.length){ const cur=yrEl.value; yrEl.innerHTML='<option value="">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join(''); yrEl.value=cur; yrEl.dataset.built='1'; }
   }
-  const yr=g('k2Year')?.value||'', qt=g('k2Qtr')?.value||'', stf=g('k2Status')?.value||'', srch=(g('k2Srch')?.value||'').toLowerCase();
-  const inScope=l=>{
-    if(yr && String(l.raised_year)!==yr) return false;
-    if(qt){ const mo=l.raised_date?new Date(l.raised_date).getUTCMonth()+1:0; if(Math.ceil(mo/3)!==parseInt(qt)) return false; }
-    return true;
-  };
-  const lines=kpi2Ecar.filter(inScope);
-  const den=lines.length;
-  let num=0, candCount=0;
-  lines.forEach(l=>{ if(k2statusOf(l)==='confirmed')num++; if((kpi2Cand[l.section_id]||[]).length)candCount++; });
-  s('k2-den',den); s('k2-num',num); s('k2-cand',candCount);
-  s('k2-rate', den>0?Math.round(num/den*100)+'%':'N/A');
-  const view=lines.filter(l=>{
-    if(stf && k2statusOf(l)!==stf) return false;
-    if(srch){ const hay=[l.report_number,l.area,l.nature,l.desc,...(l.stdRefs||[])].join(' ').toLowerCase(); if(!hay.includes(srch)) return false; }
-    return true;
-  });
-  const admin=curUser&&curUser.role==='admin';
-  TS.kpi2=TS.kpi2||{page:1};
-  renderPaged('k2Body','k2Info','k2Pg','k2cnt',view,TS.kpi2,l=>{
-    const cands=kpi2Cand[l.section_id]||[], best=cands[0], status=k2statusOf(l);
-    const stBadge = status==='confirmed'?'<span class="badge b-on">Confirmed</span>'
-      : status==='rejected'?'<span class="badge b-reje">Rejected</span>'
-      : status==='pending'?'<span class="badge b-pend">Pending</span>'
-      : '<span style="color:var(--muted);font-size:11px">No candidate</span>';
-    let action='<span style="color:var(--muted);font-size:11px">—</span>';
-    if(admin){
-      if(status==='confirmed'||status==='rejected') action=`<button class="mini-btn" onclick="kpi2Reset('${l.section_id}')">Undo</button>`;
-      else if(best) action=`<button class="mini-btn ok" onclick="kpi2Confirm('${l.report_id}','${l.section_id}','${best.mc.report_id}','${best.mc.section_id}',${best.score},'${esc((best.matched_std||'').replace(/'/g,''))}')">Confirm</button> <button class="mini-btn no" onclick="kpi2Reject('${l.report_id}','${l.section_id}','${best.mc.report_id}','${best.mc.section_id}')">Reject</button>`;
-    }
-    const bestCell = best
-      ? `<div style="font-size:11px"><b>${esc(best.mc.report_number||'—')}</b> <span class="dim">${fd(best.mc.raised_date)}</span><br><span style="color:var(--muted)">${esc((best.mc.desc||'').slice(0,90))}</span><br><span style="color:var(--green);font-size:10px">${esc((best.reasons||[]).join(' · '))}</span></div>`
-      : '<span style="color:var(--muted);font-size:11px">no earlier MCAR match</span>';
-    return `<tr>
-      <td><b>${esc(l.report_number||'—')}</b><br><span class="dim" style="font-size:10px">${fd(l.raised_date)}</span></td>
-      <td style="font-size:11px"><b>${esc((l.stdRefs||[]).join(', ')||l.area||'—')}</b><br><span style="color:var(--muted)">${esc(l.nature||'')}</span></td>
-      <td>${bestCell}</td>
-      <td style="text-align:center;font-weight:600">${best?best.score:'—'}</td>
-      <td>${stBadge}</td>
-      <td>${action}</td>
-    </tr>`;
-  });
-}
-async function kpi2Confirm(ecRid,ecSid,mcRid,mcSid,score,std){
-  if(!curUser||curUser.role!=='admin') return toast('Admin only','err');
-  try{
-    const {error}=await sb.from('kpi2_match').upsert({ecar_report_id:ecRid,ecar_section_id:ecSid,mcar_report_id:mcRid,mcar_section_id:mcSid,status:'confirmed',match_score:score,matched_std:std||null,confirmed_by:curUser.email,confirmed_at:new Date().toISOString()},{onConflict:'ecar_section_id'});
-    if(error) throw error;
-    kpi2Matches[ecSid]={ecar_section_id:ecSid,status:'confirmed',match_score:score};
-    toast('Match confirmed','ok'); renderKpi2(); buildKPI2();
-  }catch(e){ toast('Save failed: '+e.message,'err'); }
-}
-async function kpi2Reject(ecRid,ecSid,mcRid,mcSid){
-  if(!curUser||curUser.role!=='admin') return toast('Admin only','err');
-  try{
-    const {error}=await sb.from('kpi2_match').upsert({ecar_report_id:ecRid,ecar_section_id:ecSid,mcar_report_id:mcRid,mcar_section_id:mcSid,status:'rejected',confirmed_by:curUser.email,confirmed_at:new Date().toISOString()},{onConflict:'ecar_section_id'});
-    if(error) throw error;
-    kpi2Matches[ecSid]={ecar_section_id:ecSid,status:'rejected'};
-    toast('Rejected','info'); renderKpi2();
-  }catch(e){ toast('Save failed: '+e.message,'err'); }
-}
-async function kpi2Reset(ecSid){
-  if(!curUser||curUser.role!=='admin') return toast('Admin only','err');
-  try{
-    const {error}=await sb.from('kpi2_match').delete().eq('ecar_section_id',ecSid);
-    if(error) throw error;
-    delete kpi2Matches[ecSid];
-    toast('Cleared','info'); renderKpi2(); buildKPI2();
-  }catch(e){ toast('Failed: '+e.message,'err'); }
+  const yr=g('k2Year')?.value||'', grp=g('k2Group')?.value||'nature', srch=(g('k2Srch')?.value||'').toLowerCase();
+  const rows=kpi2Rows.filter(r=>!yr||String(r.raised_year)===yr);
+  const num=rows.filter(r=>r.type==='mcar').length, den=rows.filter(r=>r.type==='amo').length;
+  s('k2-num',num); s('k2-den',den); s('k2-rate', den>0?Math.round(num/den*100)+'%':'N/A');
+  const keyOf=r=> grp==='quarter'?k2quarter(r.raised_date) : grp==='year'?(r.raised_year||'(none)') : (r[grp]||'(none)');
+  const groups={};
+  rows.forEach(r=>{ const k=keyOf(r); if(!groups[k])groups[k]={mcar:0,amo:0}; groups[k][r.type]++; });
+  let entries=Object.entries(groups);
+  if(srch) entries=entries.filter(([k])=>String(k).toLowerCase().includes(srch));
+  entries.sort((a,b)=>(b[1].amo+b[1].mcar)-(a[1].amo+a[1].mcar));
+  const tb=g('k2Body'); if(tb) tb.innerHTML = entries.map(([k,v])=>{
+    const rate=v.amo>0?Math.round(v.mcar/v.amo*100)+'%':(v.mcar>0?'∞':'—');
+    return `<tr><td>${esc(k)}</td><td style="text-align:right">${v.mcar||'—'}</td><td style="text-align:right">${v.amo||'—'}</td><td style="text-align:right;font-weight:600">${rate}</td></tr>`;
+  }).join('') || '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted)">No data</td></tr>';
+  s('k2cnt', entries.length+' groups');
+  s('k2Info', `MCAR ${num} · AMO-ECAR ${den} · rate ${den>0?Math.round(num/den*100)+'%':'N/A'}`);
 }
 
 function renderAF() {
