@@ -92,7 +92,6 @@ body{font-family:'Manrope','Segoe UI',system-ui,sans-serif;background:var(--bg);
 .nav-item:hover{background:var(--surface-hover);color:var(--text)}
 .nav-item.active{background:var(--accent-soft);color:var(--accent);font-weight:700}
 .nav-item.active::before{content:'';position:absolute;left:-12px;top:50%;transform:translateY(-50%);width:3px;height:18px;border-radius:0 3px 3px 0;background:var(--accent)}
-.nav-icon{font-size:15px;width:18px;text-align:center}
 .nav-ic{display:flex;align-items:center;justify-content:center;width:18px;flex-shrink:0;opacity:.9}
 .nav-ic svg{width:17px;height:17px}
 .nav-badge{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;background:var(--c-red);color:#fff;padding:1px 7px;border-radius:20px}
@@ -699,6 +698,7 @@ tr:last-child td{border-bottom:none}
           <div class="tbl-card">
             <div class="tbl-bar">
               <div><div class="tbl-title">Overdue Detail — All forms</div><div class="tbl-count" id="ovCnt">—</div></div>
+              <select class="sel" id="ovYearF" onchange="renderOv()"><option value="">All Years</option></select>
               <select class="sel" id="ovFormF" onchange="renderOv()"><option value="">All Forms</option></select>
               <select class="sel" id="ovCatF" onchange="renderOv()">
                 <option value="">All CAT</option>
@@ -776,7 +776,7 @@ tr:last-child td{border-bottom:none}
             <div class="chart-head" style="margin-bottom:10px">
               <div>
                 <div class="chart-title">CMR-CAR vs ECAR — Findings by ATA Chapter</div>
-                <div class="chart-sub">Top 15 ATA · ECAR &gt; CMR-CAR → CMR-CAR chưa phát hiện đủ ở hệ thống đó</div>
+                <div class="chart-sub">Top 15 ATA · ECAR &gt; CMR-CAR → CMR-CAR is under-detecting findings there</div>
               </div>
               <div style="display:flex;gap:6px;align-items:center">
                 <select class="sel" id="ataGroupLevel" onchange="renderATACompare()" style="font-size:11px">
@@ -794,7 +794,7 @@ tr:last-child td{border-bottom:none}
             <div style="display:flex;gap:16px;margin-bottom:10px;font-size:11px">
               <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#58A6FF;border-radius:2px;display:inline-block"></span>CMR-CAR</span>
               <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#ff6b6b;border-radius:2px;display:inline-block"></span>ECAR</span>
-              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:rgba(240,136,62,0.5);border:1px solid var(--orange);border-radius:2px;display:inline-block"></span>ECAR &gt; CMR-CAR (kém hiệu quả)</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:rgba(240,136,62,0.5);border:1px solid var(--orange);border-radius:2px;display:inline-block"></span>ECAR &gt; CMR-CAR (under-detection)</span>
             </div>
             <div class="ch-wrap" style="height:380px"><canvas id="cATACompare"></canvas></div>
             <!-- Detail table -->
@@ -805,7 +805,7 @@ tr:last-child td{border-bottom:none}
                   <th style="text-align:center;color:var(--blue)">CMR-CAR</th>
                   <th style="text-align:center;color:#ff6b6b">ECAR</th>
                   <th style="text-align:center">Ratio ECAR/CMR</th>
-                  <th style="text-align:center">Đánh giá</th>
+                  <th style="text-align:center">Assessment</th>
                 </tr></thead>
                 <tbody id="ataCompareBody"></tbody>
               </table>
@@ -995,28 +995,28 @@ tr:last-child td{border-bottom:none}
 
           <!-- Bottleneck panel (lazy loaded) -->
           <details class="bottleneck-panel" id="bottleneckPanel" ontoggle="if(this.open)renderBottleneckPanel()">
-            <summary>📊 Phân tích tắc nghẽn — Stage Status Aggregate <span id="bottleneckSubtitle" style="font-size:10px;color:var(--muted);font-weight:400;margin-left:6px"></span></summary>
-            <div class="bottleneck-panel-body" id="bottleneckBody"><span style="color:var(--muted);font-size:12px">Đang tải dữ liệu…</span></div>
+            <summary>📊 Bottleneck Analysis — Stage Status Aggregate <span id="bottleneckSubtitle" style="font-size:10px;color:var(--muted);font-weight:400;margin-left:6px"></span></summary>
+            <div class="bottleneck-panel-body" id="bottleneckBody"><span style="color:var(--muted);font-size:12px">Loading data…</span></div>
           </details>
 
           <div class="tbl-card">
             <div class="tbl-bar">
-              <div><div class="tbl-title">Kế hoạch Audit — QA AMO</div><div class="tbl-count" id="auditCnt">—</div></div>
+              <div><div class="tbl-title">Audit Plan — QA AMO</div><div class="tbl-count" id="auditCnt">—</div></div>
 
               <!-- Filter group 1: Scope -->
               <div class="filter-group">
-                <span class="filter-group-label">Phạm vi</span>
+                <span class="filter-group-label">Scope</span>
                 <button class="pill on" id="ap-scope-qa-amo" onclick="setAuditPrefix('qa-amo',this)">QA AMO</button>
-                <button class="pill" id="ap-scope-all" onclick="setAuditPrefix('all',this)">Tất cả</button>
+                <button class="pill" id="ap-scope-all" onclick="setAuditPrefix('all',this)">All</button>
                 <button class="pill" id="ap-scope-MNT" onclick="setAuditPrefix('MNT',this)">MNT</button>
               </div>
 
               <div class="filter-sep"></div>
 
-              <!-- Filter group 2: Loại -->
+              <!-- Filter group 2: Type -->
               <div class="filter-group">
-                <span class="filter-group-label">Loại</span>
-                <button class="pill on" id="ap-cat-all" onclick="setAuditWfCat('all',this)">Tất cả</button>
+                <span class="filter-group-label">Type</span>
+                <button class="pill on" id="ap-cat-all" onclick="setAuditWfCat('all',this)">All</button>
                 <button class="pill" id="ap-cat-Audit" onclick="setAuditWfCat('Audit',this)">Audit</button>
                 <button class="pill" id="ap-cat-Inspection" onclick="setAuditWfCat('Inspection',this)">Inspection</button>
               </div>
@@ -1025,31 +1025,31 @@ tr:last-child td{border-bottom:none}
 
               <!-- Filter group 3: Status pills (existing) -->
               <div class="filter-group">
-                <span class="filter-group-label">Trạng thái</span>
-                <button class="pill on" id="ap-sf-all" onclick="setAuditF('all','status',this)">Tất cả</button>
+                <span class="filter-group-label">Status</span>
+                <button class="pill on" id="ap-sf-all" onclick="setAuditF('all','status',this)">All</button>
                 <button class="pill" onclick="setAuditF('Closed','status',this)">Closed</button>
                 <button class="pill" onclick="setAuditF('Performed','status',this)">Performed</button>
                 <button class="pill" onclick="setAuditF('Scheduled','status',this)">Scheduled</button>
                 <button class="pill" onclick="setAuditF('InProgress','status',this)">In Progress</button>
               </div>
 
-              <select class="sel" id="auditYearF" onchange="renderAudit()"><option value="">Tất cả năm</option></select>
+              <select class="sel" id="auditYearF" onchange="renderAudit()"><option value="">All years</option></select>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
-                <input class="srch" id="auditSrch" placeholder="Tìm kiếm..." oninput="dRenderAudit()">
+                <input class="srch" id="auditSrch" placeholder="Search..." oninput="dRenderAudit()">
               </div>
-              <button class="btn-sm" onclick="exportAuditExcel()" title="Xuất Excel">⬇ Excel</button>
-              <button class="btn-sm" onclick="resetAuditFilters()" title="Xóa bộ lọc">↺ Reset</button>
+              <button class="btn-sm" onclick="exportAuditExcel()" title="Export Excel">⬇ Excel</button>
+              <button class="btn-sm" onclick="resetAuditFilters()" title="Clear filters">↺ Reset</button>
             </div>
             <div class="tbl-wrap">
               <table>
                 <thead><tr>
-                  <th onclick="auditSort('number')">Số Audit ↕</th>
-                  <th onclick="auditSort('title')">Tiêu đề ↕</th>
-                  <th onclick="auditSort('workflow_category')">Loại ↕</th>
-                  <th onclick="auditSort('status')">Trạng thái ↕</th>
-                  <th onclick="auditSort('scheduled_start_date')">Kế hoạch ↕</th>
-                  <th>Trưởng đoàn</th>
-                  <th onclick="auditSort('location_name')">Địa điểm ↕</th>
+                  <th onclick="auditSort('number')">Audit No ↕</th>
+                  <th onclick="auditSort('title')">Title ↕</th>
+                  <th onclick="auditSort('workflow_category')">Type ↕</th>
+                  <th onclick="auditSort('status')">Status ↕</th>
+                  <th onclick="auditSort('scheduled_start_date')">Scheduled ↕</th>
+                  <th>Lead</th>
+                  <th onclick="auditSort('location_name')">Location ↕</th>
                   <th onclick="auditSort('finding_count')">Findings ↕</th>
                   <th>Open</th>
                   <th>Overdue</th>
@@ -1073,34 +1073,37 @@ tr:last-child td{border-bottom:none}
             <!-- Tree -->
             <aside class="doc-tree-pane">
               <div class="tree-header">
-                <input type="text" id="treeSearch" placeholder="🔍 Tìm nhóm…" oninput="filterDocTree(this.value)"/>
+                <input type="text" id="treeSearch" placeholder="🔍 Find group…" oninput="filterDocTree(this.value)"/>
                 <button class="btn-mini" onclick="expandAllTree()">⊕</button>
                 <button class="btn-mini" onclick="collapseAllTree()">⊖</button>
               </div>
               <div id="docTreeRoot" class="tree-root"></div>
-              <div class="tree-footer">Tổng: <span id="treeTotalDocs">—</span> tài liệu</div>
+              <div class="tree-footer">Total: <span id="treeTotalDocs">—</span> documents</div>
             </aside>
             <!-- Content -->
             <main class="doc-content-pane">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-shrink:0">
-                <div class="doc-breadcrumb" id="docBreadcrumb" style="border:none;margin:0;padding:0;flex:1">Tất cả tài liệu</div>
+                <div class="doc-breadcrumb" id="docBreadcrumb" style="border:none;margin:0;padding:0;flex:1">All documents</div>
                 <div style="display:flex;gap:6px;flex-shrink:0">
                   <button class="btn-sm" onclick="selectMyDepartment()">⭐ My Dept</button>
-                  <button class="btn-sm" onclick="clearDocFilters()">✕ Xóa filter</button>
+                  <button class="btn-sm" onclick="clearDocFilters()">✕ Clear filter</button>
                   <button class="btn-sm" id="docRefreshBtn" onclick="loadDocuments(true)">↻ Reload</button>
                 </div>
               </div>
               <div class="doc-toolbar">
-                <input type="text" id="docSearch" placeholder="🔍 Số / Tên / Owner" oninput="renderDocPage()"/>
-                <select id="docStatusFilter" onchange="renderDocPage()"><option value="">Tất cả trạng thái</option><option value="Active">Active</option><option value="Obsolete">Obsolete</option></select>
+                <input type="text" id="docSearch" placeholder="🔍 No / Title / Owner" oninput="renderDocPage()"/>
+                <select id="docStatusFilter" onchange="renderDocPage()"><option value="">All statuses</option><option value="Active">Active</option><option value="Obsolete">Obsolete</option></select>
                 <select id="docYearFilter" onchange="renderDocPage()"></select>
                 <select id="docOwnerFilter" onchange="renderDocPage()"></select>
-                <select id="docReviewDueFilter" onchange="renderDocPage()"><option value="">Review: tất cả</option><option value="overdue">Quá hạn</option><option value="30d">≤ 30 ngày</option><option value="90d">≤ 90 ngày</option><option value="ok">Còn xa hạn</option></select>
+                <select id="docReviewDueFilter" onchange="renderDocPage()"><option value="">Review: all</option><option value="overdue">Overdue</option><option value="30d">≤ 30 days</option><option value="90d">≤ 90 days</option><option value="ok">Not due soon</option></select>
               </div>
               <div class="doc-table-wrap">
                 <table class="doc-tbl" id="docTable">
+                  <colgroup>
+                    <col style="width:190px"><col><col style="width:150px"><col style="width:80px"><col style="width:95px"><col style="width:150px"><col style="width:160px"><col style="width:84px"><col style="width:92px">
+                  </colgroup>
                   <thead><tr>
-                    <th>Số hiệu</th><th>Tiêu đề</th><th>Loại tài liệu</th><th>Rev</th><th>Trạng thái</th><th>Owner</th><th>Review date</th><th>Distributed</th><th></th>
+                    <th>Doc No</th><th>Title</th><th>Document Type</th><th>Rev</th><th>Status</th><th>Owner</th><th>Review date</th><th>Distributed</th><th></th>
                   </tr></thead>
                   <tbody id="docTableBody"></tbody>
                 </table>
@@ -1614,11 +1617,11 @@ tr:last-child td{border-bottom:none}
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
               <div>
                 <div style="font-size:16px;font-weight:700">🔬 Query Builder</div>
-                <div style="font-size:12px;color:var(--muted);margin-top:2px">Tự do khám phá và truy vấn toàn bộ data Galileo không cần viết code</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:2px">Freely explore and query all Galileo data — no code required</div>
               </div>
               <div style="display:flex;gap:8px">
                 <button class="btn-sm" onclick="qbShowTemplates()" style="gap:5px">📋 Templates</button>
-                <button class="btn-sm" onclick="qbSaveTemplate()" style="gap:5px">💾 Lưu template</button>
+                <button class="btn-sm" onclick="qbSaveTemplate()" style="gap:5px">💾 Save template</button>
                 <button class="btn-sm admin-only" onclick="qbExportExcel()" style="background:#1D6F42;border-color:#1D6F42;color:#fff">📥 Excel</button>
               </div>
             </div>
@@ -1631,13 +1634,13 @@ tr:last-child td{border-bottom:none}
               <!-- 1. Bảng chính -->
               <div class="qb-panel" style="flex-shrink:0">
                 <div class="qb-section" style="border-bottom:none">
-                  <div class="qb-section-title">1 · Bảng chính (Primary)</div>
+                  <div class="qb-section-title">1 · Primary Table</div>
                   <select id="qbPrimaryTable" onchange="qbSetPrimary(this.value)"
                     style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px;outline:none;margin-bottom:10px">
-                    <option value="">— Chọn bảng chính —</option>
+                    <option value="">— Select primary table —</option>
                   </select>
                   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-                    <span style="font-size:11px;color:var(--muted)">Fields hiển thị:</span>
+                    <span style="font-size:11px;color:var(--muted)">Fields to display:</span>
                     <div style="display:flex;gap:4px">
                       <button onclick="qbCheckPrimary(true)" style="font-size:10px;color:var(--blue);background:none;border:none;cursor:pointer;padding:0">All</button>
                       <span style="color:var(--border)">|</span>
@@ -1645,7 +1648,7 @@ tr:last-child td{border-bottom:none}
                     </div>
                   </div>
                   <div id="qbPrimaryFields" style="max-height:200px;overflow-y:auto">
-                    <div style="font-size:11px;color:var(--muted);padding:4px">Chọn bảng trước</div>
+                    <div style="font-size:11px;color:var(--muted);padding:4px">Select a table first</div>
                   </div>
                 </div>
               </div>
@@ -1653,7 +1656,7 @@ tr:last-child td{border-bottom:none}
               <!-- 2. Join Tables -->
               <div class="qb-panel" style="flex-shrink:0">
                 <div class="qb-section" style="border-bottom:none">
-                  <div class="qb-section-title">2 · Bảng kết hợp (Join)</div>
+                  <div class="qb-section-title">2 · Join Table</div>
                   <div id="qbJoinList"></div>
                   <button id="qbAddJoinBtn" onclick="qbAddJoin()"
                     style="width:100%;padding:6px;border:1px dashed var(--border);background:none;color:var(--muted);font-size:12px;border-radius:6px;cursor:pointer;margin-top:4px;transition:all .15s"
@@ -1668,24 +1671,24 @@ tr:last-child td{border-bottom:none}
                   <div class="qb-section-title">🏢 Org Unit</div>
                   <select id="qbOrgUnitSel" onchange="qbOrgUnit=this.value"
                     style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px;outline:none">
-                    <option value="">— Tất cả Org Unit —</option>
+                    <option value="">— All Org Units —</option>
                   </select>
-                  <div id="qbOrgUnitStatus" style="font-size:10px;color:var(--muted);margin-top:5px">⏳ Đang tải danh sách...</div>
+                  <div id="qbOrgUnitStatus" style="font-size:10px;color:var(--muted);margin-top:5px">⏳ Loading list...</div>
                 </div>
               </div>
 
               <!-- 3. Filter (primary table fields only) -->
               <div class="qb-panel" style="flex-shrink:0">
                 <div class="qb-section" style="border-bottom:none">
-                  <div class="qb-section-title">3 · Điều kiện lọc (filter)</div>
+                  <div class="qb-section-title">3 · Filter conditions</div>
                   <div id="qbFilterList"></div>
-                  <button onclick="qbAddFilter()" style="width:100%;padding:5px;border:1px dashed var(--border);background:none;color:var(--muted);font-size:12px;border-radius:6px;cursor:pointer;margin-top:4px;transition:all .15s" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Thêm điều kiện</button>
+                  <button onclick="qbAddFilter()" style="width:100%;padding:5px;border:1px dashed var(--border);background:none;color:var(--muted);font-size:12px;border-radius:6px;cursor:pointer;margin-top:4px;transition:all .15s" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Add condition</button>
                   <div style="margin-top:8px">
                     <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:3px">
                       <span>OData nodes</span><span id="qbNodeCount">0 / 100</span>
                     </div>
                     <div class="qb-node-meter"><div class="qb-node-fill" id="qbNodeFill" style="width:0%;background:var(--green)"></div></div>
-                    <div id="qbNodeWarn" style="font-size:10px;color:var(--yellow);margin-top:3px;display:none">⚠ Quá nhiều filter — API có thể từ chối request</div>
+                    <div id="qbNodeWarn" style="font-size:10px;color:var(--yellow);margin-top:3px;display:none">⚠ Too many filters — the API may reject the request</div>
                   </div>
                 </div>
               </div>
@@ -1693,10 +1696,10 @@ tr:last-child td{border-bottom:none}
               <!-- 4. Sort & Limit -->
               <div class="qb-panel" style="flex-shrink:0">
                 <div class="qb-section" style="border-bottom:none">
-                  <div class="qb-section-title">4 · Sắp xếp & giới hạn</div>
+                  <div class="qb-section-title">4 · Sort & limit</div>
                   <div style="display:flex;gap:6px;margin-bottom:6px">
                     <select id="qbSortField" style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px;outline:none">
-                      <option value="">— Không sort —</option>
+                      <option value="">— No sort —</option>
                     </select>
                     <select id="qbSortDir" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px;outline:none">
                       <option value="asc">↑ ASC</option>
@@ -1704,7 +1707,7 @@ tr:last-child td{border-bottom:none}
                     </select>
                   </div>
                   <div style="display:flex;align-items:center;gap:8px">
-                    <span style="font-size:12px;color:var(--muted)">Giới hạn rows</span>
+                    <span style="font-size:12px;color:var(--muted)">Row limit</span>
                     <select id="qbLimit" style="background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px;outline:none">
                       <option value="50">50 rows</option>
                       <option value="100">100 rows</option>
@@ -1717,7 +1720,7 @@ tr:last-child td{border-bottom:none}
               </div>
 
               <!-- Run button -->
-              <button class="qb-run-btn" id="qbRunBtn" onclick="qbRun()">▶ Chạy Query</button>
+              <button class="qb-run-btn" id="qbRunBtn" onclick="qbRun()">▶ Run Query</button>
 
             </div>
 
@@ -1725,30 +1728,30 @@ tr:last-child td{border-bottom:none}
             <div class="qb-panel">
               <!-- Toolbar -->
               <div class="qb-result-bar">
-                <div id="qbResultMeta" style="font-size:12px;color:var(--muted);flex:1">Chọn bảng và chạy query để xem kết quả</div>
-                <button class="qb-viz-btn active" id="qbVizTable" onclick="qbSetViz('table',this)">📋 Bảng</button>
+                <div id="qbResultMeta" style="font-size:12px;color:var(--muted);flex:1">Pick a table and run a query to see results</div>
+                <button class="qb-viz-btn active" id="qbVizTable" onclick="qbSetViz('table',this)">📋 Table</button>
                 <button class="qb-viz-btn" id="qbVizBar" onclick="qbSetViz('bar',this)">📊 Bar</button>
                 <button class="qb-viz-btn" id="qbVizPie" onclick="qbSetViz('pie',this)">🥧 Pie</button>
                 <button class="qb-viz-btn" id="qbVizKpi" onclick="qbSetViz('kpi',this)">🔢 KPI</button>
                 <button class="qb-viz-btn" id="qbVizSql" onclick="qbSetViz('sql',this)">🔗 Query URL</button>
-                <button class="qb-viz-btn" onclick="dbPinWidget()" title="Pin widget này vào My Dashboard" style="border-color:rgba(188,140,255,.4);color:#BC8CFF">📌 Pin</button>
+                <button class="qb-viz-btn" onclick="dbPinWidget()" title="Pin this widget to My Dashboard" style="border-color:rgba(188,140,255,.4);color:#BC8CFF">📌 Pin</button>
               </div>
 
               <!-- Chart config (hidden by default) -->
               <div id="qbChartCfg" style="display:none;padding:8px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
                 <div class="qb-chart-cfg">
-                  <label>Nhóm theo (X):</label>
+                  <label>Group by (X):</label>
                   <select id="qbChartX" onchange="qbRenderChart()"></select>
-                  <label>Đếm / tổng (Y):</label>
+                  <label>Count / sum (Y):</label>
                   <select id="qbChartY" onchange="qbRenderChart()">
-                    <option value="__count__">Count (đếm)</option>
+                    <option value="__count__">Count</option>
                   </select>
                 </div>
               </div>
 
               <!-- Body -->
               <div class="qb-result-body" id="qbResultBody">
-                <div class="qb-empty">🔬<br><br>Chọn bảng → tick fields → thêm filter → <b>Chạy Query</b></div>
+                <div class="qb-empty">🔬<br><br>Pick a table → check fields → add filters → <b>Run Query</b></div>
               </div>
 
               <!-- Chart canvas (hidden) -->
@@ -1807,9 +1810,9 @@ tr:last-child td{border-bottom:none}
 .doc-toolbar input,.doc-toolbar select{padding:6px 10px;font-size:12.5px;background:var(--card2);border:1px solid var(--border);border-radius:4px;color:var(--text)}
 .doc-toolbar input{min-width:180px}
 .doc-table-wrap{flex:1;overflow:auto}
-.doc-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.doc-tbl{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed}
 .doc-tbl th{position:sticky;top:0;background:var(--card);z-index:1;padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)}
-.doc-tbl td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.04)}
+.doc-tbl td{padding:7px 10px;border-bottom:1px solid rgba(255,255,255,.04);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .doc-tbl tr:hover td{background:rgba(255,255,255,.03)}
 .doc-kpi-row{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:12px;flex-shrink:0}
 .doc-kpi-card{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 8px;text-align:center}
@@ -1850,8 +1853,8 @@ tr:last-child td{border-bottom:none}
           <!-- Empty state -->
           <div id="dbEmpty" style="display:none;text-align:center;padding:60px 20px;color:var(--muted)">
             <div style="font-size:36px;margin-bottom:12px">📌</div>
-            <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px">Dashboard trống</div>
-            <div style="font-size:12px;line-height:1.7">Vào <b>Query Builder</b> → chạy query → chọn kiểu hiển thị (📋 / 📊 / 🥧 / 🔢)<br>→ nhấn <b>📌 Pin to Dashboard</b> để thêm widget</div>
+            <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px">Dashboard is empty</div>
+            <div style="font-size:12px;line-height:1.7">Open <b>Query Builder</b> → run a query → choose a display type (📋 / 📊 / 🥧 / 🔢)<br>→ click <b>📌 Pin to Dashboard</b> to add a widget</div>
           </div>
         </div>
 
@@ -1863,7 +1866,7 @@ tr:last-child td{border-bottom:none}
               <button onclick="closeQbTmpl()" style="background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);font-size:14px;cursor:pointer;padding:3px 9px;border-radius:6px">✕</button>
             </div>
             <div style="overflow-y:auto;flex:1;padding:14px 18px" id="qbTmplList">
-              <div class="qb-empty">Chưa có template nào</div>
+              <div class="qb-empty">No templates yet</div>
             </div>
           </div>
         </div>
@@ -1913,7 +1916,7 @@ tr:last-child td{border-bottom:none}
       </div>
       <!-- Workflow pane -->
       <div class="modal-pane" data-pane="workflow">
-        <div id="docWorkflowLoading" style="text-align:center;padding:24px;color:var(--muted);display:none">Đang tải workflow…</div>
+        <div id="docWorkflowLoading" style="text-align:center;padding:24px;color:var(--muted);display:none">Loading workflow…</div>
         <div id="docWorkflowBody"></div>
       </div>
     </div>
@@ -1950,7 +1953,7 @@ tr:last-child td{border-bottom:none}
     <div id="adSummary" style="padding:10px 18px;border-bottom:1px solid var(--border);display:flex;gap:10px;flex-shrink:0;flex-wrap:wrap;align-items:center"></div>
     <!-- Audit Workflow Timeline -->
     <div style="padding:12px 18px;border-bottom:1px solid var(--border);flex-shrink:0">
-      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Tiến độ Workflow</div>
+      <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Workflow Progress</div>
       <div id="adTimeline" style="display:flex;flex-direction:column;gap:0"></div>
       <!-- Stage timing analysis -->
       <div id="adStageTiming"></div>
@@ -2593,8 +2596,8 @@ async function loadData(forceRefresh=false) {
       // 2. Audit type = Internal Audit hoặc Inspection
       //    VÀ có lead auditor là người QA AMO
       // → Load hết rồi filter: chỉ lấy Internal Audit + Inspection
-      //   (các loại khác như CMR, MPS không liên quan QA AMO)
-      // Chỉ lấy 2 loại: Internal Audit và Inspection
+      //   (các types khác như CMR, MPS không liên quan QA AMO)
+      // Chỉ lấy 2 types: Internal Audit và Inspection
       const RELEVANT_TYPES = new Set(['Internal Audit', 'Inspection']);
 
       const allAudits = Object.values(auMap).filter(a =>
@@ -2671,7 +2674,7 @@ async function loadData(forceRefresh=false) {
       });
 
       // Enrich auditData with prefix, scope, year, workflow_category
-      // Loại bỏ hoàn toàn prefix MPS khỏi Audit Plan
+      // Type bỏ hoàn toàn prefix MPS khỏi Audit Plan
       auditData = auditData.map(a => {
         const prefix = extractAuditPrefix(a.number);
         return {
@@ -2741,31 +2744,44 @@ async function fetchAll(url, skipOv=false) {
 }
 
 // ── CALCULATIONS ─────────────────────────────────────────────
+// Parse a date string to LOCAL-midnight of its calendar day, matching fd()'s
+// UTC-date extraction so aging/status math lines up with the displayed date
+// (avoids the UTC+7 off-by-one that new Date(dateOnly) caused).
+function dDay(s) {
+  if(!s) return null;
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+  const dt = new Date(s);
+  if(isNaN(dt)) return null;
+  return new Date(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate());
+}
+
 function ageCalc(t) {
-  if(!t) return null;
-  const td=new Date(t), now=new Date(); now.setHours(0,0,0,0);
-  return Math.floor((td-now)/86400000);
+  const td = dDay(t);
+  if(!td) return null;
+  const now=new Date(); now.setHours(0,0,0,0);
+  return Math.round((td-now)/86400000);
 }
 
 function semCalc(status, closeDate, targetDate) {
   const now=new Date(); now.setHours(0,0,0,0);
-  const t = targetDate ? new Date(targetDate) : null;
-  const c = closeDate  ? new Date(closeDate)  : null;
+  const t = dDay(targetDate);
+  const c = dDay(closeDate);
 
   if (status==='Closed') {
-    if (!t) return 'Closed';           // Không có target → chỉ biết Closed
-    if (!c) return 'Closed';           // Không có close date → không tính được
+    if (!t) return 'Closed';           // No target date → only know it's Closed
+    if (!c) return 'Closed';           // No close date → cannot grade timeliness
     return c<=t ? 'On-time Closed' : 'Lately Closed';
   }
 
   if (status==='Open' || status==='Submitted') {
     if (!c) {
-      // Chưa đóng — tính theo target date
-      if (!t) return 'Open';           // Không có target → Open
+      // Not yet closed — grade against the target date
+      if (!t) return 'Open';           // No target → Open
       return now<=t ? 'Open' : 'Overdue';
     }
-    // Có close date — report đã được đóng dù status vẫn là Open
-    if (!t) return 'Closed';           // Có close nhưng không có target → Closed
+    // Has a close date — report was closed even though status is still Open
+    if (!t) return 'Closed';           // Closed but no target → Closed
     return c<=t ? 'On-time Closed' : 'Lately Closed';
   }
 
@@ -2800,7 +2816,7 @@ function populateFilters() {
 
   const years=[...new Set(allData.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
   const yOpts='<option value="">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
-  ['openYearF','afYearF','pavoiYearF'].forEach(id=>{const el=g(id);if(el)el.innerHTML=yOpts;});
+  ['openYearF','afYearF','pavoiYearF','ovYearF'].forEach(id=>{const el=g(id);if(el)el.innerHTML=yOpts;});
 
   // Overview year filter — default to current year
   const curYear = new Date().getFullYear();
@@ -2831,14 +2847,11 @@ function renderOverview(d) {
   const late=d.filter(r=>r.semantic_status==='Lately Closed').length;
   const cls=d.filter(r=>r.semantic_status==='Closed').length;
   const withTgt=on+late;
-  const c1=d.filter(r=>r.overdue_cat==='CAT I').length;
-  const c2=d.filter(r=>r.overdue_cat==='CAT II').length;
-  const c3=d.filter(r=>r.overdue_cat==='CAT III').length;
   s('k-total',tot); s('k-open',open);
   s('k-over',ov); s('k-over-r',pct(ov/(open+ov||1))+' of Open+Overdue');
   s('k-on',on); s('k-on-r','On-time: '+pct(on/(withTgt||1))+' (forms with target)');
   s('k-late',late); s('k-cls',cls);
-  s('k-c1',c1); s('k-c2',c2); s('k-c3',c3);
+  // CAT tiles (k-c1/c2/c3) live on the Overdue page and are set by renderOv.
   buildChartsFor(d);
   renderStatTblsFor(d);
 }
@@ -3062,20 +3075,8 @@ function buildKPICharts(data) {
     data:{labels:lvlEntries.map(e=>e[0]),datasets:[{data:lvlEntries.map(e=>e[1]),backgroundColor:lvlColors.slice(0,lvlEntries.length),borderWidth:0}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#8B949E',font:{size:9},boxWidth:8}}}}});
 
-  // ── Overdue page charts (always use global allData) ───────
-  dc('cCat');
-  const catsAll={'CAT I':0,'CAT II':0,'CAT III':0};
-  allData.filter(r=>r.semantic_status==='Overdue').forEach(r=>{if(r.overdue_cat)catsAll[r.overdue_cat]++});
-  charts['cCat']=new Chart(g('cCat'),{type:'doughnut',
-    data:{labels:Object.keys(catsAll),datasets:[{data:Object.values(catsAll),backgroundColor:['#F0883E','#ff6b6b','#cc0000'],borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#8B949E',font:{size:10},boxWidth:8}}}}});
-  dc('cOvForm');
-  const ovf={};
-  allData.filter(r=>r.semantic_status==='Overdue').forEach(r=>{const f=r.report_title||'?';ovf[f]=(ovf[f]||0)+1});
-  const sovf=Object.entries(ovf).sort((a,b)=>b[1]-a[1]).slice(0,12);
-  charts['cOvForm']=new Chart(g('cOvForm'),{type:'bar',
-    data:{labels:sovf.map(f=>f[0]),datasets:[{data:sovf.map(f=>f[1]),backgroundColor:'#ff6b6b',borderRadius:4}]},
-    options:{...CO,indexAxis:'y',plugins:{legend:{display:false}}}});
+  // (Overdue-page charts cCat/cOvForm are built by renderOv → buildOvCharts,
+  //  so they respect the Overdue page's own Year/Form filter.)
 }
 
 // ── ATA COMPARE ──────────────────────────────────────────────
@@ -3245,8 +3246,8 @@ function renderATACompare() {
     const isBad  = (ecar > cmr && cmr > 0) || (cmr === 0 && ecar > 0);
     const label  = level===2 && ATA_LABELS[ata] ? ATA_LABELS[ata] : ata;
     let badge = '';
-    if(isBad)                          badge = `<span class="badge b-over" style="font-size:10px">❌ Không hiệu quả</span>`;
-    else if(cmr > 0 && ecar < cmr)     badge = `<span class="badge b-on"   style="font-size:10px">✅ Đạt</span>`;
+    if(isBad)                          badge = `<span class="badge b-over" style="font-size:10px">❌ Ineffective</span>`;
+    else if(cmr > 0 && ecar < cmr)     badge = `<span class="badge b-on"   style="font-size:10px">✅ OK</span>`;
     else                               badge = `<span style="color:var(--muted);font-size:10px">—</span>`;
     return `<tr style="${isBad?'background:rgba(255,107,107,0.05)':''}">
       <td style="font-size:11px;font-weight:500">${esc(label)}</td>
@@ -3398,16 +3399,23 @@ async function exportATAComparePDF() {
 function ovSort(col){TS.ov.asc=TS.ov.sort===col?!TS.ov.asc:true;TS.ov.sort=col;TS.ov.page=1;renderOv();}
 
 function renderOv() {
-  const ff=g('ovFormF')?.value||'', cat=g('ovCatF')?.value||'';
+  const ff=g('ovFormF')?.value||'', cat=g('ovCatF')?.value||'', yr=g('ovYearF')?.value||'';
   const ts=TS.ov;
 
-  let data=allData.filter(r=>{
-    if(r.semantic_status!=='Overdue') return false;
-    if(ff && r.report_title!==ff) return false;
-    if(cat && r.overdue_cat!==cat) return false;
-    return true;
-  });
+  // base = every currently-overdue finding, scoped by Year + Form only.
+  // Tiles, charts and table all derive from this one set so they always agree.
+  const base=allData.filter(r=>
+    r.semantic_status==='Overdue' &&
+    (!yr || String(r.raised_year)===yr) &&
+    (!ff || r.report_title===ff));
 
+  // CAT tiles (owned here — single source of truth for the Overdue page)
+  s('k-c1',base.filter(r=>r.overdue_cat==='CAT I').length);
+  s('k-c2',base.filter(r=>r.overdue_cat==='CAT II').length);
+  s('k-c3',base.filter(r=>r.overdue_cat==='CAT III').length);
+  buildOvCharts(base);
+
+  let data = cat ? base.filter(r=>r.overdue_cat===cat) : base.slice();
   data=sortD(data,ts.sort,ts.asc);
   renderPaged('ovBody','ovInfo','ovPg','ovCnt',data,ts,r=>`
     <tr>
@@ -3420,6 +3428,23 @@ function renderOv() {
       <td>${esc(r.finding_level)||'—'}</td>
       <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)">${esc(r.audit_title)||'—'}</td>
     </tr>`);
+}
+
+// Overdue page charts — built from the same year/form-filtered set as the tiles & table
+function buildOvCharts(base) {
+  dc('cCat');
+  const cats={'CAT I':0,'CAT II':0,'CAT III':0};
+  base.forEach(r=>{if(r.overdue_cat)cats[r.overdue_cat]++});
+  if(g('cCat')) charts['cCat']=new Chart(g('cCat'),{type:'doughnut',
+    data:{labels:Object.keys(cats),datasets:[{data:Object.values(cats),backgroundColor:['#F0883E','#ff6b6b','#cc0000'],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#8B949E',font:{size:10},boxWidth:8}}}}});
+  dc('cOvForm');
+  const ovf={};
+  base.forEach(r=>{const f=r.report_title||'?';ovf[f]=(ovf[f]||0)+1});
+  const sovf=Object.entries(ovf).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  if(g('cOvForm')) charts['cOvForm']=new Chart(g('cOvForm'),{type:'bar',
+    data:{labels:sovf.map(f=>f[0]),datasets:[{data:sovf.map(f=>f[1]),backgroundColor:'#ff6b6b',borderRadius:4}]},
+    options:{...CO,indexAxis:'y',plugins:{legend:{display:false}}}});
 }
 
 // ── TABLE: ALL FORMS ──────────────────────────────────────────
@@ -3783,7 +3808,7 @@ function pdfSafe(str){
     .replace(/[^\x00-\xFF]/g,'?');    // any remaining non-Latin-1
 }
 function exportCmrPDF(){
-  if(!curUser||curUser.role!=='admin'){toast('Chỉ admin mới có quyền xuất báo cáo','err');return;}
+  if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
   if(!cmrLoaded||!cmrData.length){toast('No CMR-CAR data loaded','err');return;}
   const ts=TS.cmr;
   const yr=g('cmrYearF')?.value||'';
@@ -4272,7 +4297,7 @@ function showEcarDetail(report_id){
 function closeEcarModal(e){if(e&&e.target!==g('ecarModal'))return;g('ecarModal').style.display='none';}
 
 async function exportEcarPDF(){
-  if(!curUser||curUser.role!=='admin'){toast('Chỉ admin mới có quyền xuất báo cáo','err');return;}
+  if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
   if(!ecarLoaded||!ecarData.length){toast('No ECAR data loaded','err');return;}
   setOv(true,'Generating PDF...','');
   try{
@@ -4458,7 +4483,7 @@ async function exportEcarPDF(){
 }
 
 function exportEcarExcel(){
-  if(!curUser||curUser.role!=='admin'){toast('Chỉ admin mới có quyền xuất báo cáo','err');return;}
+  if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
   if(!ecarLoaded||!ecarData.length){toast('No ECAR data loaded','err');return;}
   setOv(true,'Exporting Excel...','');
   try{
@@ -4535,7 +4560,7 @@ function deriveWorkflowCategory(audit) {
 // Populate audit year filter (called from populateFilters)
 function populateAuditYearFilter() {
   const auYears = [...new Set(auditData.map(a => a.sched_year).filter(Boolean))].sort((a,b) => b-a);
-  const auYOpts = '<option value="">Tất cả năm</option>' + auYears.map(y => `<option value="${y}">${y}</option>`).join('');
+  const auYOpts = '<option value="">All years</option>' + auYears.map(y => `<option value="${y}">${y}</option>`).join('');
   const auYEl = g('auditYearF'); if (auYEl) auYEl.innerHTML = auYOpts;
 }
 
@@ -4644,13 +4669,13 @@ function renderAuditKpi(data) {
   const yearsStr = years.length ? (years.length <= 3 ? years.join(', ') : `${years[0]}–${years[years.length-1]}`) : '—';
 
   el.innerHTML = [
-    kpiCard('Tổng Audit',    total,   'Đã lọc', 'kpi-tone-blue'),
-    kpiCard('Đã đóng',       closed,  'Closed',   'kpi-tone-green'),
-    kpiCard('Đang mở',       open,    'In Progress / Scheduled', 'kpi-tone-orange'),
-    kpiCard('Tỷ lệ đóng',   rate+'%','Closure rate', rate>=80?'kpi-tone-green':rate>=50?'kpi-tone-yellow':'kpi-tone-red'),
-    kpiCard('Theo dõi CAR',  inCar,   'In CAR Follow-up', 'kpi-tone-purple'),
-    kpiCard('Tắc nghẽn',    bottleneckStage.split(' (')[0]||'—', topStage?topStage[1]+' audit':'—', 'kpi-tone-muted'),
-    kpiCard('Năm',          yearsStr, `${years.length} năm`, 'kpi-tone-muted'),
+    kpiCard('Total Audits',    total,   'Filtered', 'kpi-tone-blue'),
+    kpiCard('Closed',       closed,  'Closed',   'kpi-tone-green'),
+    kpiCard('Open',       open,    'In Progress / Scheduled', 'kpi-tone-orange'),
+    kpiCard('Closure rate',   rate+'%','Closure rate', rate>=80?'kpi-tone-green':rate>=50?'kpi-tone-yellow':'kpi-tone-red'),
+    kpiCard('CAR follow-up',  inCar,   'In CAR Follow-up', 'kpi-tone-purple'),
+    kpiCard('Bottleneck',    bottleneckStage.split(' (')[0]||'—', topStage?topStage[1]+' audit':'—', 'kpi-tone-muted'),
+    kpiCard('Year',          yearsStr, `${years.length} years`, 'kpi-tone-muted'),
   ].join('');
 }
 
@@ -4670,7 +4695,7 @@ async function loadStageAggregate() {
   } catch(e) {
     console.warn('[StageAggregate] load error:', e.message);
     const bd = g('bottleneckBody');
-    if (bd) bd.innerHTML = `<span style="color:#ff6b6b;font-size:12px">Không thể tải dữ liệu: ${esc(e.message)}</span>`;
+    if (bd) bd.innerHTML = `<span style="color:#ff6b6b;font-size:12px">Could not load data: ${esc(e.message)}</span>`;
   }
 }
 
@@ -4698,7 +4723,7 @@ function buildStageAggregate(rows) {
 function renderBottleneckPanel() {
   const bd = g('bottleneckBody'); if (!bd) return;
   if (!stageAggregate) {
-    bd.innerHTML = '<span style="color:var(--muted);font-size:12px">Đang tải…</span>';
+    bd.innerHTML = '<span style="color:var(--muted);font-size:12px">Loading…</span>';
     return;
   }
   // Sort by inprogress count desc, take top 12
@@ -4706,7 +4731,7 @@ function renderBottleneckPanel() {
     .filter(([,v]) => v.total > 0)
     .sort((a,b) => (b[1].inprogress + b[1].pendingSignOff) - (a[1].inprogress + a[1].pendingSignOff))
     .slice(0, 12);
-  if (!entries.length) { bd.innerHTML = '<span style="color:var(--muted);font-size:12px">Không có dữ liệu</span>'; return; }
+  if (!entries.length) { bd.innerHTML = '<span style="color:var(--muted);font-size:12px">No data</span>'; return; }
 
   const maxTotal = Math.max(...entries.map(([,v]) => v.total), 1);
   const sub = g('bottleneckSubtitle');
@@ -4888,10 +4913,10 @@ function renderStageTimingTable(timing) {
   }).join('');
 
   return `<div style="margin-top:12px">
-    <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Phân tích thời gian Stage</div>
+    <div style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Stage Timing Analysis</div>
     <table class="stage-timing-table">
       <thead><tr>
-        <th>Stage</th><th>Trạng thái</th><th>Bắt đầu</th><th>Kết thúc</th><th>Thời gian</th>
+        <th>Stage</th><th>Status</th><th>Start</th><th>End</th><th>Duration</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -4916,9 +4941,9 @@ function showAuditPlanPage(navBtn) {
 function exportAuditExcel() {
   try {
     const data = getCurrentlyFilteredAudits();
-    if (!data.length) { toast('Không có dữ liệu để xuất','info'); return; }
+    if (!data.length) { toast('No data to export','info'); return; }
     const wb = XLSX.utils.book_new();
-    const headers = ['Số Audit','Tiêu đề','Loại WF','Audit Type','Trạng thái','Kế hoạch','Lead Auditor','Địa điểm','Findings','Open','Overdue','Prefix','Năm'];
+    const headers = ['Audit No','Title','Type WF','Audit Type','Status','Scheduled','Lead Auditor','Location','Findings','Open','Overdue','Prefix','Year'];
     const rows = [headers];
     data.forEach(a => rows.push([
       a.number||'',
@@ -4940,8 +4965,8 @@ function exportAuditExcel() {
     XLSX.utils.book_append_sheet(wb, ws, 'Audit Plan');
     const fname = `AuditPlan_${new Date().toISOString().slice(0,10)}.xlsx`;
     XLSX.writeFile(wb, fname);
-    toast('Xuất Excel thành công!', 'ok');
-  } catch(e) { toast('Lỗi xuất Excel: '+e.message, 'err'); }
+    toast('Excel exported successfully!', 'ok');
+  } catch(e) { toast('Excel export error: '+e.message, 'err'); }
 }
 
 // Main renderAudit — filters, KPIs, table
@@ -5134,7 +5159,7 @@ function renderAuditTimeline(audit) {
   const { stages, fallback } = getEffectiveStages(audit);
   const sorted = sortAuditStages(stages);
   const header = fallback
-    ? `<div style="font-size:10px;color:var(--orange);margin-bottom:8px">⚠ Dữ liệu ước tính theo trạng thái audit (${audit.status}) — chưa có API workflow</div>`
+    ? `<div style="font-size:10px;color:var(--orange);margin-bottom:8px">⚠ Data estimated from audit status (${audit.status}) — workflow API not available yet</div>`
     : '';
   if (!sorted.length) return '<span style="color:var(--muted);font-size:12px">No workflow information available</span>';
   return header + sorted.map((s,i) => {
@@ -5165,8 +5190,8 @@ function renderAuditTimeline(audit) {
       <span style="font-size:15px;color:${overdueCol};flex-shrink:0;margin-top:1px">${icon}</span>
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;font-weight:600;color:${prog||isOverdue?'var(--text)':'var(--muted)'}">${esc(s.stage_type)}
-          ${isOverdue?'<span style="font-size:10px;color:#c0392b;font-weight:600;margin-left:6px">⚠ Quá hạn</span>':''}
-          ${prog&&!isOverdue?'<span style="font-size:10px;color:var(--blue);font-weight:400;margin-left:6px">● Đang thực hiện</span>':''}
+          ${isOverdue?'<span style="font-size:10px;color:#c0392b;font-weight:600;margin-left:6px">⚠ Overdue</span>':''}
+          ${prog&&!isOverdue?'<span style="font-size:10px;color:var(--blue);font-weight:400;margin-left:6px">● In Progress</span>':''}
           ${done?'<span style="font-size:10px;color:var(--green);font-weight:400;margin-left:6px">Completed</span>':''}
         </div>
         ${s.stage_owner_name?`<div style="font-size:10px;color:var(--muted);margin-top:1px">👤 ${esc(s.stage_owner_name)}</div>`:''}
@@ -5205,7 +5230,7 @@ async function showAuditDetail(auditId) {
     audit.audit_type, audit.status,
     audit.lead_auditor_name ? '👤 '+audit.lead_auditor_name : null,
     audit.primary_scope_item_name,
-    audit.scheduled_start_date ? 'Kế hoạch: '+fd(audit.scheduled_start_date) : null
+    audit.scheduled_start_date ? 'Scheduled: '+fd(audit.scheduled_start_date) : null
   ].filter(Boolean).join(' · '));
 
   // Lazy load audit workflow stages nếu chưa có
@@ -5267,7 +5292,7 @@ async function showAuditDetail(auditId) {
   const ov   = findings.filter(r=>r.semantic_status==='Overdue').length;
   const cl   = findings.filter(r=>['On-time Closed','Lately Closed','Closed'].includes(r.semantic_status)).length;
   g('adSummary').innerHTML = [
-    `<span style="font-size:12px;padding:4px 10px;border-radius:6px;background:rgba(88,166,255,.1);color:var(--blue)">Tổng: <b>${findings.length}</b></span>`,
+    `<span style="font-size:12px;padding:4px 10px;border-radius:6px;background:rgba(88,166,255,.1);color:var(--blue)">Total: <b>${findings.length}</b></span>`,
     open ? `<span style="font-size:12px;padding:4px 10px;border-radius:6px;background:rgba(88,166,255,.08);color:var(--blue)">Open: <b>${open}</b></span>` : '',
     ov   ? `<span style="font-size:12px;padding:4px 10px;border-radius:6px;background:rgba(255,107,107,.1);color:#ff6b6b">Overdue: <b>${ov}</b></span>` : '',
     cl   ? `<span style="font-size:12px;padding:4px 10px;border-radius:6px;background:rgba(63,185,80,.1);color:var(--green)">Closed: <b>${cl}</b></span>` : '',
@@ -5283,7 +5308,7 @@ async function showAuditDetail(auditId) {
   };
 
   g('adBody').innerHTML = findings.length === 0
-    ? `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted)">Không có finding</td></tr>`
+    ? `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted)">No findings</td></tr>`
     : findings.sort((a,b)=>(a.report_number||'').localeCompare(b.report_number||'')).map(r=>{
       return `<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
       <td style="padding:7px 12px;white-space:nowrap"><b style="color:var(--blue)">${esc(r.report_number)||'—'}</b></td>
@@ -5332,10 +5357,10 @@ function updateRptFormLabel(){
   const checked=[...all].filter(el=>el.checked);
   const lbl=g('rptFormLabel');
   if(!lbl)return;
-  if(checked.length===0)lbl.textContent='Không có form';
-  else if(checked.length===all.length)lbl.textContent='Tất cả form';
+  if(checked.length===0)lbl.textContent='No forms';
+  else if(checked.length===all.length)lbl.textContent='All forms';
   else if(checked.length===1)lbl.textContent=checked[0].value;
-  else lbl.textContent=`${checked.length} form được chọn`;
+  else lbl.textContent=`${checked.length} forms selected`;
 }
 
 function updateReportFilters(){
@@ -5454,7 +5479,7 @@ function generateReport(){
   // CAT table
   const c1=d.filter(r=>r.overdue_cat==='CAT I').length, c2=d.filter(r=>r.overdue_cat==='CAT II').length, c3=d.filter(r=>r.overdue_cat==='CAT III').length;
   const ovTot=c1+c2+c3;
-  g('rptCatTable').innerHTML=[{cat:'CAT I',n:c1,col:'var(--orange)',desc:'≤30 ngày'},{cat:'CAT II',n:c2,col:'#ff6b6b',desc:'30-60 ngày'},{cat:'CAT III',n:c3,col:'#ff3333',desc:'>60 ngày'}]
+  g('rptCatTable').innerHTML=[{cat:'CAT I',n:c1,col:'var(--orange)',desc:'≤30 days'},{cat:'CAT II',n:c2,col:'#ff6b6b',desc:'30-60 days'},{cat:'CAT III',n:c3,col:'#ff3333',desc:'>60 days'}]
     .map(r=>`<tr><td><b style="color:${r.col}">${r.cat}</b></td><td>${r.n}</td><td style="color:var(--muted)">${pct(r.n/(ovTot||1))}</td><td style="color:var(--muted);font-size:11px">${r.desc}</td></tr>`).join('')
     +`<tr><td><b>Total</b></td><td><b>${ovTot}</b></td><td>${pct(ovTot/(total||1))}</td><td></td></tr>`;
 
@@ -5470,7 +5495,7 @@ function generateReport(){
 
   // Detail
   const det=d.slice(0,200);
-  s('rptDetailCount',`(${d.length} records${d.length>200?' — 200 đầu':''})`);
+  s('rptDetailCount',`(${d.length} records${d.length>200?' — first 200':''})`);
   g('rptDetailTable').innerHTML=det.map(r=>`<tr>
     <td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);white-space:nowrap"><b>${r.report_number||'—'}</b></td>
     <td style="padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px;color:var(--muted)">${r.report_title||'—'}</td>
@@ -5484,7 +5509,7 @@ function generateReport(){
 }
 
 function exportPDF(){
-  if(!curUser||curUser.role!=='admin'){toast('Chỉ admin mới có quyền xuất báo cáo','err');return;}
+  if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
   if(!rptData.length){toast('No data to export','err');return;}
   const {jsPDF}=window.jspdf;
   setOv(true,'Generating PDF...','Please wait');
@@ -5713,9 +5738,9 @@ function exportPDF(){
 }
 
 function exportExcel(){
-  if(!curUser||curUser.role!=='admin'){toast('Chỉ admin mới có quyền xuất báo cáo','err');return;}
-  if(!rptData.length){toast('Không có data','err');return;}
-  setOv(true,'Đang tạo Excel...','');
+  if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
+  if(!rptData.length){toast('No data','err');return;}
+  setOv(true,'Generating Excel...','');
   try{
     const wb=XLSX.utils.book_new(), d=rptData, total=d.length;
     const open=d.filter(r=>r.semantic_status==='Open').length, ov=d.filter(r=>r.semantic_status==='Overdue').length;
@@ -5754,7 +5779,7 @@ async function loadUsers() {
     // Use innerHTML directly — all user data is run through esc() so no XSS risk.
     // safeHTML/DOMPurify can misparse table fragments (tr/td without a parent table).
     g('userBody').innerHTML=(data||[]).length===0
-      ?'<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">Không có user</td></tr>'
+      ?'<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">No users</td></tr>'
       :data.map(u=>`<tr>
         <td><b>${esc(u.full_name)}</b></td>
         <td style="color:var(--muted)">${esc(u.email)}</td>
@@ -5787,7 +5812,7 @@ async function makeAdmin(id){
 const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',ecar:'ECAR Detail',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management',querybuilder:'Query Builder',mydashboard:'My Dashboard'};
 function showPage(name,btn){
   if((name==='reports'||name==='admin'||name==='querybuilder'||name==='mydashboard')&&(!curUser||curUser.role!=='admin')){
-    toast('Bạn không có quyền truy cập trang này','err');return;
+    toast('You do not have permission to access this page','err');return;
   }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -5803,6 +5828,7 @@ function showPage(name,btn){
   if(name==='cmrcar'){ if(!cmrLoaded) loadCmr(); else renderCmr(); }
   if(name==='ecar'){ if(!ecarLoaded) loadEcar(); else renderEcar(); }
   if(name==='kpi'){ filterKpiYear(); }
+  if(name==='overdue'){ renderOv(); }
   if(name==='overview'){
     setTimeout(()=>{
       Object.values(charts).forEach(c=>{ try{c.resize()}catch(e){} });
@@ -5816,12 +5842,12 @@ function showPage(name,btn){
 function fd(d){
   if(!d)return'—';
   try{
-    // Nếu d chỉ có phần date (yyyy-mm-dd), parse UTC để tránh bị lệch 1 ngày do timezone
+    // Nếu d chỉ có phần date (yyyy-mm-dd), parse UTC để tránh bị lệch 1 days do timezone
     if(/^\d{4}-\d{2}-\d{2}$/.test(d)){
       const [y,m,dy]=d.split('-').map(Number);
       return new Date(Date.UTC(y,m-1,dy)).toLocaleDateString('en-GB');
     }
-    // Nếu có datetime (có T hoặc space), lấy phần date UTC để tránh UTC+7 làm lệch ngày
+    // Nếu có datetime (có T hoặc space), lấy phần date UTC để tránh UTC+7 làm lệch days
     if(d.includes('T')||d.includes(' ')){
       const dt=new Date(d);
       return new Date(Date.UTC(dt.getUTCFullYear(),dt.getUTCMonth(),dt.getUTCDate())).toLocaleDateString('en-GB');
@@ -5835,12 +5861,12 @@ function ageDis(ageing,status){
   if(ageing===null||ageing===undefined)return'—';
   const DONE=['On-time Closed','Lately Closed','Closed'];
   if(DONE.includes(status))return'<span style="color:var(--muted);font-size:11px">Closed</span>';
-  if(ageing>30) return`<span class="a-ok">+${ageing}d còn lại</span>`;
-  if(ageing>0)  return`<span class="a-warn">+${ageing}d còn lại</span>`;
-  if(ageing===0)return`<span class="a-warn">Hôm nay</span>`;
-  if(ageing>=-30)return`<span class="a-warn">${ageing}d quá hạn</span>`;
-  if(ageing>=-60)return`<span class="a-bad">${ageing}d quá hạn</span>`;
-  return`<span class="a-crit">${ageing}d quá hạn</span>`;
+  if(ageing>30) return`<span class="a-ok">+${ageing}d remaining</span>`;
+  if(ageing>0)  return`<span class="a-warn">+${ageing}d remaining</span>`;
+  if(ageing===0)return`<span class="a-warn">Today</span>`;
+  if(ageing>=-30)return`<span class="a-warn">${ageing}d overdue</span>`;
+  if(ageing>=-60)return`<span class="a-bad">${ageing}d overdue</span>`;
+  return`<span class="a-crit">${ageing}d overdue</span>`;
 }
 
 function sBadge(s_){
@@ -5925,7 +5951,7 @@ async function loadDocuments(force=false) {
     buildDocTypeTree();
     countDocsPerType();
     cacheSave();
-    toast(`✓ ${docData.length} tài liệu, ${docTypeFlat.length} loại`,'ok');
+    toast(`✓ ${docData.length} documents, ${docTypeFlat.length} types`,'ok');
     renderDocTree();
     populateDocFilters();
     renderDocKpi();
@@ -5943,7 +5969,7 @@ let docActiveType   = '';
 let docGroupFilter  = '';            // giá trị dropdown nhóm
 let docCollapsedTypes = new Set();
 
-// Thứ tự hiển thị khi "Tất cả nhóm"
+// Thứ tự hiển thị khi "All groups"
 const DOC_GROUP_ORDER = [
   'AOC / OpsSpec / FAOC',
   'Approved Maintenance Organization',
@@ -6053,7 +6079,7 @@ function getDocGroupForType(rawType) {
          'Dangerous Goods', 'Dangerous Goods Regulations',
          'IOSA Documentation', 'Transport Security Program',
          'Corporate Emergency Response Plan', 'CAAC',
-         'VATM - Kế hoạch', 'CAAT AMO Certificate', 'DCAL AMO Certificates',
+         'VATM - Scheduled', 'CAAT AMO Certificate', 'DCAL AMO Certificates',
          'DGCA AMO Certificate', 'CAAV AMO Certificate', 'CAAV Caplist',
          'MOT (Bộ GTVT)'))
     return 'External';
@@ -6081,7 +6107,7 @@ function docToggleGroup(type) {
   });
 }
 
-// Mở tất cả groups
+// Expand all groups
 function docExpandAll() {
   docCollapsedTypes.clear();
   document.querySelectorAll('#docGrouped .doc-group').forEach(grp => {
@@ -6092,7 +6118,7 @@ function docExpandAll() {
   });
 }
 
-// Thu gọn tất cả groups
+// Collapse all groups
 function docCollapseAll() {
   document.querySelectorAll('#docGrouped .doc-group').forEach(grp => {
     const type = grp.dataset.grpkey;
@@ -6107,81 +6133,6 @@ function docCollapseAll() {
 // Render accordion documents.
 // - docGroupFilter === '' → group theo DOC_GROUP_ORDER (10 nhóm lớn)
 // - docGroupFilter !== '' → group theo document_type (sub-types trong nhóm đó)
-function renderDocGrouped(data) {
-  const el = g('docGrouped');
-  if (!el) return;
-  if (!data.length) {
-    el.innerHTML = '<div style="text-align:center;padding:48px 20px;color:var(--muted)">📭 Không có tài liệu nào phù hợp</div>';
-    return;
-  }
-
-  const bySubType = !!docGroupFilter; // true = đang xem 1 nhóm cụ thể
-  const groups = {};
-
-  if (bySubType) {
-    // Sub-group by document_type
-    data.forEach(r => {
-      const key = (r.document_type || '').trim() || '(Không phân loại)';
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(r);
-    });
-  } else {
-    // Group by predefined mapping
-    data.forEach(r => {
-      const key = getDocGroupForType(r.document_type);
-      if (!key) return; // skip unmapped types
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(r);
-    });
-  }
-
-  // Sắp xếp keys: predefined order (top-level) hoặc alphabetical (sub-type)
-  let groupKeys;
-  if (bySubType) {
-    groupKeys = Object.keys(groups).filter(k => k && k !== 'null').sort();
-  } else {
-    groupKeys = DOC_GROUP_ORDER.filter(k => groups[k]);
-    // Không thêm keys ngoài DOC_GROUP_ORDER — bỏ null và unmapped
-  }
-
-  let html = '';
-  groupKeys.forEach(groupKey => {
-    const rows = groups[groupKey] || [];
-    if (!rows.length) return;
-    const isOpen    = !docCollapsedTypes.has(groupKey);
-    const icon      = bySubType ? '📄' : (DOC_GROUP_ICONS[groupKey] || '📂');
-    const showType  = !bySubType; // cột Document Type chỉ hiện khi xem "Tất cả nhóm"
-
-    const rowsHtml = rows.map(r => `<tr>
-      <td><b>${esc(r.document_number)||'—'}</b></td>
-      <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.document_revision_title)||'—'}</td>
-      ${showType?`<td style="color:var(--muted);font-size:10px;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis">${esc((r.document_type||'').trim())||'—'}</td>`:''}
-      <td style="color:var(--muted)">${esc(r.revision_number)||'—'}</td>
-      <td>${docStatBadge(r.document_revision_status)}</td>
-      <td style="color:var(--muted)">${esc(r.owner_name)||'—'}</td>
-      <td style="color:var(--muted)">${fd(r.valid_from)}</td>
-      <td style="text-align:center">${r.has_been_distributed===true?'<span style="color:var(--green)">✅</span>':'<span style="color:var(--muted)">—</span>'}</td>
-      <td><button class="btn-sm" onclick="showDocDetail('${esc(r.document_revision_id)}','${esc(r.document_number||'')}','${esc((r.document_revision_title||'').replace(/'/g,''))}','${r.valid_from||''}')">Chi tiết</button></td>
-    </tr>`).join('');
-
-    const th = showType
-      ? '<th>Số hiệu</th><th>Tiêu đề tài liệu</th><th>Document Type</th><th>Rev</th><th>Trạng thái</th><th>Owner</th><th>Hiệu lực từ</th><th>Phát hành</th><th></th>'
-      : '<th>Số hiệu</th><th>Tiêu đề tài liệu</th><th>Rev</th><th>Trạng thái</th><th>Owner</th><th>Hiệu lực từ</th><th>Phát hành</th><th></th>';
-
-    html += `<div class="doc-group" data-grpkey="${esc(groupKey)}">
-      <div class="doc-group-hdr" onclick="docToggleGroup(this.closest('.doc-group').dataset.grpkey)">
-        <span class="doc-group-arrow ${isOpen?'open':''}">▶</span>
-        <span class="doc-group-name">${icon} ${esc(groupKey)}</span>
-        <span class="doc-group-cnt">${rows.length} tài liệu</span>
-      </div>
-      <div class="doc-group-body" style="${isOpen?'':'display:none'}">
-        <table><thead><tr>${th}</tr></thead><tbody>${rowsHtml}</tbody></table>
-      </div>
-    </div>`;
-  });
-
-  el.innerHTML = html || '<div style="text-align:center;padding:48px 20px;color:var(--muted)">📭 Không có tài liệu nào</div>';
-}
 
 function renderDocPage() {
   if(!docData.length) return;
@@ -6202,7 +6153,7 @@ function renderDocPage() {
   });
   const tbody = g('docTableBody');
   if(!rows.length){
-    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted)">Không có tài liệu phù hợp</td></tr>';
+    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted)">No matching documents</td></tr>';
     return;
   }
   tbody.innerHTML = rows.map(d=>{
@@ -6213,61 +6164,21 @@ function renderDocPage() {
       ? `<span class="badge b-on">Active</span>`
       : `<span class="badge b-off">${esc(d.document_revision_status||'—')}</span>`;
     return `<tr>
-      <td>${esc(d.document_number||'—')}</td>
-      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(d.document_revision_title||'')}">${esc(d.document_revision_title||'—')}</td>
-      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(node?node.path||node.title:'')}">${esc(pathDisplay)}</td>
+      <td title="${esc(d.document_number||'')}">${esc(d.document_number||'—')}</td>
+      <td title="${esc(d.document_revision_title||'')}">${esc(d.document_revision_title||'—')}</td>
+      <td title="${esc(node?node.path||node.title:'')}">${esc(pathDisplay)}</td>
       <td>${esc(d.revision_number||'—')}</td>
       <td>${stBadge}</td>
-      <td style="white-space:nowrap">${esc(d.owner_name||'—')}</td>
-      <td style="white-space:nowrap">${fd(d.review_date)}${reviewBadge}</td>
+      <td>${esc(d.owner_name||'—')}</td>
+      <td>${fd(d.review_date)}${reviewBadge}</td>
       <td style="text-align:center">${d.has_been_distributed?'✅':'—'}</td>
-      <td><button class="btn-mini" onclick="showDocDetail('${d.document_revision_id}','${esc(d.document_number||'')}','${esc((d.document_revision_title||'').replace(/'/g,"\\'"))}','${d.valid_from||''}')">👁 Chi tiết</button></td>
+      <td><button class="btn-mini" onclick="showDocDetail('${d.document_revision_id}','${esc(d.document_number||'')}','${esc((d.document_revision_title||'').replace(/'/g,"\\'"))}','${d.valid_from||''}')">Details</button></td>
     </tr>`;
   }).join('');
 }
 
-function buildDocCharts(data) {
-  // Chart 1: by type (horizontal bar, top 10)
-  const typeMap = {};
-  data.forEach(r=>{ const t=r.document_type||'?'; typeMap[t]=(typeMap[t]||0)+1; });
-  const typeEntries = Object.entries(typeMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
-  dc('cDocType');
-  if(g('cDocType')) charts['cDocType']=new Chart(g('cDocType'),{type:'bar',
-    data:{labels:typeEntries.map(e=>e[0].trim()),datasets:[{data:typeEntries.map(e=>e[1]),backgroundColor:'#58A6FF',borderRadius:3}]},
-    options:{...CO,indexAxis:'y',plugins:{legend:{display:false}},scales:{
-      x:{ticks:{color:'#8B949E',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}},
-      y:{ticks:{color:'#8B949E',font:{size:9},
-            callback:function(v){const l=this.getLabelForValue(v);return l&&l.length>24?l.slice(0,24)+'…':l||v;}},
-         grid:{display:false}}}}});
 
-  // Chart 2: by year (vertical bar)
-  const yearMap = {};
-  data.forEach(r=>{ if(!r.created_date)return; const y=new Date(r.created_date).getFullYear(); yearMap[y]=(yearMap[y]||0)+1; });
-  const yKeys = Object.keys(yearMap).sort();
-  dc('cDocYear');
-  if(g('cDocYear')) charts['cDocYear']=new Chart(g('cDocYear'),{type:'bar',
-    data:{labels:yKeys,datasets:[{label:'Documents',data:yKeys.map(k=>yearMap[k]),backgroundColor:'#3FB950',borderRadius:3}]},
-    options:{...CO,plugins:{legend:{display:false}},scales:{
-      x:{ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
-      y:{ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}}}}});
-}
 
-function docStatBadge(st) {
-  if(!st) return '<span style="color:var(--muted)">—</span>';
-  if(st==='Active') return `<span style="background:rgba(63,185,80,.15);color:var(--green);padding:2px 8px;border-radius:4px;font-size:11px">Active</span>`;
-  return `<span style="background:rgba(139,148,158,.15);color:var(--muted);padding:2px 8px;border-radius:4px;font-size:11px">${esc(st)}</span>`;
-}
-
-function docDelivBadge(ds) {
-  if(!ds) return '<span style="color:var(--muted)">—</span>';
-  const m = {
-    'completed early': `<span style="background:rgba(63,185,80,.15);color:var(--green);padding:2px 8px;border-radius:4px;font-size:11px">✅ Đúng hạn</span>`,
-    'completed late':  `<span style="background:rgba(210,153,34,.15);color:var(--yellow);padding:2px 8px;border-radius:4px;font-size:11px">⚠️ Trễ</span>`,
-    'in progress':     `<span style="background:rgba(88,166,255,.15);color:var(--blue);padding:2px 8px;border-radius:4px;font-size:11px">🔵 In Progress</span>`,
-    'overdue':         `<span style="background:rgba(255,107,107,.15);color:#ff6b6b;padding:2px 8px;border-radius:4px;font-size:11px">🔴 Quá hạn</span>`,
-  };
-  return m[ds.toLowerCase()] || `<span style="color:var(--muted);font-size:11px">${esc(ds)}</span>`;
-}
 
 function docSort(col) {
   TS.docs.asc = TS.docs.sort===col ? !TS.docs.asc : false;
@@ -6311,7 +6222,7 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
     g('docTaskLoading').style.display='none';
 
     if(!tasks.length) {
-      g('docTaskBody').innerHTML='<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Không có copyholder nào</td></tr>';
+      g('docTaskBody').innerHTML='<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">No copyholders</td></tr>';
       s('dtk-total',0); s('dtk-done',0); s('dtk-late',0); s('dtk-over',0);
       return;
     }
@@ -6337,9 +6248,9 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
           status = 'ontime'; // completed nhưng không có due date → coi là on time
         }
       } else if (rawSt === 'overdue') {
-        status = 'overdue'; // chưa complete + quá hạn
+        status = 'overdue'; // chưa complete + overdue
       } else {
-        status = 'inprogress'; // chưa complete, chưa quá hạn
+        status = 'inprogress'; // chưa complete, chưa overdue
       }
 
       if(status==='ontime')    onTimeCnt++;
@@ -6348,9 +6259,9 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
       else inProgCnt++;
 
       const badge = {
-        ontime:     `<span style="background:rgba(63,185,80,.15);color:var(--green);padding:2px 8px;border-radius:4px;font-size:11px">✅ Đúng hạn</span>`,
-        late:       `<span style="background:rgba(210,153,34,.15);color:var(--yellow);padding:2px 8px;border-radius:4px;font-size:11px">⚠️ Trễ</span>`,
-        overdue:    `<span style="background:rgba(255,107,107,.15);color:#ff6b6b;padding:2px 8px;border-radius:4px;font-size:11px">🔴 Quá hạn</span>`,
+        ontime:     `<span style="background:rgba(63,185,80,.15);color:var(--green);padding:2px 8px;border-radius:4px;font-size:11px">✅ On time</span>`,
+        late:       `<span style="background:rgba(210,153,34,.15);color:var(--yellow);padding:2px 8px;border-radius:4px;font-size:11px">⚠️ Late</span>`,
+        overdue:    `<span style="background:rgba(255,107,107,.15);color:#ff6b6b;padding:2px 8px;border-radius:4px;font-size:11px">🔴 Overdue</span>`,
         inprogress: `<span style="background:rgba(88,166,255,.15);color:var(--blue);padding:2px 8px;border-radius:4px;font-size:11px">🔵 In Progress</span>`,
       }[status];
 
@@ -6417,7 +6328,7 @@ function renderDocTree(){
   if(g('treeTotalDocs'))g('treeTotalDocs').textContent=(docData.length).toLocaleString('vi-VN');
   let html=`<div class="tree-node${selectedTypeId===null?' selected':''}" onclick="selectTreeNode(null)" style="padding-left:12px">
     <span class="tree-toggle empty"></span>
-    <span class="tree-title">📁 Tất cả tài liệu</span>
+    <span class="tree-title">📁 All documents</span>
     <span class="tree-count">${docData.length}</span>
   </div>`;
   docTypeTree.forEach(node=>{html+=renderTreeNode(node,0);});
@@ -6449,11 +6360,11 @@ function selectTreeNode(typeId){
 }
 function updateDocBreadcrumb(){
   const bc=g('docBreadcrumb');if(!bc)return;
-  if(!selectedTypeId){bc.innerHTML='Tất cả tài liệu';return;}
+  if(!selectedTypeId){bc.innerHTML='All documents';return;}
   const node=docTypeIndex[selectedTypeId];if(!node){bc.innerHTML='—';return;}
   const parts=(node.path||node.title).split(' | ').map(p=>p.trim());
   bc.innerHTML=parts.map((p,i)=>i===parts.length-1?`<span class="crumb-active">${esc(p)}</span>`:esc(p)).join(' › ')
-    +` <span style="color:var(--muted)">(${node.doc_count} tài liệu)</span>`;
+    +` <span style="color:var(--muted)">(${node.doc_count} documents)</span>`;
 }
 function expandAllTree(){Object.keys(docTypeIndex).forEach(id=>expandedTreeNodes.add(id));renderDocTree();}
 function collapseAllTree(){expandedTreeNodes.clear();renderDocTree();}
@@ -6478,7 +6389,7 @@ function selectMyDepartment(){
   const allowed=new Set(ids);
   const filtered=docData.filter(d=>allowed.has(d.type_id));
   const tbody=g('docTableBody');
-  if(!filtered.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted)">Không có tài liệu phù hợp</td></tr>';return;}
+  if(!filtered.length){tbody.innerHTML='<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--muted)">No matching documents</td></tr>';return;}
   const today=new Date();
   tbody.innerHTML=filtered.map(d=>{
     const node=docTypeIndex[d.type_id];
@@ -6492,7 +6403,7 @@ function selectMyDepartment(){
       <td>${esc(d.owner_name||'—')}</td>
       <td>${fd(d.review_date)}${renderReviewBadge(d.review_date,today)}</td>
       <td style="text-align:center">${d.has_been_distributed?'✅':'—'}</td>
-      <td><button class="btn-mini" onclick="showDocDetail('${d.document_revision_id}','${esc(d.document_number||'')}','${esc((d.document_revision_title||'').replace(/'/g,"\\'"))}','${d.valid_from||''}')">👁 Chi tiết</button></td>
+      <td><button class="btn-mini" onclick="showDocDetail('${d.document_revision_id}','${esc(d.document_number||'')}','${esc((d.document_revision_title||'').replace(/'/g,"\\'"))}','${d.valid_from||''}')">👁 Details</button></td>
     </tr>`;
   }).join('');
   const bc=g('docBreadcrumb');if(bc)bc.innerHTML='<span class="crumb-active">⭐ My Department · MQA + SQA</span>';
@@ -6507,10 +6418,10 @@ function populateDocFilters(){
   const docs=getDocsInBranch(selectedTypeId);
   const years=[...new Set(docs.map(d=>(d.created_date||'').slice(0,4)).filter(Boolean))].sort().reverse();
   const yrSel=g('docYearFilter');
-  if(yrSel)yrSel.innerHTML='<option value="">Tất cả năm</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  if(yrSel)yrSel.innerHTML='<option value="">All years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
   const owners=[...new Set(docs.map(d=>d.owner_name).filter(Boolean))].sort();
   const ownSel=g('docOwnerFilter');
-  if(ownSel)ownSel.innerHTML='<option value="">Tất cả owner</option>'+owners.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('');
+  if(ownSel)ownSel.innerHTML='<option value="">All owners</option>'+owners.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('');
 }
 function renderDocKpi(){
   const kpiRow=g('docKpiRow');if(!kpiRow)return;
@@ -6524,7 +6435,7 @@ function renderDocKpi(){
   const owners=new Set(docs.map(d=>d.owner_name).filter(Boolean)).size;
   const types=new Set(docs.map(d=>d.type_id).filter(Boolean)).size;
   const card=(label,val,color)=>`<div class="doc-kpi-card"><div class="kpi-lbl">${label}</div><div class="kpi-val"${color?` style="color:${color}"`:''}>${val.toLocaleString('vi-VN')}</div></div>`;
-  kpiRow.innerHTML=card('Tổng tài liệu',total,'var(--blue)')+card('Active',active,'var(--green)')+card('Đã phân phối',distributed,'var(--blue)')+card('Review quá hạn',revOverdue,'#ff6b6b')+card('Review ≤ 30d',rev30d,'#e67e22')+card('Owner',owners,'')+card('Số loại',types,'');
+  kpiRow.innerHTML=card('Total documents',total,'var(--blue)')+card('Active',active,'var(--green)')+card('Distributed',distributed,'var(--blue)')+card('Review overdue',revOverdue,'#ff6b6b')+card('Review ≤ 30d',rev30d,'#e67e22')+card('Owner',owners,'')+card('Types',types,'');
 }
 function reviewDueCategory(reviewDate,today){
   if(!reviewDate)return'ok';
@@ -6534,7 +6445,7 @@ function reviewDueCategory(reviewDate,today){
 function renderReviewBadge(reviewDate,today){
   if(!reviewDate)return'';
   const cat=reviewDueCategory(reviewDate,today);
-  if(cat==='overdue')return` <span class="badge badge-review-overdue" style="font-size:10px">🔴 Quá hạn</span>`;
+  if(cat==='overdue')return` <span class="badge badge-review-overdue" style="font-size:10px">🔴 Overdue</span>`;
   if(cat==='30d')return` <span class="badge badge-review-30d" style="font-size:10px">🟠 ≤30d</span>`;
   if(cat==='90d')return` <span class="badge badge-review-90d" style="font-size:10px">🟡 ≤90d</span>`;
   return'';
@@ -6563,13 +6474,13 @@ async function loadDocWorkflow(revId){
     renderDocWorkflow(raw);
   }catch(e){
     if(loading)loading.style.display='none';
-    if(body)body.innerHTML='<div style="color:var(--muted);padding:16px;text-align:center">Không tải được workflow.</div>';
+    if(body)body.innerHTML='<div style="color:var(--muted);padding:16px;text-align:center">Could not load workflow.</div>';
     console.error('[DocWorkflow]',e);
   }
 }
 function renderDocWorkflow(rows){
   const body=g('docWorkflowBody');if(!body)return;
-  if(!rows.length){body.innerHTML='<div style="color:var(--muted);padding:16px;text-align:center">Không có workflow nào.</div>';return;}
+  if(!rows.length){body.innerHTML='<div style="color:var(--muted);padding:16px;text-align:center">No workflows.</div>';return;}
   const stageMap={};
   rows.forEach(r=>{
     if(!stageMap[r.stage_id]){
@@ -6584,10 +6495,10 @@ function renderDocWorkflow(rows){
       <div class="stage-head"><div>${esc(st.stage_title||st.stage_type||'—')} <span style="color:var(--muted);font-weight:normal;font-size:11px">· ${esc(st.workflow_title||'')}</span></div><span class="badge">${esc(st.stage_status||'—')}</span></div>
       <div class="stage-meta">
         <div>Type: <b>${esc(st.stage_type||'—')}</b></div>
-        <div>Response: <b>${st.acceptable_response_time!=null?st.acceptable_response_time+' ngày':'—'}</b></div>
-        <div>Bắt đầu: ${fd(st.stage_started_date)}</div>
-        <div>Hạn: ${fd(st.stage_target_date)}</div>
-        <div>Hoàn thành: ${fd(st.stage_completed_date)}</div>
+        <div>Response: <b>${st.acceptable_response_time!=null?st.acceptable_response_time+' days':'—'}</b></div>
+        <div>Start: ${fd(st.stage_started_date)}</div>
+        <div>Due: ${fd(st.stage_target_date)}</div>
+        <div>Completed: ${fd(st.stage_completed_date)}</div>
         <div>By: ${esc(st.stage_completed_by||'—')}</div>
         <div style="grid-column:1/-1">Tasks: <b>${st.tasks.length}</b></div>
       </div>
@@ -6646,14 +6557,14 @@ const QB_TABLES = {
 
 const QB_OPS = ['eq','ne','lt','le','gt','ge','contains','year'];
 const QB_OPS_LABEL = {
-  eq:       '= bằng',
-  ne:       '≠ khác',
-  lt:       '< nhỏ hơn',
-  le:       '≤ nhỏ hơn hoặc bằng',
-  gt:       '> lớn hơn',
-  ge:       '≥ lớn hơn hoặc bằng',
-  contains: '⊃ chứa (contains)',
-  year:     '📅 Năm bằng'
+  eq:       '= equals',
+  ne:       '≠ not equal',
+  lt:       '< less than',
+  le:       '≤ less or equal',
+  gt:       '> greater than',
+  ge:       '≥ greater or equal',
+  contains: '⊃ contains',
+  year:     '📅 Year equals'
 };
 
 // Quan hệ join được định nghĩa sẵn giữa các bảng
@@ -6693,7 +6604,7 @@ function qbInit() {
   qbInited = true;
   const sel = g('qbPrimaryTable');
   if(!sel) return;
-  safeHTML(sel, '<option value="">— Chọn bảng chính —</option>' +
+  safeHTML(sel, '<option value="">— Select primary table —</option>' +
     Object.entries(QB_TABLES).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join(''));
 }
 
@@ -6713,8 +6624,8 @@ function qbSetPrimary(tbl) {
   qbShowOrgUnitPanel(tbl);
   const lbl = QB_TABLES[tbl]?.label || '';
   safeHTML(g('qbResultBody'), tbl
-    ? `<div class="qb-empty">Bảng chính: <b style="color:var(--blue)">${lbl}</b><br><br>Tick fields → Add Join Table → <b>Chạy Query</b></div>`
-    : '<div class="qb-empty">🔬<br><br>Chọn bảng chính → tick fields → thêm Join → <b>Chạy Query</b></div>');
+    ? `<div class="qb-empty">Primary table: <b style="color:var(--blue)">${lbl}</b><br><br>Tick fields → Add Join Table → <b>Run Query</b></div>`
+    : '<div class="qb-empty">🔬<br><br>Pick a primary table → check fields → add a join → <b>Run Query</b></div>');
 }
 
 function qbRenderPrimaryFields() {
@@ -6722,7 +6633,7 @@ function qbRenderPrimaryFields() {
   const container = g('qbPrimaryFields');
   if(!container) return;
   if(!tbl) {
-    container.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px">Chọn bảng trước</div>';
+    container.innerHTML = '<div style="font-size:11px;color:var(--muted);padding:4px">Select a table first</div>';
     return;
   }
   const fields = QB_TABLES[tbl].fields;
@@ -6760,7 +6671,7 @@ function qbCheckPrimary(val) {
 
 // ── JOIN TABLES ───────────────────────────────────────────────────────────
 function qbAddJoin() {
-  if(!qbState.primary.table){toast('Chọn bảng chính trước','err');return;}
+  if(!qbState.primary.table){toast('Select a primary table first','err');return;}
   qbState.joins.push({ id:Date.now(), table:null, primaryKey:'', foreignKey:'', fields:[] });
   qbRenderJoins();
 }
@@ -6802,7 +6713,7 @@ function qbRenderJoins() {
     dot.style.cssText='width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0';
     const sel=document.createElement('select');
     sel.style.cssText='flex:1;background:var(--card2);border:1px solid var(--border);border-radius:5px;color:var(--text);padding:4px 6px;font-size:11px;outline:none';
-    safeHTML(sel,'<option value="">— Chọn bảng join —</option>'+
+    safeHTML(sel,'<option value="">— Select join table —</option>'+
       Object.entries(QB_TABLES).filter(([k])=>k!==primaryTbl)
         .map(([k,v])=>`<option value="${k}"${join.table===k?' selected':''}>${v.label}</option>`).join(''));
     sel.addEventListener('change',()=>qbSetJoinTable(join.id,sel.value));
@@ -6841,7 +6752,7 @@ function qbRenderJoins() {
       fHead.style.cssText='display:flex;align-items:center;justify-content:space-between;margin-bottom:5px';
       const fLbl=document.createElement('span');
       fLbl.style.cssText='font-size:10px;color:var(--muted)';
-      fLbl.textContent='Fields từ '+QB_TABLES[join.table].label+':';
+      fLbl.textContent='Fields from '+QB_TABLES[join.table].label+':';
       const btnWrap=document.createElement('div'); btnWrap.style.cssText='display:flex;gap:4px';
       const allBtn=document.createElement('button');
       allBtn.style.cssText='font-size:10px;color:var(--green);background:none;border:none;cursor:pointer;padding:0';
@@ -6883,9 +6794,9 @@ function qbShowOrgUnitPanel(tbl) {
   if(hasOrgUnit) {
     qbOrgUnit = '';
     const sel = g('qbOrgUnitSel');
-    if(sel) { sel.innerHTML = '<option value="">— Tất cả Org Unit —</option>'; sel.value = ''; }
+    if(sel) { sel.innerHTML = '<option value="">— All Org Units —</option>'; sel.value = ''; }
     const status = g('qbOrgUnitStatus');
-    if(status) status.textContent = '⏳ Đang tải danh sách...';
+    if(status) status.textContent = '⏳ Loading list...';
     qbLoadOrgUnits(tbl);
   }
 }
@@ -6899,12 +6810,12 @@ async function qbLoadOrgUnits(tbl) {
     const units = [...new Set(data.map(r => r.org_unit_name).filter(Boolean))].sort();
     const sel = g('qbOrgUnitSel');
     if(!sel) return;
-    sel.innerHTML = '<option value="">— Tất cả Org Unit —</option>' +
+    sel.innerHTML = '<option value="">— All Org Units —</option>' +
       units.map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join('');
     sel.value = qbOrgUnit;
     if(status) status.textContent = `${units.length} org units`;
   } catch(e) {
-    if(status) status.textContent = '❌ Không tải được';
+    if(status) status.textContent = '❌ Load failed';
   }
 }
 
@@ -6927,16 +6838,16 @@ function qbRenderFilters() {
     const selOp=document.createElement('select');
     const isDate=f.field.includes('date');
     QB_OPS.forEach(op=>{
-      if(op==='year'&&!isDate) return; // chỉ hiện "Năm bằng" cho date field
+      if(op==='year'&&!isDate) return; // chỉ hiện "Year equals" cho date field
       const opt=document.createElement('option');
       opt.value=op; opt.textContent=QB_OPS_LABEL[op]||op;
       if(f.op===op) opt.selected=true;
       selOp.appendChild(opt);
     });
     const updateInpHint=()=>{
-      if(selOp.value==='year'){inp.placeholder='Nhập năm, vd: 2025';inp.type='number';inp.min='2000';inp.max='2099';}
+      if(selOp.value==='year'){inp.placeholder='Enter a year, e.g. 2025';inp.type='number';inp.min='2000';inp.max='2099';}
       else if(f.field.includes('date')){inp.placeholder='vd: 2025-01-31';inp.type='text';}
-      else{inp.placeholder='Giá trị...';inp.type='text';}
+      else{inp.placeholder='Value...';inp.type='text';}
     };
     selOp.addEventListener('change',()=>{qbState.filters[i].op=selOp.value;qbUpdateNodeMeter();updateInpHint();});
     const inp=document.createElement('input'); inp.value=f.value; inp.style.flex='1.2';
@@ -6964,18 +6875,18 @@ function qbUpdateNodeMeter() {
 
 function qbUpdateSortField() {
   const tbl=qbState.primary.table; const sf=g('qbSortField'); if(!sf) return;
-  safeHTML(sf,'<option value="">— Không sort —</option>'+(tbl?QB_TABLES[tbl].fields.map(f=>`<option value="${f}">${f}</option>`).join(''):''));
+  safeHTML(sf,'<option value="">— No sort —</option>'+(tbl?QB_TABLES[tbl].fields.map(f=>`<option value="${f}">${f}</option>`).join(''):''));
 }
 
 // ── RUN: fetch primary + all joins, merge client-side ─────────────────────
 async function qbRun() {
   if(!curUser||curUser.role!=='admin'){toast('Admin only','err');return;}
   const primaryTbl=qbState.primary.table;
-  if(!primaryTbl){toast('Chọn bảng chính trước','err');return;}
-  if(!qbState.primary.fields.length){toast('Chọn ít nhất 1 field từ bảng chính','err');return;}
+  if(!primaryTbl){toast('Select a primary table first','err');return;}
+  if(!qbState.primary.fields.length){toast('Select at least one field from the primary table','err');return;}
 
-  const btn=g('qbRunBtn'); btn.disabled=true; btn.textContent='⏳ Đang chạy...';
-  safeHTML(g('qbResultBody'),'<div class="qb-empty" style="color:var(--muted)">⏳ Đang tải dữ liệu...</div>');
+  const btn=g('qbRunBtn'); btn.disabled=true; btn.textContent='⏳ Running...';
+  safeHTML(g('qbResultBody'),'<div class="qb-empty" style="color:var(--muted)">⏳ Loading data...</div>');
   g('qbChartWrap').style.display='none';
 
   try {
@@ -7060,14 +6971,14 @@ async function qbRun() {
 
     const cx=g('qbChartX'); const cy=g('qbChartY');
     if(cx) safeHTML(cx,displayFields.map(f=>`<option value="${f}">${f}</option>`).join(''));
-    if(cy) safeHTML(cy,'<option value="__count__">Count (đếm)</option>'+displayFields.filter(f=>!f.includes('id')&&!f.includes('date')).map(f=>`<option value="${f}">${f}</option>`).join(''));
+    if(cy) safeHTML(cy,'<option value="__count__">Count</option>'+displayFields.filter(f=>!f.includes('id')&&!f.includes('date')).map(f=>`<option value="${f}">${f}</option>`).join(''));
 
     qbRenderResult();
   } catch(e){
-    toast('Lỗi: '+e.message,'err');
-    safeHTML(g('qbResultBody'),'<div class="qb-empty" style="color:#f85149">❌ Lỗi: '+esc(e.message)+'</div>');
+    toast('Error: '+e.message,'err');
+    safeHTML(g('qbResultBody'),'<div class="qb-empty" style="color:#f85149">❌ Error: '+esc(e.message)+'</div>');
   } finally {
-    btn.disabled=false; btn.textContent='▶ Chạy Query';
+    btn.disabled=false; btn.textContent='▶ Run Query';
   }
 }
 
@@ -7088,7 +6999,7 @@ function qbRenderResult() {
 
   if(!data.length) {
     chartWrap.style.display='none';
-    safeHTML(body,'<div class="qb-empty">Không có dữ liệu</div>');
+    safeHTML(body,'<div class="qb-empty">No data</div>');
     return;
   }
 
@@ -7098,7 +7009,7 @@ function qbRenderResult() {
     safeHTML(body,`<div style="padding:14px">
       <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:600">OData Query URL (qua proxy)</div>
       <div class="qb-sql-box">${esc(qbState.lastUrl||'')}${esc(qbState.lastFilterNote||'')}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:8px">Tip: Copy URL này vào browser để xem raw JSON từ Galileo API</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:8px">Tip: paste this URL into a browser to view the raw JSON from the Galileo API</div>
     </div>`);
     return;
   }
@@ -7114,7 +7025,7 @@ function qbRenderResult() {
   chartWrap.style.display='none';
   body.style.display='';
   safeHTML(body, `<table class="qb-tbl">
-    <thead><tr>${fields.map(f=>`<th onclick="qbSortLocal('${f}')" title="Click để sort">${f} <span style="opacity:.4;font-size:9px">↕</span></th>`).join('')}</tr></thead>
+    <thead><tr>${fields.map(f=>`<th onclick="qbSortLocal('${f}')" title="Click to sort">${f} <span style="opacity:.4;font-size:9px">↕</span></th>`).join('')}</tr></thead>
     <tbody>${data.map(row=>
       '<tr>'+fields.map(f=>{
         const v = row[f];
@@ -7179,21 +7090,21 @@ function qbRenderChart() {
 function qbExportExcel() {
   if(!curUser||curUser.role!=='admin'){toast('Admin only','err');return;}
   const data = qbState.results;
-  if(!data.length){toast('Chạy query trước','err');return;}
+  if(!data.length){toast('Run a query first','err');return;}
   const fields = qbState.resultFields?.length ? qbState.resultFields : (qbState.primary?.fields||[]);
   const sheetName = (qbState.primary?.table||'data').split('_').pop().slice(0,28);
   const ws = XLSX.utils.aoa_to_sheet([fields, ...data.map(r=>fields.map(f=>r[f]??''))]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,sheetName);
   XLSX.writeFile(wb,'QB_'+sheetName+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
-  toast('✓ Đã xuất Excel','ok');
+  toast('✓ Excel exported','ok');
 }
 
 // ── Template system (localStorage per admin) ──────────────────────────────
 function qbSaveTemplate() {
   const tbl = qbState.primary.table;
-  if(!tbl||!qbState.results.length){toast('Chạy query trước khi lưu','err');return;}
-  const name = prompt('Tên template:');
+  if(!tbl||!qbState.results.length){toast('Run a query before saving','err');return;}
+  const name = prompt('Template name:');
   if(!name||!name.trim()) return;
   const templates = qbGetTemplates();
   templates.push({
@@ -7206,7 +7117,7 @@ function qbSaveTemplate() {
     savedAt: new Date().toISOString()
   });
   localStorage.setItem('qb_templates_'+curUser.email, JSON.stringify(templates));
-  toast('✓ Đã lưu template "'+name.trim()+'"','ok');
+  toast('✓ Template saved "'+name.trim()+'"','ok');
 }
 
 function qbGetTemplates() {
@@ -7219,7 +7130,7 @@ function qbShowTemplates() {
   const templates = qbGetTemplates();
   const el = g('qbTmplList');
   safeHTML(el, templates.length===0
-    ? '<div class="qb-empty">Chưa có template nào.<br><br>Chạy query → Lưu template để sử dụng lại.</div>'
+    ? '<div class="qb-empty">No templates yet.<br><br>Run a query → Save template to reuse.</div>'
     : templates.map(t=>`
       <div class="qb-tmpl-item">
         <div style="flex:1">
@@ -7260,15 +7171,15 @@ function qbLoadTemplate(id) {
     if(g('qbLimit'))     g('qbLimit').value      = t.limit||'500';
   },100);
   closeQbTmpl();
-  toast('✓ Template "'+t.name+'" đã load — nhấn Chạy Query','ok');
+  toast('✓ Template "'+t.name+'" loaded — click Run Query','ok');
 }
 
 function qbDeleteTemplate(id) {
-  if(!confirm('Xóa template này?')) return;
+  if(!confirm('Delete this template?')) return;
   const templates = qbGetTemplates().filter(t=>t.id!==id);
   localStorage.setItem('qb_templates_'+curUser.email, JSON.stringify(templates));
   qbShowTemplates();
-  toast('Đã xóa template','info');
+  toast('Template deleted','info');
 }
 
 function closeQbTmpl(e) {
@@ -7292,8 +7203,8 @@ function dbSaveWidgets(arr) {
 function dbPinWidget() {
   if(!curUser||curUser.role!=='admin'){toast('Admin only','err');return;}
   const tbl = qbState.primary?.table;
-  if(!tbl||!qbState.results.length){toast('Chạy query trước khi Pin','err');return;}
-  const name = prompt('Tên widget hiển thị trên Dashboard:');
+  if(!tbl||!qbState.results.length){toast('Run a query before pinning','err');return;}
+  const name = prompt('Widget name shown on the Dashboard:');
   if(!name||!name.trim()) return;
   const vizType = qbState.viz||'table';
   const widgets = dbGetWidgets();
@@ -7314,7 +7225,7 @@ function dbPinWidget() {
     pinnedAt: new Date().toISOString()
   });
   dbSaveWidgets(widgets);
-  toast('✓ Đã pin "'+name.trim()+'" vào My Dashboard','ok');
+  toast('✓ Pinned "'+name.trim()+'" to My Dashboard','ok');
 }
 
 function dbVizIcon(v) {
@@ -7342,10 +7253,10 @@ function dbRenderAll() {
         <span class="db-panel-title" title="${esc(w.name)}">${esc(w.name)}</span>
         <span class="db-panel-meta">${esc(QB_TABLES[w.table]?.label||w.table)} · ${dbVizIcon(w.vizType)}</span>
         <button class="db-panel-btn" onclick="dbRefreshWidget(${w.id})" title="Refresh">↺</button>
-        <button class="db-panel-btn" onclick="dbDeleteWidget(${w.id})" title="Xóa widget" style="color:#f85149">✕</button>
+        <button class="db-panel-btn" onclick="dbDeleteWidget(${w.id})" title="Remove widget" style="color:#f85149">✕</button>
       </div>
       <div class="db-panel-body" id="dbBody_${w.id}">
-        <div class="db-loading">⏳ Đang tải...</div>
+        <div class="db-loading">⏳ Loading...</div>
       </div>
     </div>
   `).join(''));
@@ -7378,7 +7289,7 @@ async function dbFetchWidget(w) {
 
 function dbRenderPanel(body, w, data) {
   if(!data.length) {
-    safeHTML(body, '<div class="db-loading" style="color:var(--muted)">Không có dữ liệu</div>');
+    safeHTML(body, '<div class="db-loading" style="color:var(--muted)">No data</div>');
     return;
   }
 
@@ -7438,25 +7349,25 @@ function dbRefreshWidget(id) {
   const w = dbGetWidgets().find(x=>x.id===id);
   if(!w) return;
   const body = g('dbBody_'+id);
-  if(body) safeHTML(body, '<div class="db-loading">⏳ Đang tải...</div>');
+  if(body) safeHTML(body, '<div class="db-loading">⏳ Loading...</div>');
   if(dbCharts[id]) { dbCharts[id].destroy(); delete dbCharts[id]; }
   dbFetchWidget(w);
 }
 
 function dbRefreshAll() {
   const widgets = dbGetWidgets();
-  if(!widgets.length){toast('Không có widget nào','info');return;}
+  if(!widgets.length){toast('No widgets','info');return;}
   Object.keys(dbCharts).forEach(k=>{ try{dbCharts[k].destroy();}catch(e){} delete dbCharts[k]; });
   dbRenderAll();
-  toast(`Đang refresh ${widgets.length} widget...`,'info');
+  toast(`Refreshing ${widgets.length} widget...`,'info');
 }
 
 function dbDeleteWidget(id) {
-  if(!confirm('Xóa widget này khỏi Dashboard?')) return;
+  if(!confirm('Remove this widget from the Dashboard?')) return;
   if(dbCharts[id]) { dbCharts[id].destroy(); delete dbCharts[id]; }
   dbSaveWidgets(dbGetWidgets().filter(w=>w.id!==id));
   dbRenderAll();
-  toast('Đã xóa widget','info');
+  toast('Widget deleted','info');
 }
 
 // ── ATA CHAPTERS ──────────────────────────────────────────────────────────
@@ -7537,7 +7448,7 @@ const ATA_CHAPTERS = [
 //   await probeGalileoTables()     → thử 35+ tên bảng để tìm lookup table
 
 window.fetchATAChapters = async function(fieldName = 'ATA Chapter') {
-  console.log(`%c[ATA] Đang tìm values cho field: "${fieldName}"...`, 'color:#58A6FF;font-weight:bold');
+  console.log(`%c[ATA] Finding values for field: "${fieldName}"...`, 'color:#58A6FF;font-weight:bold');
   try {
     const url = G_URL + `dwanalytics_report_form_section_field?$filter=field_name eq '${fieldName}'&$select=text_value&$top=5000`;
     const r = await fetch(url);
@@ -7567,19 +7478,19 @@ window.fetchATAChapters = async function(fieldName = 'ATA Chapter') {
     const tree = Object.values(treeMap).sort((a, b) =>
       a.chapter.localeCompare(b.chapter, undefined, {numeric: true}));
 
-    console.log(`%c[ATA] ✅ Tìm thấy ${values.length} values duy nhất từ ${j.value.length} records`, 'color:#3FB950');
+    console.log(`%c[ATA] ✅ Found ${values.length} unique values from ${j.value.length} records`, 'color:#3FB950');
     console.log('%c[ATA] Raw values (copy JSON):', 'color:#D29922', JSON.stringify(values, null, 2));
     console.log('%c[ATA] Tree structure:', 'color:#D29922', JSON.stringify(tree, null, 2));
-    console.log('%cTip: copy kết quả ở trên dán vào code làm static list', 'color:#A3AEB8;font-style:italic');
+    console.log('%cTip: copy the result above into the code as a static list', 'color:#A3AEB8;font-style:italic');
     return { values, tree, total: j.value.length };
   } catch(e) {
-    console.error('[ATA] ❌ Lỗi:', e.message);
+    console.error('[ATA] ❌ Error:', e.message);
     return null;
   }
 };
 
 window.probeGalileoTables = async function() {
-  console.log('%c[PROBE] Bắt đầu dò tìm bảng Galileo...', 'color:#58A6FF;font-weight:bold');
+  console.log('%c[PROBE] Probing Galileo tables...', 'color:#58A6FF;font-weight:bold');
   const candidates = [
     // Ideagen-specific patterns
     'dwanalytics_field_definition','dwanalytics_form_definition',
@@ -7629,12 +7540,12 @@ window.probeGalileoTables = async function() {
   }
 
   if (ok.length) {
-    console.log(`%c[PROBE] ✅ Tìm thấy ${ok.length} bảng!`, 'color:#3FB950;font-weight:bold');
+    console.log(`%c[PROBE] ✅ Found ${ok.length} tables!`, 'color:#3FB950;font-weight:bold');
     ok.forEach(t => console.log(`  📋 ${t.table} — fields: [${t.fields.join(', ')}]`));
   } else {
-    console.log('%c[PROBE] ❌ Không tìm thấy bảng nào trong số 35+ candidates', 'color:#f85149');
+    console.log('%c[PROBE] ❌ No tables found among 35+ candidates', 'color:#f85149');
   }
-  console.log(`%c[PROBE] 404: ${notFound.length} | Lỗi: ${errored.length}`, 'color:#A3AEB8');
+  console.log(`%c[PROBE] 404: ${notFound.length} | Error: ${errored.length}`, 'color:#A3AEB8');
   if (errored.length) console.log('[PROBE] Errors:', errored);
   return { ok, notFound, errored };
 };
@@ -7642,7 +7553,7 @@ window.probeGalileoTables = async function() {
 // ── DEBUG: xem ALL fields của 1 report để tìm row correlation key ──────────
 window.debugFindingRaw = async function(reportRef) {
   const r = cmrData.find(x=>x.report_number===reportRef) || ecarData.find(x=>x.report_number===reportRef);
-  if(!r){console.error('Không tìm thấy report:', reportRef); return;}
+  if(!r){console.error('Report not found:', reportRef); return;}
   console.log('%c[DEBUG] report_id: '+r.report_id, 'color:#58A6FF');
 
   // Fetch ALL columns available for this report — no $select filter
@@ -7657,13 +7568,13 @@ window.debugFindingRaw = async function(reportRef) {
     +'?$filter='+encodeURIComponent(`report_id eq ${r.report_id}`)
     +'&$top=200';
   const j = await (await fetch(url2)).json();
-  console.log('%c[DEBUG] Full rows (tất cả columns):', 'color:#D29922;font-weight:bold');
+  console.log('%c[DEBUG] Full rows (all columns):', 'color:#D29922;font-weight:bold');
   console.table(j.value.map((row,i)=>({
     i,
     ...row,
     text_value: (row.text_value||'').slice(0,50)
   })));
-  console.log('%c[DEBUG] JSON đầy đủ:', 'color:#A3AEB8', JSON.stringify(j.value[0],null,2));
+  console.log('%c[DEBUG] Full JSON:', 'color:#A3AEB8', JSON.stringify(j.value[0],null,2));
   return j.value;
 };
 
