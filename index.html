@@ -822,8 +822,8 @@ tr:last-child td{border-bottom:none}
         <!-- ALL FORMS -->
         <div class="page" id="page-kpi2">
           <div class="kpi-3" style="grid-template-columns:repeat(3,1fr)">
-            <div class="chart-card" style="text-align:center;padding:14px"><div class="kpi-lbl">Early-detection rate</div><div class="kpi-val" id="k2-rate" style="color:var(--green);font-size:30px">—</div><div class="kpi-sub" style="font-size:10px">AMO-ECAR đã ghép sớm ÷ tổng AMO-ECAR × 100%</div></div>
-            <div class="chart-card" style="text-align:center;padding:14px"><div class="kpi-lbl">AMO-ECAR đã phát hiện sớm (đã ghép)</div><div class="kpi-val" id="k2-num" style="color:var(--green)">—</div></div>
+            <div class="chart-card" style="text-align:center;padding:14px"><div class="kpi-lbl">Early-detection rate</div><div class="kpi-val" id="k2-rate" style="color:var(--green);font-size:30px">—</div><div class="kpi-sub" style="font-size:10px">AMO-ECAR phát hiện sớm ÷ tổng AMO-ECAR × 100%</div></div>
+            <div class="chart-card" style="text-align:center;padding:14px"><div class="kpi-lbl">AMO-ECAR đã phát hiện sớm (MCAR sớm hơn, cùng Nature/nội dung)</div><div class="kpi-val" id="k2-num" style="color:var(--green)">—</div></div>
             <div class="chart-card" style="text-align:center;padding:14px"><div class="kpi-lbl">AMO-ECAR (authority) findings</div><div class="kpi-val" id="k2-den" style="color:var(--blue)">—</div></div>
           </div>
           <div class="tbl-card">
@@ -838,25 +838,12 @@ tr:last-child td{border-bottom:none}
             <div class="tbl-wrap">
               <table><thead><tr>
                 <th>Group</th>
-                <th style="text-align:right">Đã ghép sớm</th>
+                <th style="text-align:right">Phát hiện sớm</th>
                 <th style="text-align:right">AMO-ECAR (tổng)</th>
                 <th style="text-align:right">Rate %</th>
               </tr></thead><tbody id="k2Body"></tbody></table>
             </div>
             <div class="tbl-foot"><span id="k2Info" style="font-size:11px;color:var(--muted)"></span></div>
-          </div>
-          <div class="tbl-card admin-only" style="margin-top:10px;display:none">
-            <div class="tbl-bar">
-              <div><div class="tbl-title">Cặp gợi ý cần xác nhận (MCAR phát hiện sớm ↔ AMO-ECAR)</div><div class="tbl-count" id="k2CandCnt">—</div></div>
-            </div>
-            <div class="tbl-wrap">
-              <table><thead><tr>
-                <th>AMO-ECAR (mô tả)</th>
-                <th>MCAR (mô tả, sớm hơn)</th>
-                <th>Nature / sim</th>
-                <th>Xác nhận</th>
-              </tr></thead><tbody id="k2CandBody"></tbody></table>
-            </div>
           </div>
         </div>
 
@@ -2158,7 +2145,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.02-r76';
+const APP_REV = '2026.06.02-r77';
 
 // Nature of finding: ánh xạ mục con -> nhóm cha (từ danh mục gốc Galileo dwreporting_general_lists)
 const NATURE_PARENT = {
@@ -3710,17 +3697,31 @@ async function buildKPI2(){
       }}});
 }
 
-// ════════ KPI 2 — Early Detection (simple): MCAR ÷ AMO-ECAR, grouped ════════
-let kpi2Loaded=false, kpi2Rows=[], kpi2Matches=[];
+// ════════ KPI 2 — Early Detection (TỰ ĐỘNG) ════════
+// 1 AMO-ECAR = "đã phát hiện sớm" nếu có ≥1 MCAR raised_date SỚM HƠN, và
+// (cùng nhóm Nature of finding HOẶC mô tả Finding description giống ≥ ngưỡng).
+// Tỷ lệ = (số AMO-ECAR phát hiện sớm) ÷ (tổng AMO-ECAR) × 100%. KHÔNG dùng Supabase.
+const K2_SIM_THRESHOLD = 0.5;   // ngưỡng giống mô tả (0..1) để coi là "cùng nội dung"
+let kpi2Loaded=false, kpi2Rows=[];
 function k2scope(t){ const s=String(t||'').trim(); if(!s) return '(none)'; return (s.replace(/^\d+[.\)]?\s*/,'').slice(0,40))||s; }
 function k2quarter(d){ if(!d) return '(none)'; const dt=new Date(d); return dt.getUTCFullYear()+'-Q'+(Math.floor(dt.getUTCMonth()/3)+1); }
-// Tải các cặp ghép MCAR↔AMO-ECAR đã xác nhận/loại từ Supabase (KHÔNG dùng localStorage)
-async function loadKpi2Matches(){
-  try{
-    const {data,error}=await sb.from('kpi2_match').select('*');
-    if(error) throw error;
-    kpi2Matches=data||[];
-  }catch(e){ console.warn('[KPI2] match table chưa sẵn sàng:',e.message); kpi2Matches=[]; }
+function normDesc(s){
+  return String(s||'').toLowerCase()
+    .replace(/[\n\r]+/g,' ')
+    .replace(/[^\p{L}\p{N}\s./-]/gu,' ')
+    .replace(/\s+/g,' ').trim();
+}
+function descTokens(s){ return new Set(normDesc(s).split(' ').filter(w=>w.length>3)); }
+function tokenSim(A,B){ if(!A||!B||!A.size||!B.size) return 0; let i=0; A.forEach(w=>{ if(B.has(w)) i++; }); return i/Math.min(A.size,B.size); }
+// AMO-ECAR có MCAR phát hiện sớm trùng nội dung/Nature?
+function isEarlyDetected(ecar, mcarPool){
+  if(!ecar.raised_date) return false;
+  const ag=new Set(ecar.natureGroups), eDate=new Date(ecar.raised_date);
+  return mcarPool.some(m=>{
+    if(!m.raised_date || new Date(m.raised_date) >= eDate) return false;   // MCAR phải SỚM HƠN
+    if(m.natureGroups.some(g=>g!=='(none)' && ag.has(g))) return true;     // cùng nhóm Nature
+    return tokenSim(ecar.descTokens, m.descTokens) >= K2_SIM_THRESHOLD;    // HOẶC mô tả giống
+  });
 }
 async function loadKpi2(force){
   if(kpi2Loaded && !force){ renderKpi2(); return; }
@@ -3748,74 +3749,14 @@ async function loadKpi2(force){
       raised_ym: r.raised_ym,
       finding_desc: r.finding_desc || '',
       natureGroups: natureGroups(nat[r.report_id]),
+      descTokens: descTokens(r.finding_desc || ''),
       scope: k2scope(r.audit_title)
     });
     kpi2Rows=[...amo.map(r=>mk(r,'amo')), ...mcar.map(r=>mk(r,'mcar'))];
-    await loadKpi2Matches();
     kpi2Loaded=true;
-    console.log(`[KPI2] AMO-ECAR=${amo.length} · MCAR=${mcar.length} · matches=${kpi2Matches.length}`);
+    console.log(`[KPI2] AMO-ECAR=${amo.length} · MCAR=${mcar.length}`);
   }catch(e){ console.error('[KPI2] load error',e); toast('Error loading KPI 2: '+e.message,'err'); }
   setOv(false); renderKpi2();
-}
-// ── Engine ghép cặp: chuẩn hóa & chấm tương đồng mô tả ──
-function normDesc(s){
-  return String(s||'').toLowerCase()
-    .replace(/[\n\r]+/g,' ')
-    .replace(/[^\p{L}\p{N}\s./-]/gu,' ')
-    .replace(/\s+/g,' ').trim();
-}
-function descSim(a,b){
-  const A=new Set(normDesc(a).split(' ').filter(w=>w.length>3));
-  const B=new Set(normDesc(b).split(' ').filter(w=>w.length>3));
-  if(!A.size||!B.size) return 0;
-  let inter=0; A.forEach(w=>{ if(B.has(w)) inter++; });
-  return inter / Math.min(A.size,B.size);
-}
-// Sinh danh sách cặp GỢI Ý (chưa xác nhận): cùng nhóm cha Nature + MCAR sớm hơn
-function kpi2Candidates(){
-  const amo=kpi2Rows.filter(r=>r.type==='amo');
-  const mcar=kpi2Rows.filter(r=>r.type==='mcar');
-  const confirmedEcar=new Set(kpi2Matches.filter(m=>m.status==='confirmed').map(m=>m.ecar_report_id));
-  const seenPair=new Set(kpi2Matches.map(m=>m.ecar_report_id+'|'+m.mcar_report_id));
-  const out=[];
-  amo.forEach(a=>{
-    if(confirmedEcar.has(a.report_id)) return;            // ECAR này đã ghép rồi
-    const ag=new Set(a.natureGroups);
-    mcar.forEach(m=>{
-      if(seenPair.has(a.report_id+'|'+m.report_id)) return;   // cặp đã xử lý (confirmed/rejected)
-      if(!(m.raised_date && a.raised_date && new Date(m.raised_date) < new Date(a.raised_date))) return;
-      const share=m.natureGroups.filter(g=>ag.has(g) && g!=='(none)');
-      if(!share.length) return;
-      const sim=descSim(a.finding_desc, m.finding_desc);
-      out.push({ecar:a, mcar:m, nature_group:share[0], sim});
-    });
-  });
-  out.sort((x,y)=> (y.sim||0) - (x.sim||0));
-  return out;
-}
-async function kpi2Confirm(ecarId, mcarId, group){
-  const a=kpi2Rows.find(r=>r.report_id===ecarId), m=kpi2Rows.find(r=>r.report_id===mcarId);
-  try{
-    const {error}=await sb.from('kpi2_match').upsert({
-      ecar_report_id:ecarId, ecar_report_number:a?.report_number, ecar_raised_date:a?.raised_date,
-      mcar_report_id:mcarId, mcar_report_number:m?.report_number, mcar_raised_date:m?.raised_date,
-      nature_group:group, status:'confirmed',
-      matched_by: curUser?.email||null, matched_at:new Date().toISOString()
-    },{onConflict:'ecar_report_id,mcar_report_id'});
-    if(error) throw error;
-    toast('✓ Đã xác nhận cặp','ok');
-    await loadKpi2Matches(); renderKpi2();
-  }catch(e){ toast('Lỗi lưu: '+e.message,'err'); }
-}
-async function kpi2Reject(ecarId, mcarId){
-  try{
-    const {error}=await sb.from('kpi2_match').upsert({
-      ecar_report_id:ecarId, mcar_report_id:mcarId, status:'rejected',
-      matched_by: curUser?.email||null
-    },{onConflict:'ecar_report_id,mcar_report_id'});
-    if(error) throw error;
-    await loadKpi2Matches(); renderKpi2();
-  }catch(e){ toast('Lỗi: '+e.message,'err'); }
 }
 function renderKpi2(){
   const yrEl=g('k2Year');
@@ -3825,19 +3766,21 @@ function renderKpi2(){
   }
   const yr=g('k2Year')?.value||'', grp=g('k2Group')?.value||'nature', srch=(g('k2Srch')?.value||'').toLowerCase();
   const rows=kpi2Rows.filter(r=>!yr||String(r.raised_year)===yr);
-  // ĐÚNG định nghĩa: mẫu số = số AMO-ECAR trong kỳ; tử số = số AMO-ECAR đã có cặp confirmed
-  const confirmedEcar=new Set(kpi2Matches.filter(m=>m.status==='confirmed').map(m=>m.ecar_report_id));
+  // TỰ ĐỘNG: mẫu số = AMO-ECAR trong kỳ; tử số = AMO-ECAR có MCAR phát hiện sớm trùng nội dung/Nature.
+  // MCAR pool = TẤT CẢ MCAR (mọi năm) vì cặp "sớm hơn" có thể nằm ở năm trước.
   const ecarRows=rows.filter(r=>r.type==='amo');
-  const den=ecarRows.length;
-  const num=ecarRows.filter(r=>confirmedEcar.has(r.report_id)).length;
+  const mcarPool=kpi2Rows.filter(r=>r.type==='mcar');
+  const earlySet=new Set();
+  ecarRows.forEach(r=>{ if(isEarlyDetected(r,mcarPool)) earlySet.add(r.report_id); });
+  const den=ecarRows.length, num=earlySet.size;
   s('k2-num',num); s('k2-den',den); s('k2-rate', den>0?Math.round(num/den*100)+'%':'N/A');
-  // Bảng group: với mỗi nhóm — (AMO-ECAR đã ghép) ÷ (tổng AMO-ECAR nhóm đó)
+  // Bảng group: với mỗi nhóm — (AMO-ECAR phát hiện sớm) ÷ (tổng AMO-ECAR nhóm đó)
   const keysOf=r=> grp==='nature' ? (r.natureGroups&&r.natureGroups.length?r.natureGroups:['(none)'])
                   : grp==='quarter' ? [k2quarter(r.raised_date)]
                   : grp==='year' ? [r.raised_year||'(none)']
                   : [r.scope||'(none)'];
   const groups={};
-  ecarRows.forEach(r=>{ const matched=confirmedEcar.has(r.report_id);
+  ecarRows.forEach(r=>{ const matched=earlySet.has(r.report_id);
     keysOf(r).forEach(k=>{ if(!groups[k])groups[k]={tot:0,matched:0}; groups[k].tot++; if(matched)groups[k].matched++; }); });
   let entries=Object.entries(groups);
   if(srch) entries=entries.filter(([k])=>String(k).toLowerCase().includes(srch));
@@ -3847,33 +3790,7 @@ function renderKpi2(){
     return `<tr><td>${esc(k)}</td><td style="text-align:right">${v.matched||'—'}</td><td style="text-align:right">${v.tot||'—'}</td><td style="text-align:right;font-weight:600">${rate}</td></tr>`;
   }).join('') || '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--muted)">No data</td></tr>';
   s('k2cnt', entries.length+' groups');
-  s('k2Info', `Đã ghép sớm ${num} · AMO-ECAR ${den} · rate ${den>0?Math.round(num/den*100)+'%':'N/A'}`);
-  // Khu "Cặp gợi ý cần xác nhận" — chỉ admin
-  const cb=g('k2CandBody');
-  if(cb){
-    if(curUser?.role==='admin'){
-      const cands=kpi2Candidates();
-      cb.innerHTML = cands.slice(0,200).map(c=>`
-        <tr>
-          <td style="max-width:260px">
-            <b>${esc(c.ecar.report_number)}</b> <span style="color:var(--muted);font-size:10px">${fd(c.ecar.raised_date)}</span>
-            <div style="font-size:11px;color:var(--text-2);max-height:48px;overflow:hidden">${esc(c.ecar.finding_desc)||'—'}</div>
-          </td>
-          <td style="max-width:260px">
-            <b>${esc(c.mcar.report_number)}</b> <span style="color:var(--muted);font-size:10px">${fd(c.mcar.raised_date)}</span>
-            <div style="font-size:11px;color:var(--text-2);max-height:48px;overflow:hidden">${esc(c.mcar.finding_desc)||'—'}</div>
-          </td>
-          <td style="white-space:nowrap;font-size:11px">${esc(c.nature_group)}<br><span style="color:var(--muted)">sim ${Math.round((c.sim||0)*100)}%</span></td>
-          <td style="white-space:nowrap">
-            <button class="btn-sm" onclick="kpi2Confirm('${c.ecar.report_id}','${c.mcar.report_id}','${esc(c.nature_group)}')">✓</button>
-            <button class="btn-sm" onclick="kpi2Reject('${c.ecar.report_id}','${c.mcar.report_id}')">✗</button>
-          </td>
-        </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--muted)">Không có cặp gợi ý</td></tr>';
-      s('k2CandCnt', cands.length+' cặp');
-    }else{
-      cb.innerHTML='';
-    }
-  }
+  s('k2Info', `Phát hiện sớm ${num} · AMO-ECAR ${den} · rate ${den>0?Math.round(num/den*100)+'%':'N/A'}`);
 }
 
 function renderAF() {
