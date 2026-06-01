@@ -483,6 +483,8 @@ tr:last-child td{border-bottom:none}
         <button class="nav-item" onclick="showPage('pavoi',this)"><span class="nav-ic" data-ic="doc"></span>PAVOI Detail</button>
         <button class="nav-item" onclick="showPage('cmrcar',this)"><span class="nav-ic" data-ic="shield"></span>CMR-CAR</button>
         <button class="nav-item" onclick="showPage('ecar',this)"><span class="nav-ic" data-ic="shield"></span>ECAR</button>
+        <button class="nav-item" onclick="showPage('amoecar',this)"><span class="nav-ic" data-ic="shield"></span>AMO-ECAR</button>
+        <button class="nav-item" onclick="showPage('mcar',this)"><span class="nav-ic" data-ic="list"></span>MCAR</button>
         <button class="nav-item" onclick="showAuditPlanPage(this)"><span class="nav-ic" data-ic="calendar"></span>Audit Plan</button>
         <button class="nav-item" onclick="showPage('docs',this)"><span class="nav-ic" data-ic="folder"></span>Documents</button>
         <button class="nav-item admin-only" id="reportsNav" onclick="showPage('reports',this)" style="display:none"><span class="nav-ic" data-ic="download"></span>Export Reports</button>
@@ -755,23 +757,22 @@ tr:last-child td{border-bottom:none}
               <div class="kpi-lbl">Audits</div><div class="kpi-val" id="kk-audits" style="color:var(--yellow)">—</div>
             </div>
           </div>
-          <!-- Row 2: 3 charts balanced -->
-          <div style="display:grid;grid-template-columns:220px 1fr 220px;gap:8px;margin-bottom:8px;flex-shrink:0">
-            <div class="chart-card">
-              <div class="chart-head"><div><div class="chart-title">Overdue Aging</div><div class="chart-sub">CAT I / II / III</div></div></div>
-              <div class="ch-wrap" style="height:160px"><canvas id="cKpiAging"></canvas></div>
+          <!-- Row 2: KPI 2 — Early Detection -->
+          <div class="chart-card" style="flex-shrink:0;margin-bottom:8px">
+            <div class="chart-head">
+              <div>
+                <div class="chart-title">KPI 2 — Early Detection (Internal vs Authority)</div>
+                <div class="chart-sub">MCAR phát hiện sớm ÷ AMO-ECAR (finding nhà chức trách) · theo quý</div>
+              </div>
+              <div style="text-align:right">
+                <div class="kpi-val" id="kpi2-val" style="color:var(--green);font-size:22px">—</div>
+                <div class="kpi-lbl" id="kpi2-frac">—</div>
+              </div>
             </div>
-            <div class="chart-card">
-              <div class="chart-head"><div><div class="chart-title">On-time Close Rate by Month</div><div class="chart-sub">Target: 70%</div></div></div>
-              <div class="ch-wrap" style="height:160px"><canvas id="cOnM"></canvas></div>
-            </div>
-            <div class="chart-card">
-              <div class="chart-head"><div><div class="chart-title">Finding Level</div><div class="chart-sub">Distribution by level</div></div></div>
-              <div class="ch-wrap" style="height:160px"><canvas id="cKpiLevel"></canvas></div>
-            </div>
+            <div class="ch-wrap" style="height:200px"><canvas id="cKpi2"></canvas></div>
           </div>
 
-          <!-- Row 3: ATA Chapter Comparison -->
+                    <!-- Row 3: ATA Chapter Comparison -->
           <div class="chart-card" style="flex-shrink:0;margin-top:8px">
             <div class="chart-head" style="margin-bottom:10px">
               <div>
@@ -989,6 +990,76 @@ tr:last-child td{border-bottom:none}
         </div>
 
         <!-- AUDIT PLAN -->
+        <div class="page" id="page-amoecar">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-shrink:0">
+            <span style="font-size:13px;font-weight:600;color:var(--text)">AMO-ECAR — Authority Findings (issued to AMO)</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;flex-shrink:0">
+            <div class="chart-card" style="text-align:center;padding:10px 8px"><div class="kpi-lbl">Total</div><div class="kpi-val" id="amo-total" style="color:var(--blue)">—</div></div>
+            <div class="chart-card" style="text-align:center;padding:10px 8px"><div class="kpi-lbl">Open</div><div class="kpi-val" id="amo-open" style="color:var(--blue)">—</div></div>
+            <div class="chart-card" style="text-align:center;padding:10px 8px"><div class="kpi-lbl">Overdue</div><div class="kpi-val" id="amo-over" style="color:#ff6b6b">—</div></div>
+            <div class="chart-card" style="text-align:center;padding:10px 8px"><div class="kpi-lbl">Closed</div><div class="kpi-val" id="amo-closed" style="color:var(--green)">—</div></div>
+          </div>
+          <div class="tbl-card">
+            <div class="tbl-bar">
+              <div><div class="tbl-title">AMO-ECAR — Authority Findings (issued to AMO)</div><div class="tbl-count" id="amoCnt">—</div></div>
+              <select class="sel" id="amoYearF" onchange="renderAmoEcar()"><option value="">All Years</option></select>
+              <select class="sel" id="amoStatusF" onchange="renderAmoEcar()"><option value="">All Status</option><option value="Open">Open</option><option value="Overdue">Overdue</option><option value="On-time Closed">On-time</option><option value="Lately Closed">Lately</option><option value="Closed">Closed</option></select>
+              <input class="sel" id="amoSrch" oninput="renderAmoEcar()" placeholder="🔍 Search..." style="min-width:160px">
+            </div>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr>
+                  <th onclick="amoSort('report_number')">Report No ↕</th>
+                  <th onclick="amoSort('semantic_status')">Status ↕</th>
+                  <th onclick="amoSort('raised_date')">Raised ↕</th>
+                  <th onclick="amoSort('Target_date')">Target ↕</th>
+                  <th onclick="amoSort('report_ageing')">Days to Due ↕</th>
+                  <th onclick="amoSort('overdue_cat')">CAT ↕</th>
+                  <th>Finding Level</th>
+                  <th>Audit Title</th>
+                </tr></thead>
+                <tbody id="amoBody"></tbody>
+              </table>
+            </div>
+            <div class="tbl-foot"><span id="amoInfo">—</span><div class="pg-btns" id="amoPg"></div></div>
+          </div>
+        </div>
+        <div class="page" id="page-mcar">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-shrink:0">
+            <span style="font-size:13px;font-weight:600;color:var(--text)">MCAR — Internal Audit Findings</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;flex-shrink:0">
+            <div class="chart-card" style="text-align:center;padding:10px 8px"><div class="kpi-lbl">Total</div><div class="kpi-val" id="mcar-total" style="color:var(--blue)">—</div></div>
+            <div class="chart-card" style="text-align:center;padding:10px 8px"><div class="kpi-lbl">Open</div><div class="kpi-val" id="mcar-open" style="color:var(--blue)">—</div></div>
+            <div class="chart-card" style="text-align:center;padding:10px 8px"><div class="kpi-lbl">Overdue</div><div class="kpi-val" id="mcar-over" style="color:#ff6b6b">—</div></div>
+            <div class="chart-card" style="text-align:center;padding:10px 8px"><div class="kpi-lbl">Closed</div><div class="kpi-val" id="mcar-closed" style="color:var(--green)">—</div></div>
+          </div>
+          <div class="tbl-card">
+            <div class="tbl-bar">
+              <div><div class="tbl-title">MCAR — Internal Audit Findings</div><div class="tbl-count" id="mcarCnt">—</div></div>
+              <select class="sel" id="mcarYearF" onchange="renderMcar()"><option value="">All Years</option></select>
+              <select class="sel" id="mcarStatusF" onchange="renderMcar()"><option value="">All Status</option><option value="Open">Open</option><option value="Overdue">Overdue</option><option value="On-time Closed">On-time</option><option value="Lately Closed">Lately</option><option value="Closed">Closed</option></select>
+              <input class="sel" id="mcarSrch" oninput="renderMcar()" placeholder="🔍 Search..." style="min-width:160px">
+            </div>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr>
+                  <th onclick="mcarSort('report_number')">Report No ↕</th>
+                  <th onclick="mcarSort('semantic_status')">Status ↕</th>
+                  <th onclick="mcarSort('raised_date')">Raised ↕</th>
+                  <th onclick="mcarSort('Target_date')">Target ↕</th>
+                  <th onclick="mcarSort('report_ageing')">Days to Due ↕</th>
+                  <th onclick="mcarSort('overdue_cat')">CAT ↕</th>
+                  <th>Finding Level</th>
+                  <th>Audit Title</th>
+                </tr></thead>
+                <tbody id="mcarBody"></tbody>
+              </table>
+            </div>
+            <div class="tbl-foot"><span id="mcarInfo">—</span><div class="pg-btns" id="mcarPg"></div></div>
+          </div>
+        </div>
         <div class="page" id="page-auditplan">
           <!-- KPI row (7 cards, rendered by renderAuditKpi) -->
           <div class="audit-kpi-row" id="auditKpiRow"></div>
@@ -2042,7 +2113,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.05.29-r74';
+const APP_REV = '2026.06.01-r75';
 
 // Build findingRows from EAV rows.
 // Collect desc/ATA/level/NC each sorted by report_field_created_date, pair by index.
@@ -2157,6 +2228,8 @@ const TS = {
   docs:   { page:1, sort:'document_number', asc:true, typeF:'', yr:'', srch:'' },
   cmr:    { page:1, sort:'raised_date', asc:false, sf:'all', ac:'all', yr:'', qr:'', srch:'' },
   ecar:   { page:1, sort:'raised_date', asc:false, sf:'all', ac:'all', yr:'', qrs:[], issuedBy:'', srch:'' },
+  amoecar:{ page:1, sort:'raised_date', asc:false },
+  mcar:   { page:1, sort:'raised_date', asc:false },
 };
 
 // ── AUTH ─────────────────────────────────────────────────────
@@ -3035,43 +3108,7 @@ function buildKPICharts(data) {
   s('kk-rate',closed>0?pct(onTime/closed):'—');
   s('kk-cat3',cat3); s('kk-audits',audits);
 
-  // ── Chart 1: Overdue Aging by CAT (doughnut) ─────────────
-  const cats={'CAT I':0,'CAT II':0,'CAT III':0};
-  data.filter(r=>r.semantic_status==='Overdue').forEach(r=>{if(r.overdue_cat)cats[r.overdue_cat]++});
-  dc('cKpiAging');
-  charts['cKpiAging']=new Chart(g('cKpiAging'),{type:'doughnut',
-    data:{labels:Object.keys(cats),datasets:[{data:Object.values(cats),backgroundColor:['#F0883E','#ff6b6b','#cc0000'],borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#8B949E',font:{size:10},boxWidth:8}}}}});
-
-  // ── Chart 4: On-time Rate by Month (line) ─────────────────
-  const mm={};
-  data.forEach(r=>{
-    if(!r.raised_ym)return;
-    if(!mm[r.raised_ym])mm[r.raised_ym]={tot:0,on:0};
-    if(CLOSED_S.includes(r.semantic_status)){
-      mm[r.raised_ym].tot++;
-      if(r.semantic_status==='On-time Closed')mm[r.raised_ym].on++;
-    }
-  });
-  const oKeys=Object.keys(mm).sort();
-  dc('cOnM');
-  charts['cOnM']=new Chart(g('cOnM'),{type:'line',
-    data:{labels:oKeys,datasets:[
-      {label:'On-time %',data:oKeys.map(k=>mm[k].tot>0?Math.round(mm[k].on/mm[k].tot*100):null),borderColor:'#3FB950',backgroundColor:'rgba(63,185,80,0.1)',tension:.4,fill:true,pointRadius:4,spanGaps:true},
-      {label:'Target 70%',data:oKeys.map(()=>70),borderColor:'rgba(255,255,255,0.15)',borderDash:[5,5],pointRadius:0,borderWidth:1}]},
-    options:{...CO,scales:{
-      x:{ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
-      y:{min:0,max:100,ticks:{color:'#8B949E',font:{size:10},callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.04)'}}}}});
-
-  // ── Chart 5: Finding Level Distribution (doughnut) ────────
-  const lvlMap={};
-  data.forEach(r=>{const l=r.finding_level||'N/A';lvlMap[l]=(lvlMap[l]||0)+1});
-  const lvlEntries=Object.entries(lvlMap).sort((a,b)=>b[1]-a[1]);
-  const lvlColors=['#cc0000','#ff6b6b','#F0883E','#D29922','#58A6FF','#3FB950','#8B949E'];
-  dc('cKpiLevel');
-  charts['cKpiLevel']=new Chart(g('cKpiLevel'),{type:'doughnut',
-    data:{labels:lvlEntries.map(e=>e[0]),datasets:[{data:lvlEntries.map(e=>e[1]),backgroundColor:lvlColors.slice(0,lvlEntries.length),borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:'#8B949E',font:{size:9},boxWidth:8}}}}});
+  buildKPI2(data);
 
   // (Overdue-page charts cCat/cOvForm are built by renderOv → buildOvCharts,
   //  so they respect the Overdue page's own Year/Form filter.)
@@ -3453,6 +3490,75 @@ function setAF(sf,btn){
 }
 function afSort(col){TS.af.asc=TS.af.sort===col?!TS.af.asc:true;TS.af.sort=col;TS.af.page=1;renderAF();}
 
+// ── AMO-ECAR & MCAR pages (filtered views of allData) ─────────
+function renderFormView(formTitle, ids){
+  const yrEl=g(ids.yr), stEl=g(ids.st), srchEl=g(ids.srch), ts=TS[ids.ts];
+  const all=allData.filter(r=>r.report_title===formTitle);
+  if(yrEl&&yrEl.options.length<=1){
+    const years=[...new Set(all.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
+    yrEl.innerHTML='<option value="">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  }
+  const yr=yrEl?.value||'', st=stEl?.value||'', srch=(srchEl?.value||'').toLowerCase();
+  const yrSet=all.filter(r=>!yr||String(r.raised_year)===yr);
+  s(ids.kTotal,yrSet.length);
+  s(ids.kOpen,yrSet.filter(r=>r.semantic_status==='Open').length);
+  s(ids.kOver,yrSet.filter(r=>r.semantic_status==='Overdue').length);
+  s(ids.kClosed,yrSet.filter(r=>['On-time Closed','Lately Closed','Closed'].includes(r.semantic_status)).length);
+  let data=yrSet.filter(r=>{
+    if(st && r.semantic_status!==st) return false;
+    if(srch){const t=[r.report_number,r.semantic_status,r.finding_level,r.audit_title,r.dept,r.audit_ref].join(' ').toLowerCase();if(!t.includes(srch))return false;}
+    return true;
+  });
+  data=sortD(data,ts.sort,ts.asc);
+  renderPaged(ids.body,ids.info,ids.pg,ids.cnt,data,ts,r=>`
+    <tr>
+      <td><b>${esc(r.report_number)||'—'}</b></td>
+      <td>${sBadge(r.semantic_status)}</td>
+      <td style="font-size:11px;color:var(--muted)">${fd(r.raised_date)}</td>
+      <td>${fd(r.Target_date)}</td>
+      <td>${ageDis(r.report_ageing,r.semantic_status)}</td>
+      <td>${cBadge(r.overdue_cat)}</td>
+      <td>${esc(r.finding_level)||'—'}</td>
+      <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)">${esc(r.audit_title)||'—'}</td>
+    </tr>`);
+}
+function renderAmoEcar(){renderFormView('AMO ECAR',{ts:'amoecar',yr:'amoYearF',st:'amoStatusF',srch:'amoSrch',kTotal:'amo-total',kOpen:'amo-open',kOver:'amo-over',kClosed:'amo-closed',body:'amoBody',info:'amoInfo',pg:'amoPg',cnt:'amoCnt'});}
+function renderMcar(){renderFormView('MCAR',{ts:'mcar',yr:'mcarYearF',st:'mcarStatusF',srch:'mcarSrch',kTotal:'mcar-total',kOpen:'mcar-open',kOver:'mcar-over',kClosed:'mcar-closed',body:'mcarBody',info:'mcarInfo',pg:'mcarPg',cnt:'mcarCnt'});}
+function amoSort(c){const t=TS.amoecar;if(t.sort===c)t.asc=!t.asc;else{t.sort=c;t.asc=true;}renderAmoEcar();}
+function mcarSort(c){const t=TS.mcar;if(t.sort===c)t.asc=!t.asc;else{t.sort=c;t.asc=true;}renderMcar();}
+
+// ── KPI 2: Early Detection (MCAR early-detected ÷ AMO-ECAR authority findings) ──
+async function buildKPI2(data){
+  if(!data) data=allData;
+  const amo=data.filter(r=>r.report_title==='AMO ECAR');
+  const q=k=>{const m=parseInt(String(k).slice(5,7),10);return String(k).slice(0,4)+'-Q'+Math.ceil(m/3);};
+  const den={};
+  amo.forEach(r=>{if(!r.raised_ym)return;const k=q(r.raised_ym);den[k]=(den[k]||0)+1;});
+  // numerator: confirmed early-detection matches from Supabase (empty until matching engine built)
+  const num={};
+  try{
+    if(typeof sb!=='undefined' && sb){
+      const {data:rows,error}=await sb.from('kpi2_match').select('ecar_raised_date,status').eq('status','confirmed');
+      if(!error && rows){rows.forEach(m=>{if(!m.ecar_raised_date)return;const k=q(String(m.ecar_raised_date).slice(0,7));num[k]=(num[k]||0)+1;});}
+    }
+  }catch(e){/* kpi2_match table not yet created — numerator stays 0 */}
+  const keys=[...new Set([...Object.keys(den),...Object.keys(num)])].sort();
+  const denArr=keys.map(k=>den[k]||0), numArr=keys.map(k=>num[k]||0);
+  const totDen=denArr.reduce((a,b)=>a+b,0), totNum=numArr.reduce((a,b)=>a+b,0);
+  s('kpi2-val', totDen>0?Math.round(totNum/totDen*100)+'%':'N/A');
+  s('kpi2-frac', totNum+' / '+totDen+' findings');
+  if(!g('cKpi2'))return;
+  dc('cKpi2');
+  charts['cKpi2']=new Chart(g('cKpi2'),{type:'bar',
+    data:{labels:keys,datasets:[
+      {label:'AMO-ECAR (authority)',data:denArr,backgroundColor:'#ff6b6b',order:2},
+      {label:'Early-detected (MCAR)',data:numArr,backgroundColor:'#3FB950',order:1}
+    ]},
+    options:{...CO,scales:{
+      x:{ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
+      y:{beginAtZero:true,ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}}}}});
+}
+
 function renderAF() {
   const ff=g('afFormF')?.value||'', yr=g('afYearF')?.value||'';
   const srch=(g('afSrch')?.value||'').toLowerCase();
@@ -3518,6 +3624,8 @@ function goPg(bodyId,p) {
     'auditBody':[TS.audit,renderAudit],
     'cmrBody':[TS.cmr,renderCmr],
     'ecarBody':[TS.ecar,renderEcar],
+    'amoBody':[TS.amoecar,renderAmoEcar],
+    'mcarBody':[TS.mcar,renderMcar],
   };
   const [ts,fn]=map[bodyId]||[null,null]; if(!fn||p<1)return;
   ts.page=p; fn();
@@ -5807,7 +5915,7 @@ async function makeAdmin(id){
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────
-const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',ecar:'ECAR Detail',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management',querybuilder:'Query Builder',mydashboard:'My Dashboard'};
+const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',ecar:'ECAR Detail',amoecar:'AMO-ECAR',mcar:'MCAR',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management',querybuilder:'Query Builder',mydashboard:'My Dashboard'};
 function showPage(name,btn){
   if((name==='reports'||name==='admin'||name==='querybuilder'||name==='mydashboard')&&(!curUser||curUser.role!=='admin')){
     toast('You do not have permission to access this page','err');return;
@@ -5825,6 +5933,8 @@ function showPage(name,btn){
   if(name==='docs'){ if(!docData.length) loadDocuments(); else { if(!docTypeFlat.length){buildDocTypeTree();countDocsPerType();} renderDocTree();populateDocFilters();renderDocKpi();renderDocPage(); } }
   if(name==='cmrcar'){ if(!cmrLoaded) loadCmr(); else renderCmr(); }
   if(name==='ecar'){ if(!ecarLoaded) loadEcar(); else renderEcar(); }
+  if(name==='amoecar'){ renderAmoEcar(); }
+  if(name==='mcar'){ renderMcar(); }
   if(name==='kpi'){ filterKpiYear(); }
   if(name==='overdue'){ renderOv(); }
   if(name==='overview'){
