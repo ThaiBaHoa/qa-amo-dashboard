@@ -2774,18 +2774,16 @@ function semCalc(status, closeDate, targetDate) {
     return c<=t ? 'On-time Closed' : 'Lately Closed';
   }
 
-  if (status==='Open' || status==='Submitted') {
-    if (!c) {
-      // Not yet closed — grade against the target date
-      if (!t) return 'Open';           // No target → Open
-      return now<=t ? 'Open' : 'Overdue';
-    }
-    // Has a close date — report was closed even though status is still Open
-    if (!t) return 'Closed';           // Closed but no target → Closed
-    return c<=t ? 'On-time Closed' : 'Lately Closed';
+  // Any status that is not 'Closed' (Open, Submitted, New, Draft, In Progress, …)
+  // is an in-progress finding — grade it against the target date so e.g. a "New"
+  // finding past its target is correctly counted as Overdue.
+  if (!c) {
+    if (!t) return 'Open';             // no target → treat as Open / in-progress
+    return now<=t ? 'Open' : 'Overdue';
   }
-
-  return status; // New, Draft...
+  // Has a close date even though the raw status isn't 'Closed' → treat as resolved
+  if (!t) return 'Closed';
+  return c<=t ? 'On-time Closed' : 'Lately Closed';
 }
 
 function catCalc(ag, sm) {
