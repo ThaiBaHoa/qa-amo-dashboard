@@ -762,11 +762,15 @@ tr:last-child td{border-bottom:none}
             <div class="chart-head">
               <div>
                 <div class="chart-title">KPI 2 — Early Detection (Internal vs Authority)</div>
-                <div class="chart-sub">MCAR phát hiện sớm ÷ AMO-ECAR (finding nhà chức trách) · theo quý</div>
+                <div class="chart-sub">MCAR (internal) vs AMO-ECAR (authority) findings by quarter · early-detection % = Phase 2</div>
               </div>
-              <div style="text-align:right">
-                <div class="kpi-val" id="kpi2-val" style="color:var(--green);font-size:22px">—</div>
-                <div class="kpi-lbl" id="kpi2-frac">—</div>
+              <div style="display:flex;gap:6px;align-items:center">
+                <select class="sel" id="kpi2Year" onchange="buildKPI2()" style="font-size:11px;width:90px"><option value="">All Years</option></select>
+                <select class="sel" id="kpi2Qtr" onchange="buildKPI2()" style="font-size:11px"><option value="">All Q</option><option value="1">Q1</option><option value="2">Q2</option><option value="3">Q3</option><option value="4">Q4</option></select>
+                <div style="text-align:right;min-width:96px">
+                  <div class="kpi-val" id="kpi2-val" style="color:var(--green);font-size:20px">—</div>
+                  <div class="kpi-lbl" id="kpi2-frac">—</div>
+                </div>
               </div>
             </div>
             <div class="ch-wrap" style="height:200px"><canvas id="cKpi2"></canvas></div>
@@ -3150,6 +3154,17 @@ const ATA_LABELS = {
 };
 
 function renderATACompare() {
+  // This comparison needs BOTH the CMR-CAR and ECAR datasets. They are lazy-loaded
+  // only when their own pages are opened, so on the KPI page one side could still be
+  // missing → it rendered as all-zero (∞ ratio, everything "Ineffective"). Ensure
+  // both are loaded, then re-render once they arrive.
+  if((!cmrLoaded || !ecarLoaded) && !renderATACompare._loading){
+    renderATACompare._loading = true;
+    const jobs = [];
+    if(!cmrLoaded) jobs.push(loadCmr());
+    if(!ecarLoaded) jobs.push(loadEcar());
+    Promise.all(jobs).finally(()=>{ renderATACompare._loading = false; renderATACompare(); });
+  }
   if(!cmrLoaded && !ecarLoaded) return;
   const level = parseInt(g('ataGroupLevel')?.value || '2');
   const yr = g('ataCompareYear')?.value || '';
@@ -3527,34 +3542,66 @@ function renderMcar(){renderFormView('MCAR',{ts:'mcar',yr:'mcarYearF',st:'mcarSt
 function amoSort(c){const t=TS.amoecar;if(t.sort===c)t.asc=!t.asc;else{t.sort=c;t.asc=true;}renderAmoEcar();}
 function mcarSort(c){const t=TS.mcar;if(t.sort===c)t.asc=!t.asc;else{t.sort=c;t.asc=true;}renderMcar();}
 
-// ── KPI 2: Early Detection (MCAR early-detected ÷ AMO-ECAR authority findings) ──
-async function buildKPI2(data){
-  if(!data) data=allData;
-  const amo=data.filter(r=>r.report_title==='AMO ECAR');
-  const q=k=>{const m=parseInt(String(k).slice(5,7),10);return String(k).slice(0,4)+'-Q'+Math.ceil(m/3);};
-  const den={};
-  amo.forEach(r=>{if(!r.raised_ym)return;const k=q(r.raised_ym);den[k]=(den[k]||0)+1;});
-  // numerator: confirmed early-detection matches from Supabase (empty until matching engine built)
-  const num={};
+// ── KPI 2: Early Detection (Internal vs Authority) ──
+// Automatic phase: compare MCAR (internal) vs AMO-ECAR (authority) finding volume
+// by quarter, with its own Year/Quarter filter. The early-detection RATE (MCAR
+// findings confirmed to predate a matching AMO-ECAR finding) needs the Supabase
+// `kpi2_match` table + matching engine (Phase 2) → shown only once matches exist.
+async function buildKPI2(){
+  const amoAll=allData.filter(r=>r.report_title==='AMO ECAR');
+  const mcarAll=allData.filter(r=>r.report_title==='MCAR');
+
+  // Populate the Year select once (from both datasets), preserving the current pick.
+  const yrEl=g('kpi2Year');
+  if(yrEl){
+    const years=[...new Set([...amoAll,...mcarAll].map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
+    if(yrEl.dataset.built!==String(years.length)){
+      const cur=yrEl.value;
+      yrEl.innerHTML='<option value="">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+      yrEl.value=cur; yrEl.dataset.built=String(years.length);
+    }
+  }
+  const yr=g('kpi2Year')?.value||'', qt=g('kpi2Qtr')?.value||'';
+  const inScope=r=>{
+    if(yr && String(r.raised_year)!==yr) return false;
+    if(qt){ const mo=r.raised_date?new Date(r.raised_date).getUTCMonth()+1:0; if(Math.ceil(mo/3)!==parseInt(qt)) return false; }
+    return true;
+  };
+  const amo=amoAll.filter(inScope), mcar=mcarAll.filter(inScope);
+
+  const qkey=k=>{const m=parseInt(String(k).slice(5,7),10);return String(k).slice(0,4)+'-Q'+Math.ceil(m/3);};
+  const amoQ={}, mcarQ={};
+  amo.forEach(r=>{if(!r.raised_ym)return;const k=qkey(r.raised_ym);amoQ[k]=(amoQ[k]||0)+1;});
+  mcar.forEach(r=>{if(!r.raised_ym)return;const k=qkey(r.raised_ym);mcarQ[k]=(mcarQ[k]||0)+1;});
+  const keys=[...new Set([...Object.keys(amoQ),...Object.keys(mcarQ)])].sort();
+  const mcarArr=keys.map(k=>mcarQ[k]||0), amoArr=keys.map(k=>amoQ[k]||0);
+  const totAmo=amo.length, totMcar=mcar.length;
+
+  // numerator: confirmed early-detection matches (Phase 2 — 0 until kpi2_match exists)
+  let confirmed=0;
   try{
     if(typeof sb!=='undefined' && sb){
-      const {data:rows,error}=await sb.from('kpi2_match').select('ecar_raised_date,status').eq('status','confirmed');
-      if(!error && rows){rows.forEach(m=>{if(!m.ecar_raised_date)return;const k=q(String(m.ecar_raised_date).slice(0,7));num[k]=(num[k]||0)+1;});}
+      const {data:rows,error}=await sb.from('kpi2_match').select('status').eq('status','confirmed');
+      if(!error && rows) confirmed=rows.length;
     }
-  }catch(e){/* kpi2_match table not yet created — numerator stays 0 */}
-  const keys=[...new Set([...Object.keys(den),...Object.keys(num)])].sort();
-  const denArr=keys.map(k=>den[k]||0), numArr=keys.map(k=>num[k]||0);
-  const totDen=denArr.reduce((a,b)=>a+b,0), totNum=numArr.reduce((a,b)=>a+b,0);
-  s('kpi2-val', totDen>0?Math.round(totNum/totDen*100)+'%':'N/A');
-  s('kpi2-frac', totNum+' / '+totDen+' findings');
+  }catch(e){/* kpi2_match table not yet created */}
+
+  if(confirmed>0 && totAmo>0){
+    s('kpi2-val', Math.round(confirmed/totAmo*100)+'%');
+    s('kpi2-frac', confirmed+' / '+totAmo+' early-detected');
+  } else {
+    s('kpi2-val', totMcar+' : '+totAmo);
+    s('kpi2-frac', 'MCAR : AMO-ECAR (count)');
+  }
+
   if(!g('cKpi2'))return;
   dc('cKpi2');
   charts['cKpi2']=new Chart(g('cKpi2'),{type:'bar',
     data:{labels:keys,datasets:[
-      {label:'AMO-ECAR (authority)',data:denArr,backgroundColor:'#ff6b6b',order:2},
-      {label:'Early-detected (MCAR)',data:numArr,backgroundColor:'#3FB950',order:1}
+      {label:'MCAR (internal)',data:mcarArr,backgroundColor:'#3FB950'},
+      {label:'AMO-ECAR (authority)',data:amoArr,backgroundColor:'#ff6b6b'}
     ]},
-    options:{...CO,scales:{
+    options:{...CO,plugins:{legend:{display:true,position:'top',labels:{color:'#8B949E',font:{size:10},boxWidth:10}}},scales:{
       x:{ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
       y:{beginAtZero:true,ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}}}}});
 }
