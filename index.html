@@ -399,6 +399,20 @@ tr:last-child td{border-bottom:none}
   .audit-kpi-row { grid-template-columns: repeat(2, 1fr); }
   .bottleneck-bar-label { width: 100px; }
 }
+/* ===== SPI page ===== */
+.spi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:16px}
+.spi-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+.spi-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px}
+.spi-num{font-weight:700;font-size:13px;color:var(--blue)}
+.spi-title{font-size:12.5px;color:var(--text);margin:2px 0 0;line-height:1.4}
+.spi-badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.spi-badge-good{background:#e7f6ec;color:#1e7e45}
+.spi-badge-warn{background:#fdeee0;color:#b5651d}
+.spi-badge-na{background:var(--bg3);color:var(--muted)}
+.spi-meta{display:flex;gap:18px;font-size:11.5px;color:var(--muted);margin:8px 0 6px;flex-wrap:wrap}
+.spi-meta b{color:var(--text)}
+.spi-canvas-wrap{position:relative;height:240px;margin-top:6px}
+.spi-note{font-size:11px;color:var(--muted);margin-top:8px;border-top:1px dashed var(--border);padding-top:8px}
 </style>
 </head>
 <body>
@@ -478,6 +492,7 @@ tr:last-child td{border-bottom:none}
         <button class="nav-item" onclick="showPage('openrfi',this)"><span class="nav-ic" data-ic="inbox"></span>Open Reports</button>
         <button class="nav-item" onclick="showPage('overdue',this)"><span class="nav-ic" data-ic="alert"></span>Overdue</button>
         <button class="nav-item" onclick="showPage('kpi',this)"><span class="nav-ic" data-ic="chart"></span>KPI Charts</button>
+        <button class="nav-item" onclick="showSPIPage(this)"><span class="nav-icon">📈</span>SPI</button>
         <div class="nav-sec" style="margin-top:6px">Detail</div>
         <button class="nav-item" onclick="showPage('allforms',this)"><span class="nav-ic" data-ic="list"></span>All Forms</button>
         <button class="nav-item" onclick="showPage('pavoi',this)"><span class="nav-ic" data-ic="doc"></span>PAVOI Detail</button>
@@ -1091,6 +1106,17 @@ tr:last-child td{border-bottom:none}
             </div>
             <div class="tbl-foot"><span id="mcarInfo">—</span><div class="pg-btns" id="mcarPg"></div></div>
           </div>
+        </div>
+        <div id="page-spi" class="page">
+          <div class="page-head">
+            <div>
+              <h1>SPI — Safety Performance Indicators</h1>
+              <div class="muted">Target: VJ's SPI must meet or be better than the SPT threshold approved by CAAV</div>
+            </div>
+            <div class="muted" id="spiUpdated"></div>
+          </div>
+          <div class="kpi-row" id="spiKpiRow"></div>
+          <div class="spi-grid" id="spiGrid"></div>
         </div>
         <div class="page" id="page-auditplan">
           <!-- KPI row (7 cards, rendered by renderAuditKpi) -->
@@ -2145,7 +2171,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.02-r77';
+const APP_REV = '2026.06.02-r78';
 
 // Nature of finding: ánh xạ mục con -> nhóm cha (từ danh mục gốc Galileo dwreporting_general_lists)
 const NATURE_PARENT = {
@@ -6149,7 +6175,7 @@ async function makeAdmin(id){
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────
-const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',ecar:'ECAR Detail',amoecar:'AMO-ECAR',mcar:'MCAR',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management',querybuilder:'Query Builder',mydashboard:'My Dashboard',kpi2:'KPI 2 — Early Detection'};
+const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',spi:'SPI — Safety Performance Indicators',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',ecar:'ECAR Detail',amoecar:'AMO-ECAR',mcar:'MCAR',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management',querybuilder:'Query Builder',mydashboard:'My Dashboard',kpi2:'KPI 2 — Early Detection'};
 function showPage(name,btn){
   if((name==='reports'||name==='admin'||name==='querybuilder'||name==='mydashboard')&&(!curUser||curUser.role!=='admin')){
     toast('You do not have permission to access this page','err');return;
@@ -7994,6 +8020,195 @@ window.toggleTheme = function(){
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();
+
+/* ============================================================ */
+/* SPI — Safety Performance Indicators                          */
+/* ============================================================ */
+/* ===== CONFIG — xác minh với data thật ===== */
+const SPI_CONFIG = {
+  reportTitle : 'AMO - SPI',        // theo cột "Report" trên Galileo
+  orgUnit     : 'QA AMO',
+  // higher = càng cao càng tốt | lower = càng thấp càng tốt
+  direction   : { 1:'lower', 2:'lower', 3:'lower', 4:'higher', 5:'lower' },
+  defaultDirection : 'lower'
+};
+
+const FIELD_MATCHERS = {
+  spiNumber   : /^\s*SPI\s*Number/i,
+  sptApproved : /SPT\s*approved\s*by\s*CAAV/i,
+  prevYear    : /Previous\s*year.?s?\s*SPI/i,
+  remark      : /^\s*Remark/i,
+  yearAchieve : /Year\s*Achievement/i,
+  achievement : /SPIs?\s*achiev/i,
+  rate        : /Rate\s*SPI/i,
+  monthlyCount: /Monthly\s*SPI\s*Count/i,
+  trigger     : /Trigger/i
+};
+
+const MONTH_LABELS = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+
+const spiNum  = t => { const n=parseFloat(String(t??'').replace(/,/g,'').replace(/[^\d.\-]/g,'')); return Number.isFinite(n)?n:null; };
+const spiBool = t => { const v=String(t??'').trim().toLowerCase(); if(v==='yes'||v==='true'||v==='1') return true; if(v==='no'||v==='false'||v==='0') return false; return null; };
+
+function spiMonthIndex(...candidates){
+  const map = {jan:0,january:0,feb:1,february:1,mar:2,march:2,apr:3,april:3,may:4,jun:5,june:5,jul:6,july:6,aug:7,august:7,sep:8,sept:8,september:8,oct:9,october:9,nov:10,november:10,dec:11,december:11};
+  for (const c of candidates){
+    const str = String(c||'').toLowerCase(); if(!str) continue;
+    const vi = str.match(/th[aá]ng\s*(\d{1,2})/); if (vi){ const m=+vi[1]-1; if(m>=0&&m<12) return m; }
+    for (const key of Object.keys(map).sort((a,b)=>b.length-a.length)){ if (new RegExp('\\b'+key+'\\b').test(str)) return map[key]; }
+    const num = str.match(/(?:^|[^\d])(\d{1,2})\s*$/); if (num){ const m=+num[1]-1; if(m>=0&&m<12) return m; }
+  }
+  return null;
+}
+
+async function loadSPI(){
+  const sumUrl = G_URL + 'dwreporting_report_summary'
+    + '?$select=report_id,report_number,report_title,report_status,org_unit_name,modified_date,raised_date'
+    + `&$filter=org_unit_name eq '${SPI_CONFIG.orgUnit}' and report_title eq '${SPI_CONFIG.reportTitle}'`;
+  const sumRaw = await fetchAll(sumUrl);
+
+  const sumMap = {};
+  sumRaw.forEach(r => {
+    if (!r.report_number || !r.report_number.trim()) return;
+    const ex = sumMap[r.report_id];
+    if (!ex || new Date(r.modified_date) > new Date(ex.modified_date)) sumMap[r.report_id] = r;
+  });
+  const reports = Object.values(sumMap).sort((a,b)=>(a.report_number||'').localeCompare(b.report_number||''));
+  const ids = reports.map(r => r.report_id);
+  if (!ids.length) return [];
+
+  const noQuote = ids.map(id => `report_id eq ${id}`).join(' or ');
+  const quoted  = ids.map(id => `report_id eq '${id}'`).join(' or ');
+  const fldBase = 'dwanalytics_report_form_section_field?$select=report_id,field_name,text_value,repeater_section_name';
+  let fRaw;
+  try       { fRaw = await fetchAll(G_URL + fldBase + '&$filter=' + encodeURIComponent(noQuote)); }
+  catch (e) { fRaw = await fetchAll(G_URL + fldBase + '&$filter=' + encodeURIComponent(quoted)); }
+  window.__SPI_RAW_FIELDS__ = fRaw;
+
+  const byId = {};
+  reports.forEach(r => {
+    const numMatch = (r.report_number||'').match(/(\d{1,2})\s*$/);
+    const idx = numMatch ? +numMatch[1] : null;
+    byId[r.report_id] = {
+      number:r.report_number, seq:idx, title:r.report_number, status:r.report_status, raised:r.raised_date,
+      sptApproved:null, prevYear:null, remark:'', yearAchievement:null, achievement:'',
+      direction: SPI_CONFIG.direction[idx] || SPI_CONFIG.defaultDirection,
+      months: Array.from({length:12}, () => ({ rate:null, count:null, trigger:null }))
+    };
+  });
+
+  const M = FIELD_MATCHERS;
+  fRaw.forEach(f => {
+    const o = byId[f.report_id]; if(!o) return;
+    const fn = f.field_name || '', sec = f.repeater_section_name || '', tv = f.text_value;
+    if (M.spiNumber.test(fn))   { if(tv) o.title = tv; return; }
+    if (M.sptApproved.test(fn)) { if(o.sptApproved==null) o.sptApproved = spiNum(tv); return; }
+    if (M.prevYear.test(fn))    { if(o.prevYear==null)    o.prevYear    = spiNum(tv); return; }
+    if (M.remark.test(fn))      { if(!o.remark) o.remark = tv||''; return; }
+    if (M.yearAchieve.test(fn)) { if(o.yearAchievement==null) o.yearAchievement = spiBool(tv); return; }
+    if (M.achievement.test(fn)) { if(!o.achievement) o.achievement = tv||''; return; }
+    if (M.rate.test(fn)){ const m=spiMonthIndex(fn,sec); if(m!=null&&o.months[m].rate==null) o.months[m].rate=spiNum(tv); return; }
+    if (M.monthlyCount.test(fn)){ const m=spiMonthIndex(fn,sec); if(m!=null&&o.months[m].count==null) o.months[m].count=spiNum(tv); return; }
+    if (M.trigger.test(fn)){ const m=spiMonthIndex(fn,sec); if(m!=null&&o.months[m].trigger==null) o.months[m].trigger=spiBool(tv); return; }
+  });
+  return Object.values(byId).sort((a,b)=>(a.number||'').localeCompare(b.number||''));
+}
+
+function spiEvaluate(spi){
+  const spt = spi.sptApproved; let withData=0, fail=0;
+  const monthPass = spi.months.map(m => {
+    if (m.rate==null || spt==null) return null;
+    withData++;
+    const ok = spi.direction==='higher' ? m.rate>=spt : m.rate<=spt;
+    if (!ok) fail++; return ok;
+  });
+  let status;
+  if (spi.yearAchievement===true) status='good';
+  else if (spi.yearAchievement===false) status='warn';
+  else if (withData===0) status='na';
+  else status = fail===0 ? 'good' : 'warn';
+  return { monthPass, withData, fail, status };
+}
+
+const _spiCharts = [];
+function renderSPIPage(list){
+  const evals = list.map(spiEvaluate);
+  const good = evals.filter(e=>e.status==='good').length;
+  const warn = evals.filter(e=>e.status==='warn').length;
+  const tracking = list.filter(s=>s.months.some(m=>m.rate!=null)).length;
+  g('spiKpiRow').innerHTML =
+      kpiCard('Total SPIs', list.length, 'All indicators', 'kpi-tone-blue')
+    + kpiCard('Tracking', tracking, 'With monthly data', 'kpi-tone-muted')
+    + kpiCard('On target', good, 'Meeting SPT', 'kpi-tone-green')
+    + kpiCard('Out of limit', warn, 'Exceeding SPT', 'kpi-tone-red');
+  s('spiUpdated', 'Updated: ' + new Date().toLocaleString('en-GB'));
+
+  _spiCharts.forEach(c=>c.destroy()); _spiCharts.length = 0;
+  g('spiGrid').innerHTML = list.map((spi,i)=>{
+    const ev = evals[i];
+    const badge = ev.status==='good' ? '<span class="spi-badge spi-badge-good">✔ On target</span>'
+                : ev.status==='warn' ? `<span class="spi-badge spi-badge-warn">⚠ ${ev.fail} ${ev.fail===1?'month':'months'} out of limit</span>`
+                : '<span class="spi-badge spi-badge-na">No data</span>';
+    const dirTxt = spi.direction==='higher' ? 'higher is better' : 'lower is better';
+    return `
+      <div class="spi-card">
+        <div class="spi-card-head">
+          <div>
+            <div class="spi-num">${esc(spi.number)}</div>
+            <div class="spi-title">${esc(spi.title)}</div>
+          </div>
+          ${badge}
+        </div>
+        <div class="spi-meta">
+          <span>SPT (CAAV): <b>${spi.sptApproved??'—'}</b></span>
+          <span>Prev year: <b>${spi.prevYear??'—'}</b></span>
+          <span>Direction: <b>${dirTxt}</b></span>
+        </div>
+        <div class="spi-canvas-wrap"><canvas id="spiCanvas${i}"></canvas></div>
+        ${spi.remark?`<div class="spi-note">📝 ${esc(spi.remark)}</div>`:''}
+      </div>`;
+  }).join('');
+  list.forEach((spi,i)=> _spiCharts.push(drawSPIChart(`spiCanvas${i}`, spi)));
+}
+
+function drawSPIChart(canvasId, spi){
+  const spt = spi.sptApproved;
+  const rates = spi.months.map(m => m.rate);
+  const refLine = MONTH_LABELS.map(()=> spt);
+  const ptColors = spi.months.map(m=>{
+    if (m.rate==null || spt==null) return '#3f7fd0';
+    const ok = spi.direction==='higher' ? m.rate>=spt : m.rate<=spt;
+    return ok ? '#3f7fd0' : '#d0392b';
+  });
+  return new Chart(g(canvasId).getContext('2d'), {
+    type:'line',
+    data:{ labels: MONTH_LABELS, datasets:[
+      { label:'Rate SPI', data:rates, borderColor:'#3f7fd0', backgroundColor:'#3f7fd0',
+        pointBackgroundColor:ptColors, pointRadius:4, pointHoverRadius:5, borderWidth:2, tension:0, spanGaps:false },
+      { label:'SPT approved by CAAV', data:refLine, borderColor:'#d0392b', backgroundColor:'#d0392b',
+        pointRadius:0, borderWidth:2, tension:0 }
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{ legend:{ position:'bottom', labels:{ boxWidth:14, font:{size:11} } },
+                tooltip:{ callbacks:{ title: it=>'Month '+it[0].label } } },
+      scales:{ y:{ beginAtZero:true, grid:{color:'#eef1f5'}, ticks:{font:{size:11}} },
+               x:{ grid:{display:false}, ticks:{font:{size:11}} } }
+    }
+  });
+}
+
+let _spiData = null;
+async function showSPIPage(btn){
+  showPage('spi', btn);
+  if (_spiData) { renderSPIPage(_spiData); return; }
+  try {
+    _spiData = await loadSPI();
+    if (!_spiData.length){ toast('No SPI forms found — check SPI_CONFIG.reportTitle'); return; }
+    renderSPIPage(_spiData);
+  } catch(e){ console.error(e); toast('Failed to load SPI: ' + e.message); }
+}
 </script>
 </body>
 </html>
