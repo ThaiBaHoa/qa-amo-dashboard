@@ -400,7 +400,10 @@ tr:last-child td{border-bottom:none}
   .bottleneck-bar-label { width: 100px; }
 }
 /* ===== SPI page ===== */
-.spi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:16px}
+.spi-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+@media (max-width:1100px){.spi-kpi-row{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:560px){.spi-kpi-row{grid-template-columns:1fr}}
+.spi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px}
 .spi-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
 .spi-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px}
 .spi-num{font-weight:700;font-size:13px;color:var(--blue)}
@@ -1115,7 +1118,7 @@ tr:last-child td{border-bottom:none}
             </div>
             <div class="muted" id="spiUpdated"></div>
           </div>
-          <div class="kpi-row" id="spiKpiRow"></div>
+          <div class="spi-kpi-row" id="spiKpiRow"></div>
           <div class="spi-grid" id="spiGrid"></div>
         </div>
         <div class="page" id="page-auditplan">
@@ -2171,7 +2174,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.02-r78';
+const APP_REV = '2026.06.02-r79';
 
 // Nature of finding: ánh xạ mục con -> nhóm cha (từ danh mục gốc Galileo dwreporting_general_lists)
 const NATURE_PARENT = {
