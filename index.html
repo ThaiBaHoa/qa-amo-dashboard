@@ -2174,7 +2174,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.02-r79';
+const APP_REV = '2026.06.02-r80';
 
 // Nature of finding: ánh xạ mục con -> nhóm cha (từ danh mục gốc Galileo dwreporting_general_lists)
 const NATURE_PARENT = {
@@ -8068,7 +8068,7 @@ async function loadSPI(){
   const sumUrl = G_URL + 'dwreporting_report_summary'
     + '?$select=report_id,report_number,report_title,report_status,org_unit_name,modified_date,raised_date'
     + `&$filter=org_unit_name eq '${SPI_CONFIG.orgUnit}' and report_title eq '${SPI_CONFIG.reportTitle}'`;
-  const sumRaw = await fetchAll(sumUrl);
+  const sumRaw = await fetchAll(sumUrl, true);
 
   const sumMap = {};
   sumRaw.forEach(r => {
@@ -8084,8 +8084,8 @@ async function loadSPI(){
   const quoted  = ids.map(id => `report_id eq '${id}'`).join(' or ');
   const fldBase = 'dwanalytics_report_form_section_field?$select=report_id,field_name,text_value,repeater_section_name';
   let fRaw;
-  try       { fRaw = await fetchAll(G_URL + fldBase + '&$filter=' + encodeURIComponent(noQuote)); }
-  catch (e) { fRaw = await fetchAll(G_URL + fldBase + '&$filter=' + encodeURIComponent(quoted)); }
+  try       { fRaw = await fetchAll(G_URL + fldBase + '&$filter=' + encodeURIComponent(noQuote), true); }
+  catch (e) { fRaw = await fetchAll(G_URL + fldBase + '&$filter=' + encodeURIComponent(quoted), true); }
   window.__SPI_RAW_FIELDS__ = fRaw;
 
   const byId = {};
@@ -8205,12 +8205,22 @@ function drawSPIChart(canvasId, spi){
 let _spiData = null;
 async function showSPIPage(btn){
   showPage('spi', btn);
+  if (typeof setOv==='function') setOv(false);   // never block on a stale overlay
   if (_spiData) { renderSPIPage(_spiData); return; }
+  const grid = g('spiGrid');
+  if (grid) grid.innerHTML = '<div class="muted" style="padding:40px 16px;text-align:center">⏳ Loading SPI data…</div>';
   try {
     _spiData = await loadSPI();
-    if (!_spiData.length){ toast('No SPI forms found — check SPI_CONFIG.reportTitle'); return; }
+    if (!_spiData.length){
+      if (grid) grid.innerHTML = '<div class="muted" style="padding:40px 16px;text-align:center">No SPI forms found — check SPI_CONFIG.reportTitle</div>';
+      toast('No SPI forms found — check SPI_CONFIG.reportTitle'); return;
+    }
     renderSPIPage(_spiData);
-  } catch(e){ console.error(e); toast('Failed to load SPI: ' + e.message); }
+  } catch(e){
+    console.error(e);
+    if (grid) grid.innerHTML = '<div class="muted" style="padding:40px 16px;text-align:center">⚠ Failed to load SPI: '+esc(e.message)+'</div>';
+    toast('Failed to load SPI: ' + e.message);
+  }
 }
 </script>
 </body>
