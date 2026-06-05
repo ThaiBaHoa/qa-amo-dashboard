@@ -2,8 +2,8 @@
 
 **File:** `index.html` (single-file SPA, không build step)
 **Repo:** `ThaiBaHoa/qa-amo-dashboard` · **Domain:** `vjc-qa-amo.com` (GitHub Pages)
-**Version hiện tại:** `2026.06.05-r86`
-**Cập nhật spec:** 2026-06-05 — phản ánh code thực tế (gồm r81–r86, SPI, KPI2, PAVOI RFI)
+**Version hiện tại:** `2026.06.05-r87`
+**Cập nhật spec:** 2026-06-05 — phản ánh code thực tế (gồm r81–r87, SPI, KPI2, PAVOI RFI)
 
 > Tài liệu này mô tả TOÀN BỘ kiến trúc, dữ liệu, logic và quy ước của dashboard. Dùng làm nguồn tham chiếu chuẩn khi sửa code. Số dòng (Lxxxx) là tương đối, dùng để định vị nhanh.
 
@@ -57,7 +57,7 @@ Dashboard nội bộ cho **QA AMO** (Quality Assurance — Approved Maintenance 
 | `SUPA_KEY` | `sb_publishable_…` | anon key |
 | `G_URL` | `https://galileo-proxy.thaibahoa2308.workers.dev/proxy/` | Galileo proxy |
 | `ORG_UNIT` | `'QA AMO'` | filter chính cho mọi query report |
-| `APP_REV` | `'2026.06.05-r86'` | version (hiển thị footer + PDF) |
+| `APP_REV` | `'2026.06.05-r87'` | version (hiển thị footer + PDF) |
 | `PS` | `25` | page size pagination |
 | `CACHE_KEY` | `'qaAmoV5'` | localStorage cache key |
 | `CACHE_TTL` | `4*60*60*1000` (4 giờ) | TTL cache |
@@ -156,22 +156,31 @@ chưa Closed, có c:  !t→'Closed'; c<=t?'On-time Closed':'Lately Closed'
 ### 6.3 `catCalc(ag, sm)` (L3027)
 Chỉ khi `sm==='Overdue'`: `ag>=-30`→CAT I; `ag>=-60`→CAT II; còn lại→CAT III.
 
-### 6.4 KPI Overview / KPI Charts
-- **Open + Overdue:** count theo `semantic_status`. Overdue% = `over/(open+over)`.
-- **On-time Rate:** `onTime / (onTime + lately)` — **mẫu số chỉ report có target** (SR/AISC không target bị loại). Trên KPI Charts: `buildKPICharts()` (L3281) → `onTime/(onTime+lately)`.
-- **Repetitive Rate:** `count(is_rep) / total`.
-- **CAT I/II/III:** count theo `overdue_cat` (chỉ trên tập Overdue).
-- Charts: by Status (doughnut), by Month (bar theo `raised_ym`), Top Forms (bar). KPI Charts có year filter (mặc định năm hiện tại).
+### 6.4 Overview (rebuild r87) — `renderOverview(d)` + `renderOvTypeBlock()`
+Trang Overview đã rebuild (r87): KHÔNG còn donut/by-month/top-forms/summary-by-form. Chỉ monitor tiến độ 3 nhóm, dùng dữ liệu sẵn có (không fetch mới). Lọc qua `#ovYearFilter` → `filterOverviewYear()` truyền `d` (allData lọc năm) vào `renderOverview(d)`.
+- **MNT · Audit Progress** (nguồn `auditData.filter(a=>a.prefix==='MNT')`, lọc `sched_year`):
+  - 4 KPI: Total MNT / Closed (`status==='Closed'`) / In Progress (`status` ∉ {Closed, Cancelled}) / **Có finding Overdue** (`overdue_count>0`).
+  - Bảng MNT chưa đóng: sort `overdue_count` desc → `open_count` desc; dòng có overdue tô đỏ nhạt; click → `showAuditDetail(audit_id)`.
+- **Report Progress** — 2 khối `renderOvTypeBlock(title, d, prefix)` cho `'MCAR'` và `'AMO ECAR'` (lọc `report_title`):
+  - Total / Open / Overdue / Closed (`On-time + Lately + Closed`).
+  - **On-time Rate** = `onTime/(onTime+lately)` (mẫu số chỉ report có target). Thanh **% closed** = `closed/total`.
+- Dead-code giữ lại (không còn caller): `buildChartsFor`, `renderStatTblsFor`, `buildMonthChart`, `buildFormChart`.
+
+### 6.4b KPI Charts (trang riêng `page-kpi`) — `buildKPICharts()` (L3281)
+- Cards: Total / Open / Overdue / **On-time Rate** `onTime/(onTime+lately)` / CAT III / Audits (distinct `audit_id`). **Repetitive Rate** = `count(is_rep)/total`. **CAT I/II/III** count theo `overdue_cat` (tập Overdue). Year filter (mặc định năm hiện tại).
 
 ### 6.5 KPI2 — Early Detection (L3733–3887)
 Đo tỉ lệ AMO-ECAR (authority) đã được **MCAR (nội bộ) phát hiện sớm hơn**.
 - `isEarlyDetected(ecar, mcarPool)` (L3810): tồn tại MCAR có `raised_date < ecar.raised_date` VÀ (cùng Nature group **HOẶC** `tokenSim(desc) >= K2_SIM_THRESHOLD=0.5`).
 - Hiển thị tỉ lệ `MCAR ÷ AMO-ECAR`; nhóm theo Nature / Quarter / Year / Scope. Nguồn: `allData` + field Nature (Galileo), KHÔNG dùng Supabase. (Bản đối sánh kpi2_match Supabase = Phase 2, chưa làm.)
 
-### 6.6 SPI — Safety Performance Indicators (L8255–8442)
+### 6.6 SPI — Safety Performance Indicators (rework r87)
 - `SPI_CONFIG = { reportTitle:'AMO - SPI', orgUnit:'QA AMO', direction:{1:'lower',2:'lower',3:'lower',4:'higher',5:'lower'}, defaultDirection:'lower' }`.
-- Mỗi SPI: `seq` (1–5), `sptApproved` (ngưỡng CAAV), `prevYear`, `yearAchievement`, `months[12]={rate,count,trigger}`.
-- `spiEvaluate()` (L8344): so từng tháng với SPT theo `direction` (lower: rate≤SPT pass; higher: rate≥SPT pass). Status: `good` (yearAchievement true hoặc mọi tháng pass) / `warn` / `na` (không data).
+- Mỗi SPI: `seq` (1–5), `sptApproved` (ngưỡng CAAV/ALOS), `prevYear`, `yearAchievement`, `raised`/`raised_year` (= `getFullYear(raised_date)`), `months[12]={rate,count,trigger}`.
+- `FIELD_MATCHERS`: `monthTrigger: /SPI\s*Trigger\??/i` bắt cả `'Jun - SPI Trigger?'` lẫn `'Mar SPI Trigger?'`; `rate: /^\s*Rate\s*SPI\b/i` (vd `Rate SPI - May`). Tháng suy từ TÊN field qua `spiMonthIndex` (`repeater_section_name` null).
+- **`spiEvaluate(spi)`**: mỗi tháng `breach` = ưu tiên cờ `<Month> SPI Trigger?` (Yes→breach, No→ok), fallback so `rate` vs `SPT` theo `direction`. Tháng **chưa có rate = chưa tới kỳ** → KHÔNG tính trigger, KHÔNG đứt chuỗi.
+  - **Current Trigger Level** = số tháng breach **liên tiếp (dương lịch liền kề)** tính ngược từ tháng có data mới nhất → `0/1/2/≥3`. Status: `good` (yearAchievement true | level 0) / `trigger` / `na`.
+- **Render** `renderSPIPage(list)`: KPI row = Total / Tracking / On target / **Current Trigger** (tách L1/L2/L3). Badge mỗi card: `On target` / `Trigger Level 1/2/3`. Year filter `#spiYearFilter` (`raised_year`, mặc định năm hiện tại) → `populateSpiYear()` + `renderSPIYear()`. Target line: *"Vietjet AMO's SPI must meet or better than the SPT (ALOS) approved by CAAV"*.
 
 ---
 
@@ -310,7 +319,7 @@ Chỉ khi `sm==='Overdue'`: `ag>=-30`→CAT I; `ag>=-60`→CAT II; còn lại→
 ## 13. Quy ước phát triển
 
 - **Edit surgical:** chỉ chạm điểm cần sửa, không refactor lan man.
-- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r86.
+- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r87. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.)
 - **Deploy:** sửa `index.html` (bản OneDrive) → copy vào clone repo → `git diff` review → commit + push `main` (commit message dùng `git commit -F` để tránh lỗi shell với ký tự `/`). GitHub Pages tự build ~1–2 phút.
 - **Tận dụng helper có sẵn** (fetchAll, g, s, esc, fd, toast, setOv, renderPaged, sortD, ageCalc) — không viết trùng.
 - **Tài liệu liên quan:** `PAVOI_RFI_Spec.md` (RFI chi tiết), `CAR report types & KPI2` (MCAR/AMO-ECAR vs CMR-CAR/ECAR; KPI2 Phase-1), `GALILEO_QUIRKS.md`, `GALILEO_DATA_QUALITY.md`.
@@ -327,3 +336,4 @@ Chỉ khi `sm==='Overdue'`: `ag>=-30`→CAT I; `ag>=-60`→CAT II; còn lại→
 | r84 | RFI: fetch theo report_id (batch 15) thay vì kéo 24k record toàn hệ thống. |
 | r85 | RFI: retry per-chunk + `pavoiRfiDone` per-report (hết "lúc được lúc không"). |
 | r86 | RFI: page chỉ fetch PAVOI Open (~65, nhanh ~3×); modal fetch tươi 1 report (hết stale). |
+| r87 | Overview rebuild (MNT + MCAR + AMO ECAR, bỏ donut/month/top-forms); SPI rework (Current Trigger L1/L2/L3 theo chuỗi tháng breach liền kề, year filter theo raised_year, badge Trigger Level). |
