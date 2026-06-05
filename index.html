@@ -893,7 +893,8 @@ tr:last-child td{border-bottom:none}
                   <th onclick="afSort('report_ageing')">Days to Due ↕</th>
                   <th onclick="afSort('overdue_cat')">CAT ↕</th>
                   <th>Finding Level</th>
-                  <th>Repetitive</th>
+                  <th onclick="afSort('completed_date')">Completed ↕</th>
+                  <th onclick="afSort('close_date')">Close Date ↕</th>
                   <th>Audit Ref</th>
                   <th>MNT No</th>
                   <th>Audit Title</th>
@@ -2174,7 +2175,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.02-r80';
+const APP_REV = '2026.06.05-r81';
 
 // Nature of finding: ánh xạ mục con -> nhóm cha (từ danh mục gốc Galileo dwreporting_general_lists)
 const NATURE_PARENT = {
@@ -2730,10 +2731,14 @@ async function loadData(forceRefresh=false) {
       const f  = fMap[r.report_id] || {};
       const wf = wfMap[r.report_id] || null;
 
-      // Target date: ưu tiên custom field, fallback workflow target
-      const td = f['Target date'] || wf?.stage_target_date || null;
-      // Close date: từ workflow stage_completed_date
-      const cd = wf?.stage_completed_date || null;
+      // Suy 3 mốc từ workflow stage (Task = report management, ReportAcceptReject = closure)
+      const sd = deriveStageDates(wfAllMap[r.report_id]);
+      // Target date: ưu tiên custom field → stage Task target → stage ReportAcceptReject target
+      const td = f['Target date'] || sd.td || wf?.stage_target_date || null;
+      // Completed date: ngày làm xong báo cáo (stage Task)
+      const completed_date = sd.completed || null;
+      // Close date: ngày report đóng (ReportAcceptReject) → fallback stage completed cũ
+      const cd = sd.cd || wf?.stage_completed_date || null;
 
       const ag = ageCalc(td);
       const sm = semCalc(r.report_status, cd, td);
@@ -2742,6 +2747,7 @@ async function loadData(forceRefresh=false) {
         ...r,
         Target_date:   td,
         close_date:    cd,
+        completed_date: completed_date,
         issue_date:    f['Issue Date']                || null,
         finding_level: f['Finding level']             || null,
         repetitive:    f['Repetitive']                || null,
@@ -2986,6 +2992,27 @@ function catCalc(ag, sm) {
   if (ag>=-30) return 'CAT I';
   if (ag>=-60) return 'CAT II';
   return 'CAT III';
+}
+
+// Suy 3 mốc thời gian từ workflow stages (cho SR/AISC không có custom 'Target date').
+// Galileo giữ 3 khái niệm khác nhau, lấy theo stage_type:
+//   Target Date    = stage_target_date của stage 'Task' (vd "Report Management") — deadline gốc
+//   Completed Date = stage_completed_date của stage 'Task' — ngày làm xong báo cáo
+//   Close Date     = stage_completed_date của stage 'ReportAcceptReject' — ngày report đóng
+// Lấy giá trị muộn nhất khi có nhiều stage cùng loại (đồng thời dedup stage Task trùng).
+function deriveStageDates(stages) {
+  const out = { td: null, completed: null, cd: null };
+  if (!stages || !stages.length) return out;
+  const later = (a, b) => !a ? b : !b ? a : (new Date(b) > new Date(a) ? b : a);
+  stages.forEach(s => {
+    if (s.stage_type === 'Task') {
+      out.td        = later(out.td, s.stage_target_date);
+      out.completed = later(out.completed, s.stage_completed_date);
+    } else if (s.stage_type === 'ReportAcceptReject') {
+      out.cd        = later(out.cd, s.stage_completed_date);
+    }
+  });
+  return out;
 }
 
 // ── RENDER ALL ────────────────────────────────────────────────
@@ -3850,7 +3877,8 @@ function renderAF() {
       <td>${ageDis(r.report_ageing,r.semantic_status)}</td>
       <td>${cBadge(r.overdue_cat)}</td>
       <td>${esc(r.finding_level)||'—'}</td>
-      <td>${r.is_rep?'<span style="color:var(--yellow)">⚠ Yes</span>':'—'}</td>
+      <td style="font-size:11px;color:var(--muted)">${fd(r.completed_date)}</td>
+      <td style="font-size:11px;color:var(--muted)">${fd(r.close_date)}</td>
       <td style="font-size:11px;color:var(--muted)">${esc(r.audit_ref)||'—'}</td>
       <td style="font-size:11px;color:var(--blue)">${esc(r.audit_number)||'—'}</td>
       <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)">${esc(r.audit_title)||'—'}</td>
