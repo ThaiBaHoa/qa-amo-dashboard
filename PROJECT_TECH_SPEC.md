@@ -2,8 +2,8 @@
 
 **File:** `index.html` (single-file SPA, không build step)
 **Repo:** `ThaiBaHoa/qa-amo-dashboard` · **Domain:** `vjc-qa-amo.com` (GitHub Pages)
-**Version hiện tại:** `2026.06.05-r87`
-**Cập nhật spec:** 2026-06-05 — phản ánh code thực tế (gồm r81–r87, SPI, KPI2, PAVOI RFI)
+**Version hiện tại:** `2026.06.05-r88`
+**Cập nhật spec:** 2026-06-05 — phản ánh code thực tế (gồm r81–r88, SPI, KPI2, PAVOI RFI)
 
 > Tài liệu này mô tả TOÀN BỘ kiến trúc, dữ liệu, logic và quy ước của dashboard. Dùng làm nguồn tham chiếu chuẩn khi sửa code. Số dòng (Lxxxx) là tương đối, dùng để định vị nhanh.
 
@@ -57,7 +57,7 @@ Dashboard nội bộ cho **QA AMO** (Quality Assurance — Approved Maintenance 
 | `SUPA_KEY` | `sb_publishable_…` | anon key |
 | `G_URL` | `https://galileo-proxy.thaibahoa2308.workers.dev/proxy/` | Galileo proxy |
 | `ORG_UNIT` | `'QA AMO'` | filter chính cho mọi query report |
-| `APP_REV` | `'2026.06.05-r87'` | version (hiển thị footer + PDF) |
+| `APP_REV` | `'2026.06.05-r88'` | version (hiển thị footer + PDF) |
 | `PS` | `25` | page size pagination |
 | `CACHE_KEY` | `'qaAmoV5'` | localStorage cache key |
 | `CACHE_TTL` | `4*60*60*1000` (4 giờ) | TTL cache |
@@ -179,7 +179,7 @@ Trang Overview đã rebuild (r87): KHÔNG còn donut/by-month/top-forms/summary-
 - Mỗi SPI: `seq` (1–5), `sptApproved` (ngưỡng CAAV/ALOS), `prevYear`, `yearAchievement`, `raised`/`raised_year` (= `getFullYear(raised_date)`), `months[12]={rate,count,trigger}`.
 - `FIELD_MATCHERS`: `monthTrigger: /SPI\s*Trigger\??/i` bắt cả `'Jun - SPI Trigger?'` lẫn `'Mar SPI Trigger?'`; `rate: /^\s*Rate\s*SPI\b/i` (vd `Rate SPI - May`). Tháng suy từ TÊN field qua `spiMonthIndex` (`repeater_section_name` null).
 - **`spiEvaluate(spi)`**: mỗi tháng `breach` = ưu tiên cờ `<Month> SPI Trigger?` (Yes→breach, No→ok), fallback so `rate` vs `SPT` theo `direction`. Tháng **chưa có rate = chưa tới kỳ** → KHÔNG tính trigger, KHÔNG đứt chuỗi.
-  - **Current Trigger Level** = số tháng breach **liên tiếp (dương lịch liền kề)** tính ngược từ tháng có data mới nhất → `0/1/2/≥3`. Status: `good` (yearAchievement true | level 0) / `trigger` / `na`.
+  - **Trigger Level** = chuỗi breach **liên tiếp (dương lịch liền kề) DÀI NHẤT** trong năm (cap 3): 1 tháng breach lẻ = L1, 2 tháng liền kề = L2, 3+ = L3. Breach dù đã phục hồi vẫn tính; tháng đạt chỉ số / chưa có data làm đứt chuỗi (vd Mar breach nhưng Feb đạt → vẫn L1). (r88 — sửa từ logic "tính ngược từ tháng cuối" của r87 vốn bỏ sót breach đã phục hồi.) Status: `good` (yearAchievement true | level 0) / `trigger` / `na`.
 - **Render** `renderSPIPage(list)`: KPI row = Total / Tracking / On target / **Current Trigger** (tách L1/L2/L3). Badge mỗi card: `On target` / `Trigger Level 1/2/3`. Year filter `#spiYearFilter` (`raised_year`, mặc định năm hiện tại) → `populateSpiYear()` + `renderSPIYear()`. Target line: *"Vietjet AMO's SPI must meet or better than the SPT (ALOS) approved by CAAV"*.
 
 ---
@@ -319,7 +319,7 @@ Trang Overview đã rebuild (r87): KHÔNG còn donut/by-month/top-forms/summary-
 ## 13. Quy ước phát triển
 
 - **Edit surgical:** chỉ chạm điểm cần sửa, không refactor lan man.
-- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r87. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.)
+- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r88. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.)
 - **Deploy:** sửa `index.html` (bản OneDrive) → copy vào clone repo → `git diff` review → commit + push `main` (commit message dùng `git commit -F` để tránh lỗi shell với ký tự `/`). GitHub Pages tự build ~1–2 phút.
 - **Tận dụng helper có sẵn** (fetchAll, g, s, esc, fd, toast, setOv, renderPaged, sortD, ageCalc) — không viết trùng.
 - **Tài liệu liên quan:** `PAVOI_RFI_Spec.md` (RFI chi tiết), `CAR report types & KPI2` (MCAR/AMO-ECAR vs CMR-CAR/ECAR; KPI2 Phase-1), `GALILEO_QUIRKS.md`, `GALILEO_DATA_QUALITY.md`.
@@ -337,3 +337,4 @@ Trang Overview đã rebuild (r87): KHÔNG còn donut/by-month/top-forms/summary-
 | r85 | RFI: retry per-chunk + `pavoiRfiDone` per-report (hết "lúc được lúc không"). |
 | r86 | RFI: page chỉ fetch PAVOI Open (~65, nhanh ~3×); modal fetch tươi 1 report (hết stale). |
 | r87 | Overview rebuild (MNT + MCAR + AMO ECAR, bỏ donut/month/top-forms); SPI rework (Current Trigger L1/L2/L3 theo chuỗi tháng breach liền kề, year filter theo raised_year, badge Trigger Level). |
+| r88 | SPI fix: Trigger Level = chuỗi breach liền kề DÀI NHẤT trong năm (không phải tính ngược từ tháng cuối) → breach lẻ đã phục hồi (vd SPI-03 Mar) vẫn hiện L1. |

@@ -2159,7 +2159,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.05-r87';
+const APP_REV = '2026.06.05-r88';
 
 // Nature of finding: ánh xạ mục con -> nhóm cha (từ danh mục gốc Galileo dwreporting_general_lists)
 const NATURE_PARENT = {
@@ -8351,22 +8351,16 @@ function spiEvaluate(spi){
     return { hasData:true, breach };
   });
 
-  const dataMonths = monthState.map((s,i)=>({...s,i})).filter(s=>s.hasData);
+  const dataMonths = monthState.filter(s=>s.hasData);
   const withData = dataMonths.length;
   const fail = dataMonths.filter(s=>s.breach).length;
 
-  // Current Trigger = số tháng breach LIÊN TIẾP (dương lịch liền kề) tính ngược từ tháng data mới nhất.
-  let currentLevel = 0;
-  for(let k = dataMonths.length - 1; k >= 0; k--){
-    const cur = dataMonths[k];
-    if(!cur.breach) break;
-    if(k < dataMonths.length - 1){
-      const next = dataMonths[k+1];
-      if(next.i - cur.i !== 1) break;   // không liền kề dương lịch → dừng
-    }
-    currentLevel++;
-  }
-  const level = currentLevel >= 3 ? 3 : currentLevel;
+  // Trigger Level = chuỗi breach LIÊN TIẾP (dương lịch liền kề) DÀI NHẤT trong năm (cap 3).
+  // 1 tháng breach lẻ = L1; 2 tháng liền kề = L2; 3+ = L3. Breach dù đã phục hồi vẫn tính.
+  // Tháng đạt chỉ số / chưa có data làm đứt chuỗi (vd Mar breach nhưng Feb đạt → vẫn L1).
+  let run = 0, maxRun = 0;
+  monthState.forEach(m => { if(m.breach){ run++; if(run>maxRun) maxRun=run; } else run = 0; });
+  const level = maxRun >= 3 ? 3 : maxRun;
 
   let status;
   if(spi.yearAchievement === true)  status = 'good';
