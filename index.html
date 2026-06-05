@@ -2208,7 +2208,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.05-r83';
+const APP_REV = '2026.06.05-r84';
 
 // Nature of finding: ánh xạ mục con -> nhóm cha (từ danh mục gốc Galileo dwreporting_general_lists)
 const NATURE_PARENT = {
@@ -4004,26 +4004,33 @@ function renderPavoi() {
 
 // ── PAVOI RFI (Request For Information) monitor ───────────────
 // Lazy-load RFI cho tất cả PAVOI từ dwreporting_report_task.
-// Fetch theo task_title, post-filter report_id bằng Set (tránh nhồi report_id vào $filter).
+// Fetch THEO report_id của PAVOI (batch ~30 GUID/request) thay vì kéo toàn bộ
+// 'Request For Information' của cả công ty (~24k record, ~11MB → dễ timeout).
+// GUID trong $filter KHÔNG bọc nháy.
 async function loadPavoiRfi(force=false){
   if(pavoiRfiLoaded && !force){ renderPavoi(); return; }
-  const pavoiIds = new Set(allData.filter(r=>r.report_title==='PAVOI').map(r=>r.report_id));
-  if(!pavoiIds.size){ pavoiRfiLoaded=true; renderPavoi(); return; }
+  const pavoiIds = [...new Set(allData.filter(r=>r.report_title==='PAVOI').map(r=>r.report_id).filter(Boolean))];
+  if(!pavoiIds.length){ pavoiRfiLoaded=true; renderPavoi(); return; }
   setOv(true,'Loading PAVOI RFI...','');
   try{
-    const raw = await fetchAll(
-      G_URL + 'dwreporting_report_task' +
-      '?$select=report_id,task_title,task_owner,task_status,task_delivery_status,' +
-      'task_target_date,task_completed_date,task_instructions,task_related_section_name' +
-      '&$filter=' + encodeURIComponent("task_title eq 'Request For Information'"),
-      true
-    );
     pavoiRfiMap = {};
-    raw.forEach(t=>{
-      if(!pavoiIds.has(t.report_id)) return;
-      if(t.task_status === 'Deleted') return;            // loại RFI đã xóa
-      (pavoiRfiMap[t.report_id] ||= []).push(t);
-    });
+    const CHUNK = 15;   // OData giới hạn 100 node/filter → tối đa ~16 'report_id eq' + clause task_title
+    for(let i=0;i<pavoiIds.length;i+=CHUNK){
+      const ids = pavoiIds.slice(i,i+CHUNK);
+      const orClause = ids.map(id=>'report_id eq '+id).join(' or ');  // GUID không bọc nháy
+      setOv(true,'Loading PAVOI RFI...',`${Math.min(i+CHUNK,pavoiIds.length)}/${pavoiIds.length} reports`);
+      const raw = await fetchAll(
+        G_URL + 'dwreporting_report_task' +
+        '?$select=report_id,task_title,task_owner,task_status,task_delivery_status,' +
+        'task_target_date,task_completed_date' +
+        '&$filter=' + encodeURIComponent('('+orClause+") and task_title eq 'Request For Information'"),
+        true
+      );
+      raw.forEach(t=>{
+        if(t.task_status === 'Deleted') return;            // loại RFI đã xóa
+        (pavoiRfiMap[t.report_id] ||= []).push(t);
+      });
+    }
     pavoiRfiLoaded = true;
   }catch(e){
     console.warn('[PAVOI RFI] load error:', e.message);
