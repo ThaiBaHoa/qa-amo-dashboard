@@ -559,116 +559,64 @@ tr:last-child td{border-bottom:none}
             <span style="font-size:11px;color:var(--muted)" id="ovYearCount"></span>
           </div>
 
-          <!-- ROW 1: KPI Cards — 6 equal columns -->
-          <div class="ov-kpi-row">
-            <div class="kpi" style="--accent:var(--blue)"><div class="kpi-lbl">Total Reports</div><div class="kpi-val" id="k-total">—</div><div class="kpi-sub">All forms</div></div>
-            <div class="kpi" style="--accent:var(--blue)"><div class="kpi-lbl">Open</div><div class="kpi-val" id="k-open">—</div><div class="kpi-sub">In Progress</div></div>
-            <div class="kpi" style="--accent:#ff6b6b"><div class="kpi-lbl">Overdue</div><div class="kpi-val" id="k-over">—</div><div class="kpi-sub" id="k-over-r">—</div></div>
-            <div class="kpi" style="--accent:var(--green)"><div class="kpi-lbl">On-time Closed</div><div class="kpi-val" id="k-on">—</div><div class="kpi-sub" id="k-on-r">—</div></div>
-            <div class="kpi" style="--accent:var(--yellow)"><div class="kpi-lbl">Lately Closed</div><div class="kpi-val" id="k-late">—</div><div class="kpi-sub">Late closure</div></div>
-            <div class="kpi" style="--accent:var(--muted)"><div class="kpi-lbl">Closed</div><div class="kpi-val" id="k-cls">—</div><div class="kpi-sub">No target date</div></div>
+          <!-- SECTION 1: MNT / Audit Progress -->
+          <div class="sec-title">MNT · Audit Progress</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;flex-shrink:0">
+            <div class="kpi" style="--accent:var(--blue)"><div class="kpi-lbl">Total MNT</div><div class="kpi-val" id="ov-mnt-total">—</div></div>
+            <div class="kpi" style="--accent:var(--green)"><div class="kpi-lbl">Closed</div><div class="kpi-val" id="ov-mnt-closed">—</div></div>
+            <div class="kpi" style="--accent:var(--yellow)"><div class="kpi-lbl">In Progress</div><div class="kpi-val" id="ov-mnt-open">—</div></div>
+            <div class="kpi" style="--accent:#ff6b6b"><div class="kpi-lbl">Có finding Overdue</div><div class="kpi-val" id="ov-mnt-overdue">—</div></div>
           </div>
-
-          <!-- ROW 2: 3 charts side by side — each 33% width -->
-          <div class="ov-chart-row">
-            <div class="chart-card" style="min-width:0">
-              <div style="font-size:12px;font-weight:600;margin-bottom:6px">By status</div>
-              <div style="height:clamp(120px,calc(26vh - 44px),260px);position:relative"><canvas id="cStatus"></canvas></div>
-            </div>
-            <div class="chart-card" style="min-width:0">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-                <div style="font-size:12px;font-weight:600">Findings by Month</div>
-                <select class="sel" id="monthYr" onchange="buildMonthChart()" style="padding:3px 8px;font-size:11px">
-                  <option value="all">All Years</option>
-                </select>
-              </div>
-              <div style="height:clamp(120px,calc(26vh - 44px),260px);position:relative"><canvas id="cMonth"></canvas></div>
-            </div>
-            <div class="chart-card" style="min-width:0">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-                <div style="font-size:12px;font-weight:600">Top Forms</div>
-                <select class="sel" id="chartFormFilter" onchange="buildFormChart()" style="padding:3px 8px;font-size:11px">
-                  <option value="all">All</option>
-                  <option value="Open">Open</option>
-                  <option value="Overdue">Overdue</option>
-                </select>
-              </div>
-              <div style="height:clamp(120px,calc(26vh - 44px),260px);position:relative"><canvas id="cForm"></canvas></div>
+          <div class="tbl-card" style="margin-bottom:16px;flex:none;max-height:360px">
+            <div class="tbl-bar"><div><div class="tbl-title">MNT đang mở (chưa đóng)</div><div class="tbl-count" id="ov-mnt-count">—</div></div></div>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr>
+                  <th>Audit No</th><th>Title</th><th>Status</th><th>Scheduled</th>
+                  <th style="text-align:center">Findings</th><th style="text-align:center">Open</th><th style="text-align:center">Overdue</th>
+                </tr></thead>
+                <tbody id="ov-mnt-body"></tbody>
+              </table>
             </div>
           </div>
 
-          <!-- ROW 3: Form table (left) + 4 metric cards (right) -->
-          <div class="ov-bottom-row">
+          <!-- SECTION 2: Report progress (MCAR + AMO ECAR) -->
+          <div class="sec-title">Report Progress</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
 
-            <div class="chart-card" style="min-width:0;display:flex;flex-direction:column;min-height:0">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-shrink:0">
-                <div style="font-size:12px;font-weight:600">Summary by Form</div>
-                <span style="font-size:11px;color:var(--muted)" id="statFormCount"></span>
+            <!-- MCAR block -->
+            <div class="chart-card">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <div style="font-size:14px;font-weight:700">MCAR <span style="font-size:11px;color:var(--muted);font-weight:400">· Internal Audit Findings</span></div>
+                <div style="font-size:12px;color:var(--muted)">On-time: <b id="ov-mcar-rate" style="color:var(--green)">—</b></div>
               </div>
-              <div style="flex:1;min-height:0;overflow-y:auto">
-                <table class="stat-tbl" style="width:100%">
-                  <thead style="position:sticky;top:0;background:var(--card);z-index:1">
-                    <tr>
-                      <th>Form</th>
-                      <th style="text-align:center;width:70px">Open</th>
-                      <th style="text-align:center;width:70px">Overdue</th>
-                      <th style="text-align:center;width:70px">Closed</th>
-                      <th style="text-align:center;width:70px">Total</th>
-                      <th style="text-align:center;width:50px">%</th>
-                    </tr>
-                  </thead>
-                  <tbody id="statForm"></tbody>
-                </table>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+                <div style="text-align:center"><div style="font-size:26px;font-weight:700;color:var(--blue)" id="ov-mcar-total">—</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Total</div></div>
+                <div style="text-align:center"><div style="font-size:26px;font-weight:700;color:var(--blue)" id="ov-mcar-open">—</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Open</div></div>
+                <div style="text-align:center"><div style="font-size:26px;font-weight:700;color:#ff6b6b" id="ov-mcar-over">—</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Overdue</div></div>
+                <div style="text-align:center"><div style="font-size:26px;font-weight:700;color:var(--green)" id="ov-mcar-closed">—</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Closed</div></div>
               </div>
+              <div style="background:rgba(255,255,255,.06);border-radius:5px;height:8px;overflow:hidden"><div id="ov-mcar-bar" style="height:100%;background:var(--green);border-radius:5px;transition:width .4s;width:0%"></div></div>
+              <div style="font-size:10px;color:var(--muted);margin-top:5px" id="ov-mcar-barlbl">—</div>
             </div>
 
-            <!-- Right panel: 2×2 metric cards + overdue breakdown -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr 1fr;gap:8px;height:100%;min-height:0">
-              <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
-                <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Open + Overdue</div>
-                <div style="font-size:28px;font-weight:700;color:var(--blue);line-height:1" id="mc-open-ov">—</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:4px" id="mc-open-ov-r">—</div>
+            <!-- AMO ECAR block -->
+            <div class="chart-card">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <div style="font-size:14px;font-weight:700">AMO ECAR <span style="font-size:11px;color:var(--muted);font-weight:400">· Authority Findings</span></div>
+                <div style="font-size:12px;color:var(--muted)">On-time: <b id="ov-amo-rate" style="color:var(--green)">—</b></div>
               </div>
-              <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
-                <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">On-time Rate</div>
-                <div style="font-size:28px;font-weight:700;color:var(--green);line-height:1" id="mc-ontime-r">—</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:4px" id="mc-ontime-v">—</div>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
+                <div style="text-align:center"><div style="font-size:26px;font-weight:700;color:var(--blue)" id="ov-amo-total">—</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Total</div></div>
+                <div style="text-align:center"><div style="font-size:26px;font-weight:700;color:var(--blue)" id="ov-amo-open">—</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Open</div></div>
+                <div style="text-align:center"><div style="font-size:26px;font-weight:700;color:#ff6b6b" id="ov-amo-over">—</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Overdue</div></div>
+                <div style="text-align:center"><div style="font-size:26px;font-weight:700;color:var(--green)" id="ov-amo-closed">—</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Closed</div></div>
               </div>
-              <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
-                <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Overdue CAT III</div>
-                <div style="font-size:28px;font-weight:700;color:#ff3333;line-height:1" id="mc-cat3">—</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:4px">&gt;60 days</div>
-              </div>
-              <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center">
-                <div style="font-size:10px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">Repetitive</div>
-                <div style="font-size:28px;font-weight:700;color:var(--yellow);line-height:1" id="mc-rep">—</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:4px" id="mc-rep-r">—</div>
-              </div>
-              <!-- Overdue CAT breakdown — span 2 columns -->
-              <div class="chart-card" style="grid-column:1/-1;display:flex;flex-direction:column;min-height:0">
-                <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;flex-shrink:0">Overdue Breakdown</div>
-                <div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;justify-content:center" id="mc-cat-breakdown">
-                  <div style="display:grid;grid-template-columns:90px 1fr 40px;align-items:center;gap:8px;font-size:11px">
-                    <span style="color:var(--orange)">CAT I ≤30d</span>
-                    <div style="background:rgba(255,255,255,.06);border-radius:4px;height:8px;overflow:hidden"><div id="bar-c1" style="height:100%;background:var(--orange);border-radius:4px;transition:width .4s"></div></div>
-                    <span style="color:var(--muted);text-align:right" id="mc-c1">—</span>
-                  </div>
-                  <div style="display:grid;grid-template-columns:90px 1fr 40px;align-items:center;gap:8px;font-size:11px">
-                    <span style="color:#ff6b6b">CAT II 30–60d</span>
-                    <div style="background:rgba(255,255,255,.06);border-radius:4px;height:8px;overflow:hidden"><div id="bar-c2" style="height:100%;background:#ff6b6b;border-radius:4px;transition:width .4s"></div></div>
-                    <span style="color:var(--muted);text-align:right" id="mc-c2">—</span>
-                  </div>
-                  <div style="display:grid;grid-template-columns:90px 1fr 40px;align-items:center;gap:8px;font-size:11px">
-                    <span style="color:#cc0000">CAT III >60d</span>
-                    <div style="background:rgba(255,255,255,.06);border-radius:4px;height:8px;overflow:hidden"><div id="bar-c3" style="height:100%;background:#cc0000;border-radius:4px;transition:width .4s"></div></div>
-                    <span style="color:var(--muted);text-align:right" id="mc-c3-v">—</span>
-                  </div>
-                </div>
-              </div>
+              <div style="background:rgba(255,255,255,.06);border-radius:5px;height:8px;overflow:hidden"><div id="ov-amo-bar" style="height:100%;background:var(--green);border-radius:5px;transition:width .4s;width:0%"></div></div>
+              <div style="font-size:10px;color:var(--muted);margin-top:5px" id="ov-amo-barlbl">—</div>
             </div>
+
           </div>
-
-          <table style="display:none"><tbody id="statMeta"></tbody></table>
         </div>
 
         <!-- OPEN RFI -->
@@ -1116,9 +1064,12 @@ tr:last-child td{border-bottom:none}
           <div class="page-head">
             <div>
               <h1>SPI — Safety Performance Indicators</h1>
-              <div class="muted">Target: VJ's SPI must meet or be better than the SPT threshold approved by CAAV</div>
+              <div class="muted">Target: Vietjet AMO's SPI must meet or better than the SPT (ALOS) approved by CAAV</div>
             </div>
-            <div class="muted" id="spiUpdated"></div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <select class="sel" id="spiYearFilter" onchange="renderSPIYear()" style="padding:5px 12px;font-size:12px"></select>
+              <div class="muted" id="spiUpdated"></div>
+            </div>
           </div>
           <div class="spi-kpi-row" id="spiKpiRow"></div>
           <div class="spi-grid" id="spiGrid"></div>
@@ -2208,7 +2159,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.05-r86';
+const APP_REV = '2026.06.05-r87';
 
 // Nature of finding: ánh xạ mục con -> nhóm cha (từ danh mục gốc Galileo dwreporting_general_lists)
 const NATURE_PARENT = {
@@ -3098,19 +3049,64 @@ function filterOverviewYear() {
 }
 
 function renderOverview(d) {
-  const tot=d.length, open=d.filter(r=>r.semantic_status==='Open').length;
-  const ov=d.filter(r=>r.semantic_status==='Overdue').length;
-  const on=d.filter(r=>r.semantic_status==='On-time Closed').length;
-  const late=d.filter(r=>r.semantic_status==='Lately Closed').length;
-  const cls=d.filter(r=>r.semantic_status==='Closed').length;
-  const withTgt=on+late;
-  s('k-total',tot); s('k-open',open);
-  s('k-over',ov); s('k-over-r',pct(ov/(open+ov||1))+' of Open+Overdue');
-  s('k-on',on); s('k-on-r','On-time: '+pct(on/(withTgt||1))+' (forms with target)');
-  s('k-late',late); s('k-cls',cls);
-  // CAT tiles (k-c1/c2/c3) live on the Overdue page and are set by renderOv.
-  buildChartsFor(d);
-  renderStatTblsFor(d);
+  const yr = g('ovYearFilter')?.value || 'all';
+
+  // ── Section 1: MNT / Audit progress ──
+  let mnt = auditData.filter(a => a.prefix === 'MNT');
+  if (yr !== 'all') mnt = mnt.filter(a => String(a.sched_year) === yr);
+
+  const mntClosed  = mnt.filter(a => a.status === 'Closed').length;
+  const mntOpen    = mnt.filter(a => a.status !== 'Closed' && a.status !== 'Cancelled').length;
+  const mntOverdue = mnt.filter(a => (a.overdue_count || 0) > 0).length;
+  s('ov-mnt-total',   mnt.length);
+  s('ov-mnt-closed',  mntClosed);
+  s('ov-mnt-open',    mntOpen);
+  s('ov-mnt-overdue', mntOverdue);
+
+  const notClosed = mnt
+    .filter(a => a.status !== 'Closed' && a.status !== 'Cancelled')
+    .sort((a, b) => (b.overdue_count||0) - (a.overdue_count||0) || (b.open_count||0) - (a.open_count||0));
+
+  const STC = {'Closed':'b-on','Performed':'b-late','Scheduled':'b-open','InProgress':'b-open','Cancelled':'b-with'};
+  const body = g('ov-mnt-body');
+  if (body) body.innerHTML = notClosed.length === 0
+    ? '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted)">Không có MNT đang mở</td></tr>'
+    : notClosed.map(a => `<tr style="cursor:pointer;${(a.overdue_count||0)>0?'background:rgba(255,107,107,.06)':''}" onclick="showAuditDetail('${a.audit_id}')">
+        <td><b style="color:var(--blue)">${esc(a.number)||'—'}</b></td>
+        <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.title)||'—'}</td>
+        <td><span class="badge ${STC[a.status]||'b-with'}">${esc(a.status)||'—'}</span></td>
+        <td style="font-size:11px;color:var(--muted)">${fdYM(a.scheduled_start_date)}</td>
+        <td style="text-align:center"><b>${a.finding_count||0}</b></td>
+        <td style="text-align:center;color:var(--blue)">${a.open_count||0}</td>
+        <td style="text-align:center;color:#ff6b6b">${(a.overdue_count||0) || '—'}</td>
+      </tr>`).join('');
+  s('ov-mnt-count', notClosed.length + ' đang mở / ' + mnt.length + ' tổng');
+
+  // ── Section 2 & 3: report-type blocks ──
+  renderOvTypeBlock('MCAR',     d, 'ov-mcar');
+  renderOvTypeBlock('AMO ECAR', d, 'ov-amo');
+}
+
+// Render 1 khối thống kê cho 1 loại report
+function renderOvTypeBlock(title, d, prefix) {
+  const rows   = d.filter(r => r.report_title === title);
+  const total  = rows.length;
+  const open   = rows.filter(r => r.semantic_status === 'Open').length;
+  const over   = rows.filter(r => r.semantic_status === 'Overdue').length;
+  const onTime = rows.filter(r => r.semantic_status === 'On-time Closed').length;
+  const lately = rows.filter(r => r.semantic_status === 'Lately Closed').length;
+  const closed = onTime + lately + rows.filter(r => r.semantic_status === 'Closed').length;
+  const withTgt = onTime + lately;
+  const rate = withTgt ? Math.round(onTime / withTgt * 100) : null;
+  const closedPct = total ? Math.round(closed / total * 100) : 0;
+
+  s(prefix + '-total',  total);
+  s(prefix + '-open',   open);
+  s(prefix + '-over',   over);
+  s(prefix + '-closed', closed);
+  s(prefix + '-rate',   rate === null ? '—' : rate + '%');
+  const bar = g(prefix + '-bar'); if (bar) bar.style.width = closedPct + '%';
+  s(prefix + '-barlbl', closedPct + '% closed');
 }
 
 function buildChartsFor(d) {
@@ -8267,9 +8263,9 @@ const FIELD_MATCHERS = {
   remark      : /^\s*Remark/i,
   yearAchieve : /Year\s*Achievement/i,
   achievement : /SPIs?\s*achiev/i,
-  rate        : /Rate\s*SPI/i,
+  rate        : /^\s*Rate\s*SPI\b/i,                       // "Rate SPI - May"
   monthlyCount: /Monthly\s*SPI\s*Count/i,
-  trigger     : /Trigger/i
+  monthTrigger: /SPI\s*Trigger\??/i                        // "Jun - SPI Trigger?" | "Mar SPI Trigger?"
 };
 
 const MONTH_LABELS = ['1','2','3','4','5','6','7','8','9','10','11','12'];
@@ -8318,6 +8314,7 @@ async function loadSPI(){
     const idx = numMatch ? +numMatch[1] : null;
     byId[r.report_id] = {
       number:r.report_number, seq:idx, title:r.report_number, status:r.report_status, raised:r.raised_date,
+      raised_year: r.raised_date ? new Date(r.raised_date).getFullYear() : null,
       sptApproved:null, prevYear:null, remark:'', yearAchievement:null, achievement:'',
       direction: SPI_CONFIG.direction[idx] || SPI_CONFIG.defaultDirection,
       months: Array.from({length:12}, () => ({ rate:null, count:null, trigger:null }))
@@ -8336,46 +8333,81 @@ async function loadSPI(){
     if (M.achievement.test(fn)) { if(!o.achievement) o.achievement = tv||''; return; }
     if (M.rate.test(fn)){ const m=spiMonthIndex(fn,sec); if(m!=null&&o.months[m].rate==null) o.months[m].rate=spiNum(tv); return; }
     if (M.monthlyCount.test(fn)){ const m=spiMonthIndex(fn,sec); if(m!=null&&o.months[m].count==null) o.months[m].count=spiNum(tv); return; }
-    if (M.trigger.test(fn)){ const m=spiMonthIndex(fn,sec); if(m!=null&&o.months[m].trigger==null) o.months[m].trigger=spiBool(tv); return; }
+    if (M.monthTrigger.test(fn)){ const m=spiMonthIndex(fn,sec); if(m!=null) o.months[m].trigger=spiBool(tv); return; }
   });
   return Object.values(byId).sort((a,b)=>(a.number||'').localeCompare(b.number||''));
 }
 
 function spiEvaluate(spi){
-  const spt = spi.sptApproved; let withData=0, fail=0;
-  const monthPass = spi.months.map(m => {
-    if (m.rate==null || spt==null) return null;
-    withData++;
-    const ok = spi.direction==='higher' ? m.rate>=spt : m.rate<=spt;
-    if (!ok) fail++; return ok;
+  const spt = spi.sptApproved;
+  const monthState = spi.months.map(m => {
+    const hasData = (m.rate !== null && m.rate !== undefined);
+    if(!hasData) return { hasData:false, breach:false };
+    let breach;
+    if(m.trigger === true)       breach = true;
+    else if(m.trigger === false) breach = false;
+    else if(spt != null)         breach = spi.direction==='higher' ? m.rate < spt : m.rate > spt; // fallback
+    else                         breach = false;
+    return { hasData:true, breach };
   });
+
+  const dataMonths = monthState.map((s,i)=>({...s,i})).filter(s=>s.hasData);
+  const withData = dataMonths.length;
+  const fail = dataMonths.filter(s=>s.breach).length;
+
+  // Current Trigger = số tháng breach LIÊN TIẾP (dương lịch liền kề) tính ngược từ tháng data mới nhất.
+  let currentLevel = 0;
+  for(let k = dataMonths.length - 1; k >= 0; k--){
+    const cur = dataMonths[k];
+    if(!cur.breach) break;
+    if(k < dataMonths.length - 1){
+      const next = dataMonths[k+1];
+      if(next.i - cur.i !== 1) break;   // không liền kề dương lịch → dừng
+    }
+    currentLevel++;
+  }
+  const level = currentLevel >= 3 ? 3 : currentLevel;
+
   let status;
-  if (spi.yearAchievement===true) status='good';
-  else if (spi.yearAchievement===false) status='warn';
-  else if (withData===0) status='na';
-  else status = fail===0 ? 'good' : 'warn';
-  return { monthPass, withData, fail, status };
+  if(spi.yearAchievement === true)  status = 'good';
+  else if(withData === 0)           status = 'na';
+  else if(level === 0)              status = 'good';
+  else                              status = 'trigger';
+
+  return { monthState, withData, fail, currentLevel: level, status };
 }
 
 const _spiCharts = [];
 function renderSPIPage(list){
   const evals = list.map(spiEvaluate);
-  const good = evals.filter(e=>e.status==='good').length;
-  const warn = evals.filter(e=>e.status==='warn').length;
+  const good     = evals.filter(e=>e.status==='good').length;
   const tracking = list.filter(s=>s.months.some(m=>m.rate!=null)).length;
+  const l1 = evals.filter(e=>e.currentLevel===1).length;
+  const l2 = evals.filter(e=>e.currentLevel===2).length;
+  const l3 = evals.filter(e=>e.currentLevel>=3).length;
+
   g('spiKpiRow').innerHTML =
       kpiCard('Total SPIs', list.length, 'All indicators', 'kpi-tone-blue')
     + kpiCard('Tracking', tracking, 'With monthly data', 'kpi-tone-muted')
     + kpiCard('On target', good, 'Meeting SPT', 'kpi-tone-green')
-    + kpiCard('Out of limit', warn, 'Exceeding SPT', 'kpi-tone-red');
+    + `<div class="kpi kpi-tone-red"><div class="kpi-lbl">Current Trigger</div>
+         <div style="display:flex;gap:14px;align-items:baseline;margin-top:4px">
+           <div><span class="kpi-val" style="font-size:24px;color:var(--yellow)">${l1}</span><span style="font-size:11px;color:var(--muted);margin-left:3px">L1</span></div>
+           <div><span class="kpi-val" style="font-size:24px;color:var(--orange)">${l2}</span><span style="font-size:11px;color:var(--muted);margin-left:3px">L2</span></div>
+           <div><span class="kpi-val" style="font-size:24px;color:#ff6b6b">${l3}</span><span style="font-size:11px;color:var(--muted);margin-left:3px">L3</span></div>
+         </div>
+         <div class="kpi-sub">Consecutive-month trigger</div></div>`;
   s('spiUpdated', 'Updated: ' + new Date().toLocaleString('en-GB'));
 
   _spiCharts.forEach(c=>c.destroy()); _spiCharts.length = 0;
   g('spiGrid').innerHTML = list.map((spi,i)=>{
     const ev = evals[i];
-    const badge = ev.status==='good' ? '<span class="spi-badge spi-badge-good">✔ On target</span>'
-                : ev.status==='warn' ? `<span class="spi-badge spi-badge-warn">⚠ ${ev.fail} ${ev.fail===1?'month':'months'} out of limit</span>`
-                : '<span class="spi-badge spi-badge-na">No data</span>';
+    let badge;
+    if(ev.status==='na')          badge = '<span class="spi-badge spi-badge-na">No data</span>';
+    else if(ev.currentLevel>=3)   badge = '<span class="spi-badge spi-badge-warn" style="background:#fde0e0;color:#b91c1c">⚠ Trigger Level 3</span>';
+    else if(ev.currentLevel===2)  badge = '<span class="spi-badge spi-badge-warn" style="background:#fdeae0;color:#c2410c">⚠ Trigger Level 2</span>';
+    else if(ev.currentLevel===1)  badge = '<span class="spi-badge spi-badge-warn">⚠ Trigger Level 1</span>';
+    else                          badge = '<span class="spi-badge spi-badge-good">✔ On target</span>';
     const dirTxt = spi.direction==='higher' ? 'higher is better' : 'lower is better';
     return `
       <div class="spi-card">
@@ -8426,11 +8458,25 @@ function drawSPIChart(canvasId, spi){
   });
 }
 
+function populateSpiYear(){
+  const sel = g('spiYearFilter'); if(!sel || !_spiData) return;
+  const years = [...new Set(_spiData.map(s=>s.raised_year).filter(Boolean))].sort((a,b)=>b-a);
+  const cur = new Date().getFullYear();
+  const def = years.includes(cur) ? cur : (years[0]||cur);
+  sel.innerHTML = years.map(y=>`<option value="${y}" ${y===def?'selected':''}>${y}</option>`).join('')
+                || `<option value="${cur}">${cur}</option>`;
+}
+function renderSPIYear(){
+  if(!_spiData) return;
+  const yr = g('spiYearFilter')?.value;
+  const filtered = yr ? _spiData.filter(s=>String(s.raised_year)===String(yr)) : _spiData;
+  renderSPIPage(filtered);
+}
 let _spiData = null;
 async function showSPIPage(btn){
   showPage('spi', btn);
   if (typeof setOv==='function') setOv(false);   // never block on a stale overlay
-  if (_spiData) { renderSPIPage(_spiData); return; }
+  if (_spiData) { populateSpiYear(); renderSPIYear(); return; }
   const grid = g('spiGrid');
   if (grid) grid.innerHTML = '<div class="muted" style="padding:40px 16px;text-align:center">⏳ Loading SPI data…</div>';
   try {
@@ -8439,7 +8485,8 @@ async function showSPIPage(btn){
       if (grid) grid.innerHTML = '<div class="muted" style="padding:40px 16px;text-align:center">No SPI forms found — check SPI_CONFIG.reportTitle</div>';
       toast('No SPI forms found — check SPI_CONFIG.reportTitle'); return;
     }
-    renderSPIPage(_spiData);
+    populateSpiYear();
+    renderSPIYear();
   } catch(e){
     console.error(e);
     if (grid) grid.innerHTML = '<div class="muted" style="padding:40px 16px;text-align:center">⚠ Failed to load SPI: '+esc(e.message)+'</div>';
