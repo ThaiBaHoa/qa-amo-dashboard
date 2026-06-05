@@ -2208,7 +2208,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.05-r84';
+const APP_REV = '2026.06.05-r85';
 
 // Nature of finding: ánh xạ mục con -> nhóm cha (từ danh mục gốc Galileo dwreporting_general_lists)
 const NATURE_PARENT = {
@@ -2370,7 +2370,8 @@ let curUser = null, allData = [], auditData = [], docData = [], cmrData = [], ec
 let docTypeTree=[], docTypeFlat=[], docTypeIndex={}, docTypeByTitle={}, selectedTypeId=null, docWorkflowCache={}, expandedTreeNodes=new Set(), currentDocRevId=null;
 let cmrLoaded = false, ecarLoaded = false;
 let pavoiRfiLoaded = false;
-let pavoiRfiMap = {};   // report_id -> [rfi,...]
+let pavoiRfiMap = {};            // report_id -> [rfi,...]
+let pavoiRfiDone = new Set();    // report_id đã fetch xong (để cell hiện data đã có dù còn chunk lỗi)
 const PS = 25; // page size
 
 // Table states — mỗi table có state riêng
@@ -2672,7 +2673,7 @@ function updateCacheAge(ts) {
 async function loadData(forceRefresh=false) {
   if(isLoading){toast('Loading data, please wait...','info');return;}
   isLoading=true;
-  pavoiRfiLoaded = false; pavoiRfiMap = {};   // reset RFI để Refresh kéo lại bản mới
+  pavoiRfiLoaded = false; pavoiRfiMap = {}; pavoiRfiDone = new Set();   // reset RFI để Refresh kéo lại bản mới
   setOv(true,'[1/6] Connecting to Galileo...','',5);
   try {
 
@@ -4004,38 +4005,50 @@ function renderPavoi() {
 
 // ── PAVOI RFI (Request For Information) monitor ───────────────
 // Lazy-load RFI cho tất cả PAVOI từ dwreporting_report_task.
-// Fetch THEO report_id của PAVOI (batch ~30 GUID/request) thay vì kéo toàn bộ
+// Fetch THEO report_id của PAVOI (batch ~15 GUID/request) thay vì kéo toàn bộ
 // 'Request For Information' của cả công ty (~24k record, ~11MB → dễ timeout).
-// GUID trong $filter KHÔNG bọc nháy.
+// GUID trong $filter KHÔNG bọc nháy. OData giới hạn 100 node/filter → tối đa ~16 GUID.
+// Mỗi chunk retry tối đa 3 lần; 1 chunk lỗi KHÔNG phá các chunk khác; còn chunk lỗi
+// thì để loaded=false để lần mở trang sau tự thử lại (tránh "lúc được lúc không").
 async function loadPavoiRfi(force=false){
   if(pavoiRfiLoaded && !force){ renderPavoi(); return; }
   const pavoiIds = [...new Set(allData.filter(r=>r.report_title==='PAVOI').map(r=>r.report_id).filter(Boolean))];
-  if(!pavoiIds.length){ pavoiRfiLoaded=true; renderPavoi(); return; }
+  // Chỉ fetch report CHƯA xong → lần mở lại trang sẽ tự thử lại các chunk lỗi, không kéo lại từ đầu.
+  const todo = pavoiIds.filter(id => !pavoiRfiDone.has(id));
+  if(!todo.length){ pavoiRfiLoaded=true; renderPavoi(); return; }
   setOv(true,'Loading PAVOI RFI...','');
-  try{
-    pavoiRfiMap = {};
-    const CHUNK = 15;   // OData giới hạn 100 node/filter → tối đa ~16 'report_id eq' + clause task_title
-    for(let i=0;i<pavoiIds.length;i+=CHUNK){
-      const ids = pavoiIds.slice(i,i+CHUNK);
-      const orClause = ids.map(id=>'report_id eq '+id).join(' or ');  // GUID không bọc nháy
-      setOv(true,'Loading PAVOI RFI...',`${Math.min(i+CHUNK,pavoiIds.length)}/${pavoiIds.length} reports`);
-      const raw = await fetchAll(
-        G_URL + 'dwreporting_report_task' +
-        '?$select=report_id,task_title,task_owner,task_status,task_delivery_status,' +
-        'task_target_date,task_completed_date' +
-        '&$filter=' + encodeURIComponent('('+orClause+") and task_title eq 'Request For Information'"),
-        true
-      );
-      raw.forEach(t=>{
-        if(t.task_status === 'Deleted') return;            // loại RFI đã xóa
-        (pavoiRfiMap[t.report_id] ||= []).push(t);
-      });
+  const CHUNK = 15, MAX_TRY = 3;
+  let failed = 0;
+  for(let i=0;i<todo.length;i+=CHUNK){
+    const ids = todo.slice(i,i+CHUNK);
+    const orClause = ids.map(id=>'report_id eq '+id).join(' or ');     // GUID không bọc nháy
+    const url = G_URL + 'dwreporting_report_task' +
+      '?$select=report_id,task_title,task_owner,task_status,task_delivery_status,' +
+      'task_target_date,task_completed_date' +
+      '&$filter=' + encodeURIComponent('('+orClause+") and task_title eq 'Request For Information'");
+    setOv(true,'Loading PAVOI RFI...',`${Math.min(i+CHUNK,todo.length)}/${todo.length} reports`);
+    let ok = false;
+    for(let attempt=1; attempt<=MAX_TRY && !ok; attempt++){
+      try{
+        const raw = await fetchAll(url, true);
+        raw.forEach(t=>{
+          if(t.task_status === 'Deleted') return;          // loại RFI đã xóa
+          (pavoiRfiMap[t.report_id] ||= []).push(t);
+        });
+        ids.forEach(id => pavoiRfiDone.add(id));            // đánh dấu các report trong chunk đã xong
+        ok = true;
+      }catch(e){
+        console.warn(`[PAVOI RFI] chunk@${i} try ${attempt}/${MAX_TRY} failed:`, e.message);
+        if(attempt<MAX_TRY) await new Promise(res=>setTimeout(res, 400*attempt)); // backoff
+      }
     }
+    if(!ok) failed++;
+  }
+  if(failed){
+    pavoiRfiLoaded = false;   // còn chunk lỗi → mở lại trang sẽ thử lại đúng các report còn thiếu
+    toast(`PAVOI RFI: ${failed} nhóm tải lỗi — mở lại trang để thử lại`,'err');
+  }else{
     pavoiRfiLoaded = true;
-  }catch(e){
-    console.warn('[PAVOI RFI] load error:', e.message);
-    toast('Error loading PAVOI RFI: '+e.message,'err');
-    pavoiRfiLoaded = true; // tránh loop; cột RFI sẽ hiện —
   }
   setOv(false);
   renderPavoi();
@@ -4061,7 +4074,7 @@ function pavoiRfiSummary(report_id){
 }
 
 function pavoiRfiCell(report_id){
-  if(!pavoiRfiLoaded) return '<span style="color:var(--muted)">…</span>';
+  if(!pavoiRfiDone.has(report_id)) return '<span style="color:var(--muted)">…</span>';
   const sm = pavoiRfiSummary(report_id);
   if(!sm.total) return '<span style="color:var(--muted)">—</span>';
   // 1) Có RFI overdue → luôn ưu tiên hiển thị cái dài nhất + tên người
