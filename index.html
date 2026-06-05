@@ -2208,7 +2208,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.05-r85';
+const APP_REV = '2026.06.05-r86';
 
 // Nature of finding: ánh xạ mục con -> nhóm cha (từ danh mục gốc Galileo dwreporting_general_lists)
 const NATURE_PARENT = {
@@ -4012,9 +4012,13 @@ function renderPavoi() {
 // thì để loaded=false để lần mở trang sau tự thử lại (tránh "lúc được lúc không").
 async function loadPavoiRfi(force=false){
   if(pavoiRfiLoaded && !force){ renderPavoi(); return; }
-  const pavoiIds = [...new Set(allData.filter(r=>r.report_title==='PAVOI').map(r=>r.report_id).filter(Boolean))];
-  // Chỉ fetch report CHƯA xong → lần mở lại trang sẽ tự thử lại các chunk lỗi, không kéo lại từ đầu.
-  const todo = pavoiIds.filter(id => !pavoiRfiDone.has(id));
+  const allPavoi = allData.filter(r=>r.report_title==='PAVOI');
+  // PAVOI đã đóng → RFI đã hoàn tất hết, KHÔNG fetch lúc load trang (đánh dấu done-rỗng để cell hiện '—');
+  // lịch sử RFI của report đã đóng vẫn xem được vì modal fetch tươi on-demand khi click.
+  allPavoi.forEach(r=>{ if(r.report_id && r.report_status!=='Open') pavoiRfiDone.add(r.report_id); });
+  // Chỉ fetch RFI cho PAVOI đang Open (gồm cả Overdue) — nơi RFI mới có thể đang mở. ~65/217 → nhanh hơn ~3x.
+  const openIds = [...new Set(allPavoi.filter(r=>r.report_status==='Open').map(r=>r.report_id).filter(Boolean))];
+  const todo = openIds.filter(id => !pavoiRfiDone.has(id));
   if(!todo.length){ pavoiRfiLoaded=true; renderPavoi(); return; }
   setOv(true,'Loading PAVOI RFI...','');
   const CHUNK = 15, MAX_TRY = 3;
@@ -4054,6 +4058,18 @@ async function loadPavoiRfi(force=false){
   renderPavoi();
 }
 
+// Fetch TƯƠI RFI của đúng 1 report (dùng khi mở modal) → tránh số liệu stale trong phiên.
+// Thay thế (không cộng dồn) list của report đó trong map; đánh dấu done.
+async function fetchPavoiRfiOne(report_id){
+  const url = G_URL + 'dwreporting_report_task' +
+    '?$select=report_id,task_title,task_owner,task_status,task_delivery_status,' +
+    'task_target_date,task_completed_date' +
+    '&$filter=' + encodeURIComponent('report_id eq '+report_id+" and task_title eq 'Request For Information'");
+  const raw = await fetchAll(url, true);
+  pavoiRfiMap[report_id] = raw.filter(t => t.task_status !== 'Deleted');   // GUID không bọc nháy
+  pavoiRfiDone.add(report_id);
+}
+
 // Trả {total, open, overdueCount, worst} cho 1 PAVOI.
 // worst = RFI open quá hạn LÂU NHẤT (ageing âm nhất). Ưu tiên overdue trên mọi open khác.
 function pavoiRfiSummary(report_id){
@@ -4090,11 +4106,20 @@ function pavoiRfiCell(report_id){
   return `<span class="badge b-on">All done</span>`;
 }
 
-function showPavoiDetail(report_id){
+async function showPavoiDetail(report_id){
   const r = allData.find(x=>x.report_id===report_id && x.report_title==='PAVOI');
   if(!r) return;
   s('pavoiMTitle', r.report_number||'—');
   s('pavoiMSub', [r.report_ref?('Ref: '+r.report_ref):null, r.dept, fd(r.raised_date)].filter(Boolean).join(' · '));
+  g('pavoiModal').style.display='flex';
+  s('pvk-total','…'); s('pvk-open','…'); s('pvk-over','…'); s('pvk-done','…');
+  g('pavoiRfiBody').innerHTML='<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Loading RFI…</td></tr>';
+  // Luôn fetch tươi report này → modal + cell phản ánh đúng hiện trạng Galileo (tránh số liệu stale).
+  try{ await fetchPavoiRfiOne(report_id); renderPavoi(); }   // renderPavoi: cập nhật cell ngoài bảng cho khớp
+  catch(e){ console.warn('[PAVOI RFI one] '+report_id, e.message); }   // lỗi → dùng cache đã có nếu có
+  renderPavoiModal(report_id);
+}
+function renderPavoiModal(report_id){
   const list = (pavoiRfiMap[report_id]||[]).slice();
   // KPI
   const open = list.filter(t=>t.task_status!=='Completed' && !t.task_completed_date);
@@ -4132,7 +4157,6 @@ function showPavoiDetail(report_id){
         <td>${daysCell}</td>
       </tr>`;
     }).join('');
-  g('pavoiModal').style.display='flex';
 }
 function closePavoiModal(e){ if(e&&e.target!==g('pavoiModal'))return; g('pavoiModal').style.display='none'; }
 
