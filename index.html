@@ -2208,7 +2208,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.05-r82';
+const APP_REV = '2026.06.05-r83';
 
 // Nature of finding: ánh xạ mục con -> nhóm cha (từ danh mục gốc Galileo dwreporting_general_lists)
 const NATURE_PARENT = {
@@ -4035,19 +4035,21 @@ async function loadPavoiRfi(force=false){
 }
 
 // Trả {total, open, overdueCount, worst} cho 1 PAVOI.
-// worst = RFI open quá hạn lâu nhất (target xa quá khứ nhất) → {owner, target, ageing}
+// worst = RFI open quá hạn LÂU NHẤT (ageing âm nhất). Ưu tiên overdue trên mọi open khác.
 function pavoiRfiSummary(report_id){
   const list = pavoiRfiMap[report_id] || [];
   const open = list.filter(t => t.task_status !== 'Completed' && !t.task_completed_date);
-  let worst = null;
+  let worst = null, overdueCount = 0;
   open.forEach(t=>{
-    const ag = ageCalc(t.task_target_date);   // số ngày tới target; âm = quá hạn
-    if(ag === null) return;
-    if(ag < 0){
-      if(!worst || ag < worst.ageing) worst = { owner: t.task_owner, target: t.task_target_date, ageing: ag };
-    }
+    const ag = ageCalc(t.task_target_date);                 // âm = quá hạn
+    // RFI coi là overdue nếu ageing âm HOẶC Galileo đã gắn cờ overdue
+    const isOverdue = (ag !== null && ag < 0) || t.task_delivery_status === 'overdue';
+    if(!isOverdue) return;
+    overdueCount++;
+    // chọn cái overdue dài nhất; nếu thiếu target (ag null) coi như 0 để vẫn vào diện worst
+    const eff = (ag !== null) ? ag : 0;
+    if(!worst || eff < worst.ageing) worst = { owner: t.task_owner, target: t.task_target_date, ageing: eff };
   });
-  const overdueCount = open.filter(t => { const a=ageCalc(t.task_target_date); return a!==null && a<0; }).length;
   return { total: list.length, open: open.length, overdueCount, worst };
 }
 
@@ -4055,12 +4057,16 @@ function pavoiRfiCell(report_id){
   if(!pavoiRfiLoaded) return '<span style="color:var(--muted)">…</span>';
   const sm = pavoiRfiSummary(report_id);
   if(!sm.total) return '<span style="color:var(--muted)">—</span>';
+  // 1) Có RFI overdue → luôn ưu tiên hiển thị cái dài nhất + tên người
   if(sm.worst){
     const d = Math.abs(sm.worst.ageing);
-    return `<span class="badge b-over" title="${esc(sm.worst.owner)} · target ${fd(sm.worst.target)}">Overdue ${d}d</span>`
+    const more = sm.overdueCount > 1 ? ` <span style="color:var(--muted)">+${sm.overdueCount-1}</span>` : '';
+    return `<span class="badge b-over" title="${esc(sm.worst.owner)} · target ${fd(sm.worst.target)} · ${sm.overdueCount} RFI overdue">Overdue ${d}d</span>${more}`
          + `<div style="font-size:10px;color:var(--muted);margin-top:2px">${esc(sm.worst.owner)||'—'}</div>`;
   }
+  // 2) Còn RFI open nhưng chưa quá hạn
   if(sm.open) return `<span class="badge b-open">${sm.open} open</span>`;
+  // 3) Tất cả đã xong
   return `<span class="badge b-on">All done</span>`;
 }
 
