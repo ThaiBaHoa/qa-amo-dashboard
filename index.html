@@ -131,6 +131,8 @@ body{font-family:'Manrope','Segoe UI',system-ui,sans-serif;background:var(--bg);
 .kpi-sub{font-size:11.5px;color:var(--text-3);margin-top:7px;font-weight:500}
 .c2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;flex-shrink:0}
 .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:var(--pad);box-shadow:var(--shadow)}
+#page-overview .chart-card{min-width:0}
+#page-overview .chart-card canvas{max-width:100%}
 .chart-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .chart-title{font-size:13px;font-weight:600}
 .chart-sub{font-size:11px;color:var(--muted)}
@@ -2132,7 +2134,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.05-r89';
+const APP_REV = '2026.06.05-r90';
 
 // Nature of finding: ánh xạ mục con -> nhóm cha (từ danh mục gốc Galileo dwreporting_general_lists)
 const NATURE_PARENT = {
@@ -3051,25 +3053,72 @@ function renderOverview(d) {
   ovReportDonut('AMO ECAR', d, 'ovAmo',  'ov-amo-cnt');
 }
 
-// Donut chung (destroy + create); rỗng → 1 lát xám "No data"
+// Màu chữ theo theme (đọc --text) cho label vẽ trên canvas
+function ovInk(){ return (getComputedStyle(document.documentElement).getPropertyValue('--text')||'').trim() || '#e9edf3'; }
+
+// Plugin: vẽ % ngay trên từng lát donut (bỏ lát <6% cho đỡ rối)
+const ovArcPct = { id:'ovArcPct', afterDatasetsDraw(chart){
+  const ds=chart.data.datasets[0], total=ds.data.reduce((a,b)=>a+b,0); if(!total) return;
+  const ctx=chart.ctx; ctx.save(); ctx.font='700 12px Manrope, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  chart.getDatasetMeta(0).data.forEach((arc,i)=>{
+    const v=ds.data[i]; if(!v) return; const pct=v/total*100; if(pct<6) return;
+    const ang=(arc.startAngle+arc.endAngle)/2, r=(arc.innerRadius+arc.outerRadius)/2;
+    ctx.fillStyle='#fff'; ctx.fillText(Math.round(pct)+'%', arc.x+Math.cos(ang)*r, arc.y+Math.sin(ang)*r);
+  });
+  ctx.restore();
+}};
+// Plugin: tổng ở tâm donut
+const ovDonutCenter = { id:'ovDonutCenter', afterDatasetsDraw(chart){
+  const ds=chart.data.datasets[0], total=ds.data.reduce((a,b)=>a+b,0);
+  const m=chart.getDatasetMeta(0).data[0]; if(!m) return; const ctx=chart.ctx;
+  ctx.save(); ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillStyle=ovInk(); ctx.font='700 22px Manrope, sans-serif'; ctx.fillText(total, m.x, m.y-3);
+  ctx.fillStyle='#8B949E'; ctx.font='600 9px Manrope, sans-serif'; ctx.fillText('TOTAL', m.x, m.y+14);
+  ctx.restore();
+}};
+// Plugin: giá trị trên từng đoạn của stacked bar
+const ovBarVal = { id:'ovBarVal', afterDatasetsDraw(chart){
+  const ctx=chart.ctx; ctx.save(); ctx.font='700 12px Manrope, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle='#fff';
+  chart.data.datasets.forEach((ds,di)=>{ chart.getDatasetMeta(di).data.forEach((bar,i)=>{
+    const v=ds.data[i]; if(!v) return; if(Math.abs(bar.base-bar.y)<16) return;
+    ctx.fillText(v, bar.x, (bar.y+bar.base)/2);
+  }); });
+  ctx.restore();
+}};
+
+// Donut chung (destroy + create); rỗng → 1 lát xám "No data". Legend kèm số + %.
 function ovDonut(id, labels, data, colors){
   dc(id); const el=g(id); if(!el) return;
-  if(!data.length){ labels=['No data']; data=[1]; colors=['#6E7681']; }
+  let empty=false;
+  if(!data.length){ labels=['No data']; data=[1]; colors=['#6E7681']; empty=true; }
   charts[id]=new Chart(el.getContext('2d'),{type:'doughnut',
     data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:0}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'58%',
-      plugins:{legend:{position:'right',labels:{color:'#8B949E',font:{size:11},boxWidth:10,padding:8}}}}});
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',layout:{padding:6},
+      plugins:{
+        legend:{position:'right',labels:{color:ovInk(),font:{size:11},boxWidth:10,padding:7,
+          generateLabels(chart){
+            const d=chart.data.datasets[0], tot=d.data.reduce((a,b)=>a+b,0)||1;
+            return chart.data.labels.map((lb,i)=>({
+              text: empty ? String(lb) : `${lb}  ${d.data[i]} (${Math.round(d.data[i]/tot*100)}%)`,
+              fillStyle:d.backgroundColor[i], strokeStyle:d.backgroundColor[i], lineWidth:0,
+              hidden:!chart.getDataVisibility(i), index:i }));
+          }}},
+        tooltip:{enabled:!empty}
+      }},
+    plugins: empty ? [] : [ovArcPct, ovDonutCenter]});
 }
 
-// Stacked bar chung
+// Stacked bar chung (giá trị vẽ trên từng đoạn; legend kèm tổng)
 function ovStackBar(id, labels, datasets){
   dc(id); const el=g(id); if(!el) return;
   charts[id]=new Chart(el.getContext('2d'),{type:'bar',
-    data:{labels,datasets:datasets.map(ds=>({label:ds.label,data:ds.data,backgroundColor:ds.color,borderWidth:0,borderRadius:4,maxBarThickness:90}))},
+    data:{labels,datasets:datasets.map(ds=>({label:`${ds.label} (${ds.data.reduce((a,b)=>a+b,0)})`,data:ds.data,backgroundColor:ds.color,borderWidth:0,borderRadius:4,maxBarThickness:90}))},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom',labels:{color:'#8B949E',font:{size:11},boxWidth:10}}},
-      scales:{x:{stacked:true,grid:{display:false},ticks:{color:'#8B949E'}},
-              y:{stacked:true,beginAtZero:true,grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#8B949E',precision:0}}}}});
+      plugins:{legend:{position:'bottom',labels:{color:ovInk(),font:{size:11},boxWidth:10}},
+               tooltip:{callbacks:{label:c=>`${c.dataset.label.replace(/\s*\(\d+\)$/,'')}: ${c.parsed.y}`}}},
+      scales:{x:{stacked:true,grid:{display:false},ticks:{color:ovInk()}},
+              y:{stacked:true,beginAtZero:true,grid:{color:'rgba(140,148,163,.15)'},ticks:{color:'#8B949E',precision:0}}}},
+    plugins:[ovBarVal]});
 }
 
 // Donut 1 loại report theo semantic_status + dòng count/on-time

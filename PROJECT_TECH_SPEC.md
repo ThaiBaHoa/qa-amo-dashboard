@@ -2,8 +2,8 @@
 
 **File:** `index.html` (single-file SPA, không build step)
 **Repo:** `ThaiBaHoa/qa-amo-dashboard` · **Domain:** `vjc-qa-amo.com` (GitHub Pages)
-**Version hiện tại:** `2026.06.05-r89`
-**Cập nhật spec:** 2026-06-05 — phản ánh code thực tế (gồm r81–r89, SPI, KPI2, PAVOI RFI)
+**Version hiện tại:** `2026.06.05-r90`
+**Cập nhật spec:** 2026-06-05 — phản ánh code thực tế (gồm r81–r90, SPI, KPI2, PAVOI RFI)
 
 > Tài liệu này mô tả TOÀN BỘ kiến trúc, dữ liệu, logic và quy ước của dashboard. Dùng làm nguồn tham chiếu chuẩn khi sửa code. Số dòng (Lxxxx) là tương đối, dùng để định vị nhanh.
 
@@ -57,7 +57,7 @@ Dashboard nội bộ cho **QA AMO** (Quality Assurance — Approved Maintenance 
 | `SUPA_KEY` | `sb_publishable_…` | anon key |
 | `G_URL` | `https://galileo-proxy.thaibahoa2308.workers.dev/proxy/` | Galileo proxy |
 | `ORG_UNIT` | `'QA AMO'` | filter chính cho mọi query report |
-| `APP_REV` | `'2026.06.05-r89'` | version (hiển thị footer + PDF) |
+| `APP_REV` | `'2026.06.05-r90'` | version (hiển thị footer + PDF) |
 | `PS` | `25` | page size pagination |
 | `CACHE_KEY` | `'qaAmoV5'` | localStorage cache key |
 | `CACHE_TTL` | `4*60*60*1000` (4 giờ) | TTL cache |
@@ -162,7 +162,8 @@ Trang Overview là **biểu đồ** (Chart.js), không KPI tile/bảng. Lọc qu
   - Donut `ovAuditStatus`: theo `status` (Scheduled/In Progress/Performed/Closed/Cancelled).
   - Stacked bar `ovAuditType`: trục X = Audit / Inspection (`workflow_category`), stack Closed (green) vs In progress (`status` ∉ {Closed,Cancelled}, amber).
 - **Report Progress** — 2 donut `ovReportDonut` cho `'MCAR'` & `'AMO ECAR'` (lọc `report_title`): chia theo `semantic_status` (Open/Overdue/On-time/Lately/Closed) + dòng `{total} · {on-time%}`.
-- Donut rỗng → 1 lát xám "No data". Dead-code giữ lại (không còn caller): `buildChartsFor`, `renderStatTblsFor`, `buildMonthChart`, `buildFormChart`, `renderOvTypeBlock` (gỡ ở r89).
+- Donut rỗng → 1 lát xám "No data". **Datalabels (r90):** plugin inline `ovArcPct` vẽ **% trên từng lát** (bỏ <6%), `ovDonutCenter` vẽ tổng ở tâm, `ovBarVal` vẽ value trên đoạn bar; legend kèm `count (pct%)`. Màu chữ canvas theme-aware qua `ovInk()`. Layout: `#page-overview .chart-card{min-width:0}` chống tràn grid khi zoom (Chart.js responsive co giãn).
+- Dead-code giữ lại (không còn caller): `buildChartsFor`, `renderStatTblsFor`, `buildMonthChart`, `buildFormChart`, `renderOvTypeBlock` (gỡ ở r89).
 
 ### 6.4b KPI Charts (trang riêng `page-kpi`) — `buildKPICharts()` (L3281)
 - Cards: Total / Open / Overdue / **On-time Rate** `onTime/(onTime+lately)` / CAT III / Audits (distinct `audit_id`). **Repetitive Rate** = `count(is_rep)/total`. **CAT I/II/III** count theo `overdue_cat` (tập Overdue). Year filter (mặc định năm hiện tại).
@@ -317,7 +318,7 @@ Trang Overview là **biểu đồ** (Chart.js), không KPI tile/bảng. Lọc qu
 ## 13. Quy ước phát triển
 
 - **Edit surgical:** chỉ chạm điểm cần sửa, không refactor lan man.
-- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r89. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.)
+- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r90. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.)
 - **Deploy:** sửa `index.html` (bản OneDrive) → copy vào clone repo → `git diff` review → commit + push `main` (commit message dùng `git commit -F` để tránh lỗi shell với ký tự `/`). GitHub Pages tự build ~1–2 phút.
 - **Tận dụng helper có sẵn** (fetchAll, g, s, esc, fd, toast, setOv, renderPaged, sortD, ageCalc) — không viết trùng.
 - **Tài liệu liên quan:** `PAVOI_RFI_Spec.md` (RFI chi tiết), `CAR report types & KPI2` (MCAR/AMO-ECAR vs CMR-CAR/ECAR; KPI2 Phase-1), `GALILEO_QUIRKS.md`, `GALILEO_DATA_QUALITY.md`.
@@ -337,3 +338,4 @@ Trang Overview là **biểu đồ** (Chart.js), không KPI tile/bảng. Lọc qu
 | r87 | Overview rebuild (MNT + MCAR + AMO ECAR, bỏ donut/month/top-forms); SPI rework (Current Trigger L1/L2/L3 theo chuỗi tháng breach liền kề, year filter theo raised_year, badge Trigger Level). |
 | r88 | SPI fix: Trigger Level = chuỗi breach liền kề DÀI NHẤT trong năm (không phải tính ngược từ tháng cuối) → breach lẻ đã phục hồi (vd SPI-03 Mar) vẫn hiện L1. |
 | r89 | Overview chuyển sang chart-based: donut status + stacked bar Audit vs Inspection (MNT gồm cả audit+inspection) + 2 donut MCAR/AMO ECAR theo status; bỏ KPI tiles + bảng "MNT đang mở". |
+| r90 | Overview charts: hiện % trên từng lát donut + tổng ở tâm + value trên bar (plugin inline); legend kèm count(%); fix `min-width:0` chống tràn/co giãn khi zoom. |
