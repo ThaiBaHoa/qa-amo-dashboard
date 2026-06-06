@@ -2134,7 +2134,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.05-r91';
+const APP_REV = '2026.06.05-r92';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3101,7 +3101,7 @@ function ovDonut(id, labels, data, colors){
     data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:0}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'62%',layout:{padding:6},
       plugins:{
-        legend:{position:'right',labels:{color:ovInk(),font:{size:11},boxWidth:10,padding:7,
+        legend:{position:'right',labels:{color:'#8B949E',font:{size:11},boxWidth:10,padding:7,
           generateLabels(chart){
             const d=chart.data.datasets[0], tot=d.data.reduce((a,b)=>a+b,0)||1;
             return chart.data.labels.map((lb,i)=>({
@@ -3120,9 +3120,9 @@ function ovStackBar(id, labels, datasets){
   charts[id]=new Chart(el.getContext('2d'),{type:'bar',
     data:{labels,datasets:datasets.map(ds=>({label:`${ds.label} (${ds.data.reduce((a,b)=>a+b,0)})`,data:ds.data,backgroundColor:ds.color,borderWidth:0,borderRadius:4,maxBarThickness:90}))},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom',labels:{color:ovInk(),font:{size:11},boxWidth:10}},
+      plugins:{legend:{position:'bottom',labels:{color:'#8B949E',font:{size:11},boxWidth:10}},
                tooltip:{callbacks:{label:c=>`${c.dataset.label.replace(/\s*\(\d+\)$/,'')}: ${c.parsed.y}`}}},
-      scales:{x:{stacked:true,grid:{display:false},ticks:{color:ovInk()}},
+      scales:{x:{stacked:true,grid:{display:false},ticks:{color:'#8B949E'}},
               y:{stacked:true,beginAtZero:true,grid:{color:'rgba(140,148,163,.15)'},ticks:{color:'#8B949E',precision:0}}}},
     plugins:[ovBarVal]});
 }
