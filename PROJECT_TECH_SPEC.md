@@ -2,8 +2,8 @@
 
 **File:** `index.html` (single-file SPA, không build step)
 **Repo:** `ThaiBaHoa/qa-amo-dashboard` · **Domain:** `vjc-qa-amo.com` (GitHub Pages)
-**Version hiện tại:** `2026.06.05-r88`
-**Cập nhật spec:** 2026-06-05 — phản ánh code thực tế (gồm r81–r88, SPI, KPI2, PAVOI RFI)
+**Version hiện tại:** `2026.06.05-r89`
+**Cập nhật spec:** 2026-06-05 — phản ánh code thực tế (gồm r81–r89, SPI, KPI2, PAVOI RFI)
 
 > Tài liệu này mô tả TOÀN BỘ kiến trúc, dữ liệu, logic và quy ước của dashboard. Dùng làm nguồn tham chiếu chuẩn khi sửa code. Số dòng (Lxxxx) là tương đối, dùng để định vị nhanh.
 
@@ -57,7 +57,7 @@ Dashboard nội bộ cho **QA AMO** (Quality Assurance — Approved Maintenance 
 | `SUPA_KEY` | `sb_publishable_…` | anon key |
 | `G_URL` | `https://galileo-proxy.thaibahoa2308.workers.dev/proxy/` | Galileo proxy |
 | `ORG_UNIT` | `'QA AMO'` | filter chính cho mọi query report |
-| `APP_REV` | `'2026.06.05-r88'` | version (hiển thị footer + PDF) |
+| `APP_REV` | `'2026.06.05-r89'` | version (hiển thị footer + PDF) |
 | `PS` | `25` | page size pagination |
 | `CACHE_KEY` | `'qaAmoV5'` | localStorage cache key |
 | `CACHE_TTL` | `4*60*60*1000` (4 giờ) | TTL cache |
@@ -156,15 +156,13 @@ chưa Closed, có c:  !t→'Closed'; c<=t?'On-time Closed':'Lately Closed'
 ### 6.3 `catCalc(ag, sm)` (L3027)
 Chỉ khi `sm==='Overdue'`: `ag>=-30`→CAT I; `ag>=-60`→CAT II; còn lại→CAT III.
 
-### 6.4 Overview (rebuild r87) — `renderOverview(d)` + `renderOvTypeBlock()`
-Trang Overview đã rebuild (r87): KHÔNG còn donut/by-month/top-forms/summary-by-form. Chỉ monitor tiến độ 3 nhóm, dùng dữ liệu sẵn có (không fetch mới). Lọc qua `#ovYearFilter` → `filterOverviewYear()` truyền `d` (allData lọc năm) vào `renderOverview(d)`.
-- **MNT · Audit Progress** (nguồn `auditData.filter(a=>a.prefix==='MNT')`, lọc `sched_year`):
-  - 4 KPI: Total MNT / Closed (`status==='Closed'`) / In Progress (`status` ∉ {Closed, Cancelled}) / **Có finding Overdue** (`overdue_count>0`).
-  - Bảng MNT chưa đóng: sort `overdue_count` desc → `open_count` desc; dòng có overdue tô đỏ nhạt; click → `showAuditDetail(audit_id)`.
-- **Report Progress** — 2 khối `renderOvTypeBlock(title, d, prefix)` cho `'MCAR'` và `'AMO ECAR'` (lọc `report_title`):
-  - Total / Open / Overdue / Closed (`On-time + Lately + Closed`).
-  - **On-time Rate** = `onTime/(onTime+lately)` (mẫu số chỉ report có target). Thanh **% closed** = `closed/total`.
-- Dead-code giữ lại (không còn caller): `buildChartsFor`, `renderStatTblsFor`, `buildMonthChart`, `buildFormChart`.
+### 6.4 Overview (chart-based, r89) — `renderOverview(d)`
+Trang Overview là **biểu đồ** (Chart.js), không KPI tile/bảng. Lọc qua `#ovYearFilter` → `filterOverviewYear()` truyền `d` (allData lọc năm) vào `renderOverview(d)`. Helper chung: `ovDonut(id,labels,data,colors)`, `ovStackBar(id,labels,datasets)`, `ovReportDonut(title,d,canvasId,cntId)`; đều `dc(id)` destroy trước khi tạo lại (đăng ký trong `charts{}` → `showPage('overview')` resize).
+- **Audit & Inspection Progress · MNT** (nguồn `auditData.filter(a=>a.prefix==='MNT')` — **gồm CẢ audit + inspection** vì MNT prefix chứa cả hai, MPS đã loại; lọc `sched_year`):
+  - Donut `ovAuditStatus`: theo `status` (Scheduled/In Progress/Performed/Closed/Cancelled).
+  - Stacked bar `ovAuditType`: trục X = Audit / Inspection (`workflow_category`), stack Closed (green) vs In progress (`status` ∉ {Closed,Cancelled}, amber).
+- **Report Progress** — 2 donut `ovReportDonut` cho `'MCAR'` & `'AMO ECAR'` (lọc `report_title`): chia theo `semantic_status` (Open/Overdue/On-time/Lately/Closed) + dòng `{total} · {on-time%}`.
+- Donut rỗng → 1 lát xám "No data". Dead-code giữ lại (không còn caller): `buildChartsFor`, `renderStatTblsFor`, `buildMonthChart`, `buildFormChart`, `renderOvTypeBlock` (gỡ ở r89).
 
 ### 6.4b KPI Charts (trang riêng `page-kpi`) — `buildKPICharts()` (L3281)
 - Cards: Total / Open / Overdue / **On-time Rate** `onTime/(onTime+lately)` / CAT III / Audits (distinct `audit_id`). **Repetitive Rate** = `count(is_rep)/total`. **CAT I/II/III** count theo `overdue_cat` (tập Overdue). Year filter (mặc định năm hiện tại).
@@ -319,7 +317,7 @@ Trang Overview đã rebuild (r87): KHÔNG còn donut/by-month/top-forms/summary-
 ## 13. Quy ước phát triển
 
 - **Edit surgical:** chỉ chạm điểm cần sửa, không refactor lan man.
-- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r88. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.)
+- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r89. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.)
 - **Deploy:** sửa `index.html` (bản OneDrive) → copy vào clone repo → `git diff` review → commit + push `main` (commit message dùng `git commit -F` để tránh lỗi shell với ký tự `/`). GitHub Pages tự build ~1–2 phút.
 - **Tận dụng helper có sẵn** (fetchAll, g, s, esc, fd, toast, setOv, renderPaged, sortD, ageCalc) — không viết trùng.
 - **Tài liệu liên quan:** `PAVOI_RFI_Spec.md` (RFI chi tiết), `CAR report types & KPI2` (MCAR/AMO-ECAR vs CMR-CAR/ECAR; KPI2 Phase-1), `GALILEO_QUIRKS.md`, `GALILEO_DATA_QUALITY.md`.
@@ -338,3 +336,4 @@ Trang Overview đã rebuild (r87): KHÔNG còn donut/by-month/top-forms/summary-
 | r86 | RFI: page chỉ fetch PAVOI Open (~65, nhanh ~3×); modal fetch tươi 1 report (hết stale). |
 | r87 | Overview rebuild (MNT + MCAR + AMO ECAR, bỏ donut/month/top-forms); SPI rework (Current Trigger L1/L2/L3 theo chuỗi tháng breach liền kề, year filter theo raised_year, badge Trigger Level). |
 | r88 | SPI fix: Trigger Level = chuỗi breach liền kề DÀI NHẤT trong năm (không phải tính ngược từ tháng cuối) → breach lẻ đã phục hồi (vd SPI-03 Mar) vẫn hiện L1. |
+| r89 | Overview chuyển sang chart-based: donut status + stacked bar Audit vs Inspection (MNT gồm cả audit+inspection) + 2 donut MCAR/AMO ECAR theo status; bỏ KPI tiles + bảng "MNT đang mở". |

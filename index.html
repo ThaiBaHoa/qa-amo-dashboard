@@ -559,63 +559,36 @@ tr:last-child td{border-bottom:none}
             <span style="font-size:11px;color:var(--muted)" id="ovYearCount"></span>
           </div>
 
-          <!-- SECTION 1: MNT / Audit Progress -->
-          <div class="sec-title">MNT · Audit Progress</div>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;flex-shrink:0">
-            <div class="kpi" style="--accent:var(--blue)"><div class="kpi-lbl">Total MNT</div><div class="kpi-val" id="ov-mnt-total">—</div></div>
-            <div class="kpi" style="--accent:var(--green)"><div class="kpi-lbl">Closed</div><div class="kpi-val" id="ov-mnt-closed">—</div></div>
-            <div class="kpi" style="--accent:var(--yellow)"><div class="kpi-lbl">In Progress</div><div class="kpi-val" id="ov-mnt-open">—</div></div>
-            <div class="kpi" style="--accent:#ff6b6b"><div class="kpi-lbl">Có finding Overdue</div><div class="kpi-val" id="ov-mnt-overdue">—</div></div>
-          </div>
-          <div class="tbl-card" style="margin-bottom:16px;flex:none;max-height:360px">
-            <div class="tbl-bar"><div><div class="tbl-title">MNT đang mở (chưa đóng)</div><div class="tbl-count" id="ov-mnt-count">—</div></div></div>
-            <div class="tbl-wrap">
-              <table>
-                <thead><tr>
-                  <th>Audit No</th><th>Title</th><th>Status</th><th>Scheduled</th>
-                  <th style="text-align:center">Findings</th><th style="text-align:center">Open</th><th style="text-align:center">Overdue</th>
-                </tr></thead>
-                <tbody id="ov-mnt-body"></tbody>
-              </table>
+          <!-- SECTION 1: Audit & Inspection Progress (MNT = Audit + Inspection) -->
+          <div class="sec-title">Audit &amp; Inspection Progress · MNT</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+            <div class="chart-card">
+              <div style="font-size:13px;font-weight:600;margin-bottom:8px">By status <span id="ov-mnt-cnt" style="font-size:11px;color:var(--muted);font-weight:400"></span></div>
+              <div style="height:240px;position:relative"><canvas id="ovAuditStatus"></canvas></div>
+            </div>
+            <div class="chart-card">
+              <div style="font-size:13px;font-weight:600;margin-bottom:8px">Audit vs Inspection <span style="font-size:11px;color:var(--muted);font-weight:400">· closed vs in-progress</span></div>
+              <div style="height:240px;position:relative"><canvas id="ovAuditType"></canvas></div>
             </div>
           </div>
 
-          <!-- SECTION 2: Report progress (MCAR + AMO ECAR) -->
+          <!-- SECTION 2: Report Progress (MCAR + AMO ECAR) -->
           <div class="sec-title">Report Progress</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-
-            <!-- MCAR block -->
             <div class="chart-card">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-                <div style="font-size:14px;font-weight:700">MCAR <span style="font-size:11px;color:var(--muted);font-weight:400">· Internal Audit Findings</span></div>
-                <div style="font-size:12px;color:var(--muted)">On-time: <b id="ov-mcar-rate" style="color:var(--green)">—</b></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <div style="font-size:13px;font-weight:600">MCAR <span style="font-size:11px;color:var(--muted);font-weight:400">· Internal Audit Findings</span></div>
+                <div style="font-size:11px;color:var(--muted)" id="ov-mcar-cnt"></div>
               </div>
-              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
-                <div style="text-align:center"><div style="font-size:26px;font-weight:700;color:var(--blue)" id="ov-mcar-total">—</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Total</div></div>
-                <div style="text-align:center"><div style="font-size:26px;font-weight:700;color:var(--blue)" id="ov-mcar-open">—</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Open</div></div>
-                <div style="text-align:center"><div style="font-size:26px;font-weight:700;color:#ff6b6b" id="ov-mcar-over">—</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Overdue</div></div>
-                <div style="text-align:center"><div style="font-size:26px;font-weight:700;color:var(--green)" id="ov-mcar-closed">—</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Closed</div></div>
-              </div>
-              <div style="background:rgba(255,255,255,.06);border-radius:5px;height:8px;overflow:hidden"><div id="ov-mcar-bar" style="height:100%;background:var(--green);border-radius:5px;transition:width .4s;width:0%"></div></div>
-              <div style="font-size:10px;color:var(--muted);margin-top:5px" id="ov-mcar-barlbl">—</div>
+              <div style="height:240px;position:relative"><canvas id="ovMcar"></canvas></div>
             </div>
-
-            <!-- AMO ECAR block -->
             <div class="chart-card">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-                <div style="font-size:14px;font-weight:700">AMO ECAR <span style="font-size:11px;color:var(--muted);font-weight:400">· Authority Findings</span></div>
-                <div style="font-size:12px;color:var(--muted)">On-time: <b id="ov-amo-rate" style="color:var(--green)">—</b></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <div style="font-size:13px;font-weight:600">AMO ECAR <span style="font-size:11px;color:var(--muted);font-weight:400">· Authority Findings</span></div>
+                <div style="font-size:11px;color:var(--muted)" id="ov-amo-cnt"></div>
               </div>
-              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
-                <div style="text-align:center"><div style="font-size:26px;font-weight:700;color:var(--blue)" id="ov-amo-total">—</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Total</div></div>
-                <div style="text-align:center"><div style="font-size:26px;font-weight:700;color:var(--blue)" id="ov-amo-open">—</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Open</div></div>
-                <div style="text-align:center"><div style="font-size:26px;font-weight:700;color:#ff6b6b" id="ov-amo-over">—</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Overdue</div></div>
-                <div style="text-align:center"><div style="font-size:26px;font-weight:700;color:var(--green)" id="ov-amo-closed">—</div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Closed</div></div>
-              </div>
-              <div style="background:rgba(255,255,255,.06);border-radius:5px;height:8px;overflow:hidden"><div id="ov-amo-bar" style="height:100%;background:var(--green);border-radius:5px;transition:width .4s;width:0%"></div></div>
-              <div style="font-size:10px;color:var(--muted);margin-top:5px" id="ov-amo-barlbl">—</div>
+              <div style="height:240px;position:relative"><canvas id="ovAmo"></canvas></div>
             </div>
-
           </div>
         </div>
 
@@ -2159,7 +2132,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.05-r88';
+const APP_REV = '2026.06.05-r89';
 
 // Nature of finding: ánh xạ mục con -> nhóm cha (từ danh mục gốc Galileo dwreporting_general_lists)
 const NATURE_PARENT = {
@@ -3051,62 +3024,66 @@ function filterOverviewYear() {
 function renderOverview(d) {
   const yr = g('ovYearFilter')?.value || 'all';
 
-  // ── Section 1: MNT / Audit progress ──
+  // ── Section 1: Audit & Inspection progress (MNT = audit + inspection) ──
   let mnt = auditData.filter(a => a.prefix === 'MNT');
   if (yr !== 'all') mnt = mnt.filter(a => String(a.sched_year) === yr);
+  s('ov-mnt-cnt', `(${mnt.length})`);
 
-  const mntClosed  = mnt.filter(a => a.status === 'Closed').length;
-  const mntOpen    = mnt.filter(a => a.status !== 'Closed' && a.status !== 'Cancelled').length;
-  const mntOverdue = mnt.filter(a => (a.overdue_count || 0) > 0).length;
-  s('ov-mnt-total',   mnt.length);
-  s('ov-mnt-closed',  mntClosed);
-  s('ov-mnt-open',    mntOpen);
-  s('ov-mnt-overdue', mntOverdue);
+  // Donut: by status
+  const ST_ORDER = ['Scheduled','InProgress','Performed','Closed','Cancelled'];
+  const ST_LABEL = {Scheduled:'Scheduled',InProgress:'In Progress',Performed:'Performed',Closed:'Closed',Cancelled:'Cancelled'};
+  const ST_COLOR = {Scheduled:'#58A6FF',InProgress:'#D29922',Performed:'#A78BFA',Closed:'#3FB950',Cancelled:'#6E7681'};
+  const stLabels=[], stData=[], stColors=[];
+  ST_ORDER.forEach(st=>{ const n=mnt.filter(a=>a.status===st).length; if(n>0){ stLabels.push(ST_LABEL[st]); stData.push(n); stColors.push(ST_COLOR[st]); } });
+  ovDonut('ovAuditStatus', stLabels, stData, stColors);
 
-  const notClosed = mnt
-    .filter(a => a.status !== 'Closed' && a.status !== 'Cancelled')
-    .sort((a, b) => (b.overdue_count||0) - (a.overdue_count||0) || (b.open_count||0) - (a.open_count||0));
+  // Bar: Audit vs Inspection — stacked Closed vs In-progress
+  const types = ['Audit','Inspection'];
+  const closedByType = types.map(t => mnt.filter(a=>a.workflow_category===t && a.status==='Closed').length);
+  const openByType   = types.map(t => mnt.filter(a=>a.workflow_category===t && a.status!=='Closed' && a.status!=='Cancelled').length);
+  ovStackBar('ovAuditType', types, [
+    {label:'Closed',      data:closedByType, color:'#3FB950'},
+    {label:'In progress', data:openByType,   color:'#D29922'}
+  ]);
 
-  const STC = {'Closed':'b-on','Performed':'b-late','Scheduled':'b-open','InProgress':'b-open','Cancelled':'b-with'};
-  const body = g('ov-mnt-body');
-  if (body) body.innerHTML = notClosed.length === 0
-    ? '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted)">Không có MNT đang mở</td></tr>'
-    : notClosed.map(a => `<tr style="cursor:pointer;${(a.overdue_count||0)>0?'background:rgba(255,107,107,.06)':''}" onclick="showAuditDetail('${a.audit_id}')">
-        <td><b style="color:var(--blue)">${esc(a.number)||'—'}</b></td>
-        <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.title)||'—'}</td>
-        <td><span class="badge ${STC[a.status]||'b-with'}">${esc(a.status)||'—'}</span></td>
-        <td style="font-size:11px;color:var(--muted)">${fdYM(a.scheduled_start_date)}</td>
-        <td style="text-align:center"><b>${a.finding_count||0}</b></td>
-        <td style="text-align:center;color:var(--blue)">${a.open_count||0}</td>
-        <td style="text-align:center;color:#ff6b6b">${(a.overdue_count||0) || '—'}</td>
-      </tr>`).join('');
-  s('ov-mnt-count', notClosed.length + ' đang mở / ' + mnt.length + ' tổng');
-
-  // ── Section 2 & 3: report-type blocks ──
-  renderOvTypeBlock('MCAR',     d, 'ov-mcar');
-  renderOvTypeBlock('AMO ECAR', d, 'ov-amo');
+  // ── Section 2: report-type donuts (semantic_status) ──
+  ovReportDonut('MCAR',     d, 'ovMcar', 'ov-mcar-cnt');
+  ovReportDonut('AMO ECAR', d, 'ovAmo',  'ov-amo-cnt');
 }
 
-// Render 1 khối thống kê cho 1 loại report
-function renderOvTypeBlock(title, d, prefix) {
-  const rows   = d.filter(r => r.report_title === title);
-  const total  = rows.length;
-  const open   = rows.filter(r => r.semantic_status === 'Open').length;
-  const over   = rows.filter(r => r.semantic_status === 'Overdue').length;
-  const onTime = rows.filter(r => r.semantic_status === 'On-time Closed').length;
-  const lately = rows.filter(r => r.semantic_status === 'Lately Closed').length;
-  const closed = onTime + lately + rows.filter(r => r.semantic_status === 'Closed').length;
-  const withTgt = onTime + lately;
-  const rate = withTgt ? Math.round(onTime / withTgt * 100) : null;
-  const closedPct = total ? Math.round(closed / total * 100) : 0;
+// Donut chung (destroy + create); rỗng → 1 lát xám "No data"
+function ovDonut(id, labels, data, colors){
+  dc(id); const el=g(id); if(!el) return;
+  if(!data.length){ labels=['No data']; data=[1]; colors=['#6E7681']; }
+  charts[id]=new Chart(el.getContext('2d'),{type:'doughnut',
+    data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'58%',
+      plugins:{legend:{position:'right',labels:{color:'#8B949E',font:{size:11},boxWidth:10,padding:8}}}}});
+}
 
-  s(prefix + '-total',  total);
-  s(prefix + '-open',   open);
-  s(prefix + '-over',   over);
-  s(prefix + '-closed', closed);
-  s(prefix + '-rate',   rate === null ? '—' : rate + '%');
-  const bar = g(prefix + '-bar'); if (bar) bar.style.width = closedPct + '%';
-  s(prefix + '-barlbl', closedPct + '% closed');
+// Stacked bar chung
+function ovStackBar(id, labels, datasets){
+  dc(id); const el=g(id); if(!el) return;
+  charts[id]=new Chart(el.getContext('2d'),{type:'bar',
+    data:{labels,datasets:datasets.map(ds=>({label:ds.label,data:ds.data,backgroundColor:ds.color,borderWidth:0,borderRadius:4,maxBarThickness:90}))},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{color:'#8B949E',font:{size:11},boxWidth:10}}},
+      scales:{x:{stacked:true,grid:{display:false},ticks:{color:'#8B949E'}},
+              y:{stacked:true,beginAtZero:true,grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#8B949E',precision:0}}}}});
+}
+
+// Donut 1 loại report theo semantic_status + dòng count/on-time
+function ovReportDonut(title, d, canvasId, cntId){
+  const rows = d.filter(r => r.report_title === title);
+  const SC={'Open':'#58A6FF','Overdue':'#ff6b6b','On-time Closed':'#3FB950','Lately Closed':'#D29922','Closed':'#6E7681'};
+  const ORDER=['Open','Overdue','On-time Closed','Lately Closed','Closed'];
+  const labels=[],data=[],colors=[];
+  ORDER.forEach(st=>{ const n=rows.filter(r=>r.semantic_status===st).length; if(n>0){ labels.push(st); data.push(n); colors.push(SC[st]); } });
+  ovDonut(canvasId, labels, data, colors);
+  const onTime=rows.filter(r=>r.semantic_status==='On-time Closed').length;
+  const lately=rows.filter(r=>r.semantic_status==='Lately Closed').length;
+  const rate = (onTime+lately) ? Math.round(onTime/(onTime+lately)*100)+'% on-time' : '—';
+  s(cntId, `${rows.length} total · ${rate}`);
 }
 
 function buildChartsFor(d) {
