@@ -2134,7 +2134,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.05-r92';
+const APP_REV = '2026.06.05-r93';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3060,7 +3060,8 @@ function renderOverview(d) {
 }
 
 // Màu chữ theo theme (đọc --text) cho label vẽ trên canvas
-function ovInk(){ return (getComputedStyle(document.documentElement).getPropertyValue('--text')||'').trim() || '#e9edf3'; }
+// Màu chữ chart: TRẮNG trên dark, ĐEN trên light (đọc tại thời điểm vẽ; charts re-render khi đổi theme)
+function ovInk(){ return document.documentElement.getAttribute('data-theme')==='light' ? '#1a2230' : '#ffffff'; }
 
 // Plugin: vẽ % ngay trên từng lát donut (bỏ lát <6% cho đỡ rối)
 const ovArcPct = { id:'ovArcPct', afterDatasetsDraw(chart){
@@ -3101,12 +3102,12 @@ function ovDonut(id, labels, data, colors){
     data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:0}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'62%',layout:{padding:6},
       plugins:{
-        legend:{position:'right',labels:{color:'#8B949E',font:{size:11},boxWidth:10,padding:7,
+        legend:{position:'right',labels:{color:ovInk(),font:{size:11},boxWidth:10,padding:7,
           generateLabels(chart){
-            const d=chart.data.datasets[0], tot=d.data.reduce((a,b)=>a+b,0)||1;
+            const d=chart.data.datasets[0], tot=d.data.reduce((a,b)=>a+b,0)||1, ink=ovInk();
             return chart.data.labels.map((lb,i)=>({
               text: empty ? String(lb) : `${lb}  ${d.data[i]} (${Math.round(d.data[i]/tot*100)}%)`,
-              fillStyle:d.backgroundColor[i], strokeStyle:d.backgroundColor[i], lineWidth:0,
+              fillStyle:d.backgroundColor[i], strokeStyle:d.backgroundColor[i], lineWidth:0, fontColor:ink,
               hidden:!chart.getDataVisibility(i), index:i }));
           }}},
         tooltip:{enabled:!empty}
@@ -3120,10 +3121,10 @@ function ovStackBar(id, labels, datasets){
   charts[id]=new Chart(el.getContext('2d'),{type:'bar',
     data:{labels,datasets:datasets.map(ds=>({label:`${ds.label} (${ds.data.reduce((a,b)=>a+b,0)})`,data:ds.data,backgroundColor:ds.color,borderWidth:0,borderRadius:4,maxBarThickness:90}))},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom',labels:{color:'#8B949E',font:{size:11},boxWidth:10}},
+      plugins:{legend:{position:'bottom',labels:{color:ovInk(),font:{size:11},boxWidth:10}},
                tooltip:{callbacks:{label:c=>`${c.dataset.label.replace(/\s*\(\d+\)$/,'')}: ${c.parsed.y}`}}},
-      scales:{x:{stacked:true,grid:{display:false},ticks:{color:'#8B949E'}},
-              y:{stacked:true,beginAtZero:true,grid:{color:'rgba(140,148,163,.15)'},ticks:{color:'#8B949E',precision:0}}}},
+      scales:{x:{stacked:true,grid:{display:false},ticks:{color:ovInk()}},
+              y:{stacked:true,beginAtZero:true,grid:{color:'rgba(140,148,163,.15)'},ticks:{color:ovInk(),precision:0}}}},
     plugins:[ovBarVal]});
 }
 
@@ -8261,8 +8262,9 @@ window.toggleTheme = function(){
   try { localStorage.setItem('qa_theme', next); } catch(e){}
   var btn = document.querySelector('#btnTheme .nav-ic');
   if (btn) { btn.dataset.painted=''; btn.dataset.ic = next === 'light' ? 'moon' : 'sun'; window.paintIcons(btn.parentElement); }
-  // charts read CSS vars at build time → rebuild so they pick up the new palette
+  // charts read màu chữ tại build time → rebuild để đổi theo theme mới
   try { if (window.allData && allData.length) renderAll(); } catch(e){}
+  try { if (typeof _spiData!=='undefined' && _spiData && document.getElementById('page-spi')?.classList.contains('active') && typeof renderSPIYear==='function') renderSPIYear(); } catch(e){}
 };
 (function(){
   try { var t = localStorage.getItem('qa_theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch(e){}
@@ -8497,10 +8499,10 @@ function drawSPIChart(canvasId, spi){
     options:{
       responsive:true, maintainAspectRatio:false,
       interaction:{ mode:'index', intersect:false },
-      plugins:{ legend:{ position:'bottom', labels:{ boxWidth:14, font:{size:11} } },
+      plugins:{ legend:{ position:'bottom', labels:{ boxWidth:14, font:{size:11}, color:ovInk() } },
                 tooltip:{ callbacks:{ title: it=>'Month '+it[0].label } } },
-      scales:{ y:{ beginAtZero:true, grid:{color:'rgba(140,148,163,.15)'}, ticks:{font:{size:11}} },
-               x:{ grid:{display:false}, ticks:{font:{size:11}} } }
+      scales:{ y:{ beginAtZero:true, grid:{color:'rgba(140,148,163,.15)'}, ticks:{font:{size:11}, color:ovInk()} },
+               x:{ grid:{display:false}, ticks:{font:{size:11}, color:ovInk()} } }
     }
   });
 }
