@@ -1980,11 +1980,11 @@ tr:last-child td{border-bottom:none}
         <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed">
           <colgroup><col style="width:28%"><col style="width:16%"><col style="width:16%"><col style="width:20%"><col style="width:20%"></colgroup>
           <thead style="position:sticky;top:0;background:var(--card);z-index:1"><tr>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Staff</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Distribution Date</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Due Date</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Acknowledged Date</th>
-            <th style="padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Status</th>
+            <th onclick="docTaskSort('name')" style="cursor:pointer;padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Staff ↕</th>
+            <th onclick="docTaskSort('distDt')" style="cursor:pointer;padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Distribution Date ↕</th>
+            <th onclick="docTaskSort('dueDt')" style="cursor:pointer;padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Due Date ↕</th>
+            <th onclick="docTaskSort('ackDt')" style="cursor:pointer;padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Acknowledged Date ↕</th>
+            <th onclick="docTaskSort('status')" style="cursor:pointer;padding:8px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Status ↕</th>
           </tr></thead>
           <tbody id="docTaskBody"></tbody>
         </table>
@@ -2149,7 +2149,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.05-r94';
+const APP_REV = '2026.06.05-r95';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2314,6 +2314,7 @@ try {
 
 // ── STATE ────────────────────────────────────────────────────
 let curUser = null, allData = [], auditData = [], docData = [], cmrData = [], ecarData = [], docTaskCache = {}, charts = {}, userFilter = 'all', isLoading = false;
+let _docTasks = [], _docTaskSort = { col:'status', asc:true };   // copyholder list + sort (modal Document)
 let docTypeTree=[], docTypeFlat=[], docTypeIndex={}, docTypeByTitle={}, selectedTypeId=null, docWorkflowCache={}, expandedTreeNodes=new Set(), currentDocRevId=null;
 let cmrLoaded = false, ecarLoaded = false;
 let pavoiRfiLoaded = false;
@@ -6842,89 +6843,88 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
   document.body.style.overflow='hidden';
 
   try {
-    // ── Fetch tasks — UUID không dùng quotes, disable main overlay ──
+    // ── Fetch tasks — $select gọn (giảm payload ~3x) + retry 3× chống timeout tạm thời.
+    //    GUID KHÔNG bọc nháy; skipOv=true để không chiếm overlay chính.
     let tasks = docTaskCache[revId];
     if(!tasks) {
-      const raw = await fetchAll(
-        G_URL + 'dwreporting_document_task' +
-        '?$filter=document_revision_id eq ' + revId,
-        true // skipOv = true: không update main overlay
-      );
-      tasks = raw;
-      docTaskCache[revId] = tasks;
-      if(tasks.length > 0) {
-        console.log('[DocTask] Fields:', Object.keys(tasks[0]));
-        console.log('[DocTask] Sample:', tasks[0]);
-      } else {
-        console.log('[DocTask] 0 records for revId:', revId);
+      const url = G_URL + 'dwreporting_document_task' +
+        '?$select=task_owner,task_status,task_delivery_status,task_target_date,' +
+        'document_revision_created_date,modified_date' +
+        '&$filter=document_revision_id eq ' + revId;
+      let lastErr;
+      for(let attempt=1; attempt<=3 && !tasks; attempt++){
+        try { tasks = await fetchAll(url, true); }
+        catch(e){ lastErr=e; console.warn(`[DocTask] try ${attempt}/3 failed:`, e.message); if(attempt<3) await new Promise(r=>setTimeout(r,500*attempt)); }
       }
+      if(!tasks) throw lastErr;
+      docTaskCache[revId] = tasks;
     }
     g('docTaskLoading').style.display='none';
 
     if(!tasks.length) {
+      _docTasks = [];
       g('docTaskBody').innerHTML='<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">No copyholders</td></tr>';
       s('dtk-total',0); s('dtk-done',0); s('dtk-late',0); s('dtk-over',0);
       return;
     }
 
-    // ── Build rows dùng field names xác nhận từ API ──
+    // ── Xử lý → list (sort lại được) + đếm KPI ──
     let onTimeCnt=0, lateCnt=0, overCnt=0, inProgCnt=0;
-
-    const rows = tasks.map(t => {
-      const name    = t.task_owner || '—';
-      const distDt  = t.document_revision_created_date || null;
-      const dueDt   = t.task_target_date || null;
-      const ackDt   = t.task_status === 'Completed' ? (t.modified_date || null) : null;
-      const rawSt   = (t.task_delivery_status || '').toLowerCase();
-      const taskSt  = (t.task_status || '').toLowerCase();
-
-      // Status: task_status Completed + so sánh ack vs due date
+    _docTasks = tasks.map(t => {
+      const name   = t.task_owner || '—';
+      const distDt = t.document_revision_created_date || null;
+      const dueDt  = t.task_target_date || null;
+      const ackDt  = t.task_status === 'Completed' ? (t.modified_date || null) : null;
+      const rawSt  = (t.task_delivery_status || '').toLowerCase();
+      const taskSt = (t.task_status || '').toLowerCase();
       let status;
-      if (taskSt === 'completed') {
-        // Có ack date: so sánh với due date
-        if (ackDt && dueDt) {
-          status = new Date(ackDt) <= new Date(dueDt) ? 'ontime' : 'late';
-        } else {
-          status = 'ontime'; // completed nhưng không có due date → coi là on time
-        }
-      } else if (rawSt === 'overdue') {
-        status = 'overdue'; // chưa complete + overdue
-      } else {
-        status = 'inprogress'; // chưa complete, chưa overdue
-      }
-
-      if(status==='ontime')    onTimeCnt++;
-      else if(status==='late') lateCnt++;
-      else if(status==='overdue') overCnt++;
-      else inProgCnt++;
-
-      const badge = {
-        ontime:     `<span style="background:rgba(63,185,80,.15);color:var(--green);padding:2px 8px;border-radius:4px;font-size:11px">✅ On time</span>`,
-        late:       `<span style="background:rgba(210,153,34,.15);color:var(--yellow);padding:2px 8px;border-radius:4px;font-size:11px">⚠️ Late</span>`,
-        overdue:    `<span style="background:rgba(255,107,107,.15);color:#ff6b6b;padding:2px 8px;border-radius:4px;font-size:11px">🔴 Overdue</span>`,
-        inprogress: `<span style="background:rgba(88,166,255,.15);color:var(--blue);padding:2px 8px;border-radius:4px;font-size:11px">🔵 In Progress</span>`,
-      }[status];
-
-      return `<tr>
-        <td style="font-size:12px;font-weight:500">${esc(name)}</td>
-        <td style="font-size:11px;color:var(--muted)">${fd(distDt)}</td>
-        <td style="font-size:11px;color:var(--muted)">${fd(dueDt)}</td>
-        <td style="font-size:11px;color:var(--muted)">${fd(ackDt)}</td>
-        <td>${badge}</td>
-      </tr>`;
+      if (taskSt === 'completed') status = (ackDt && dueDt) ? (new Date(ackDt) <= new Date(dueDt) ? 'ontime' : 'late') : 'ontime';
+      else if (rawSt === 'overdue') status = 'overdue';
+      else status = 'inprogress';
+      if(status==='ontime') onTimeCnt++; else if(status==='late') lateCnt++; else if(status==='overdue') overCnt++; else inProgCnt++;
+      return { name, distDt, dueDt, ackDt, status };
     });
-
-    s('dtk-total', tasks.length);
-    s('dtk-done',  onTimeCnt);
-    s('dtk-late',  lateCnt);
-    s('dtk-over',  overCnt);
-    g('docTaskBody').innerHTML = rows.join('');
+    s('dtk-total', _docTasks.length); s('dtk-done', onTimeCnt); s('dtk-late', lateCnt); s('dtk-over', overCnt);
+    _docTaskSort = { col:'status', asc:true };   // mặc định: chưa acknowledge (overdue → in-progress) lên đầu
+    renderDocTaskTable();
 
   } catch(e) {
     g('docTaskLoading').style.display='none';
-    g('docTaskBody').innerHTML=`<tr><td colspan="5" style="text-align:center;padding:24px;color:#ff6b6b">Error: ${esc(e.message)}</td></tr>`;
+    g('docTaskBody').innerHTML=`<tr><td colspan="5" style="text-align:center;padding:24px;color:#ff6b6b">Error: ${esc(e.message)}. <a href="javascript:void(0)" style="color:var(--blue)" onclick="delete docTaskCache['${revId}'];showDocDetail('${revId}','${esc(docNum||'')}','','')">Thử lại</a></td></tr>`;
     console.error('[DocTask] Error:', e);
   }
+}
+
+// Click sort cột trong bảng copyholder (modal Document)
+function docTaskSort(col){
+  if(_docTaskSort.col===col) _docTaskSort.asc=!_docTaskSort.asc;
+  else { _docTaskSort.col=col; _docTaskSort.asc=true; }
+  renderDocTaskTable();
+}
+// Render bảng copyholder theo _docTaskSort (status: overdue→in-progress→late→on-time để gom người chưa ack)
+function renderDocTaskTable(){
+  const ts=_docTaskSort, RANK={overdue:0,inprogress:1,late:2,ontime:3};
+  const BADGE={
+    ontime:     '<span style="background:rgba(63,185,80,.15);color:var(--green);padding:2px 8px;border-radius:4px;font-size:11px">✅ On time</span>',
+    late:       '<span style="background:rgba(210,153,34,.15);color:var(--yellow);padding:2px 8px;border-radius:4px;font-size:11px">⚠️ Late</span>',
+    overdue:    '<span style="background:rgba(255,107,107,.15);color:#ff6b6b;padding:2px 8px;border-radius:4px;font-size:11px">🔴 Overdue</span>',
+    inprogress: '<span style="background:rgba(88,166,255,.15);color:var(--blue);padding:2px 8px;border-radius:4px;font-size:11px">🔵 In Progress</span>',
+  };
+  const arr=[..._docTasks].sort((a,b)=>{
+    if(ts.col==='name'){ const r=(a.name||'').toLowerCase().localeCompare((b.name||'').toLowerCase()); return ts.asc?r:-r; }
+    let va,vb;
+    if(ts.col==='status'){ va=RANK[a.status]??9; vb=RANK[b.status]??9; }
+    else { va=a[ts.col]?new Date(a[ts.col]).getTime():(ts.asc?Infinity:-Infinity); vb=b[ts.col]?new Date(b[ts.col]).getTime():(ts.asc?Infinity:-Infinity); }
+    return ts.asc?va-vb:vb-va;
+  });
+  const body=g('docTaskBody'); if(!body) return;
+  body.innerHTML = arr.map(t=>`<tr>
+    <td style="font-size:12px;font-weight:500">${esc(t.name)}</td>
+    <td style="font-size:11px;color:var(--muted)">${fd(t.distDt)}</td>
+    <td style="font-size:11px;color:var(--muted)">${fd(t.dueDt)}</td>
+    <td style="font-size:11px;color:var(--muted)">${fd(t.ackDt)}</td>
+    <td>${BADGE[t.status]||'—'}</td>
+  </tr>`).join('');
 }
 
 // ── Document Type Tree ──────────────────────────────────────────
