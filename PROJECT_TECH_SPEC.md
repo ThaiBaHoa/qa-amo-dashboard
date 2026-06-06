@@ -2,8 +2,8 @@
 
 **File:** `index.html` (single-file SPA, không build step)
 **Repo:** `ThaiBaHoa/qa-amo-dashboard` · **Domain:** `vjc-qa-amo.com` (GitHub Pages)
-**Version hiện tại:** `2026.06.05-r90`
-**Cập nhật spec:** 2026-06-05 — phản ánh code thực tế (gồm r81–r90, SPI, KPI2, PAVOI RFI)
+**Version hiện tại:** `2026.06.05-r91`
+**Cập nhật spec:** 2026-06-05 — phản ánh code thực tế (gồm r81–r91, SPI, KPI2, PAVOI RFI)
 
 > Tài liệu này mô tả TOÀN BỘ kiến trúc, dữ liệu, logic và quy ước của dashboard. Dùng làm nguồn tham chiếu chuẩn khi sửa code. Số dòng (Lxxxx) là tương đối, dùng để định vị nhanh.
 
@@ -57,7 +57,7 @@ Dashboard nội bộ cho **QA AMO** (Quality Assurance — Approved Maintenance 
 | `SUPA_KEY` | `sb_publishable_…` | anon key |
 | `G_URL` | `https://galileo-proxy.thaibahoa2308.workers.dev/proxy/` | Galileo proxy |
 | `ORG_UNIT` | `'QA AMO'` | filter chính cho mọi query report |
-| `APP_REV` | `'2026.06.05-r90'` | version (hiển thị footer + PDF) |
+| `APP_REV` | `'2026.06.05-r91'` | version (hiển thị footer + PDF) |
 | `PS` | `25` | page size pagination |
 | `CACHE_KEY` | `'qaAmoV5'` | localStorage cache key |
 | `CACHE_TTL` | `4*60*60*1000` (4 giờ) | TTL cache |
@@ -177,9 +177,11 @@ Trang Overview là **biểu đồ** (Chart.js), không KPI tile/bảng. Lọc qu
 - `SPI_CONFIG = { reportTitle:'AMO - SPI', orgUnit:'QA AMO', direction:{1:'lower',2:'lower',3:'lower',4:'higher',5:'lower'}, defaultDirection:'lower' }`.
 - Mỗi SPI: `seq` (1–5), `sptApproved` (ngưỡng CAAV/ALOS), `prevYear`, `yearAchievement`, `raised`/`raised_year` (= `getFullYear(raised_date)`), `months[12]={rate,count,trigger}`.
 - `FIELD_MATCHERS`: `monthTrigger: /SPI\s*Trigger\??/i` bắt cả `'Jun - SPI Trigger?'` lẫn `'Mar SPI Trigger?'`; `rate: /^\s*Rate\s*SPI\b/i` (vd `Rate SPI - May`). Tháng suy từ TÊN field qua `spiMonthIndex` (`repeater_section_name` null).
-- **`spiEvaluate(spi)`**: mỗi tháng `breach` = ưu tiên cờ `<Month> SPI Trigger?` (Yes→breach, No→ok), fallback so `rate` vs `SPT` theo `direction`. Tháng **chưa có rate = chưa tới kỳ** → KHÔNG tính trigger, KHÔNG đứt chuỗi.
-  - **Trigger Level** = chuỗi breach **liên tiếp (dương lịch liền kề) DÀI NHẤT** trong năm (cap 3): 1 tháng breach lẻ = L1, 2 tháng liền kề = L2, 3+ = L3. Breach dù đã phục hồi vẫn tính; tháng đạt chỉ số / chưa có data làm đứt chuỗi (vd Mar breach nhưng Feb đạt → vẫn L1). (r88 — sửa từ logic "tính ngược từ tháng cuối" của r87 vốn bỏ sót breach đã phục hồi.) Status: `good` (yearAchievement true | level 0) / `trigger` / `na`.
-- **Render** `renderSPIPage(list)`: KPI row = Total / Tracking / On target / **Current Trigger** (tách L1/L2/L3). Badge mỗi card: `On target` / `Trigger Level 1/2/3`. Year filter `#spiYearFilter` (`raised_year`, mặc định năm hiện tại) → `populateSpiYear()` + `renderSPIYear()`. Target line: *"Vietjet AMO's SPI must meet or better than the SPT (ALOS) approved by CAAV"*.
+- **`spiEvaluate(spi)`**: mỗi tháng `breach` = ưu tiên cờ `<Month> SPI Trigger?` (Yes→breach, No→ok), fallback so `rate` vs `SPT` theo `direction`. Tháng **chưa có rate = chưa tới kỳ** → KHÔNG tính trigger, KHÔNG đứt chuỗi. Trả `{currentLevel, hist:{l1,l2,l3}, status, ...}`.
+  - **`currentLevel`** (r91) = chuỗi breach **liên tiếp tính NGƯỢC từ tháng có data MỚI NHẤT** (cap 3) → phản ánh **hiện trạng tháng current**. Vd SPI-03 breach tháng 3 nhưng tháng 5 (mới nhất) đạt → currentLevel 0 = On target. Đang trong chuỗi breach ở cuối → L1/L2/L3. Dùng cho **badge card** + ô **Current Trigger**. Status: `good` (yearAchievement true | currentLevel 0) / `trigger` / `na`.
+  - **`hist`** = số **đợt (episode) breach liền kề** trong năm theo độ dài đỉnh: run 1→l1, =2→l2, ≥3→l3. Dùng cho ô **History**.
+- **Render** `renderSPIPage(list)`: KPI row = Total SPIs / Tracking / **Current Trigger** (đếm SPI theo hiện trạng: On target / L1 / L2 / L3) / **History** (tổng đợt L1/L2/L3 cả năm). Badge mỗi card theo `currentLevel`: `On target` / `Trigger Level 1/2/3`. Year filter `#spiYearFilter` (`raised_year`) → `populateSpiYear()`+`renderSPIYear()`. Target line: *"Vietjet AMO's SPI must meet or better than the SPT (ALOS) approved by CAAV"*.
+- **Theme (r91):** `Chart.defaults.color='#8B949E'` + `borderColor='rgba(140,148,163,.18)'` (đọc được cả dark/light); `drawSPIChart` grid `rgba(140,148,163,.15)`. Trước đó chart dùng màu mặc định `#666` quá tối trên dark.
 
 ---
 
@@ -318,7 +320,7 @@ Trang Overview là **biểu đồ** (Chart.js), không KPI tile/bảng. Lọc qu
 ## 13. Quy ước phát triển
 
 - **Edit surgical:** chỉ chạm điểm cần sửa, không refactor lan man.
-- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r90. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.)
+- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r91. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.)
 - **Deploy:** sửa `index.html` (bản OneDrive) → copy vào clone repo → `git diff` review → commit + push `main` (commit message dùng `git commit -F` để tránh lỗi shell với ký tự `/`). GitHub Pages tự build ~1–2 phút.
 - **Tận dụng helper có sẵn** (fetchAll, g, s, esc, fd, toast, setOv, renderPaged, sortD, ageCalc) — không viết trùng.
 - **Tài liệu liên quan:** `PAVOI_RFI_Spec.md` (RFI chi tiết), `CAR report types & KPI2` (MCAR/AMO-ECAR vs CMR-CAR/ECAR; KPI2 Phase-1), `GALILEO_QUIRKS.md`, `GALILEO_DATA_QUALITY.md`.
@@ -339,3 +341,4 @@ Trang Overview là **biểu đồ** (Chart.js), không KPI tile/bảng. Lọc qu
 | r88 | SPI fix: Trigger Level = chuỗi breach liền kề DÀI NHẤT trong năm (không phải tính ngược từ tháng cuối) → breach lẻ đã phục hồi (vd SPI-03 Mar) vẫn hiện L1. |
 | r89 | Overview chuyển sang chart-based: donut status + stacked bar Audit vs Inspection (MNT gồm cả audit+inspection) + 2 donut MCAR/AMO ECAR theo status; bỏ KPI tiles + bảng "MNT đang mở". |
 | r90 | Overview charts: hiện % trên từng lát donut + tổng ở tâm + value trên bar (plugin inline); legend kèm count(%); fix `min-width:0` chống tràn/co giãn khi zoom. |
+| r91 | Theme fix: `Chart.defaults.color` đọc được trên dark. SPI: badge theo tháng current (`currentLevel` tính ngược từ tháng mới nhất); ô "On target"→"Current Trigger" (On target/L1/L2/L3 hiện trạng); ô "Current Trigger"→"History" (số đợt L1/L2/L3 cả năm). |
