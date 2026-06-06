@@ -133,6 +133,11 @@ body{font-family:'Manrope','Segoe UI',system-ui,sans-serif;background:var(--bg);
 .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:var(--pad);box-shadow:var(--shadow)}
 #page-overview .chart-card{min-width:0}
 #page-overview .chart-card canvas{max-width:100%}
+/* Legend HTML cho chart Overview — màu chữ theo theme qua var(--text), tự đổi tức thì khi toggle */
+.ov-lg{display:flex;flex-direction:column;gap:7px;font-size:11px;color:var(--text);min-width:0;flex-shrink:0}
+.ov-lg.h{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:6px 16px;margin-top:8px}
+.ov-lg-item{display:flex;align-items:center;gap:7px;white-space:nowrap;line-height:1.2}
+.ov-lg-sw{width:10px;height:10px;border-radius:2px;flex-shrink:0}
 .chart-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .chart-title{font-size:13px;font-weight:600}
 .chart-sub{font-size:11px;color:var(--muted)}
@@ -566,11 +571,15 @@ tr:last-child td{border-bottom:none}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
             <div class="chart-card">
               <div style="font-size:13px;font-weight:600;margin-bottom:8px">By status <span id="ov-mnt-cnt" style="font-size:11px;color:var(--muted);font-weight:400"></span></div>
-              <div style="height:240px;position:relative"><canvas id="ovAuditStatus"></canvas></div>
+              <div style="display:flex;gap:12px;align-items:center">
+                <div style="flex:1;min-width:0;height:230px;position:relative"><canvas id="ovAuditStatus"></canvas></div>
+                <div class="ov-lg" id="ovAuditStatus-lg"></div>
+              </div>
             </div>
             <div class="chart-card">
               <div style="font-size:13px;font-weight:600;margin-bottom:8px">Audit vs Inspection <span style="font-size:11px;color:var(--muted);font-weight:400">· closed vs in-progress</span></div>
-              <div style="height:240px;position:relative"><canvas id="ovAuditType"></canvas></div>
+              <div style="height:230px;position:relative"><canvas id="ovAuditType"></canvas></div>
+              <div class="ov-lg h" id="ovAuditType-lg"></div>
             </div>
           </div>
 
@@ -582,14 +591,20 @@ tr:last-child td{border-bottom:none}
                 <div style="font-size:13px;font-weight:600">MCAR <span style="font-size:11px;color:var(--muted);font-weight:400">· Internal Audit Findings</span></div>
                 <div style="font-size:11px;color:var(--muted)" id="ov-mcar-cnt"></div>
               </div>
-              <div style="height:240px;position:relative"><canvas id="ovMcar"></canvas></div>
+              <div style="display:flex;gap:12px;align-items:center">
+                <div style="flex:1;min-width:0;height:230px;position:relative"><canvas id="ovMcar"></canvas></div>
+                <div class="ov-lg" id="ovMcar-lg"></div>
+              </div>
             </div>
             <div class="chart-card">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
                 <div style="font-size:13px;font-weight:600">AMO ECAR <span style="font-size:11px;color:var(--muted);font-weight:400">· Authority Findings</span></div>
                 <div style="font-size:11px;color:var(--muted)" id="ov-amo-cnt"></div>
               </div>
-              <div style="height:240px;position:relative"><canvas id="ovAmo"></canvas></div>
+              <div style="display:flex;gap:12px;align-items:center">
+                <div style="flex:1;min-width:0;height:230px;position:relative"><canvas id="ovAmo"></canvas></div>
+                <div class="ov-lg" id="ovAmo-lg"></div>
+              </div>
             </div>
           </div>
         </div>
@@ -2134,7 +2149,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.05-r93';
+const APP_REV = '2026.06.05-r94';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3093,36 +3108,36 @@ const ovBarVal = { id:'ovBarVal', afterDatasetsDraw(chart){
   ctx.restore();
 }};
 
-// Donut chung (destroy + create); rỗng → 1 lát xám "No data". Legend kèm số + %.
+// Legend HTML (màu chữ theo var(--text) qua CSS → tự đổi theo theme, không cần re-render)
+function ovLegend(id, items){
+  const el=g(id+'-lg'); if(!el) return;
+  el.innerHTML = items.map(it=>`<div class="ov-lg-item"><span class="ov-lg-sw" style="background:${it.color}"></span><span>${esc(it.text)}</span></div>`).join('');
+}
+
+// Donut chung (destroy + create); rỗng → 1 lát xám "No data". Legend = HTML.
 function ovDonut(id, labels, data, colors){
   dc(id); const el=g(id); if(!el) return;
   let empty=false;
   if(!data.length){ labels=['No data']; data=[1]; colors=['#6E7681']; empty=true; }
+  const tot = data.reduce((a,b)=>a+b,0)||1;
+  ovLegend(id, empty ? [{text:'No data',color:'#6E7681'}]
+    : labels.map((lb,i)=>({text:`${lb}  ${data[i]} (${Math.round(data[i]/tot*100)}%)`, color:colors[i]})));
   charts[id]=new Chart(el.getContext('2d'),{type:'doughnut',
     data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:0}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'62%',layout:{padding:6},
-      plugins:{
-        legend:{position:'right',labels:{color:ovInk(),font:{size:11},boxWidth:10,padding:7,
-          generateLabels(chart){
-            const d=chart.data.datasets[0], tot=d.data.reduce((a,b)=>a+b,0)||1, ink=ovInk();
-            return chart.data.labels.map((lb,i)=>({
-              text: empty ? String(lb) : `${lb}  ${d.data[i]} (${Math.round(d.data[i]/tot*100)}%)`,
-              fillStyle:d.backgroundColor[i], strokeStyle:d.backgroundColor[i], lineWidth:0, fontColor:ink,
-              hidden:!chart.getDataVisibility(i), index:i }));
-          }}},
-        tooltip:{enabled:!empty}
-      }},
+      plugins:{ legend:{display:false}, tooltip:{enabled:!empty} }},
     plugins: empty ? [] : [ovArcPct, ovDonutCenter]});
 }
 
-// Stacked bar chung (giá trị vẽ trên từng đoạn; legend kèm tổng)
+// Stacked bar chung (giá trị vẽ trên từng đoạn; legend = HTML)
 function ovStackBar(id, labels, datasets){
   dc(id); const el=g(id); if(!el) return;
+  ovLegend(id, datasets.map(ds=>({text:`${ds.label} (${ds.data.reduce((a,b)=>a+b,0)})`, color:ds.color})));
   charts[id]=new Chart(el.getContext('2d'),{type:'bar',
-    data:{labels,datasets:datasets.map(ds=>({label:`${ds.label} (${ds.data.reduce((a,b)=>a+b,0)})`,data:ds.data,backgroundColor:ds.color,borderWidth:0,borderRadius:4,maxBarThickness:90}))},
+    data:{labels,datasets:datasets.map(ds=>({label:ds.label,data:ds.data,backgroundColor:ds.color,borderWidth:0,borderRadius:4,maxBarThickness:90}))},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom',labels:{color:ovInk(),font:{size:11},boxWidth:10}},
-               tooltip:{callbacks:{label:c=>`${c.dataset.label.replace(/\s*\(\d+\)$/,'')}: ${c.parsed.y}`}}},
+      plugins:{legend:{display:false},
+               tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y}`}}},
       scales:{x:{stacked:true,grid:{display:false},ticks:{color:ovInk()}},
               y:{stacked:true,beginAtZero:true,grid:{color:'rgba(140,148,163,.15)'},ticks:{color:ovInk(),precision:0}}}},
     plugins:[ovBarVal]});
