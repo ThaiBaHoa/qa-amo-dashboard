@@ -1661,7 +1661,7 @@ tr:last-child td{border-bottom:none}
                 </div>
                 <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
                   <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ When is the data updated?</div>
-                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">Click the "↻ Refresh" button on the topbar to reload the latest data from Galileo. The dashboard does not refresh automatically. Loading takes approximately 30–60 seconds.</div>
+                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">Click the "↻ Refresh" button on the topbar to reload the latest data from Galileo at any time. The dashboard also auto-refreshes its data every 12 hours (for LED / kiosk screens) without reloading the page or logging you out. Loading takes approximately 30–60 seconds.</div>
                 </div>
                 <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
                   <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ Why does Audit Plan show 963 records?</div>
@@ -2218,7 +2218,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.07-r96';
+const APP_REV = '2026.06.07-r97';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2560,6 +2560,7 @@ function initApp() {
     document.querySelectorAll('.admin-only').forEach(el=>el.style.display='');
   }
   if(!cacheLoad()) loadData();
+  startAutoRefresh();
 }
 
 const dRenderOpen  = debounce(renderOpen,  300);
@@ -2641,6 +2642,27 @@ window.addEventListener('DOMContentLoaded', async ()=>{
 // ── CACHE (4 giờ) ────────────────────────────────────────────
 const CACHE_KEY = 'qaAmoV5';
 const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
+
+// ── AUTO-REFRESH (màn hình LED / kiosk) ──────────────────────
+// Làm mới dữ liệu Galileo mỗi 12h NGAY TẠI CHỖ (loadData(true)),
+// không reload trang nên không chạm tới phiên đăng nhập (sessionStorage).
+const AUTO_REFRESH_MS       = 12 * 60 * 60 * 1000; // 12 giờ: chu kỳ làm mới
+const AUTO_REFRESH_CHECK_MS = 5  * 60 * 1000;      // nhịp kiểm tra (chịu được sleep/wake + throttle)
+let   autoRefreshTimer = null;
+let   nextAutoRefresh  = 0;
+
+function startAutoRefresh() {
+  nextAutoRefresh = Date.now() + AUTO_REFRESH_MS;
+  if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+  autoRefreshTimer = setInterval(() => {
+    if (!curUser)  return;                 // đã logout → bỏ qua
+    if (isLoading) return;                 // đang tải → đợi nhịp sau
+    if (Date.now() < nextAutoRefresh) return;
+    console.log('[autoRefresh] đủ 12h → loadData(true)');
+    nextAutoRefresh = Date.now() + AUTO_REFRESH_MS;
+    loadData(true);                        // fetch lại từ Galileo, KHÔNG reload, KHÔNG chạm auth
+  }, AUTO_REFRESH_CHECK_MS);
+}
 
 function cacheLoad() {
   try {

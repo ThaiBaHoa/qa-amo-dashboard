@@ -33,6 +33,10 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
 - `doLogin` / `doRegister` / `doLogout` — auth flow against Supabase `users`.
 - `initApp` — runs after login, builds UI shell, calls `loadData`.
 - `loadData` — fetches reports from Galileo in stages, builds `allData` / `auditData`.
+- `startAutoRefresh` — kiosk/LED auto-refresh: a wall-clock heartbeat (checks every 5
+  min) that calls `loadData(true)` in place every 12h. No page reload, so the
+  sessionStorage login is never touched. Started at the end of `initApp`; no-ops after
+  logout via an `if(!curUser)` guard.
 - `fetchAll` — paginated OData fetch with 30s `AbortController` timeout.
 - `renderAll` — renders every page from `allData`.
 - `showPage` — sidebar nav / page switching.
