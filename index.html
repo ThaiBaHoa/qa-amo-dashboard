@@ -2218,7 +2218,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.07-r97';
+const APP_REV = '2026.06.07-r98';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -7005,7 +7005,7 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
 
     // ── Xử lý → list (sort lại được) + đếm KPI ──
     let onTimeCnt=0, lateCnt=0, overCnt=0, inProgCnt=0;
-    _docTasks = tasks.map(t => {
+    _docTasks = tasks.filter(t => !['Cancelled','Deleted'].includes(t.task_status)).map(t => {
       const name   = t.task_owner || '—';
       const distDt = t.document_revision_created_date || null;
       const dueDt  = t.task_target_date || null;
