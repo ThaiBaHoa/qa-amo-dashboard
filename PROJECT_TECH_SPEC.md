@@ -2,8 +2,8 @@
 
 **File:** `index.html` (single-file SPA, không build step)
 **Repo:** `ThaiBaHoa/qa-amo-dashboard` · **Domain:** `vjc-qa-amo.com` (GitHub Pages)
-**Version hiện tại:** `2026.06.07-r98`
-**Cập nhật spec:** 2026-06-07 — phản ánh code thực tế (gồm r81–r98, lọc copyholder Cancelled/Deleted, auto-refresh kiosk, multi-year filter, admin export, SPI, KPI2, PAVOI RFI)
+**Version hiện tại:** `2026.06.07-r99`
+**Cập nhật spec:** 2026-06-07 — phản ánh code thực tế (gồm r81–r99, copyholder on-time so theo ngày, lọc Cancelled/Deleted, auto-refresh kiosk, multi-year filter, admin export, SPI, KPI2, PAVOI RFI)
 
 > Tài liệu này mô tả TOÀN BỘ kiến trúc, dữ liệu, logic và quy ước của dashboard. Dùng làm nguồn tham chiếu chuẩn khi sửa code. Số dòng (Lxxxx) là tương đối, dùng để định vị nhanh.
 
@@ -57,7 +57,7 @@ Dashboard nội bộ cho **QA AMO** (Quality Assurance — Approved Maintenance 
 | `SUPA_KEY` | `sb_publishable_…` | anon key |
 | `G_URL` | `https://galileo-proxy.thaibahoa2308.workers.dev/proxy/` | Galileo proxy |
 | `ORG_UNIT` | `'QA AMO'` | filter chính cho mọi query report |
-| `APP_REV` | `'2026.06.07-r98'` | version (hiển thị footer sidebar + User Guide + PDF; nhãn User Guide nạp động từ `APP_REV` qua `#guideVer`/`#guideFooter`) |
+| `APP_REV` | `'2026.06.07-r99'` | version (hiển thị footer sidebar + User Guide + PDF; nhãn User Guide nạp động từ `APP_REV` qua `#guideVer`/`#guideFooter`) |
 | `AUTO_REFRESH_MS` | `12*60*60*1000` (12h) | chu kỳ auto-refresh kiosk (xem §5.6) |
 | `AUTO_REFRESH_CHECK_MS` | `5*60*1000` (5 phút) | nhịp heartbeat kiểm tra tới hạn |
 | `PS` | `25` | page size pagination |
@@ -333,7 +333,7 @@ Thay toàn bộ `<select>` year (17 chỗ) bằng **dropdown checkbox** cho phé
 ## 13. Quy ước phát triển
 
 - **Edit surgical:** chỉ chạm điểm cần sửa, không refactor lan man.
-- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r98. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.) Nhãn version ở User Guide nạp động từ `APP_REV` (không hardcode "vN").
+- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r99. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.) Nhãn version ở User Guide nạp động từ `APP_REV` (không hardcode "vN").
 - **Deploy:** sửa `index.html` (bản OneDrive) → copy vào clone repo → `git diff` review → commit + push `main` (commit message dùng `git commit -F` để tránh lỗi shell với ký tự `/`). GitHub Pages tự build ~1–2 phút.
 - **Tận dụng helper có sẵn** (fetchAll, g, s, esc, fd, toast, setOv, renderPaged, sortD, ageCalc) — không viết trùng.
 - **Tài liệu liên quan:** `PAVOI_RFI_Spec.md` (RFI chi tiết), `CAR report types & KPI2` (MCAR/AMO-ECAR vs CMR-CAR/ECAR; KPI2 Phase-1), `GALILEO_QUIRKS.md`, `GALILEO_DATA_QUALITY.md`.
@@ -359,6 +359,7 @@ Thay toàn bộ `<select>` year (17 chỗ) bằng **dropdown checkbox** cho phé
 | r93 | Theme fix màu chữ chart: `ovInk()` = trắng (dark) / đen (light) đọc tại lúc vẽ; áp cho legend (+ `fontColor` từng item donut), tick (Overview + SPI), số tổng tâm. `toggleTheme` re-render cả SPI để cập nhật màu. |
 | r94 | Legend chart Overview chuyển sang **HTML** (`.ov-lg`, helper `ovLegend`, Chart.js legend `display:false`) — màu chữ `var(--text)` đổi tức thì theo theme qua CSS, không phụ thuộc re-render. Dứt điểm lỗi legend đen-trên-đen. Canvas text (% lát/value bar trắng, tick/số tổng `ovInk()`) re-render theo toggle. |
 | r95 | Document copyholder: `$select` gọn + retry 3× chống timeout proxy (351KB→109KB); cột Status (và tất cả cột) **sort được**, mặc định gom người chưa acknowledge (overdue→in-progress) lên đầu; lỗi có link "Thử lại". |
+| r99 | **Fix copyholder On time/Late:** `showDocDetail` so acknowledged vs due **theo NGÀY** (`dDay(ackDt) <= dDay(dueDt)`) thay vì so cả giờ-phút (`new Date(...)`). Trước đây ack đúng ngày due nhưng có giờ > 00:00 bị tính Late. Quy ước: ack đúng ngày due = On time. |
 | r98 | **Fix copyholder Cancelled/Deleted:** modal Documents (`showDocDetail` → builder `_docTasks`) lọc bỏ `task_status ∈ {Cancelled, Deleted}` **trước** `.map` (Galileo ẩn người đã gỡ khỏi distribution nhưng vẫn giữ dòng task). VD `VJC-MQA-EIS-2026-017`: Total 426→424, Overdue 5→3. Quirk dữ liệu kho, lọc ở dashboard (xem §8.6). |
 | r97 | **Auto-refresh kiosk (additive):** `startAutoRefresh()` — heartbeat 5 phút/wall-clock, đủ 12h → `loadData(true)` tại chỗ (không reload, không chạm phiên sessionStorage); guard `!curUser`/`isLoading`. Bật ở cuối `initApp`. User Guide FAQ "When is the data updated?" cập nhật theo (xem §5.6). |
 | r96 | **Year filter đa năm** (component dùng chung `initYearMulti`/`ymHas`/`ymVal`/`ymText`, 17 chỗ — chọn 1/2/tất cả năm, Overview/KPI/SPI mặc định năm hiện tại — xem §7.5). **Export gom về Admin** (nav vào `#adminNav`; vá lỗ hổng nút Audit Plan Excel thiếu gating). Query Builder: nhãn 4 bước + hint tiếng Việt. My Dashboard: thêm phụ đề mục đích. User Guide: callout bộ lọc năm + đánh dấu Export Admin-only; **fix render** 2 khối Form Types + FAQ (trước in nguyên template-literal); nhãn version nạp động từ `APP_REV`. Dọn dead-code `monthYr`. CLAUDE.md: sửa thông tin sai "plaintext password" (auth = Supabase Auth). |

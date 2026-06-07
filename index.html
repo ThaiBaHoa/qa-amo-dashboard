@@ -2218,7 +2218,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.07-r98';
+const APP_REV = '2026.06.07-r99';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -7013,7 +7013,8 @@ async function showDocDetail(revId, docNum, docTitle, validFrom) {
       const rawSt  = (t.task_delivery_status || '').toLowerCase();
       const taskSt = (t.task_status || '').toLowerCase();
       let status;
-      if (taskSt === 'completed') status = (ackDt && dueDt) ? (new Date(ackDt) <= new Date(dueDt) ? 'ontime' : 'late') : 'ontime';
+      // So theo NGÀY (bỏ giờ) — acknowledged đúng ngày due vẫn là On time, chỉ trễ SAU due mới Late.
+      if (taskSt === 'completed') status = (ackDt && dueDt) ? (dDay(ackDt) <= dDay(dueDt) ? 'ontime' : 'late') : 'ontime';
       else if (rawSt === 'overdue') status = 'overdue';
       else status = 'inprogress';
       if(status==='ontime') onTimeCnt++; else if(status==='late') lateCnt++; else if(status==='overdue') overCnt++; else inProgCnt++;
