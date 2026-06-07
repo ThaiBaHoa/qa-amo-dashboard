@@ -2,8 +2,8 @@
 
 **File:** `index.html` (single-file SPA, không build step)
 **Repo:** `ThaiBaHoa/qa-amo-dashboard` · **Domain:** `vjc-qa-amo.com` (GitHub Pages)
-**Version hiện tại:** `2026.06.07-r99`
-**Cập nhật spec:** 2026-06-07 — phản ánh code thực tế (gồm r81–r99, copyholder on-time so theo ngày, lọc Cancelled/Deleted, auto-refresh kiosk, multi-year filter, admin export, SPI, KPI2, PAVOI RFI)
+**Version hiện tại:** `2026.06.08-r100`
+**Cập nhật spec:** 2026-06-08 — phản ánh code thực tế (gồm r81–r100, Target_date chuẩn theo stage Task, copyholder on-time so theo ngày, lọc Cancelled/Deleted, auto-refresh kiosk, multi-year filter, admin export, SPI, KPI2, PAVOI RFI)
 
 > Tài liệu này mô tả TOÀN BỘ kiến trúc, dữ liệu, logic và quy ước của dashboard. Dùng làm nguồn tham chiếu chuẩn khi sửa code. Số dòng (Lxxxx) là tương đối, dùng để định vị nhanh.
 
@@ -57,7 +57,7 @@ Dashboard nội bộ cho **QA AMO** (Quality Assurance — Approved Maintenance 
 | `SUPA_KEY` | `sb_publishable_…` | anon key |
 | `G_URL` | `https://galileo-proxy.thaibahoa2308.workers.dev/proxy/` | Galileo proxy |
 | `ORG_UNIT` | `'QA AMO'` | filter chính cho mọi query report |
-| `APP_REV` | `'2026.06.07-r99'` | version (hiển thị footer sidebar + User Guide + PDF; nhãn User Guide nạp động từ `APP_REV` qua `#guideVer`/`#guideFooter`) |
+| `APP_REV` | `'2026.06.08-r100'` | version (hiển thị footer sidebar + User Guide + PDF; nhãn User Guide nạp động từ `APP_REV` qua `#guideVer`/`#guideFooter`) |
 | `AUTO_REFRESH_MS` | `12*60*60*1000` (12h) | chu kỳ auto-refresh kiosk (xem §5.6) |
 | `AUTO_REFRESH_CHECK_MS` | `5*60*1000` (5 phút) | nhịp heartbeat kiểm tra tới hạn |
 | `PS` | `25` | page size pagination |
@@ -126,7 +126,7 @@ Suy 3 mốc theo `stage_type` (lấy giá trị muộn nhất):
 
 ### 5.4 Schema 1 dòng `allData` (L2767–2810)
 Spread `...summary` + các field suy:
-`Target_date` (custom `Target date` → stage Task target → wfMap target), `close_date` (stage ReportAcceptReject completed → wfMap), `completed_date` (stage Task completed), `issue_date`, `finding_level`, `repetitive`, `ext1_date`, `ext2_date`, `audit_ref`, **PAVOI:** `rfv`, `report_ref`, `verif_result`, `dept`, `finding_desc`, `nature_raw`; `owner_name` (userMap), `semantic_status` (semCalc), `report_ageing` (ageCalc), `overdue_cat` (catCalc), `raised_ym`, `raised_year`, `is_rep` (`Repetitive`=='yes'), `audit_number`, `wf_stages` (=wfAllMap).
+`Target_date` (**r100:** stage Task target `sd.td` → custom `Target date` fallback → wfMap target; trước r100 custom được ưu tiên 1 nhưng hay sai/cũ → đổi sang chuẩn workflow), `close_date` (stage ReportAcceptReject completed → wfMap), `completed_date` (stage Task completed), `issue_date`, `finding_level`, `repetitive`, `ext1_date`, `ext2_date`, `audit_ref`, **PAVOI:** `rfv`, `report_ref`, `verif_result`, `dept`, `finding_desc`, `nature_raw`; `owner_name` (userMap), `semantic_status` (semCalc), `report_ageing` (ageCalc), `overdue_cat` (catCalc), `raised_ym`, `raised_year`, `is_rep` (`Repetitive`=='yes'), `audit_number`, `wf_stages` (=wfAllMap).
 
 ### 5.5 Loaders phụ (lazy, org_unit khác)
 - **loadCmr()** (L~4170): `org_unit_name eq 'TQA' and report_title eq 'CMR CAR'` → `cmrData` (aircraft_reg, findingRows, ata_chapter, nc_type, defect_class, cap, final_action, issued_to, verified_by, rca…). Dùng thêm `dwanalytics_report_field` (ghép finding theo section_id).
@@ -333,7 +333,7 @@ Thay toàn bộ `<select>` year (17 chỗ) bằng **dropdown checkbox** cho phé
 ## 13. Quy ước phát triển
 
 - **Edit surgical:** chỉ chạm điểm cần sửa, không refactor lan man.
-- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r99. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.) Nhãn version ở User Guide nạp động từ `APP_REV` (không hardcode "vN").
+- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r100. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.) Nhãn version ở User Guide nạp động từ `APP_REV` (không hardcode "vN").
 - **Deploy:** sửa `index.html` (bản OneDrive) → copy vào clone repo → `git diff` review → commit + push `main` (commit message dùng `git commit -F` để tránh lỗi shell với ký tự `/`). GitHub Pages tự build ~1–2 phút.
 - **Tận dụng helper có sẵn** (fetchAll, g, s, esc, fd, toast, setOv, renderPaged, sortD, ageCalc) — không viết trùng.
 - **Tài liệu liên quan:** `PAVOI_RFI_Spec.md` (RFI chi tiết), `CAR report types & KPI2` (MCAR/AMO-ECAR vs CMR-CAR/ECAR; KPI2 Phase-1), `GALILEO_QUIRKS.md`, `GALILEO_DATA_QUALITY.md`.
@@ -363,3 +363,4 @@ Thay toàn bộ `<select>` year (17 chỗ) bằng **dropdown checkbox** cho phé
 | r97 | **Auto-refresh kiosk (additive):** `startAutoRefresh()` — heartbeat 5 phút/wall-clock, đủ 12h → `loadData(true)` tại chỗ (không reload, không chạm phiên sessionStorage); guard `!curUser`/`isLoading`. Bật ở cuối `initApp`. User Guide FAQ "When is the data updated?" cập nhật theo (xem §5.6). |
 | r98 | **Fix copyholder Cancelled/Deleted:** modal Documents (`showDocDetail` → builder `_docTasks`) lọc bỏ `task_status ∈ {Cancelled, Deleted}` **trước** `.map` (Galileo ẩn người đã gỡ khỏi distribution nhưng vẫn giữ dòng task). VD `VJC-MQA-EIS-2026-017`: Total 426→424, Overdue 5→3. Quirk dữ liệu kho, lọc ở dashboard (xem §8.6). |
 | r99 | **Fix copyholder On time/Late:** `showDocDetail` so acknowledged vs due **theo NGÀY** (`dDay(ackDt) <= dDay(dueDt)`) thay vì so cả giờ-phút (`new Date(...)`). Trước đây ack đúng ngày due nhưng có giờ > 00:00 bị tính Late. Quy ước: ack đúng ngày due = On time. |
+| r100 | **Target_date chuẩn theo workflow:** đảo ưu tiên suy `td` trong `loadData` → `sd.td` (stage Task target, management) trước; custom field `'Target date'` thành **fallback** (hay nhập sai/cũ). 531 report (MCAR/PAVOI/CAR/AMO-ECAR…) đổi `Target_date` → kéo theo `semantic_status`/overdue/aging/KPI (cả report đã đóng). VD `MQA-RP-065-2026` 22/04→30/06; `AMO-ECAR-027` 22/02→13/01. Report không có stage Task giữ nguyên (vẫn dùng custom). Cũng dứt điểm lỗi custom trùng giá trị trong EAV (first-wins không tất định). |
