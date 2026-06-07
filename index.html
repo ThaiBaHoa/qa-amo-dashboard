@@ -1325,7 +1325,7 @@ tr:last-child td{border-bottom:none}
             <div style="background:linear-gradient(135deg,#E30613,#a00010);border-radius:12px;padding:28px 32px;margin-bottom:16px;color:white">
               <div style="font-size:11px;opacity:.7;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">VietJet Air · Quality Assurance AMO</div>
               <div style="font-size:24px;font-weight:700;margin-bottom:6px">User Guide</div>
-              <div style="font-size:13px;opacity:.85">QA AMO Dashboard v7 · Full documentation</div>
+              <div style="font-size:13px;opacity:.85" id="guideVer">QA AMO Dashboard · Full documentation</div>
             </div>
 
             <!-- Quick Nav -->
@@ -1675,8 +1675,8 @@ tr:last-child td{border-bottom:none}
             </div>
 
             <!-- Footer -->
-            <div style="text-align:center;padding:16px;color:var(--muted);font-size:11px;border-top:1px solid var(--border)">
-              QA AMO Dashboard v7 · VietJet Air · Data from Galileo GRC · Developed by QA AMO Team
+            <div style="text-align:center;padding:16px;color:var(--muted);font-size:11px;border-top:1px solid var(--border)" id="guideFooter">
+              QA AMO Dashboard · VietJet Air · Data from Galileo GRC · Developed by QA AMO Team
             </div>
 
           </div>
@@ -2553,6 +2553,8 @@ function initApp() {
   g('sideName').textContent=curUser.full_name;
   g('sideRole').textContent=curUser.role==='admin'?'🔑 Administrator':'👤 Viewer';
   if(g('appRev'))g('appRev').textContent='Rev '+APP_REV;
+  if(g('guideVer'))g('guideVer').textContent='QA AMO Dashboard · Rev '+APP_REV+' · Full documentation';
+  if(g('guideFooter'))g('guideFooter').textContent='QA AMO Dashboard · Rev '+APP_REV+' · VietJet Air · Data from Galileo GRC · Developed by QA AMO Team';
   if(curUser.role==='admin'){
     g('adminNav').style.display='';
     document.querySelectorAll('.admin-only').forEach(el=>el.style.display='');

@@ -2,8 +2,8 @@
 
 **File:** `index.html` (single-file SPA, không build step)
 **Repo:** `ThaiBaHoa/qa-amo-dashboard` · **Domain:** `vjc-qa-amo.com` (GitHub Pages)
-**Version hiện tại:** `2026.06.05-r95`
-**Cập nhật spec:** 2026-06-05 — phản ánh code thực tế (gồm r81–r95, SPI, KPI2, PAVOI RFI)
+**Version hiện tại:** `2026.06.07-r96`
+**Cập nhật spec:** 2026-06-07 — phản ánh code thực tế (gồm r81–r96, multi-year filter, admin export, SPI, KPI2, PAVOI RFI)
 
 > Tài liệu này mô tả TOÀN BỘ kiến trúc, dữ liệu, logic và quy ước của dashboard. Dùng làm nguồn tham chiếu chuẩn khi sửa code. Số dòng (Lxxxx) là tương đối, dùng để định vị nhanh.
 
@@ -19,7 +19,7 @@ Dashboard nội bộ cho **QA AMO** (Quality Assurance — Approved Maintenance 
 - **PAVOI RFI** (Request For Information monitor).
 - Công cụ admin: Export (PDF/Excel), Query Builder, My Dashboard, User Management.
 
-**Đặc điểm kiến trúc:** 1 file `index.html` (~8400 dòng) chứa toàn bộ HTML + CSS + JS. Không framework, không bundler. Dữ liệu lấy runtime từ **Galileo OData API** (qua Cloudflare Worker proxy) + **Supabase** (auth & user roles).
+**Đặc điểm kiến trúc:** 1 file `index.html` (~8050 dòng) chứa toàn bộ HTML + CSS + JS. Không framework, không bundler. Dữ liệu lấy runtime từ **Galileo OData API** (qua Cloudflare Worker proxy) + **Supabase** (auth & user roles).
 
 ---
 
@@ -45,7 +45,7 @@ Dashboard nội bộ cho **QA AMO** (Quality Assurance — Approved Maintenance 
 ### 2.3 Deployment
 - Push `main` → GitHub Pages tự deploy (no build). `CNAME` = `vjc-qa-amo.com`.
 - `_headers` (Cloudflare/Netlify format): `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=()`, `X-XSS-Protection: 1; mode=block`.
-- **Repo files:** `index.html`, `CNAME`, `_headers`, `CLAUDE.md`, `TECHNICAL_REFERENCE.md`, `KPI2_DECISION_POINTS.md`, `.gitignore`. (Không có package.json/node_modules.)
+- **Repo files:** `index.html`, `CNAME`, `_headers`, `CLAUDE.md`, `PROJECT_TECH_SPEC.md`, `TECHNICAL_REFERENCE.md`, `KPI2_DECISION_POINTS.md`, `PAVOI_RFI_Spec.md`, `.gitignore`. (Không có package.json/node_modules.)
 
 ---
 
@@ -57,7 +57,7 @@ Dashboard nội bộ cho **QA AMO** (Quality Assurance — Approved Maintenance 
 | `SUPA_KEY` | `sb_publishable_…` | anon key |
 | `G_URL` | `https://galileo-proxy.thaibahoa2308.workers.dev/proxy/` | Galileo proxy |
 | `ORG_UNIT` | `'QA AMO'` | filter chính cho mọi query report |
-| `APP_REV` | `'2026.06.05-r95'` | version (hiển thị footer + PDF) |
+| `APP_REV` | `'2026.06.07-r96'` | version (hiển thị footer sidebar + User Guide + PDF; nhãn User Guide nạp động từ `APP_REV` qua `#guideVer`/`#guideFooter`) |
 | `PS` | `25` | page size pagination |
 | `CACHE_KEY` | `'qaAmoV5'` | localStorage cache key |
 | `CACHE_TTL` | `4*60*60*1000` (4 giờ) | TTL cache |
@@ -203,9 +203,17 @@ Trang Overview là **biểu đồ** (Chart.js), không KPI tile/bảng. Lọc qu
 - **Documents** `renderDocPage`: cây doc_type (15 root) + bảng Doc No, Title, Type, Rev, Status, Owner, Review date, Distributed, Actions.
 
 ### 7.3 Filtering & sort
-- Pills status (`TS[page].sf`), form select (`ff`), year (`yr`), search (debounce 300ms). Mỗi trang có search fields riêng.
+- Pills status (`TS[page].sf`), form select (`ff`), **year (multi-year widget — xem §7.5)**, search (debounce 300ms). Mỗi trang có search fields riêng.
 - Sort: click header → `xxxSort(col)` toggle `asc`, reset page; `sortD()` null-safe.
-- `populateFilters()` (L3069): điền form/year unique.
+- `populateFilters()` (L3069): điền form unique + khởi tạo các year-multi (Overview/KPI mặc định năm hiện tại).
+
+### 7.5 Year filter đa năm (r96) — component dùng chung
+Thay toàn bộ `<select>` year (17 chỗ) bằng **dropdown checkbox** cho phép chọn 1 năm / 2 năm / tất cả năm. State per element id: `_YM[id] = {years[], sel:Set (rỗng = tất cả), cb, defaulted}`.
+- **Khởi tạo:** `initYearMulti(id, years, {onChange, default})` — mount `<div class="ymulti" id=...>`; `default:'current'` chọn sẵn năm hiện tại (chỉ lần đầu). Idempotent: gọi lại với cùng danh sách năm KHÔNG rebuild DOM (giữ popover mở khi tick nhiều năm); danh sách năm đổi (data mới) thì rebuild + giữ selection còn hợp lệ.
+- **Đọc trong render/export:** `ymHas(id, value)` → true nếu value qua được filter (true khi "tất cả"); `ymVal(id)` → mảng năm đã chọn (`[]` = tất cả); `ymText(id)` → nhãn (`All` / `2025` / `2025, 2024`); `ymReset(id)` → về "tất cả".
+- **QUAN TRỌNG:** các id year giờ là `<div>`, KHÔNG đọc `g(id).value`. Pattern lọc: `data.filter(r => ymHas(id, r.raised_year))`.
+- ECAR: quarter-pills bật khi `ymVal('ecarYearF').length>0`; chart tháng dùng `_ecarMonthData(base, sel.length===1 ? sel[0] : '')` (1 năm → đủ 12 tháng; nhiều năm → gộp tháng có data).
+- **Dead state:** `TS.*.yr` không còn được đọc (selection nằm ở `_YM`), giữ lại như stub vô hại.
 - Pagination chung: `renderPaged(bodyId, infoId, pgId, cntId, data, ts, rowFn)` (L3926), 25 dòng/trang, `goPg()`.
 
 ### 7.4 Modals
@@ -224,10 +232,12 @@ Trang Overview là **biểu đồ** (Chart.js), không KPI tile/bảng. Lọc qu
 - **r86:** page chỉ fetch RFI cho **PAVOI `report_status='Open'`** (~65/217, batch 15 GUID/request do **OData giới hạn 100 node/filter**); report đã đóng đánh dấu done-rỗng. Mở modal → `fetchPavoiRfiOne` fetch tươi 1 report (chống stale do replica lag) + `renderPavoi()`. Retry 3× backoff, per-report `pavoiRfiDone`.
 - Hàm: `loadPavoiRfi`, `fetchPavoiRfiOne`, `pavoiRfiSummary`, `pavoiRfiCell`, `showPavoiDetail`, `renderPavoiModal`, `closePavoiModal`.
 
-### 8.2 Export Reports (admin)
-- **exportPDF()** (L6103): jsPDF + AutoTable; 3 phần (KPI Summary, Form Summary, Detail) + ảnh chart (`chartImg` qua html2canvas).
-- **exportExcel()** (L6332): XLSX 3 sheet (KPI Summary, Form Summary, Detail Data 11 cột). File `QA_AMO_{title}_{YYYY-MM-DD}.xlsx`.
-- `initReportFilters()` / `generateReport()`: lọc theo month/quarter/form.
+### 8.2 Export Reports (admin) — gom + siết chặt (r96)
+- Nav **Export Reports** nằm trong khối `#adminNav` (cùng nhóm Admin). **Mọi** nút export (Export Reports PDF/Excel, CMR-CAR, ECAR, AMO-ECAR, Audit Plan, ATA-compare, Query Builder) đều có class `.admin-only` (ẩn với viewer) **VÀ** handler tự kiểm `curUser.role==='admin'`. `showPage` cũng chặn điều hướng trực tiếp.
+- **Fix r96:** nút Audit Plan ⬇ Excel (`exportAuditExcel`) trước đây thiếu cả `.admin-only` lẫn guard → đã vá cả hai.
+- **exportPDF()**: jsPDF + AutoTable; 3 phần (KPI Summary, Form Summary, Detail) + ảnh chart (`chartImg` qua html2canvas).
+- **exportExcel()**: XLSX 3 sheet (KPI Summary, Form Summary, Detail Data 11 cột). File `QA_AMO_{title}_{YYYY-MM-DD}.xlsx`.
+- `initReportFilters()` / `generateReport()`: lọc theo year (multi-year `rptYear`) + month/quarter/form.
 
 ### 8.3 Query Builder (admin, L7118–7700)
 - `QB_TABLES`: 7 bảng (report_summary, report_workflow, users, form_section_field, audit_summary, audit_workflow, document_summary) + field list.
@@ -320,7 +330,7 @@ Trang Overview là **biểu đồ** (Chart.js), không KPI tile/bảng. Lọc qu
 ## 13. Quy ước phát triển
 
 - **Edit surgical:** chỉ chạm điểm cần sửa, không refactor lan man.
-- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r95. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.)
+- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r96. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.) Nhãn version ở User Guide nạp động từ `APP_REV` (không hardcode "vN").
 - **Deploy:** sửa `index.html` (bản OneDrive) → copy vào clone repo → `git diff` review → commit + push `main` (commit message dùng `git commit -F` để tránh lỗi shell với ký tự `/`). GitHub Pages tự build ~1–2 phút.
 - **Tận dụng helper có sẵn** (fetchAll, g, s, esc, fd, toast, setOv, renderPaged, sortD, ageCalc) — không viết trùng.
 - **Tài liệu liên quan:** `PAVOI_RFI_Spec.md` (RFI chi tiết), `CAR report types & KPI2` (MCAR/AMO-ECAR vs CMR-CAR/ECAR; KPI2 Phase-1), `GALILEO_QUIRKS.md`, `GALILEO_DATA_QUALITY.md`.
@@ -346,3 +356,4 @@ Trang Overview là **biểu đồ** (Chart.js), không KPI tile/bảng. Lọc qu
 | r93 | Theme fix màu chữ chart: `ovInk()` = trắng (dark) / đen (light) đọc tại lúc vẽ; áp cho legend (+ `fontColor` từng item donut), tick (Overview + SPI), số tổng tâm. `toggleTheme` re-render cả SPI để cập nhật màu. |
 | r94 | Legend chart Overview chuyển sang **HTML** (`.ov-lg`, helper `ovLegend`, Chart.js legend `display:false`) — màu chữ `var(--text)` đổi tức thì theo theme qua CSS, không phụ thuộc re-render. Dứt điểm lỗi legend đen-trên-đen. Canvas text (% lát/value bar trắng, tick/số tổng `ovInk()`) re-render theo toggle. |
 | r95 | Document copyholder: `$select` gọn + retry 3× chống timeout proxy (351KB→109KB); cột Status (và tất cả cột) **sort được**, mặc định gom người chưa acknowledge (overdue→in-progress) lên đầu; lỗi có link "Thử lại". |
+| r96 | **Year filter đa năm** (component dùng chung `initYearMulti`/`ymHas`/`ymVal`/`ymText`, 17 chỗ — chọn 1/2/tất cả năm, Overview/KPI/SPI mặc định năm hiện tại — xem §7.5). **Export gom về Admin** (nav vào `#adminNav`; vá lỗ hổng nút Audit Plan Excel thiếu gating). Query Builder: nhãn 4 bước + hint tiếng Việt. My Dashboard: thêm phụ đề mục đích. User Guide: callout bộ lọc năm + đánh dấu Export Admin-only; **fix render** 2 khối Form Types + FAQ (trước in nguyên template-literal); nhãn version nạp động từ `APP_REV`. Dọn dead-code `monthYr`. CLAUDE.md: sửa thông tin sai "plaintext password" (auth = Supabase Auth). |
