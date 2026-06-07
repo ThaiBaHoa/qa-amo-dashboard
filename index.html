@@ -1423,19 +1423,38 @@ tr:last-child td{border-bottom:none}
               <!-- Form types -->
               <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">QA AMO Form Types</div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px">
-                ${[
-                  ['Surveillance Report (SR)','Periodic surveillance report. No target date. Generated from Inspection activities.'],
-                  ['Aircraft Inspection/Spot Check (AISC)','Random or scheduled aircraft inspection at the ramp.'],
-                  ['MCAR','Mandatory Corrective Action Report — Mandatory corrective action report from internal audits.'],
-                  ['PAVOI','Post Audit Verification of Implementation — Tracks implementation of corrective actions.'],
-                  ['CAR','Corrective Action Report — Corrective action report from external audits or CAAV.'],
-                  ['MOR','Mandatory Occurrence Report — Mandatory occurrence report as required by CAAV regulations.'],
-                  ['AMO ECAR','Internal AMO Electronic Corrective Action Report.'],
-                  ['Battery Workshop Inspection (BWI)','Periodic battery maintenance workshop inspection — once per month.'],
-                ].map(([name,desc])=>`<div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
-                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">${name}</div>
-                  <div style="font-size:11px;color:var(--muted)">${desc}</div>
-                </div>`).join('')}
+                <div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">Surveillance Report (SR)</div>
+                  <div style="font-size:11px;color:var(--muted)">Periodic surveillance report. No target date. Generated from Inspection activities.</div>
+                </div>
+                <div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">Aircraft Inspection/Spot Check (AISC)</div>
+                  <div style="font-size:11px;color:var(--muted)">Random or scheduled aircraft inspection at the ramp.</div>
+                </div>
+                <div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">MCAR</div>
+                  <div style="font-size:11px;color:var(--muted)">Mandatory Corrective Action Report — Mandatory corrective action report from internal audits.</div>
+                </div>
+                <div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">PAVOI</div>
+                  <div style="font-size:11px;color:var(--muted)">Post Audit Verification of Implementation — Tracks implementation of corrective actions.</div>
+                </div>
+                <div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">CAR</div>
+                  <div style="font-size:11px;color:var(--muted)">Corrective Action Report — Corrective action report from external audits or CAAV.</div>
+                </div>
+                <div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">MOR</div>
+                  <div style="font-size:11px;color:var(--muted)">Mandatory Occurrence Report — Mandatory occurrence report as required by CAAV regulations.</div>
+                </div>
+                <div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">AMO ECAR</div>
+                  <div style="font-size:11px;color:var(--muted)">Internal AMO Electronic Corrective Action Report.</div>
+                </div>
+                <div style="padding:10px 12px;background:var(--card2);border-radius:8px;border-left:2px solid var(--border)">
+                  <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:3px">Battery Workshop Inspection (BWI)</div>
+                  <div style="font-size:11px;color:var(--muted)">Periodic battery maintenance workshop inspection — once per month.</div>
+                </div>
               </div>
 
               <!-- KPI definitions -->
@@ -1628,17 +1647,30 @@ tr:last-child td{border-bottom:none}
               </div>
 
               <div style="display:grid;gap:8px">
-                ${[
-                  ['Why does the total report count exceed 3,000?', 'The dashboard loads the full QA AMO history since the Galileo system went live. Use the Year filter on the Overview page to view data for a specific year.'],
-                  ['What does an on-time rate of 12% mean?', 'Only 12% of forms with a target date were closed on time. This figure is calculated only on forms that have a target date (CAR, MCAR, PAVOI). Forms without a target date (Surveillance, AISC) are excluded from the on-time rate.'],
-                  ['Why is the Repetitive count 0?', 'The "Repetitive" field in Galileo must be set to "Yes" when creating a finding. If it is left blank, the dashboard cannot detect it. Auditors should be reminded to fill in this field.'],
-                  ['When is the data updated?', 'Click the "↻ Refresh" button on the topbar to reload the latest data from Galileo. The dashboard does not refresh automatically. Loading takes approximately 30–60 seconds.'],
-                  ['Why does Audit Plan show 963 records?', 'The dashboard loads all audits for QA AMO auditors (Vo Vinh Hien, Le Hong Chuong, Thai Ba Hoa…) from past to present, including future Scheduled audits. Use the Year filter to view a specific year\'s plan.'],
-                  ['How do I add a new user?', 'The user self-registers on the login page → Admin goes to "User Management" → Approve the account. Admins can Approve/Reject/grant Admin rights to other users.'],
-                ].map(([q,a])=>`<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
-                  <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ ${q}</div>
-                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">${a}</div>
-                </div>`).join('')}
+                <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
+                  <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ Why does the total report count exceed 3,000?</div>
+                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">The dashboard loads the full QA AMO history since the Galileo system went live. Use the Year filter on the Overview page to view data for a specific year.</div>
+                </div>
+                <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
+                  <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ What does an on-time rate of 12% mean?</div>
+                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">Only 12% of forms with a target date were closed on time. This figure is calculated only on forms that have a target date (CAR, MCAR, PAVOI). Forms without a target date (Surveillance, AISC) are excluded from the on-time rate.</div>
+                </div>
+                <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
+                  <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ Why is the Repetitive count 0?</div>
+                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">The "Repetitive" field in Galileo must be set to "Yes" when creating a finding. If it is left blank, the dashboard cannot detect it. Auditors should be reminded to fill in this field.</div>
+                </div>
+                <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
+                  <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ When is the data updated?</div>
+                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">Click the "↻ Refresh" button on the topbar to reload the latest data from Galileo. The dashboard does not refresh automatically. Loading takes approximately 30–60 seconds.</div>
+                </div>
+                <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
+                  <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ Why does Audit Plan show 963 records?</div>
+                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">The dashboard loads all audits for QA AMO auditors (Vo Vinh Hien, Le Hong Chuong, Thai Ba Hoa…) from past to present, including future Scheduled audits. Use the Year filter to view a specific year's plan.</div>
+                </div>
+                <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
+                  <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ How do I add a new user?</div>
+                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">The user self-registers on the login page → Admin goes to "User Management" → Approve the account. Admins can Approve/Reject/grant Admin rights to other users.</div>
+                </div>
               </div>
             </div>
 
