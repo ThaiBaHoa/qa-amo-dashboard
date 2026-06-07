@@ -10,7 +10,7 @@ UI language is Vietnamese.
 
 ## Architecture — read this first
 
-The **entire app is one file: `index.html`** (~2030 lines). HTML + CSS + JS inline.
+The **entire app is one file: `index.html`** (~8000 lines). HTML + CSS + JS inline.
 There is no build step, no `package.json`, no `node_modules`, no framework.
 
 - `CNAME` — GitHub Pages custom domain (`vjc-qa-amo.com`). Deploy = push to `main`.
@@ -19,8 +19,11 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
 
 ### Two backends — do not confuse them
 
-1. **Supabase** (`SUPA_URL`/`SUPA_KEY`, ~line 766) — auth only. The `users` table
-   holds login accounts (email, password, role, approval state).
+1. **Supabase** (`SUPA_URL`/`SUPA_KEY`) — auth only, via **Supabase Auth**.
+   `doLogin`/`doRegister` call `sb.auth.signInWithPassword` / `sb.auth.signUp`, so
+   credentials live in Supabase's managed `auth.users` (bcrypt-hashed). The
+   `public.users` table is a **profile table only** — `supabase_id` (FK to
+   `auth.users`), `email`, `full_name`, `role`, `created_at`. **No password column.**
 2. **Galileo** (`G_URL`, ~line 768) — report data. A Cloudflare Worker proxy
    (`galileo-proxy.*.workers.dev`) in front of an OData API. All report/workflow/
    audit data comes from here via `fetchAll()`.
@@ -50,15 +53,24 @@ Galileo proxy is also remote — local run hits production data.
 - `g(id)` = `getElementById`; `s(id,txt)` = set textContent. Used everywhere.
 - Vietnamese strings in UI text and toasts — keep new user-facing text Vietnamese.
 - Edits are surgical: this is one giant file, match the existing inline style.
+- **Year filters are multi-year** via a shared widget (`initYearMulti(id, years, {onChange, default})`).
+  Each page mounts a `<div class="ymulti" id="...">`; read selections with `ymHas(id, value)`
+  (true when "all"), `ymVal(id)` (array; `[]` = all), `ymText(id)` (label), `ymReset(id)`.
+  Do NOT use `g(id).value` on these — they're divs, not `<select>`s.
+- **Admin-only tools**: Export Reports, Query Builder, My Dashboard, Early Detection, User
+  Management live under the sidebar `#adminNav` block. Every export button carries the
+  `.admin-only` class (hidden for viewers) AND its handler re-checks `curUser.role==='admin'`.
+  `showPage` also blocks direct navigation to those pages for non-admins.
 
 ## Known issues / gotchas
 
 - **Galileo HTTP 524**: the report-summary query is slow; the Cloudflare Worker
   times out (~100s) intermittently. `fetchAll` caps each request at 30s and
   `loadData` shows a retry overlay on failure. The root slowness is backend.
-- **Security — passwords stored plaintext** in the Supabase `users` table, and the
-  table is readable with the publishable key embedded in `index.html`. Not yet
-  fixed. Real fix = Supabase Auth + Row Level Security.
+- **Auth is Supabase Auth** (passwords are NOT stored in `public.users` — earlier
+  docs claimed plaintext storage; that was wrong). The remaining hardening item is
+  **Row Level Security** on `public.users`: it's still readable with the publishable
+  key embedded in `index.html`, so enable RLS policies to lock down profile reads.
 
 ## Deploy
 

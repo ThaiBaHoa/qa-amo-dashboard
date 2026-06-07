@@ -150,6 +150,19 @@ body{font-family:'Manrope','Segoe UI',system-ui,sans-serif;background:var(--bg);
 .pill.on{background:var(--accent-soft);color:var(--accent);border-color:color-mix(in oklab,var(--accent) 35%,transparent)}
 .pill:not(.on):hover{color:var(--text)}
 .sel{padding:6px 11px;background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:8px;font-size:12.5px;cursor:pointer;font-family:inherit;font-weight:600}
+/* ── Reusable multi-year filter (1 year / 2 years / all years) ── */
+.ymulti{position:relative;display:inline-block;vertical-align:middle}
+.ym-btn{display:flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:6px 11px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
+.ym-btn:hover{border-color:var(--blue,#58A6FF)}
+.ym-caret{color:var(--muted);font-size:10px}
+.ym-pop{position:absolute;top:calc(100% + 4px);left:0;z-index:400;background:var(--card);border:1px solid var(--border);border-radius:9px;padding:6px;min-width:150px;max-height:280px;overflow-y:auto;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.ym-opt{display:flex;align-items:center;gap:8px;padding:5px 9px;border-radius:6px;font-size:12.5px;color:var(--text);cursor:pointer;font-weight:500}
+.ym-opt:hover{background:var(--surface-2)}
+.ym-opt input{accent-color:var(--blue,#58A6FF);width:14px;height:14px;cursor:pointer;flex-shrink:0}
+.ym-sep{height:1px;background:var(--border);margin:5px 2px}
+.ymulti.ym-full{display:block}
+.ym-full .ym-btn{width:100%;justify-content:space-between;padding:7px 10px;font-size:13px}
+.ym-full .ym-pop{width:100%}
 .srch-wrap{position:relative}
 .srch-icon{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--text-3)}
 .srch{padding:6px 10px 6px 28px;background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:8px;font-size:12.5px;width:180px;outline:none;font-family:inherit}
@@ -512,11 +525,11 @@ tr:last-child td{border-bottom:none}
         <button class="nav-item" onclick="showPage('mcar',this)"><span class="nav-ic" data-ic="list"></span>MCAR</button>
         <button class="nav-item" onclick="showAuditPlanPage(this)"><span class="nav-ic" data-ic="calendar"></span>Audit Plan</button>
         <button class="nav-item" onclick="showPage('docs',this)"><span class="nav-ic" data-ic="folder"></span>Documents</button>
-        <button class="nav-item admin-only" id="reportsNav" onclick="showPage('reports',this)" style="display:none"><span class="nav-ic" data-ic="download"></span>Export Reports</button>
         <button class="nav-item" onclick="showPage('help',this)"><span class="nav-ic" data-ic="doc"></span>User Guide</button>
         <div id="adminNav" style="display:none">
           <div class="nav-sec" style="margin-top:6px">Admin</div>
           <button class="nav-item" onclick="showPage('admin',this)"><span class="nav-ic" data-ic="users"></span>User Management</button>
+          <button class="nav-item admin-only" id="reportsNav" onclick="showPage('reports',this)"><span class="nav-ic" data-ic="download"></span>Export Reports</button>
           <button class="nav-item" onclick="showPage('kpi2',this)"><span class="nav-ic" data-ic="chart"></span>Early Detection</button>
           <button class="nav-item" onclick="showPage('querybuilder',this)"><span class="nav-ic" data-ic="search"></span>Query Builder</button>
           <button class="nav-item" onclick="showPage('mydashboard',this)"><span class="nav-ic" data-ic="star"></span>My Dashboard</button>
@@ -560,9 +573,7 @@ tr:last-child td{border-bottom:none}
           <!-- Year Filter Row -->
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
             <span style="font-size:12px;color:var(--muted);font-weight:500">📅 Filter by year:</span>
-            <select class="sel" id="ovYearFilter" onchange="filterOverviewYear()" style="padding:5px 12px;font-size:12px;min-width:120px">
-              <option value="all">All Years</option>
-            </select>
+            <div class="ymulti" id="ovYearFilter"></div>
             <span style="font-size:11px;color:var(--muted)" id="ovYearCount"></span>
           </div>
 
@@ -618,7 +629,7 @@ tr:last-child td{border-bottom:none}
               <button class="pill" onclick="setOpenF('Open',this)">Open</button>
               <button class="pill" onclick="setOpenF('Overdue',this)">Overdue</button>
               <select class="sel" id="openFormF" onchange="renderOpen()"><option value="">All Forms</option></select>
-              <select class="sel" id="openYearF" onchange="renderOpen()"><option value="">All Years</option></select>
+              <div class="ymulti" id="openYearF"></div>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
                 <input class="srch" id="openSrch" placeholder="Search..." oninput="dRenderOpen()">
               </div>
@@ -657,7 +668,7 @@ tr:last-child td{border-bottom:none}
           <div class="tbl-card">
             <div class="tbl-bar">
               <div><div class="tbl-title">Overdue Detail — All forms</div><div class="tbl-count" id="ovCnt">—</div></div>
-              <select class="sel" id="ovYearF" onchange="renderOv()"><option value="">All Years</option></select>
+              <div class="ymulti" id="ovYearF"></div>
               <select class="sel" id="ovFormF" onchange="renderOv()"><option value="">All Forms</option></select>
               <select class="sel" id="ovCatF" onchange="renderOv()">
                 <option value="">All CAT</option>
@@ -690,7 +701,7 @@ tr:last-child td{border-bottom:none}
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-shrink:0">
             <span style="font-size:13px;font-weight:600;color:var(--text)">KPI Charts</span>
             <label style="font-size:12px;color:var(--muted)">Year:</label>
-            <select class="sel" id="kpiYear" onchange="filterKpiYear()" style="width:100px"></select>
+            <div class="ymulti" id="kpiYear"></div>
             <span id="kpiYearCount" style="font-size:11px;color:var(--muted)"></span>
           </div>
           <!-- Row 1: 6 KPI summary cards -->
@@ -722,7 +733,7 @@ tr:last-child td{border-bottom:none}
                 <div class="chart-sub">MCAR vs AMO-ECAR theo Nature of finding (nhóm cha) — bức tranh khối lượng phát hiện</div>
               </div>
               <div style="display:flex;gap:6px;align-items:center">
-                <select class="sel" id="kpi2Year" onchange="buildKPI2()" style="font-size:11px;width:90px"><option value="">All Years</option></select>
+                <div class="ymulti" id="kpi2Year"></div>
                 <select class="sel" id="kpi2Qtr" onchange="buildKPI2()" style="font-size:11px"><option value="">All Q</option><option value="1">Q1</option><option value="2">Q2</option><option value="3">Q3</option><option value="4">Q4</option></select>
                 <div style="text-align:right;min-width:96px">
                   <div class="kpi-val" id="kpi2-val" style="color:var(--green);font-size:20px">—</div>
@@ -746,9 +757,7 @@ tr:last-child td{border-bottom:none}
                   <option value="4">Section (XX-XX)</option>
                   <option value="6">Subject (XX-XX-XX)</option>
                 </select>
-                <select class="sel" id="ataCompareYear" onchange="renderATACompare()" style="font-size:11px;width:90px">
-                  <option value="">All Years</option>
-                </select>
+                <div class="ymulti" id="ataCompareYear"></div>
                 <button class="btn-sm admin-only" onclick="exportATAComparePDF()" style="white-space:nowrap;flex-shrink:0">⬇ PDF</button>
               </div>
             </div>
@@ -787,7 +796,7 @@ tr:last-child td{border-bottom:none}
               <div><div class="tbl-title">Early detection — MCAR vs AMO-ECAR by group</div><div class="tbl-count" id="k2cnt">—</div></div>
               <span style="font-size:11px;color:var(--muted)">Group by</span>
               <select class="sel" id="k2Group" onchange="renderKpi2()"><option value="nature">Nature of finding</option><option value="scope">Scope / audit area</option><option value="quarter">Quarter</option><option value="year">Year</option></select>
-              <select class="sel" id="k2Year" onchange="renderKpi2()"><option value="">All Years</option></select>
+              <div class="ymulti" id="k2Year"></div>
               <input class="sel" id="k2Srch" oninput="renderKpi2()" placeholder="\ud83d\udd0d Search group..." style="min-width:150px">
               <button class="btn-sm" onclick="loadKpi2(true)">↻ Reload</button>
             </div>
@@ -814,7 +823,7 @@ tr:last-child td{border-bottom:none}
               <button class="pill" onclick="setAF('Lately Closed',this)">Lately</button>
               <button class="pill" onclick="setAF('Closed',this)">Closed</button>
               <select class="sel" id="afFormF" onchange="renderAF()"><option value="">All Forms</option></select>
-              <select class="sel" id="afYearF" onchange="renderAF()"><option value="">All Years</option></select>
+              <div class="ymulti" id="afYearF"></div>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
                 <input class="srch" id="afSrch" placeholder="Search..." oninput="dRenderAF()">
               </div>
@@ -855,7 +864,7 @@ tr:last-child td{border-bottom:none}
               <button class="pill" onclick="setPAV('Overdue',this)">Overdue</button>
               <button class="pill" onclick="setPAV('On-time Closed',this)">On-time</button>
               <button class="pill" onclick="setPAV('Lately Closed',this)">Lately</button>
-              <select class="sel" id="pavoiYearF" onchange="renderPavoi()"><option value="">All Years</option></select>
+              <div class="ymulti" id="pavoiYearF"></div>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
                 <input class="srch" id="pavoiSrch" placeholder="Search..." oninput="dRenderPavoi()">
               </div>
@@ -895,7 +904,7 @@ tr:last-child td{border-bottom:none}
               <button class="pill" onclick="setCmrF('Overdue',this)">Overdue</button>
               <button class="pill" onclick="setCmrF('On-time Closed',this)">On-time</button>
               <button class="pill" onclick="setCmrF('Lately Closed',this)">Lately</button>
-              <select class="sel" id="cmrYearF" onchange="renderCmr()"><option value="">All Years</option></select>
+              <div class="ymulti" id="cmrYearF"></div>
               <select class="sel" id="cmrQtrF" onchange="renderCmr()">
                 <option value="">All quarters</option>
                 <option value="1">Q1 (Jan–Mar)</option>
@@ -943,7 +952,7 @@ tr:last-child td{border-bottom:none}
               <button class="pill" onclick="setEcarF('Overdue',this)">Overdue</button>
               <button class="pill" onclick="setEcarF('On-time Closed',this)">On-time</button>
               <button class="pill" onclick="setEcarF('Lately Closed',this)">Lately</button>
-              <select class="sel" id="ecarYearF" onchange="ecarYearChange()"><option value="">All Years</option></select>
+              <div class="ymulti" id="ecarYearF"></div>
               <button class="pill qtr-pill" onclick="toggleEcarQtr(1,this)" disabled style="opacity:.5">Q1</button>
               <button class="pill qtr-pill" onclick="toggleEcarQtr(2,this)" disabled style="opacity:.5">Q2</button>
               <button class="pill qtr-pill" onclick="toggleEcarQtr(3,this)" disabled style="opacity:.5">Q3</button>
@@ -993,7 +1002,7 @@ tr:last-child td{border-bottom:none}
           <div class="tbl-card">
             <div class="tbl-bar">
               <div><div class="tbl-title">AMO-ECAR — Authority Findings (issued to AMO)</div><div class="tbl-count" id="amoCnt">—</div></div>
-              <select class="sel" id="amoYearF" onchange="renderAmoEcar()"><option value="">All Years</option></select>
+              <div class="ymulti" id="amoYearF"></div>
               <select class="sel" id="amoStatusF" onchange="renderAmoEcar()"><option value="">All Status</option><option value="Open">Open</option><option value="Overdue">Overdue</option><option value="On-time Closed">On-time</option><option value="Lately Closed">Lately</option><option value="Closed">Closed</option></select>
               <input class="sel" id="amoSrch" oninput="renderAmoEcar()" placeholder="🔍 Search..." style="min-width:160px">
             </div>
@@ -1028,7 +1037,7 @@ tr:last-child td{border-bottom:none}
           <div class="tbl-card">
             <div class="tbl-bar">
               <div><div class="tbl-title">MCAR — Internal Audit Findings</div><div class="tbl-count" id="mcarCnt">—</div></div>
-              <select class="sel" id="mcarYearF" onchange="renderMcar()"><option value="">All Years</option></select>
+              <div class="ymulti" id="mcarYearF"></div>
               <select class="sel" id="mcarStatusF" onchange="renderMcar()"><option value="">All Status</option><option value="Open">Open</option><option value="Overdue">Overdue</option><option value="On-time Closed">On-time</option><option value="Lately Closed">Lately</option><option value="Closed">Closed</option></select>
               <input class="sel" id="mcarSrch" oninput="renderMcar()" placeholder="🔍 Search..." style="min-width:160px">
             </div>
@@ -1057,7 +1066,7 @@ tr:last-child td{border-bottom:none}
               <div class="muted">Target: Vietjet AMO's SPI must meet or better than the SPT (ALOS) approved by CAAV</div>
             </div>
             <div style="display:flex;align-items:center;gap:10px">
-              <select class="sel" id="spiYearFilter" onchange="renderSPIYear()" style="padding:5px 12px;font-size:12px"></select>
+              <div class="ymulti" id="spiYearFilter"></div>
               <div class="muted" id="spiUpdated"></div>
             </div>
           </div>
@@ -1108,11 +1117,11 @@ tr:last-child td{border-bottom:none}
                 <button class="pill" onclick="setAuditF('InProgress','status',this)">In Progress</button>
               </div>
 
-              <select class="sel" id="auditYearF" onchange="renderAudit()"><option value="">All years</option></select>
+              <div class="ymulti" id="auditYearF"></div>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
                 <input class="srch" id="auditSrch" placeholder="Search..." oninput="dRenderAudit()">
               </div>
-              <button class="btn-sm" onclick="exportAuditExcel()" title="Export Excel">⬇ Excel</button>
+              <button class="btn-sm admin-only" onclick="exportAuditExcel()" title="Export Excel" style="display:none">⬇ Excel</button>
               <button class="btn-sm" onclick="resetAuditFilters()" title="Clear filters">↺ Reset</button>
             </div>
             <div class="tbl-wrap">
@@ -1168,7 +1177,7 @@ tr:last-child td{border-bottom:none}
               <div class="doc-toolbar">
                 <input type="text" id="docSearch" placeholder="🔍 No / Title / Owner" oninput="renderDocPage()"/>
                 <select id="docStatusFilter" onchange="renderDocPage()"><option value="">All statuses</option><option value="Active">Active</option><option value="Obsolete">Obsolete</option></select>
-                <select id="docYearFilter" onchange="renderDocPage()"></select>
+                <div class="ymulti" id="docYearFilter"></div>
                 <select id="docOwnerFilter" onchange="renderDocPage()"></select>
                 <select id="docReviewDueFilter" onchange="renderDocPage()"><option value="">Review: all</option><option value="overdue">Overdue</option><option value="30d">≤ 30 days</option><option value="90d">≤ 90 days</option><option value="ok">Not due soon</option></select>
               </div>
@@ -1202,9 +1211,7 @@ tr:last-child td{border-bottom:none}
               </div>
               <div>
                 <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500">Year</div>
-                <select class="sel" id="rptYear" onchange="generateReport()" style="width:100%;padding:7px 10px">
-                  <option value="all">All Years</option>
-                </select>
+                <div class="ymulti ym-full" id="rptYear" style="width:100%"></div>
               </div>
               <div id="rptPeriodWrap">
                 <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500" id="rptPeriodLabel">Month</div>
@@ -1345,6 +1352,22 @@ tr:last-child td{border-bottom:none}
                   <div style="font-size:12px;font-weight:600;color:var(--text)">FAQ</div>
                   <div style="font-size:10px;color:var(--muted)">Common questions</div>
                 </div></a>
+              </div>
+            </div>
+
+            <!-- WHAT'S NEW: multi-year filter -->
+            <div class="chart-card" style="margin-bottom:14px;border-left:3px solid var(--blue)">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                <span style="font-size:18px">📅</span>
+                <div style="font-size:15px;font-weight:700">Bộ lọc năm (mới) — chọn 1 năm, 2 năm hoặc tất cả</div>
+              </div>
+              <div style="font-size:12px;color:var(--muted);line-height:1.7">
+                Tất cả bộ lọc năm trên mọi trang giờ là một <b style="color:var(--text)">menu chọn nhiều năm</b>.
+                Bấm vào nút <b style="color:var(--text)">📅</b> để mở danh sách:
+                tích <b style="color:var(--text)">"All years"</b> để xem toàn bộ, hoặc tích từng năm để
+                so sánh (ví dụ chọn <b style="color:var(--text)">2024</b> và <b style="color:var(--text)">2025</b> cùng lúc).
+                Nhãn nút hiển thị các năm đang chọn (vd <i>"2025, 2024"</i>) — bảng và biểu đồ cập nhật ngay.
+                Trang <b style="color:var(--text)">Overview</b>, <b style="color:var(--text)">KPI Charts</b> và <b style="color:var(--text)">SPI</b> mặc định chọn năm hiện tại.
               </div>
             </div>
 
@@ -1545,6 +1568,13 @@ tr:last-child td{border-bottom:none}
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
                 <span style="font-size:18px">📄</span>
                 <div style="font-size:15px;font-weight:700">Export Reports</div>
+                <span style="font-size:10px;background:rgba(227,6,19,.12);color:var(--red);padding:2px 8px;border-radius:4px;font-weight:600">🔑 Admin Only</span>
+              </div>
+
+              <div style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:12px">
+                Mọi chức năng xuất báo cáo (PDF/Excel ở trang Export Reports, cũng như các nút
+                ⬇ PDF/Excel trên CMR-CAR, ECAR, Audit Plan, Query Builder…) chỉ hiển thị và hoạt
+                động với tài khoản <b style="color:var(--text)">Admin</b>. Người dùng thường (Viewer) sẽ không thấy các nút này.
               </div>
 
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
@@ -1692,7 +1722,7 @@ tr:last-child td{border-bottom:none}
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
               <div>
                 <div style="font-size:16px;font-weight:700">🔬 Query Builder</div>
-                <div style="font-size:12px;color:var(--muted);margin-top:2px">Freely explore and query all Galileo data — no code required</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:2px">Tự truy vấn dữ liệu Galileo — không cần code. <b style="color:var(--text)">4 bước:</b> ① chọn bảng → ② tích cột → ③ thêm điều kiện lọc → ④ bấm <b style="color:var(--text)">Run Query</b></div>
               </div>
               <div style="display:flex;gap:8px">
                 <button class="btn-sm" onclick="qbShowTemplates()" style="gap:5px">📋 Templates</button>
@@ -1709,7 +1739,8 @@ tr:last-child td{border-bottom:none}
               <!-- 1. Bảng chính -->
               <div class="qb-panel" style="flex-shrink:0">
                 <div class="qb-section" style="border-bottom:none">
-                  <div class="qb-section-title">1 · Primary Table</div>
+                  <div class="qb-section-title">Bước 1 · Bảng chính (Primary Table)</div>
+                <div style="font-size:10px;color:var(--muted);margin:-4px 0 8px">Chọn bảng dữ liệu nguồn, rồi tích những cột muốn hiển thị.</div>
                   <select id="qbPrimaryTable" onchange="qbSetPrimary(this.value)"
                     style="width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px;outline:none;margin-bottom:10px">
                     <option value="">— Select primary table —</option>
@@ -1731,7 +1762,8 @@ tr:last-child td{border-bottom:none}
               <!-- 2. Join Tables -->
               <div class="qb-panel" style="flex-shrink:0">
                 <div class="qb-section" style="border-bottom:none">
-                  <div class="qb-section-title">2 · Join Table</div>
+                  <div class="qb-section-title">Bước 2 · Ghép bảng (Join) — tùy chọn</div>
+                  <div style="font-size:10px;color:var(--muted);margin:-4px 0 8px">Bỏ qua nếu chỉ cần 1 bảng. Ghép thêm bảng liên quan khi cần đối chiếu.</div>
                   <div id="qbJoinList"></div>
                   <button id="qbAddJoinBtn" onclick="qbAddJoin()"
                     style="width:100%;padding:6px;border:1px dashed var(--border);background:none;color:var(--muted);font-size:12px;border-radius:6px;cursor:pointer;margin-top:4px;transition:all .15s"
@@ -1755,7 +1787,8 @@ tr:last-child td{border-bottom:none}
               <!-- 3. Filter (primary table fields only) -->
               <div class="qb-panel" style="flex-shrink:0">
                 <div class="qb-section" style="border-bottom:none">
-                  <div class="qb-section-title">3 · Filter conditions</div>
+                  <div class="qb-section-title">Bước 3 · Điều kiện lọc (Filter) — tùy chọn</div>
+                  <div style="font-size:10px;color:var(--muted);margin:-4px 0 8px">Thêm điều kiện để thu hẹp kết quả (vd: năm = 2025, trạng thái = Open).</div>
                   <div id="qbFilterList"></div>
                   <button onclick="qbAddFilter()" style="width:100%;padding:5px;border:1px dashed var(--border);background:none;color:var(--muted);font-size:12px;border-radius:6px;cursor:pointer;margin-top:4px;transition:all .15s" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Add condition</button>
                   <div style="margin-top:8px">
@@ -1771,7 +1804,8 @@ tr:last-child td{border-bottom:none}
               <!-- 4. Sort & Limit -->
               <div class="qb-panel" style="flex-shrink:0">
                 <div class="qb-section" style="border-bottom:none">
-                  <div class="qb-section-title">4 · Sort & limit</div>
+                  <div class="qb-section-title">Bước 4 · Sắp xếp & giới hạn (Sort & limit)</div>
+                  <div style="font-size:10px;color:var(--muted);margin:-4px 0 8px">Chọn cột sắp xếp và số dòng tối đa, rồi bấm <b style="color:var(--text)">Run Query</b> bên dưới.</div>
                   <div style="display:flex;gap:6px;margin-bottom:6px">
                     <select id="qbSortField" style="flex:1;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 8px;font-size:12px;outline:none">
                       <option value="">— No sort —</option>
@@ -1911,13 +1945,16 @@ tr:last-child td{border-bottom:none}
 </style>
 
           <!-- Toolbar -->
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-shrink:0">
-            <div style="display:flex;align-items:center;gap:10px">
-              <span style="font-size:15px;font-weight:700">My Dashboard</span>
-              <span style="font-size:10px;background:rgba(227,6,19,.12);color:var(--red);padding:2px 8px;border-radius:4px;font-weight:600">🔑 Admin Only</span>
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;flex-shrink:0">
+            <div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <span style="font-size:15px;font-weight:700">My Dashboard</span>
+                <span style="font-size:10px;background:rgba(227,6,19,.12);color:var(--red);padding:2px 8px;border-radius:4px;font-weight:600">🔑 Admin Only</span>
+              </div>
+              <div style="font-size:11px;color:var(--muted);margin-top:3px">Các widget bạn đã ghim từ Query Builder. Mở Query Builder → chạy truy vấn → bấm 📌 Pin để thêm widget vào đây.</div>
             </div>
             <div style="display:flex;gap:8px">
-              <button class="btn-sm" onclick="dbRefreshAll()">↺ Refresh All</button>
+              <button class="btn-sm" onclick="dbRefreshAll()" title="Chạy lại tất cả widget với dữ liệu mới">↺ Refresh All</button>
               <button class="btn-sm" onclick="showPage('querybuilder',document.querySelector('[onclick*=querybuilder]'))">🔬 Query Builder</button>
             </div>
           </div>
@@ -2149,7 +2186,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.05-r95';
+const APP_REV = '2026.06.07-r96';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3013,44 +3050,114 @@ function renderAll() {
   filterKpiYear();
 }
 
+// ── REUSABLE MULTI-YEAR FILTER ───────────────────────────────
+// Replaces the old single-select year dropdowns. Lets the user pick one year,
+// two years, or all years via a checkbox popover. State per element id:
+//   _YM[id] = { years:[...strings], sel:Set<string> (empty = all years), cb, defaulted }
+// Read API used by render/export code:
+//   ymVal(id)  -> array of selected year strings ([] = all)
+//   ymHas(id,v)-> true if value v passes the filter (true when "all")
+//   ymText(id) -> human label ("All" | "2024" | "2024, 2025")
+const _YM = {};
+function initYearMulti(id, years, opts){
+  opts = opts || {};
+  const host = g(id); if(!host) return;
+  years = [...new Set(years.map(String))];
+  const st = _YM[id] || (_YM[id] = { sel:new Set(), cb:null, defaulted:false });
+  if(opts.onChange) st.cb = opts.onChange;
+  const sameYears = st.years && st.years.length===years.length && st.years.every((y,i)=>y===years[i]);
+  st.years = years;
+  if(!st.defaulted){
+    st.defaulted = true;
+    if(opts.default === 'current'){
+      const cy = String(new Date().getFullYear());
+      st.sel = new Set(years.includes(cy) ? [cy] : (years.length ? [years[0]] : []));
+    }
+  } else {
+    // Drop selections that no longer exist in the refreshed year list.
+    [...st.sel].forEach(y => { if(!years.includes(y)) st.sel.delete(y); });
+  }
+  // Only (re)build the DOM when the year list changed or the widget isn't built yet.
+  // This keeps an open popover open while the user ticks several years (each tick
+  // re-runs the page's render, which calls initYearMulti again).
+  if(!sameYears || !host.querySelector('.ym-btn')) _ymRender(id);
+}
+function _ymRender(id){
+  const host = g(id), st = _YM[id]; if(!host || !st) return;
+  host.classList.add('ymulti');
+  const label = st.sel.size===0 ? 'All years' : [...st.sel].sort((a,b)=>b-a).join(', ');
+  host.innerHTML =
+    `<button type="button" class="ym-btn" onclick="_ymToggle('${id}',event)">`+
+      `<span class="ym-lbl">📅 ${esc(label)}</span><span class="ym-caret">▾</span></button>`+
+    `<div class="ym-pop" style="display:none" onclick="event.stopPropagation()">`+
+      `<label class="ym-opt"><input type="checkbox" class="ym-all" ${st.sel.size===0?'checked':''} onchange="_ymSetAll('${id}')"><span>All years</span></label>`+
+      `<div class="ym-sep"></div>`+
+      st.years.map(y=>`<label class="ym-opt"><input type="checkbox" class="ym-yr" value="${y}" ${st.sel.has(y)?'checked':''} onchange="_ymPick('${id}','${y}',this.checked)"><span>${y}</span></label>`).join('')+
+    `</div>`;
+}
+function _ymSync(id){
+  const host = g(id), st = _YM[id]; if(!host || !st) return;
+  const lbl = host.querySelector('.ym-lbl');
+  if(lbl) lbl.textContent = '📅 '+(st.sel.size===0 ? 'All years' : [...st.sel].sort((a,b)=>b-a).join(', '));
+  const allCb = host.querySelector('.ym-all'); if(allCb) allCb.checked = st.sel.size===0;
+}
+function _ymToggle(id,ev){
+  ev.stopPropagation();
+  const pop = g(id)?.querySelector('.ym-pop'); if(!pop) return;
+  const open = pop.style.display==='none';
+  document.querySelectorAll('.ym-pop').forEach(p=>p.style.display='none');
+  pop.style.display = open ? 'block' : 'none';
+}
+function _ymSetAll(id){
+  const st = _YM[id]; if(!st) return;
+  st.sel = new Set();
+  g(id).querySelectorAll('.ym-yr').forEach(cb=>cb.checked=false);
+  _ymSync(id); _ymFire(id);
+}
+function _ymPick(id,y,checked){
+  const st = _YM[id]; if(!st) return;
+  if(checked) st.sel.add(y); else st.sel.delete(y);
+  _ymSync(id); _ymFire(id);
+}
+function _ymFire(id){ const st=_YM[id]; if(st && st.cb){ try{ st.cb(); }catch(e){ console.warn('[year-filter]',id,e); } } }
+function ymVal(id){ const st=_YM[id]; return st ? [...st.sel] : []; }
+function ymHas(id,v){ const st=_YM[id]; if(!st || st.sel.size===0) return true; return st.sel.has(String(v)); }
+function ymText(id){ const st=_YM[id]; return (!st || st.sel.size===0) ? 'All' : [...st.sel].sort((a,b)=>b-a).join(', '); }
+function ymReset(id){ const st=_YM[id]; if(st){ st.sel=new Set(); _ymRender(id); } }
+function ymBuilt(id){ const st=_YM[id]; return !!(st && st.years && st.years.length); }
+// Close any open year popover when clicking elsewhere.
+document.addEventListener('click', ()=>{ document.querySelectorAll('.ym-pop').forEach(p=>p.style.display='none'); });
+
 // ── POPULATE FILTERS ─────────────────────────────────────────
 function populateFilters() {
   const forms=[...new Set(allData.map(r=>r.report_title).filter(Boolean))].sort();
   const fOpts='<option value="">All Forms</option>'+forms.map(f=>`<option>${f}</option>`).join('');
   ['openFormF','ovFormF','afFormF'].forEach(id=>{const el=g(id);if(el)el.innerHTML=fOpts;});
 
+  // Multi-year filters (allData-based). Overview + KPI default to the current year.
   const years=[...new Set(allData.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
-  const yOpts='<option value="">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
-  ['openYearF','afYearF','pavoiYearF','ovYearF'].forEach(id=>{const el=g(id);if(el)el.innerHTML=yOpts;});
-
-  // Overview year filter — default to current year
-  const curYear = new Date().getFullYear();
-  const ovYOpts='<option value="all">All Years</option>'+years.map(y=>`<option value="${y}" ${y===curYear?'selected':''}>${y}</option>`).join('');
-  const ovYEl=g('ovYearFilter'); if(ovYEl) ovYEl.innerHTML=ovYOpts;
-
-  // KPI year filter — default to current year
-  const curYearKpi = new Date().getFullYear();
-  const kpiYOpts='<option value="all">All Years</option>'+years.map(y=>`<option value="${y}" ${y===curYearKpi?'selected':''}>${y}</option>`).join('');
-  const kpiYEl=g('kpiYear'); if(kpiYEl) kpiYEl.innerHTML=kpiYOpts;
+  initYearMulti('openYearF',    years, {onChange:renderOpen});
+  initYearMulti('afYearF',      years, {onChange:renderAF});
+  initYearMulti('pavoiYearF',   years, {onChange:renderPavoi});
+  initYearMulti('ovYearF',      years, {onChange:renderOv});
+  initYearMulti('ovYearFilter', years, {onChange:filterOverviewYear, default:'current'});
+  initYearMulti('kpiYear',      years, {onChange:filterKpiYear,      default:'current'});
 
   // Audit year filter
   populateAuditYearFilter();
 }
 
 function filterOverviewYear() {
-  const yr = g('ovYearFilter')?.value || 'all';
-  const d = yr==='all' ? allData : allData.filter(r=>String(r.raised_year)===yr);
+  const d = allData.filter(r=>ymHas('ovYearFilter', r.raised_year));
+  const all = ymVal('ovYearFilter').length===0;
   const countEl = g('ovYearCount');
-  if(countEl) countEl.textContent = yr==='all' ? `${allData.length} records` : `${d.length} records for ${yr}`;
+  if(countEl) countEl.textContent = all ? `${allData.length} records` : `${d.length} records for ${ymText('ovYearFilter')}`;
   renderOverview(d);
 }
 
 function renderOverview(d) {
-  const yr = g('ovYearFilter')?.value || 'all';
-
   // ── Section 1: Audit & Inspection progress (MNT = audit + inspection) ──
-  let mnt = auditData.filter(a => a.prefix === 'MNT');
-  if (yr !== 'all') mnt = mnt.filter(a => String(a.sched_year) === yr);
+  let mnt = auditData.filter(a => a.prefix === 'MNT' && ymHas('ovYearFilter', a.sched_year));
   s('ov-mnt-cnt', `(${mnt.length})`);
 
   // Donut: by status
@@ -3180,8 +3287,7 @@ function buildChartsFor(d) {
       scales:{x:{ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'}},
         y:{ticks:{color:'#E6EDF3',font:{size:11},maxRotation:0,callback:function(val,idx){const lbl=this.getLabelForValue(val);return lbl.length>22?lbl.substring(0,20)+'…':lbl;}},grid:{color:'rgba(255,255,255,0.04)'}}}}});
   dc('cMonth');
-  const yr=g('monthYr')?.value||'all';
-  const msrc=yr==='all'?d:d.filter(r=>String(r.raised_year)===yr);
+  const msrc=d;   // already scoped by the page's year filter
   const m={};
   msrc.forEach(r=>{if(!r.raised_ym)return;if(!m[r.raised_ym])m[r.raised_ym]={o:0,c:0,ov:0};
     if(r.semantic_status==='Open')m[r.raised_ym].o++;
@@ -3293,8 +3399,7 @@ function buildFormChart() {
 
 function buildMonthChart() {
   dc('cMonth');
-  const yr=g('monthYr')?.value||'all';
-  const src=yr==='all'?allData:allData.filter(r=>String(r.raised_year)===yr);
+  const src=allData;
   const m={};
   src.forEach(r=>{
     if(!r.raised_ym)return;
@@ -3315,10 +3420,10 @@ function buildMonthChart() {
 }
 
 function filterKpiYear() {
-  const yr = g('kpiYear')?.value || 'all';
-  const data = yr==='all' ? allData : allData.filter(r=>String(r.raised_year)===yr);
+  const data = allData.filter(r=>ymHas('kpiYear', r.raised_year));
+  const all = ymVal('kpiYear').length===0;
   const countEl = g('kpiYearCount');
-  if(countEl) countEl.textContent = yr==='all' ? `${allData.length} records` : `${data.length} records for ${yr}`;
+  if(countEl) countEl.textContent = all ? `${allData.length} records` : `${data.length} records for ${ymText('kpiYear')}`;
   buildKPICharts(data);
   renderATACompare();
 }
@@ -3394,22 +3499,17 @@ function renderATACompare() {
   }
   if(!cmrLoaded && !ecarLoaded) return;
   const level = parseInt(g('ataGroupLevel')?.value || '2');
-  const yr = g('ataCompareYear')?.value || '';
 
-  // Populate year filter
-  const yrEl = g('ataCompareYear');
-  if(yrEl && yrEl.options.length <= 1) {
-    const years = [...new Set([
-      ...cmrData.map(r=>r.raised_year),
-      ...ecarData.map(r=>r.raised_year)
-    ].filter(Boolean))].sort((a,b)=>b-a);
-    yrEl.innerHTML = '<option value="">All Years</option>' +
-      years.map(y=>`<option value="${y}">${y}</option>`).join('');
-  }
+  // Populate year filter (multi-year)
+  const years = [...new Set([
+    ...cmrData.map(r=>r.raised_year),
+    ...ecarData.map(r=>r.raised_year)
+  ].filter(Boolean))].sort((a,b)=>b-a);
+  initYearMulti('ataCompareYear', years, {onChange:renderATACompare});
 
   // Filter by year
-  const cmrF = yr ? cmrData.filter(r=>String(r.raised_year)===yr) : cmrData;
-  const ecarF = yr ? ecarData.filter(r=>String(r.raised_year)===yr) : ecarData;
+  const cmrF = cmrData.filter(r=>ymHas('ataCompareYear', r.raised_year));
+  const ecarF = ecarData.filter(r=>ymHas('ataCompareYear', r.raised_year));
 
   // Count by normalized ATA — use findingRows for per-finding ATA accuracy
   const cmrCount = {}, ecarCount = {};
@@ -3557,7 +3657,7 @@ function setOpenF(sf,btn){
 function openSort(col){TS.open.asc=TS.open.sort===col?!TS.open.asc:true;TS.open.sort=col;TS.open.page=1;renderOpen();}
 
 function renderOpen() {
-  const ff=g('openFormF')?.value||'', yr=g('openYearF')?.value||'';
+  const ff=g('openFormF')?.value||'';
   const srch=(g('openSrch')?.value||'').toLowerCase();
   const ts=TS.open;
 
@@ -3567,7 +3667,7 @@ function renderOpen() {
     if(!isOpen) return false;
     if(ts.sf!=='all' && r.semantic_status!==ts.sf) return false;
     if(ff && r.report_title!==ff) return false;
-    if(yr && String(r.raised_year)!==yr) return false;
+    if(!ymHas('openYearF', r.raised_year)) return false;
     if(srch){
       const t=[r.report_number,r.report_title,r.audit_title,r.semantic_status,r.finding_level].join(' ').toLowerCase();
       if(!t.includes(srch))return false;
@@ -3599,7 +3699,7 @@ async function exportATAComparePDF() {
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
   const W=doc.internal.pageSize.getWidth(), M=10;
   const level=parseInt(g('ataGroupLevel')?.value||'2');
-  const yr=g('ataCompareYear')?.value||'';
+  const yr=ymText('ataCompareYear');
   const lvlLabel=level===2?'Chapter':level===4?'Section':'Subject';
 
   // Header bar — ASCII only (jsPDF default font: no Vietnamese/emoji)
@@ -3608,7 +3708,7 @@ async function exportATAComparePDF() {
   doc.setFontSize(11);doc.setFont(undefined,'bold');doc.setTextColor(230,237,243);
   doc.text('CMR-CAR vs ECAR - Findings by ATA '+lvlLabel,M,11);
   doc.setFontSize(8);doc.setFont(undefined,'normal');doc.setTextColor(163,174,184);
-  doc.text('Year: '+(yr||'All'),W/2,11,{align:'center'});
+  doc.text('Year: '+yr,W/2,11,{align:'center'});
   doc.text('Rev '+APP_REV,W-M,11,{align:'right'});
 
   let y=20;
@@ -3667,7 +3767,7 @@ async function exportATAComparePDF() {
     margin:{left:M,right:M},
   });
 
-  const fname=`ATA_Compare_${lvlLabel}_${yr||'All'}_${new Date().toISOString().slice(0,10)}.pdf`;
+  const fname=`ATA_Compare_${lvlLabel}_${yr.replace(/, /g,'-')}_${new Date().toISOString().slice(0,10)}.pdf`;
   doc.save(fname);
   toast('Da xuat '+fname,'ok');
 }
@@ -3676,14 +3776,14 @@ async function exportATAComparePDF() {
 function ovSort(col){TS.ov.asc=TS.ov.sort===col?!TS.ov.asc:true;TS.ov.sort=col;TS.ov.page=1;renderOv();}
 
 function renderOv() {
-  const ff=g('ovFormF')?.value||'', cat=g('ovCatF')?.value||'', yr=g('ovYearF')?.value||'';
+  const ff=g('ovFormF')?.value||'', cat=g('ovCatF')?.value||'';
   const ts=TS.ov;
 
   // base = every currently-overdue finding, scoped by Year + Form only.
   // Tiles, charts and table all derive from this one set so they always agree.
   const base=allData.filter(r=>
     r.semantic_status==='Overdue' &&
-    (!yr || String(r.raised_year)===yr) &&
+    ymHas('ovYearF', r.raised_year) &&
     (!ff || r.report_title===ff));
 
   // CAT tiles (owned here — single source of truth for the Overdue page)
@@ -3734,14 +3834,12 @@ function afSort(col){TS.af.asc=TS.af.sort===col?!TS.af.asc:true;TS.af.sort=col;T
 
 // ── AMO-ECAR & MCAR pages (filtered views of allData) ─────────
 function renderFormView(formTitle, ids){
-  const yrEl=g(ids.yr), stEl=g(ids.st), srchEl=g(ids.srch), ts=TS[ids.ts];
+  const stEl=g(ids.st), srchEl=g(ids.srch), ts=TS[ids.ts];
   const all=allData.filter(r=>r.report_title===formTitle);
-  if(yrEl&&yrEl.options.length<=1){
-    const years=[...new Set(all.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
-    yrEl.innerHTML='<option value="">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
-  }
-  const yr=yrEl?.value||'', st=stEl?.value||'', srch=(srchEl?.value||'').toLowerCase();
-  const yrSet=all.filter(r=>!yr||String(r.raised_year)===yr);
+  const years=[...new Set(all.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
+  initYearMulti(ids.yr, years, {onChange:ids.onChange});
+  const st=stEl?.value||'', srch=(srchEl?.value||'').toLowerCase();
+  const yrSet=all.filter(r=>ymHas(ids.yr, r.raised_year));
   s(ids.kTotal,yrSet.length);
   s(ids.kOpen,yrSet.filter(r=>r.semantic_status==='Open').length);
   s(ids.kOver,yrSet.filter(r=>r.semantic_status==='Overdue').length);
@@ -3766,8 +3864,8 @@ function renderFormView(formTitle, ids){
       </td>
     </tr>`);
 }
-function renderAmoEcar(){renderFormView('AMO ECAR',{ts:'amoecar',yr:'amoYearF',st:'amoStatusF',srch:'amoSrch',kTotal:'amo-total',kOpen:'amo-open',kOver:'amo-over',kClosed:'amo-closed',body:'amoBody',info:'amoInfo',pg:'amoPg',cnt:'amoCnt'});}
-function renderMcar(){renderFormView('MCAR',{ts:'mcar',yr:'mcarYearF',st:'mcarStatusF',srch:'mcarSrch',kTotal:'mcar-total',kOpen:'mcar-open',kOver:'mcar-over',kClosed:'mcar-closed',body:'mcarBody',info:'mcarInfo',pg:'mcarPg',cnt:'mcarCnt'});}
+function renderAmoEcar(){renderFormView('AMO ECAR',{ts:'amoecar',yr:'amoYearF',onChange:renderAmoEcar,st:'amoStatusF',srch:'amoSrch',kTotal:'amo-total',kOpen:'amo-open',kOver:'amo-over',kClosed:'amo-closed',body:'amoBody',info:'amoInfo',pg:'amoPg',cnt:'amoCnt'});}
+function renderMcar(){renderFormView('MCAR',{ts:'mcar',yr:'mcarYearF',onChange:renderMcar,st:'mcarStatusF',srch:'mcarSrch',kTotal:'mcar-total',kOpen:'mcar-open',kOver:'mcar-over',kClosed:'mcar-closed',body:'mcarBody',info:'mcarInfo',pg:'mcarPg',cnt:'mcarCnt'});}
 function amoSort(c){const t=TS.amoecar;if(t.sort===c)t.asc=!t.asc;else{t.sort=c;t.asc=true;}renderAmoEcar();}
 function mcarSort(c){const t=TS.mcar;if(t.sort===c)t.asc=!t.asc;else{t.sort=c;t.asc=true;}renderMcar();}
 
@@ -3779,19 +3877,12 @@ async function buildKPI2(){
   // Cần dữ liệu Nature (nhóm cha) từ kpi2Rows — nạp nếu chưa có (nhẹ: lọc allData + 1 fetch Nature)
   if(!kpi2Loaded){ try{ await loadKpi2(); }catch(e){ console.warn('[KPI2] loadKpi2 fail',e); } }
 
-  // Populate the Year select once, preserving the current pick.
-  const yrEl=g('kpi2Year');
-  if(yrEl){
-    const years=[...new Set(kpi2Rows.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
-    if(yrEl.dataset.built!==String(years.length)){
-      const cur=yrEl.value;
-      yrEl.innerHTML='<option value="">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
-      yrEl.value=cur; yrEl.dataset.built=String(years.length);
-    }
-  }
-  const yr=g('kpi2Year')?.value||'', qt=g('kpi2Qtr')?.value||'';
+  // Populate the Year filter (multi-year), preserving the current pick.
+  const years=[...new Set(kpi2Rows.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
+  initYearMulti('kpi2Year', years, {onChange:buildKPI2});
+  const qt=g('kpi2Qtr')?.value||'';
   const inScope=r=>{
-    if(yr && String(r.raised_year)!==yr) return false;
+    if(!ymHas('kpi2Year', r.raised_year)) return false;
     if(qt){ const mo=r.raised_date?new Date(r.raised_date).getUTCMonth()+1:0; if(Math.ceil(mo/3)!==parseInt(qt)) return false; }
     return true;
   };
@@ -3897,13 +3988,10 @@ async function loadKpi2(force){
   setOv(false); renderKpi2();
 }
 function renderKpi2(){
-  const yrEl=g('k2Year');
-  if(yrEl && !yrEl.dataset.built){
-    const years=[...new Set(kpi2Rows.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
-    if(years.length){ const cur=yrEl.value; yrEl.innerHTML='<option value="">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join(''); yrEl.value=cur; yrEl.dataset.built='1'; }
-  }
-  const yr=g('k2Year')?.value||'', grp=g('k2Group')?.value||'nature', srch=(g('k2Srch')?.value||'').toLowerCase();
-  const rows=kpi2Rows.filter(r=>!yr||String(r.raised_year)===yr);
+  const years=[...new Set(kpi2Rows.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
+  initYearMulti('k2Year', years, {onChange:renderKpi2});
+  const grp=g('k2Group')?.value||'nature', srch=(g('k2Srch')?.value||'').toLowerCase();
+  const rows=kpi2Rows.filter(r=>ymHas('k2Year', r.raised_year));
   // TỰ ĐỘNG: mẫu số = AMO-ECAR trong kỳ; tử số = AMO-ECAR có MCAR phát hiện sớm trùng nội dung/Nature.
   // MCAR pool = TẤT CẢ MCAR (mọi năm) vì cặp "sớm hơn" có thể nằm ở năm trước.
   const ecarRows=rows.filter(r=>r.type==='amo');
@@ -3932,14 +4020,14 @@ function renderKpi2(){
 }
 
 function renderAF() {
-  const ff=g('afFormF')?.value||'', yr=g('afYearF')?.value||'';
+  const ff=g('afFormF')?.value||'';
   const srch=(g('afSrch')?.value||'').toLowerCase();
   const ts=TS.af;
 
   let data=allData.filter(r=>{
     if(ts.sf!=='all' && r.semantic_status!==ts.sf) return false;
     if(ff && r.report_title!==ff) return false;
-    if(yr && String(r.raised_year)!==yr) return false;
+    if(!ymHas('afYearF', r.raised_year)) return false;
     if(srch){
       const t=[r.report_number,r.report_title,r.audit_title,r.semantic_status,r.finding_level,r.audit_ref].join(' ').toLowerCase();
       if(!t.includes(srch))return false;
@@ -4014,14 +4102,13 @@ function setPAV(sf,btn){
 function pavSort(col){TS.pavoi.asc=TS.pavoi.sort===col?!TS.pavoi.asc:true;TS.pavoi.sort=col;TS.pavoi.page=1;renderPavoi();}
 
 function renderPavoi() {
-  const yr=(g('pavoiYearF')?.value||'');
   const srch=(g('pavoiSrch')?.value||'').toLowerCase();
   const ts=TS.pavoi;
 
   let data=allData.filter(r=>{
     if(r.report_title!=='PAVOI') return false;
     if(ts.sf!=='all' && r.semantic_status!==ts.sf) return false;
-    if(yr && String(r.raised_year)!==yr) return false;
+    if(!ymHas('pavoiYearF', r.raised_year)) return false;
     if(srch){
       const t=[r.report_number,r.semantic_status,r.audit_title,
                r.audit_number,r.rfv,r.report_ref,r.verif_result,r.dept].join(' ').toLowerCase();
@@ -4315,16 +4402,13 @@ function renderCmr(){
     return;
   }
   const ts=TS.cmr;
-  const yr=(g('cmrYearF')?.value||'');
   const qr=(g('cmrQtrF')?.value||'');
   const ata=(g('cmrAtaF')?.value||'');
   const srch=(g('cmrSrch')?.value||'').toLowerCase();
 
-  // Populate year filter once
+  // Populate year filter (multi-year)
   const years=[...new Set(cmrData.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
-  const yrEl=g('cmrYearF');
-  if(yrEl&&yrEl.options.length<=1)
-    yrEl.innerHTML='<option value="">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  initYearMulti('cmrYearF', years, {onChange:renderCmr});
 
   // Populate ATA filter from actual data values (sorted by ATA_CHAPTERS order)
   const cmrAtaEl=g('cmrAtaF');
@@ -4348,7 +4432,7 @@ function renderCmr(){
   let data=cmrData.filter(r=>{
     if(ts.ac!=='all'&&r.aircraft_reg!==ts.ac)return false;
     if(ts.sf!=='all'&&r.semantic_status!==ts.sf)return false;
-    if(yr&&String(r.raised_year)!==yr)return false;
+    if(!ymHas('cmrYearF', r.raised_year))return false;
     if(qr&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(Math.ceil(m/3)!==parseInt(qr))return false;}
     if(ata&&r.ata_chapter!==ata)return false;
     if(srch){
@@ -4448,7 +4532,7 @@ function exportCmrPDF(){
   if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
   if(!cmrLoaded||!cmrData.length){toast('No CMR-CAR data loaded','err');return;}
   const ts=TS.cmr;
-  const yr=g('cmrYearF')?.value||'';
+  const hasYr=ymVal('cmrYearF').length>0, yrTxt=ymText('cmrYearF');
   const qr=g('cmrQtrF')?.value||'';
   const ataExport=g('cmrAtaF')?.value||'';
 
@@ -4456,7 +4540,7 @@ function exportCmrPDF(){
   let data=cmrData.filter(r=>{
     if(ts.ac!=='all'&&r.aircraft_reg!==ts.ac)return false;
     if(ts.sf!=='all'&&r.semantic_status!==ts.sf)return false;
-    if(yr&&String(r.raised_year)!==yr)return false;
+    if(!ymHas('cmrYearF', r.raised_year))return false;
     if(qr&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(Math.ceil(m/3)!==parseInt(qr))return false;}
     if(ataExport&&r.ata_chapter!==ataExport)return false;
     return true;
@@ -4465,8 +4549,8 @@ function exportCmrPDF(){
 
   // Build period label
   let period='All';
-  if(yr&&qr)period=`Q${qr}/${yr}`;
-  else if(yr)period=`Year ${yr}`;
+  if(hasYr&&qr)period=`Q${qr}/${yrTxt}`;
+  else if(hasYr)period=`Year ${yrTxt}`;
   else if(qr)period=`Q${qr} (all years)`;
   const acLabel=ts.ac==='all'?'All Aircraft':ts.ac;
 
@@ -4562,7 +4646,7 @@ function exportCmrPDF(){
   }
 
   const grpSuffix=cmrGroupBy==='ata'?'_byATA':'_byAC';
-  const fname=`CMR-CAR_${yr||'all'}_${qr?'Q'+qr:'allQ'}${grpSuffix}_${new Date().toISOString().slice(0,10)}.pdf`;
+  const fname=`CMR-CAR_${hasYr?yrTxt.replace(/, /g,'-'):'all'}_${qr?'Q'+qr:'allQ'}${grpSuffix}_${new Date().toISOString().slice(0,10)}.pdf`;
   doc.save(fname);
   toast(`Exported ${fname}`,'ok');
 }
@@ -4657,9 +4741,9 @@ function ecarSort(col){TS.ecar.asc=TS.ecar.sort===col?!TS.ecar.asc:true;TS.ecar.
 let _dEcar;function dRenderEcar(){clearTimeout(_dEcar);_dEcar=setTimeout(()=>{TS.ecar.page=1;renderEcar();},220);}
 
 function ecarYearChange(){
-  const yr=g('ecarYearF')?.value||'';
-  document.querySelectorAll('#page-ecar .qtr-pill').forEach(b=>{b.disabled=!yr;b.style.opacity=yr?'1':'.5';});
-  if(!yr){TS.ecar.qrs=[];document.querySelectorAll('#page-ecar .qtr-pill').forEach(b=>b.classList.remove('on'));}
+  const has=ymVal('ecarYearF').length>0;   // quarter pills only make sense once a year is picked
+  document.querySelectorAll('#page-ecar .qtr-pill').forEach(b=>{b.disabled=!has;b.style.opacity=has?'1':'.5';});
+  if(!has){TS.ecar.qrs=[];document.querySelectorAll('#page-ecar .qtr-pill').forEach(b=>b.classList.remove('on'));}
   TS.ecar.page=1;renderEcar();
 }
 function toggleEcarQtr(q,btn){
@@ -4675,17 +4759,14 @@ function renderEcar(){
     return;
   }
   const ts=TS.ecar;
-  const yr=g('ecarYearF')?.value||'';
   const qrs=ts.qrs;
   const issuedBy=g('ecarIssuedByF')?.value||'';
   const ata=(g('ecarAtaF')?.value||'');
   const srch=(g('ecarSrch')?.value||'').toLowerCase();
 
-  // Populate year filter once
+  // Populate year filter (multi-year)
   const years=[...new Set(ecarData.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
-  const yrEl=g('ecarYearF');
-  if(yrEl&&yrEl.options.length<=1)
-    yrEl.innerHTML='<option value="">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  initYearMulti('ecarYearF', years, {onChange:ecarYearChange});
 
   // Populate issued-by filter once
   const ibEl=g('ecarIssuedByF');
@@ -4716,7 +4797,7 @@ function renderEcar(){
   let data=ecarData.filter(r=>{
     if(ts.ac!=='all'&&r.aircraft_reg!==ts.ac)return false;
     if(ts.sf!=='all'&&r.semantic_status!==ts.sf)return false;
-    if(yr&&String(r.raised_year)!==yr)return false;
+    if(!ymHas('ecarYearF', r.raised_year))return false;
     if(qrs.length&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(!qrs.includes(Math.ceil(m/3)))return false;}
     if(issuedBy&&r.issued_by!==issuedBy)return false;
     if(ata&&r.ata_chapter!==ata)return false;
@@ -4785,10 +4866,10 @@ function _ecarMonthData(baseData, chartYr){
 }
 
 function buildEcarChart(){
-  const chartYr=g('ecarYearF')?.value||'';
   const ts=TS.ecar;
-  const base=ts.ac==='all'?ecarData:ecarData.filter(r=>r.aircraft_reg===ts.ac);
-  const md=_ecarMonthData(base,chartYr);
+  const sel=ymVal('ecarYearF');
+  const base=(ts.ac==='all'?ecarData:ecarData.filter(r=>r.aircraft_reg===ts.ac)).filter(r=>ymHas('ecarYearF', r.raised_year));
+  const md=_ecarMonthData(base, sel.length===1 ? sel[0] : '');
   const labels=md.map(d=>d.label);
   const counts=md.map(d=>d.total);
 
@@ -4861,10 +4942,10 @@ function buildEcarChart(){
 }
 
 function buildEcarMoM(){
-  const chartYr=g('ecarYearF')?.value||'';
   const ts=TS.ecar;
-  const base=ts.ac==='all'?ecarData:ecarData.filter(r=>r.aircraft_reg===ts.ac);
-  const md=_ecarMonthData(base,chartYr);
+  const sel=ymVal('ecarYearF');
+  const base=(ts.ac==='all'?ecarData:ecarData.filter(r=>r.aircraft_reg===ts.ac)).filter(r=>ymHas('ecarYearF', r.raised_year));
+  const md=_ecarMonthData(base, sel.length===1 ? sel[0] : '');
   const tbody=g('ecarMoMBody');
   if(!tbody)return;
   if(!md.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">No data</td></tr>';return;}
@@ -4938,11 +5019,11 @@ async function exportEcarPDF(){
   if(!ecarLoaded||!ecarData.length){toast('No ECAR data loaded','err');return;}
   setOv(true,'Generating PDF...','');
   try{
-    const ts=TS.ecar,yr=g('ecarYearF')?.value||'',qrs=ts.qrs,issuedBy=g('ecarIssuedByF')?.value||'',ataExport=g('ecarAtaF')?.value||'';
+    const ts=TS.ecar,sel=ymVal('ecarYearF'),hasYr=sel.length>0,yrTxt=ymText('ecarYearF'),qrs=ts.qrs,issuedBy=g('ecarIssuedByF')?.value||'',ataExport=g('ecarAtaF')?.value||'';
     let data=ecarData.filter(r=>{
       if(ts.ac!=='all'&&r.aircraft_reg!==ts.ac)return false;
       if(ts.sf!=='all'&&r.semantic_status!==ts.sf)return false;
-      if(yr&&String(r.raised_year)!==yr)return false;
+      if(!ymHas('ecarYearF', r.raised_year))return false;
       if(qrs.length&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(!qrs.includes(Math.ceil(m/3)))return false;}
       if(issuedBy&&r.issued_by!==issuedBy)return false;
       if(ataExport&&r.ata_chapter!==ataExport)return false;
@@ -4950,17 +5031,17 @@ async function exportEcarPDF(){
     });
     let period='All';
     const qLabel=qrs.length?qrs.slice().sort((a,b)=>a-b).map(q=>'Q'+q).join('+'):'';
-    if(yr&&qLabel)period=`${qLabel}/${yr}`;
-    else if(yr)period=`Year ${yr}`;
+    if(hasYr&&qLabel)period=`${qLabel}/${yrTxt}`;
+    else if(hasYr)period=`Year ${yrTxt}`;
     else if(qLabel)period=`${qLabel} (All Years)`;
     const acLabel=ts.ac==='all'?'All Aircraft':ts.ac;
     const base=ts.ac==='all'?ecarData:ecarData.filter(r=>r.aircraft_reg===ts.ac);
     const baseFiltered=base.filter(r=>{
-      if(yr&&String(r.raised_year)!==yr)return false;
+      if(!ymHas('ecarYearF', r.raised_year))return false;
       if(qrs.length&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(!qrs.includes(Math.ceil(m/3)))return false;}
       return true;
     });
-    const md=_ecarMonthData(baseFiltered,qrs.length?'':yr);
+    const md=_ecarMonthData(baseFiltered, qrs.length?'':(sel.length===1?sel[0]:''));
     const counts=md.map(d=>d.total);
 
     // Render bar chart offscreen → PNG
@@ -5113,7 +5194,7 @@ async function exportEcarPDF(){
 
     const grpSuffix=ecarGroupBy==='ata'?'_byATA':'_byAC';
     const qFname=qrs.length?qrs.slice().sort((a,b)=>a-b).map(q=>'Q'+q).join(''):'allQ';
-    const fname=`ECAR_${yr||'all'}_${qFname}${grpSuffix}_${new Date().toISOString().slice(0,10)}.pdf`;
+    const fname=`ECAR_${hasYr?yrTxt.replace(/, /g,'-'):'all'}_${qFname}${grpSuffix}_${new Date().toISOString().slice(0,10)}.pdf`;
     doc.save(fname);toast(`Exported ${fname}`,'ok');
   }catch(e){toast('PDF error: '+e.message,'err');}
   finally{setOv(false);}
@@ -5124,11 +5205,11 @@ function exportEcarExcel(){
   if(!ecarLoaded||!ecarData.length){toast('No ECAR data loaded','err');return;}
   setOv(true,'Exporting Excel...','');
   try{
-    const ts=TS.ecar,yr=g('ecarYearF')?.value||'',qrs=ts.qrs,issuedBy=g('ecarIssuedByF')?.value||'',ataExportXl=g('ecarAtaF')?.value||'';
+    const ts=TS.ecar,sel=ymVal('ecarYearF'),qrs=ts.qrs,issuedBy=g('ecarIssuedByF')?.value||'',ataExportXl=g('ecarAtaF')?.value||'';
     let data=ecarData.filter(r=>{
       if(ts.ac!=='all'&&r.aircraft_reg!==ts.ac)return false;
       if(ts.sf!=='all'&&r.semantic_status!==ts.sf)return false;
-      if(yr&&String(r.raised_year)!==yr)return false;
+      if(!ymHas('ecarYearF', r.raised_year))return false;
       if(qrs.length&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(!qrs.includes(Math.ceil(m/3)))return false;}
       if(issuedBy&&r.issued_by!==issuedBy)return false;
       if(ataExportXl&&r.ata_chapter!==ataExportXl)return false;
@@ -5137,11 +5218,11 @@ function exportEcarExcel(){
     const wb=XLSX.utils.book_new();
     const base=ts.ac==='all'?ecarData:ecarData.filter(r=>r.aircraft_reg===ts.ac);
     const baseFiltered=base.filter(r=>{
-      if(yr&&String(r.raised_year)!==yr)return false;
+      if(!ymHas('ecarYearF', r.raised_year))return false;
       if(qrs.length&&r.raised_date){const m=new Date(r.raised_date).getMonth()+1;if(!qrs.includes(Math.ceil(m/3)))return false;}
       return true;
     });
-    const md=_ecarMonthData(baseFiltered,qrs.length?'':yr);
+    const md=_ecarMonthData(baseFiltered, qrs.length?'':(sel.length===1?sel[0]:''));
     const s1=[['Month','Total','Open','Overdue','Closed','vs Prev Month','% Change']];
     md.forEach((d,i)=>{
       const prev=i>0?md[i-1].total:null;
@@ -5161,7 +5242,7 @@ function exportEcarExcel(){
     ws2['!cols']=[{wch:15},{wch:18},{wch:16},{wch:12},{wch:12},{wch:10},{wch:60}];
     XLSX.utils.book_append_sheet(wb,ws2,'Finding Detail');
     const qFname=qrs.length?qrs.slice().sort((a,b)=>a-b).map(q=>'Q'+q).join(''):'allQ';
-    const fname=`ECAR_${yr||'all'}_${qFname}_${new Date().toISOString().slice(0,10)}.xlsx`;
+    const fname=`ECAR_${ymText('ecarYearF').replace(/, /g,'-')}_${qFname}_${new Date().toISOString().slice(0,10)}.xlsx`;
     XLSX.writeFile(wb,fname);toast('Excel exported!','ok');
   }catch(e){toast('Excel error: '+e.message,'err');}
   finally{setOv(false);}
@@ -5197,8 +5278,7 @@ function deriveWorkflowCategory(audit) {
 // Populate audit year filter (called from populateFilters)
 function populateAuditYearFilter() {
   const auYears = [...new Set(auditData.map(a => a.sched_year).filter(Boolean))].sort((a,b) => b-a);
-  const auYOpts = '<option value="">All years</option>' + auYears.map(y => `<option value="${y}">${y}</option>`).join('');
-  const auYEl = g('auditYearF'); if (auYEl) auYEl.innerHTML = auYOpts;
+  initYearMulti('auditYearF', auYears, {onChange:renderAudit});
 }
 
 // Get the currently visible filtered audits (for bottleneck panel / export)
@@ -5254,7 +5334,7 @@ function resetAuditFilters() {
   TS.audit.prefixF = 'qa-amo';
   TS.audit.wfCatF  = 'all';
   TS.audit.page    = 1;
-  const yr = g('auditYearF'); if (yr) yr.value = '';
+  ymReset('auditYearF');
   const srch = g('auditSrch'); if (srch) srch.value = '';
   // Reset pills: activate default buttons
   ['ap-scope-qa-amo','ap-cat-all','ap-sf-all'].forEach(id => {
@@ -5576,6 +5656,7 @@ function showAuditPlanPage(navBtn) {
 // ── EXPORT AUDIT EXCEL ────────────────────────────────────────
 
 function exportAuditExcel() {
+  if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
   try {
     const data = getCurrentlyFilteredAudits();
     if (!data.length) { toast('No data to export','info'); return; }
@@ -5608,7 +5689,6 @@ function exportAuditExcel() {
 
 // Main renderAudit — filters, KPIs, table
 function renderAudit() {
-  const yr   = (g('auditYearF')?.value || '');
   const srch = (g('auditSrch')?.value  || '').toLowerCase();
   const ts   = TS.audit;
 
@@ -5624,7 +5704,7 @@ function renderAudit() {
     // 3. Status pill
     if (ts.sf !== 'all' && a.status !== ts.sf) return false;
     // 4. Year
-    if (yr && String(a.sched_year) !== yr) return false;
+    if (!ymHas('auditYearF', a.sched_year)) return false;
     // 5. Search
     if (srch) {
       const t = [a.number,a.title,a.audit_type,a.workflow_category,a.status,a.lead_auditor_name,a.primary_scope_item_name,a.prefix].join(' ').toLowerCase();
@@ -6015,7 +6095,7 @@ function updateReportFilters(){
 
 function initReportFilters(){
   const years=[...new Set(allData.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
-  g('rptYear').innerHTML='<option value="all">All Years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  initYearMulti('rptYear', years, {onChange:generateReport});
   const forms=[...new Set(allData.map(r=>r.report_title).filter(Boolean))].sort();
   rptFormSelected=[];
   g('rptFormChecks').innerHTML=forms.map(f=>`<label style="display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;font-size:13px"><input type="checkbox" class="rptFormItem" value="${f.replace(/"/g,'&quot;')}" onchange="rptFormItemChange()" checked> ${f}</label>`).join('');
@@ -6024,12 +6104,12 @@ function initReportFilters(){
 }
 
 function getRptData(){
-  const type=g('rptFilterType').value, year=g('rptYear').value;
+  const type=g('rptFilterType').value;
   const period=g('rptPeriod')?.value||'all';
   const sel=rptFormSelected;
   return allData.filter(r=>{
     if(sel.length&&!sel.includes(r.report_title))return false;
-    if(year!=='all'&&String(r.raised_year)!==year)return false;
+    if(!ymHas('rptYear', r.raised_year))return false;
     if(type==='month'&&period!=='all'){const m=r.raised_date?new Date(r.raised_date).getMonth()+1:null;if(m!==parseInt(period))return false;}
     if(type==='quarter'&&period!=='all'){const m=r.raised_date?new Date(r.raised_date).getMonth()+1:null;const q=Math.ceil(m/3);if(q!==parseInt(period))return false;}
     return true;
@@ -6037,7 +6117,7 @@ function getRptData(){
 }
 
 function getRptTitle(){
-  const type=g('rptFilterType').value, year=g('rptYear').value;
+  const type=g('rptFilterType').value;
   const period=g('rptPeriod')?.value||'all';
   const sel=rptFormSelected;
   let t='QA AMO';
@@ -6045,11 +6125,11 @@ function getRptTitle(){
   else if(sel.length>1)t+=` — ${sel.length} form`;
   if(type==='month'&&period!=='all')t+=` Month ${period}`;
   else if(type==='quarter'&&period!=='all')t+=` Q${period}`;
-  if(year!=='all')t+=` ${year}`;
+  if(ymVal('rptYear').length)t+=` ${ymText('rptYear')}`;
   return t;
 }
 function getRptTitleEn(){
-  const type=g('rptFilterType').value, year=g('rptYear').value;
+  const type=g('rptFilterType').value;
   const period=g('rptPeriod')?.value||'all';
   const sel=rptFormSelected;
   let t='QA AMO';
@@ -6057,7 +6137,7 @@ function getRptTitleEn(){
   else if(sel.length>1)t+=` - ${sel.length} forms`;
   if(type==='month'&&period!=='all')t+=` Month ${period}`;
   else if(type==='quarter'&&period!=='all')t+=` Q${period}`;
-  if(year!=='all')t+=` ${year}`;
+  if(ymVal('rptYear').length)t+=` ${ymText('rptYear')}`;
   return t;
 }
 
@@ -6069,12 +6149,12 @@ function generateReport(){
   s('rptDate',new Date().toLocaleDateString('en-GB'));
   s('rptTotal',total+' records');
   // subtitle
-  const type=g('rptFilterType').value, year=g('rptYear').value;
+  const type=g('rptFilterType').value, yLabel=ymText('rptYear');
   const period=g('rptPeriod')?.value||'all';
   const sel=rptFormSelected;
   let sub='';
-  if(type==='month')sub=period==='all'?`Year ${year==='all'?'All':year}`:`Month ${period}/${year==='all'?'All':year}`;
-  else if(type==='quarter')sub=period==='all'?`Year ${year==='all'?'All':year}`:`Q${period} — ${year==='all'?'All':year}`;
+  if(type==='month')sub=period==='all'?`Year ${yLabel}`:`Month ${period}/${yLabel}`;
+  else if(type==='quarter')sub=period==='all'?`Year ${yLabel}`:`Q${period} — ${yLabel}`;
   else if(type==='form')sub=sel.length===0?'All forms':sel.length===1?sel[0]:`${sel.length} forms`;
   else sub='All QA AMO';
   s('rptSubtitle',sub);
@@ -6780,14 +6860,13 @@ function renderDocPage() {
   let rows = getDocsInBranch(selectedTypeId);
   const q = (g('docSearch')?.value||'').trim().toLowerCase();
   const stFilter = g('docStatusFilter')?.value||'';
-  const yrFilter = g('docYearFilter')?.value||'';
   const ownFilter = g('docOwnerFilter')?.value||'';
   const revFilter = g('docReviewDueFilter')?.value||'';
   const today = new Date();
   rows = rows.filter(d => {
     if(q){const h=`${d.document_number||''} ${d.document_revision_title||''} ${d.owner_name||''}`.toLowerCase();if(!h.includes(q))return false;}
     if(stFilter && d.document_revision_status!==stFilter) return false;
-    if(yrFilter && (d.created_date||'').slice(0,4)!==yrFilter) return false;
+    if(!ymHas('docYearFilter', (d.created_date||'').slice(0,4))) return false;
     if(ownFilter && d.owner_name!==ownFilter) return false;
     if(revFilter && reviewDueCategory(d.review_date,today)!==revFilter) return false;
     return true;
@@ -7051,14 +7130,14 @@ function selectMyDepartment(){
 }
 function clearDocFilters(){
   selectedTypeId=null;
-  ['docSearch','docStatusFilter','docYearFilter','docOwnerFilter','docReviewDueFilter'].forEach(id=>{const el=g(id);if(el)el.value='';});
+  ['docSearch','docStatusFilter','docOwnerFilter','docReviewDueFilter'].forEach(id=>{const el=g(id);if(el)el.value='';});
+  ymReset('docYearFilter');
   updateDocBreadcrumb();renderDocTree();populateDocFilters();renderDocKpi();renderDocPage();
 }
 function populateDocFilters(){
   const docs=getDocsInBranch(selectedTypeId);
   const years=[...new Set(docs.map(d=>(d.created_date||'').slice(0,4)).filter(Boolean))].sort().reverse();
-  const yrSel=g('docYearFilter');
-  if(yrSel)yrSel.innerHTML='<option value="">All years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  initYearMulti('docYearFilter', years, {onChange:renderDocPage});
   const owners=[...new Set(docs.map(d=>d.owner_name).filter(Boolean))].sort();
   const ownSel=g('docOwnerFilter');
   if(ownSel)ownSel.innerHTML='<option value="">All owners</option>'+owners.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('');
@@ -8523,17 +8602,13 @@ function drawSPIChart(canvasId, spi){
 }
 
 function populateSpiYear(){
-  const sel = g('spiYearFilter'); if(!sel || !_spiData) return;
+  if(!_spiData) return;
   const years = [...new Set(_spiData.map(s=>s.raised_year).filter(Boolean))].sort((a,b)=>b-a);
-  const cur = new Date().getFullYear();
-  const def = years.includes(cur) ? cur : (years[0]||cur);
-  sel.innerHTML = years.map(y=>`<option value="${y}" ${y===def?'selected':''}>${y}</option>`).join('')
-                || `<option value="${cur}">${cur}</option>`;
+  initYearMulti('spiYearFilter', years, {onChange:renderSPIYear, default:'current'});
 }
 function renderSPIYear(){
   if(!_spiData) return;
-  const yr = g('spiYearFilter')?.value;
-  const filtered = yr ? _spiData.filter(s=>String(s.raised_year)===String(yr)) : _spiData;
+  const filtered = _spiData.filter(s=>ymHas('spiYearFilter', s.raised_year));
   renderSPIPage(filtered);
 }
 let _spiData = null;
