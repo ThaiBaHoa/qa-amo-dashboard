@@ -2220,7 +2220,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.08-r101';
+const APP_REV = '2026.06.08-r102';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2814,8 +2814,9 @@ async function loadData(forceRefresh=false) {
 
       // Suy 3 mốc từ workflow stage (Task = report management, ReportAcceptReject = closure)
       const sd = deriveStageDates(wfAllMap[r.report_id]);
-      // Target date: ưu tiên stage Task target (management — chuẩn theo workflow) → custom field (fallback nếu không có stage Task) → ReportAcceptReject
-      const td = sd.td || f['Target date'] || wf?.stage_target_date || null;
+      // Target date: ưu tiên custom field 'Target date' (Report — mốc chính thức theo QA) → stage Task target (fallback nếu Report trống) → ReportAcceptReject
+      // (r102: revert r100. Report Target date mới là chuẩn; stage Workflow có thể lệch — vd MCAR-0363 Report 18/06 vs stage Final Action 22/06.)
+      const td = f['Target date'] || sd.td || wf?.stage_target_date || null;
       // Completed date: ngày làm xong báo cáo (stage Task)
       const completed_date = sd.completed || null;
       // Close date: ngày report đóng (ReportAcceptReject) → fallback stage completed cũ
