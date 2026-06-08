@@ -1039,6 +1039,7 @@ tr:last-child td{border-bottom:none}
               <div><div class="tbl-title">MCAR — Internal Audit Findings</div><div class="tbl-count" id="mcarCnt">—</div></div>
               <div class="ymulti" id="mcarYearF"></div>
               <select class="sel" id="mcarStatusF" onchange="renderMcar()"><option value="">All Status</option><option value="Open">Open</option><option value="Overdue">Overdue</option><option value="On-time Closed">On-time</option><option value="Lately Closed">Lately</option><option value="Closed">Closed</option></select>
+              <select class="sel" id="mcarWarnF" onchange="renderMcar()"><option value="">All deadline</option><option value="warn">⚠ Mismatch only</option><option value="ok">✓ OK only</option></select>
               <input class="sel" id="mcarSrch" oninput="renderMcar()" placeholder="🔍 Search..." style="min-width:160px">
             </div>
             <div class="tbl-wrap">
@@ -1048,6 +1049,7 @@ tr:last-child td{border-bottom:none}
                   <th onclick="mcarSort('semantic_status')">Status ↕</th>
                   <th onclick="mcarSort('raised_date')">Raised ↕</th>
                   <th onclick="mcarSort('Target_date')">Target ↕</th>
+                  <th>⚠ Deadline</th>
                   <th onclick="mcarSort('report_ageing')">Days to Due ↕</th>
                   <th onclick="mcarSort('overdue_cat')">CAT ↕</th>
                   <th>Audit Title</th>
@@ -2218,7 +2220,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.08-r100';
+const APP_REV = '2026.06.08-r101';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2793,7 +2795,8 @@ async function loadData(forceRefresh=false) {
           "field_name eq 'Second extension agreed date' or field_name eq 'Audit Ref. No' or " +
           "field_name eq 'Request For Verification' or field_name eq 'Report Reference' or " +
           "field_name eq 'Verification Result' or field_name eq 'Department' or " +
-          "field_name eq 'Finding description' or field_name eq 'Nature of finding'"
+          "field_name eq 'Finding description' or field_name eq 'Nature of finding' or " +
+          "field_name eq 'First extension approved?' or field_name eq 'Second extension agreed?'"
         )
       );
       fRaw.forEach(f => {
@@ -2820,6 +2823,7 @@ async function loadData(forceRefresh=false) {
 
       const ag = ageCalc(td);
       const sm = semCalc(r.report_status, cd, td);
+      const mcarChk = (r.report_title==='MCAR') ? buildMcarDeadlineChk(r.raised_date, f, td) : null;
 
       return {
         ...r,
@@ -2831,6 +2835,7 @@ async function loadData(forceRefresh=false) {
         repetitive:    f['Repetitive']                || null,
         ext1_date:     f['First extension agreed date']  || null,
         ext2_date:     f['Second extension agreed date'] || null,
+        mcar_chk:      mcarChk,
         audit_ref:     f['Audit Ref. No']             || null,
         // PAVOI-specific fields
         rfv:           f['Request For Verification']  || null,
@@ -3070,6 +3075,57 @@ function catCalc(ag, sm) {
   if (ag>=-30) return 'CAT I';
   if (ag>=-60) return 'CAT II';
   return 'CAT III';
+}
+
+// ── MCAR deadline rule (r101) ─────────────────────────────────
+// Responded due = raised+14d. Target due = raised+45d, +30d cho mỗi extension
+// đã duyệt (First extension approved? / Second extension agreed?). Cảnh báo khi
+// Target_date đang lưu lệch so với rule. So theo NGÀY (dDay), hiển thị qua fd().
+function ymd(d){
+  if(!d) return null;
+  const p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+}
+function buildMcarDeadlineChk(raisedStr, f, curTarget){
+  const raised = dDay(raisedStr);
+  if(!raised) return null;
+  const addD = (b,n)=> new Date(b.getFullYear(), b.getMonth(), b.getDate()+n);
+  const yes  = v => String(v||'').trim().toLowerCase()==='yes';
+  const ext1 = yes(f['First extension approved?']);
+  const ext2 = yes(f['Second extension agreed?']);
+  const n    = (ext1?1:0) + (ext2?1:0);
+  const expResp   = addD(raised, 14);
+  const expTarget = addD(raised, 45 + 30*n);
+  const cur = dDay(curTarget);
+  const targetWarn = cur ? (cur.getTime() !== expTarget.getTime()) : true;
+  // Lưu dạng string 'YYYY-MM-DD' + boolean → an toàn khi cache (JSON), không giữ Date.
+  return {
+    n,
+    exp_resp:    ymd(expResp),
+    exp_target:  ymd(expTarget),
+    target_warn: targetWarn,
+    agreed1: f['First extension agreed date']  || null,
+    agreed2: f['Second extension agreed date'] || null,
+  };
+}
+function mcarWarnCell(r){
+  const c = r.mcar_chk;
+  if(!c) return `<td style="white-space:nowrap;font-size:11px;color:var(--muted)">—</td>`;
+  const respTxt = fd(c.exp_resp);
+  const tgtTxt  = fd(c.exp_target);
+  const extTxt  = c.n ? ` · ${c.n} ext (+${30*c.n}d)` : '';
+  const tip = `Responded due (raised+14): ${respTxt}`
+    + `\nTarget due (raised+45${c.n?`+${30*c.n}`:''}): ${tgtTxt}`
+    + (c.agreed1?`\nHệ thống 1st agreed: ${fd(c.agreed1)}`:'')
+    + (c.agreed2?`\nHệ thống 2nd agreed: ${fd(c.agreed2)}`:'');
+  if(c.target_warn){
+    return `<td style="white-space:nowrap" title="${esc(tip)}">`
+      + `<span class="badge b-over">⚠ Target → ${tgtTxt}</span>`
+      + `<div style="font-size:10px;color:var(--muted)">Resp due ${respTxt}${extTxt}</div></td>`;
+  }
+  return `<td style="white-space:nowrap" title="${esc(tip)}">`
+    + `<span style="color:var(--green);font-size:11px">✓ OK</span>`
+    + `<div style="font-size:10px;color:var(--muted)">Resp due ${respTxt}${extTxt}</div></td>`;
 }
 
 // Suy 3 mốc thời gian từ workflow stages (cho SR/AISC không có custom 'Target date').
@@ -3905,6 +3961,10 @@ function renderFormView(formTitle, ids){
     if(srch){const t=[r.report_number,r.semantic_status,r.finding_level,r.audit_title,r.dept,r.audit_ref,r.finding_desc].join(' ').toLowerCase();if(!t.includes(srch))return false;}
     return true;
   });
+  if(ids.warnFilter){
+    const wv=g(ids.warnFilter)?.value||'';
+    if(wv) data=data.filter(r=>{ const c=r.mcar_chk; if(!c) return false; return wv==='warn'? c.target_warn : !c.target_warn; });
+  }
   data=sortD(data,ts.sort,ts.asc);
   renderPaged(ids.body,ids.info,ids.pg,ids.cnt,data,ts,r=>`
     <tr>
@@ -3912,6 +3972,7 @@ function renderFormView(formTitle, ids){
       <td style="white-space:nowrap">${sBadge(r.semantic_status)}</td>
       <td style="font-size:11px;color:var(--muted);white-space:nowrap">${fd(r.raised_date)}</td>
       <td style="white-space:nowrap">${fd(r.Target_date)}</td>
+      ${ids.warn?mcarWarnCell(r):''}
       <td style="white-space:nowrap">${ageDis(r.report_ageing,r.semantic_status)}</td>
       <td style="white-space:nowrap">${cBadge(r.overdue_cat)}</td>
       <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--muted)" title="${esc(r.audit_title)||''}">${esc(r.audit_title)||'—'}</td>
@@ -3921,7 +3982,7 @@ function renderFormView(formTitle, ids){
     </tr>`);
 }
 function renderAmoEcar(){renderFormView('AMO ECAR',{ts:'amoecar',yr:'amoYearF',onChange:renderAmoEcar,st:'amoStatusF',srch:'amoSrch',kTotal:'amo-total',kOpen:'amo-open',kOver:'amo-over',kClosed:'amo-closed',body:'amoBody',info:'amoInfo',pg:'amoPg',cnt:'amoCnt'});}
-function renderMcar(){renderFormView('MCAR',{ts:'mcar',yr:'mcarYearF',onChange:renderMcar,st:'mcarStatusF',srch:'mcarSrch',kTotal:'mcar-total',kOpen:'mcar-open',kOver:'mcar-over',kClosed:'mcar-closed',body:'mcarBody',info:'mcarInfo',pg:'mcarPg',cnt:'mcarCnt'});}
+function renderMcar(){renderFormView('MCAR',{ts:'mcar',yr:'mcarYearF',onChange:renderMcar,st:'mcarStatusF',srch:'mcarSrch',kTotal:'mcar-total',kOpen:'mcar-open',kOver:'mcar-over',kClosed:'mcar-closed',body:'mcarBody',info:'mcarInfo',pg:'mcarPg',cnt:'mcarCnt',warn:true,warnFilter:'mcarWarnF'});}
 function amoSort(c){const t=TS.amoecar;if(t.sort===c)t.asc=!t.asc;else{t.sort=c;t.asc=true;}renderAmoEcar();}
 function mcarSort(c){const t=TS.mcar;if(t.sort===c)t.asc=!t.asc;else{t.sort=c;t.asc=true;}renderMcar();}
 

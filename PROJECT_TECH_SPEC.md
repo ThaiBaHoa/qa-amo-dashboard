@@ -2,8 +2,8 @@
 
 **File:** `index.html` (single-file SPA, không build step)
 **Repo:** `ThaiBaHoa/qa-amo-dashboard` · **Domain:** `vjc-qa-amo.com` (GitHub Pages)
-**Version hiện tại:** `2026.06.08-r100`
-**Cập nhật spec:** 2026-06-08 — phản ánh code thực tế (gồm r81–r100, Target_date chuẩn theo stage Task, copyholder on-time so theo ngày, lọc Cancelled/Deleted, auto-refresh kiosk, multi-year filter, admin export, SPI, KPI2, PAVOI RFI)
+**Version hiện tại:** `2026.06.08-r101`
+**Cập nhật spec:** 2026-06-08 — phản ánh code thực tế (gồm r81–r101, MCAR deadline check, Target_date chuẩn theo stage Task, copyholder on-time so theo ngày, lọc Cancelled/Deleted, auto-refresh kiosk, multi-year filter, admin export, SPI, KPI2, PAVOI RFI)
 
 > Tài liệu này mô tả TOÀN BỘ kiến trúc, dữ liệu, logic và quy ước của dashboard. Dùng làm nguồn tham chiếu chuẩn khi sửa code. Số dòng (Lxxxx) là tương đối, dùng để định vị nhanh.
 
@@ -57,7 +57,7 @@ Dashboard nội bộ cho **QA AMO** (Quality Assurance — Approved Maintenance 
 | `SUPA_KEY` | `sb_publishable_…` | anon key |
 | `G_URL` | `https://galileo-proxy.thaibahoa2308.workers.dev/proxy/` | Galileo proxy |
 | `ORG_UNIT` | `'QA AMO'` | filter chính cho mọi query report |
-| `APP_REV` | `'2026.06.08-r100'` | version (hiển thị footer sidebar + User Guide + PDF; nhãn User Guide nạp động từ `APP_REV` qua `#guideVer`/`#guideFooter`) |
+| `APP_REV` | `'2026.06.08-r101'` | version (hiển thị footer sidebar + User Guide + PDF; nhãn User Guide nạp động từ `APP_REV` qua `#guideVer`/`#guideFooter`) |
 | `AUTO_REFRESH_MS` | `12*60*60*1000` (12h) | chu kỳ auto-refresh kiosk (xem §5.6) |
 | `AUTO_REFRESH_CHECK_MS` | `5*60*1000` (5 phút) | nhịp heartbeat kiểm tra tới hạn |
 | `PS` | `25` | page size pagination |
@@ -114,7 +114,7 @@ Reset đầu hàm (sau `isLoading=true`): `pavoiRfiLoaded=false; pavoiRfiMap={};
 | [5/6] | `dwanalytics_report_form_section_field` | 13 field_name (xem dưới) | report_id, field_name, text_value | `fMap[report_id][field_name]`=text_value (first wins) |
 | [6/6] | `dwreporting_audit_summary` + (đk) `dwreporting_audit_workflow` | (none) | audit_id, number, title, audit_type, status, scheduled/actual/closed dates, lead_auditor_name, scope, location | theo `audit_id` |
 
-**13 custom field_name (bước 5):** `Target date`, `Issue Date`, `Finding level`, `Repetitive`, `First extension agreed date`, `Second extension agreed date`, `Audit Ref. No`, `Request For Verification`, `Report Reference`, `Verification Result`, `Department`, `Finding description`, `Nature of finding`.
+**15 custom field_name (bước 5):** `Target date`, `Issue Date`, `Finding level`, `Repetitive`, `First extension agreed date`, `Second extension agreed date`, `Audit Ref. No`, `Request For Verification`, `Report Reference`, `Verification Result`, `Department`, `Finding description`, `Nature of finding`, `First extension approved?`, `Second extension agreed?` (2 cờ cuối r101 cho MCAR deadline check — 15×2=30 node, dưới MaxNodeCount 100).
 
 **Audit (bước 6):** giữ audit nếu `audit_id` thuộc report QA AMO HOẶC (`audit_type` ∈ {Internal Audit, Inspection} VÀ `lead_auditor_name` ∈ `QA_AMO_AUDITORS`). Audit workflow chỉ fetch khi `allAudits.length <= 50` (bảng 100K+ rows). Sau đó merge `audit_number` vào `allData`.
 
@@ -176,6 +176,16 @@ Trang Overview là **biểu đồ** (Chart.js), không KPI tile/bảng. Lọc qu
 - `isEarlyDetected(ecar, mcarPool)` (L3810): tồn tại MCAR có `raised_date < ecar.raised_date` VÀ (cùng Nature group **HOẶC** `tokenSim(desc) >= K2_SIM_THRESHOLD=0.5`).
 - Hiển thị tỉ lệ `MCAR ÷ AMO-ECAR`; nhóm theo Nature / Quarter / Year / Scope. Nguồn: `allData` + field Nature (Galileo), KHÔNG dùng Supabase. (Bản đối sánh kpi2_match Supabase = Phase 2, chưa làm.)
 
+### 6.5b MCAR Deadline Check — Extension Rule (r101)
+Chỉ áp cho MCAR. Tính hạn kỳ vọng theo quy trình rồi cảnh báo khi `Target_date` đang lưu lệch (case điển hình: đã duyệt extension nhưng quên sửa Target date).
+- `buildMcarDeadlineChk(raisedStr, f, curTarget)` (gắn vào `allData.mcar_chk` trong `loadData`, chỉ khi `report_title==='MCAR'`):
+  - **Responded due** = `raised + 14d`; **Target due** = `raised + 45d + 30d × n`.
+  - `n` ∈ {0,1,2} = số extension **đã duyệt**, đếm theo cờ duyệt (KHÔNG theo cờ request): ext1 = `First extension approved? === 'Yes'`, ext2 = `Second extension agreed? === 'Yes'` (tên bất đối xứng: lần 1 `approved?`, lần 2 `agreed?`).
+  - `target_warn` = `dDay(curTarget) !== expTarget` (so theo NGÀY; không có Target → warn). Kết quả lưu dạng string `YYYY-MM-DD` + boolean ⇒ **cache-safe** (JSON, không giữ Date).
+  - Verify với agreed date thực (khớp 100%): MCAR-0234 raised 08/04/2025 +45+30 = 22/06/2025; CAR-0597 raised 30/05/2022 → 13/08 rồi 12/09/2022. **KHÔNG** dùng field `First/Second extension target date` (lệch +1 ngày so với agreed).
+- Hiển thị: `mcarWarnCell(r)` render cột ⚠ Deadline (badge `⚠ Target → <date>` khi lệch / `✓ OK` khi khớp, kèm Responded due + số ext, tooltip chi tiết). Cột + filter chỉ render khi `renderFormView` được truyền `ids.warn`/`ids.warnFilter` (chỉ `renderMcar`).
+- *Mở rộng (chưa làm):* cảnh báo riêng cho Responded cần field "ngày respond thực" — chạy probe field `contains(field_name,'espond'/'eply'/'nswer'/'eceived')` để xác minh trước.
+
 ### 6.6 SPI — Safety Performance Indicators (rework r87)
 - `SPI_CONFIG = { reportTitle:'AMO - SPI', orgUnit:'QA AMO', direction:{1:'lower',2:'lower',3:'lower',4:'higher',5:'lower'}, defaultDirection:'lower' }`.
 - Mỗi SPI: `seq` (1–5), `sptApproved` (ngưỡng CAAV/ALOS), `prevYear`, `yearAchievement`, `raised`/`raised_year` (= `getFullYear(raised_date)`), `months[12]={rate,count,trigger}`.
@@ -201,7 +211,7 @@ Trang Overview là **biểu đồ** (Chart.js), không KPI tile/bảng. Lọc qu
 - **PAVOI** `renderPavoi`: No, Status, Raised, Target, Days, Report Ref, RFV, Verification Result, Department, **RFI**, Audit No, Audit Title. Row click → modal.
 - **CMR-CAR** `renderCmr`: No, Aircraft, Status, Finding Count, Dept, Raised, Target, Days (+ filter aircraft/quarter/ATA).
 - **ECAR** `renderEcar`: No, Aircraft, Status, Finding Desc, Raised, Target, Days, Detail (+ quarter multi-select, issued-by).
-- **AMO-ECAR / MCAR** `renderAmoEcar/renderMcar` (dùng `renderFormView`): No, Status, Raised, Target, Days, CAT, Finding Level, Audit Title.
+- **AMO-ECAR / MCAR** `renderAmoEcar/renderMcar` (dùng `renderFormView`): No, Status, Raised, Target, Days, CAT, Finding Level, Audit Title. **MCAR riêng (r101):** thêm cột **⚠ Deadline** + dropdown lọc `mcarWarnF` (All/Mismatch/OK), gate qua `ids.warn`/`ids.warnFilter` (AMO-ECAR không truyền nên giữ 8 cột). Cột tính hạn kỳ vọng theo rule (xem §6.5b) và cảnh báo khi `Target_date` đang lưu lệch.
 - **Audit Plan** `renderAudit`: No, Title, Type, Status, Scheduled, Lead Auditor, Location, Findings, Open, Overdue, Pipeline, Workflow (+ bottleneck panel).
 - **Documents** `renderDocPage`: cây doc_type (15 root) + bảng Doc No, Title, Type, Rev, Status, Owner, Review date, Distributed, Actions.
 
@@ -333,7 +343,7 @@ Thay toàn bộ `<select>` year (17 chỗ) bằng **dropdown checkbox** cho phé
 ## 13. Quy ước phát triển
 
 - **Edit surgical:** chỉ chạm điểm cần sửa, không refactor lan man.
-- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r100. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.) Nhãn version ở User Guide nạp động từ `APP_REV` (không hardcode "vN").
+- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r101. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.) Nhãn version ở User Guide nạp động từ `APP_REV` (không hardcode "vN").
 - **Deploy:** sửa `index.html` (bản OneDrive) → copy vào clone repo → `git diff` review → commit + push `main` (commit message dùng `git commit -F` để tránh lỗi shell với ký tự `/`). GitHub Pages tự build ~1–2 phút.
 - **Tận dụng helper có sẵn** (fetchAll, g, s, esc, fd, toast, setOv, renderPaged, sortD, ageCalc) — không viết trùng.
 - **Tài liệu liên quan:** `PAVOI_RFI_Spec.md` (RFI chi tiết), `CAR report types & KPI2` (MCAR/AMO-ECAR vs CMR-CAR/ECAR; KPI2 Phase-1), `GALILEO_QUIRKS.md`, `GALILEO_DATA_QUALITY.md`.
@@ -363,4 +373,5 @@ Thay toàn bộ `<select>` year (17 chỗ) bằng **dropdown checkbox** cho phé
 | r97 | **Auto-refresh kiosk (additive):** `startAutoRefresh()` — heartbeat 5 phút/wall-clock, đủ 12h → `loadData(true)` tại chỗ (không reload, không chạm phiên sessionStorage); guard `!curUser`/`isLoading`. Bật ở cuối `initApp`. User Guide FAQ "When is the data updated?" cập nhật theo (xem §5.6). |
 | r98 | **Fix copyholder Cancelled/Deleted:** modal Documents (`showDocDetail` → builder `_docTasks`) lọc bỏ `task_status ∈ {Cancelled, Deleted}` **trước** `.map` (Galileo ẩn người đã gỡ khỏi distribution nhưng vẫn giữ dòng task). VD `VJC-MQA-EIS-2026-017`: Total 426→424, Overdue 5→3. Quirk dữ liệu kho, lọc ở dashboard (xem §8.6). |
 | r99 | **Fix copyholder On time/Late:** `showDocDetail` so acknowledged vs due **theo NGÀY** (`dDay(ackDt) <= dDay(dueDt)`) thay vì so cả giờ-phút (`new Date(...)`). Trước đây ack đúng ngày due nhưng có giờ > 00:00 bị tính Late. Quy ước: ack đúng ngày due = On time. |
+| r101 | **MCAR Deadline Check (additive):** cột ⚠ Deadline + filter `mcarWarnF` trên bảng MCAR (chỉ MCAR). `buildMcarDeadlineChk` tính Target due = raised+45+30×n (n = số extension đã duyệt: `First extension approved?`/`Second extension agreed?`), cảnh báo khi `Target_date` đang lưu lệch (so theo ngày). Thêm 2 cờ vào `$filter` bước [5/6] (15 field, 30 node). Cache-safe (string+boolean). Xem §6.5b. |
 | r100 | **Target_date chuẩn theo workflow:** đảo ưu tiên suy `td` trong `loadData` → `sd.td` (stage Task target, management) trước; custom field `'Target date'` thành **fallback** (hay nhập sai/cũ). 531 report (MCAR/PAVOI/CAR/AMO-ECAR…) đổi `Target_date` → kéo theo `semantic_status`/overdue/aging/KPI (cả report đã đóng). VD `MQA-RP-065-2026` 22/04→30/06; `AMO-ECAR-027` 22/02→13/01. Report không có stage Task giữ nguyên (vẫn dùng custom). Cũng dứt điểm lỗi custom trùng giá trị trong EAV (first-wins không tất định). |
