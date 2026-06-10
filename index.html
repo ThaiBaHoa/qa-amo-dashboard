@@ -830,22 +830,7 @@ tr:last-child td{border-bottom:none}
             </div>
             <div class="tbl-wrap">
               <table>
-                <thead><tr>
-                  <th onclick="afSort('report_number')">Report No ↕</th>
-                  <th onclick="afSort('report_title')">Form ↕</th>
-                  <th onclick="afSort('semantic_status')">Status ↕</th>
-                  <th onclick="afSort('owner_name')">Owner ↕</th>
-                  <th onclick="afSort('raised_date')">Raised Date ↕</th>
-                  <th onclick="afSort('Target_date')">Target Date ↕</th>
-                  <th onclick="afSort('report_ageing')">Days to Due ↕</th>
-                  <th onclick="afSort('overdue_cat')">CAT ↕</th>
-                  <th>Finding Level</th>
-                  <th onclick="afSort('completed_date')">Completed ↕</th>
-                  <th onclick="afSort('close_date')">Close Date ↕</th>
-                  <th>Audit Ref</th>
-                  <th>MNT No</th>
-                  <th>Audit Title</th>
-                </tr></thead>
+                <thead id="afHead"></thead>
                 <tbody id="afBody"></tbody>
               </table>
             </div>
@@ -2086,6 +2071,23 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- EIS DETAIL MODAL -->
+<div class="overlay" id="eisModal" onclick="closeEisModal(event)" style="z-index:215;display:none">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:95%;max-width:900px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0">
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">MQA Event Investigation Summary</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text);margin-top:2px" id="eisMTitle">—</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px" id="eisMSub">—</div>
+      </div>
+      <button onclick="closeEisModal()" style="background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);font-size:16px;cursor:pointer;padding:3px 10px;border-radius:6px;flex-shrink:0;margin-left:12px">✕</button>
+    </div>
+    <div style="overflow:auto;flex:1;padding:16px 18px">
+      <div id="eisMBody"></div>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="auditModal" onclick="closeAuditModal(event)" style="z-index:210">
   <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:93%;max-width:1020px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
     <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0">
@@ -2220,7 +2222,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.08-r103';
+const APP_REV = '2026.06.10-r104';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2717,6 +2719,7 @@ async function loadData(forceRefresh=false) {
   if(isLoading){toast('Loading data, please wait...','info');return;}
   isLoading=true;
   pavoiRfiLoaded = false; pavoiRfiMap = {}; pavoiRfiDone = new Set();   // reset RFI để Refresh kéo lại bản mới
+  eisLoaded=false; eisCAMap={}; eisDescMap={};   // reset EIS per-CA cache để Refresh kéo lại
   setOv(true,'[1/6] Connecting to Galileo...','',5);
   try {
 
@@ -4138,40 +4141,198 @@ function renderKpi2(){
   s('k2Info', `Phát hiện sớm ${num} · AMO-ECAR ${den} · rate ${den>0?Math.round(num/den*100)+'%':'N/A'}`);
 }
 
+// ── ALL FORMS · form-specific column schemas (r104) ───────────
+const EIS_TITLE = 'MQA Event Investigation Summary';
+
+// cell helpers tái dùng style hiện có
+const _tdMuted = v => `<td style="font-size:11px;color:var(--muted)">${v}</td>`;
+
+const AF_DEFAULT_COLS = [
+  {label:'Report No',  sortKey:'report_number',   render:r=>`<td><b>${esc(r.report_number)||'—'}</b></td>`},
+  {label:'Form',       sortKey:'report_title',     render:r=>`<td><span style="font-size:11px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">${esc(r.report_title)||'—'}</span></td>`},
+  {label:'Status',     sortKey:'semantic_status',  render:r=>`<td>${sBadge(r.semantic_status)}</td>`},
+  {label:'Owner',      sortKey:'owner_name',        render:r=>_tdMuted(esc(r.owner_name)||'—')},
+  {label:'Raised Date',sortKey:'raised_date',       render:r=>_tdMuted(fd(r.raised_date))},
+  {label:'Target Date',sortKey:'Target_date',       render:r=>`<td>${fd(r.Target_date)}</td>`},
+  {label:'Days to Due',sortKey:'report_ageing',     render:r=>`<td>${ageDis(r.report_ageing,r.semantic_status)}</td>`},
+  {label:'CAT',        sortKey:'overdue_cat',       render:r=>`<td>${cBadge(r.overdue_cat)}</td>`},
+  {label:'Finding Level',                            render:r=>`<td>${esc(r.finding_level)||'—'}</td>`},
+  {label:'Completed',  sortKey:'completed_date',     render:r=>_tdMuted(fd(r.completed_date))},
+  {label:'Close Date', sortKey:'close_date',         render:r=>_tdMuted(fd(r.close_date))},
+  {label:'Audit Ref',                                render:r=>_tdMuted(esc(r.audit_ref)||'—')},
+  {label:'MNT No',                                   render:r=>`<td style="font-size:11px;color:var(--blue)">${esc(r.audit_number)||'—'}</td>`},
+  {label:'Audit Title',                              render:r=>`<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)">${esc(r.audit_title)||'—'}</td>`},
+];
+
+const AF_EIS_COLS = [
+  {label:'Report No',   sortKey:'report_number',   render:r=>`<td><b style="color:var(--blue)">${esc(r.report_number)||'—'}</b></td>`},
+  {label:'Status',      sortKey:'semantic_status',  render:r=>`<td>${sBadge(r.semantic_status)}</td>`},
+  {label:'Owner',       sortKey:'owner_name',        render:r=>_tdMuted(esc(r.owner_name)||'—')},
+  {label:'Primary Source',                           render:r=>_tdMuted(esc(r.eis_primary_source)||'—')},
+  {label:'Raised Date', sortKey:'raised_date',       render:r=>_tdMuted(fd(r.raised_date))},
+  {label:'Target (latest)', sortKey:'Target_date',   render:r=>`<td>${fd(r.Target_date)}</td>`},
+  {label:'Days to Due', sortKey:'report_ageing',     render:r=>`<td>${ageDis(r.report_ageing,r.semantic_status)}</td>`},
+  {label:'CAs',         sortKey:'eis_ca_total',      render:r=>`<td style="text-align:center"><b style="color:var(--blue)">${r.eis_ca_total||0}</b>${r.eis_ca_overdue?` <span style="font-size:10px;color:#ff6b6b">(${r.eis_ca_overdue} overdue)</span>`:''}</td>`},
+  {label:'Departments',                              render:r=>`<td style="font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis" title="${esc((r.eis_depts||[]).join(', '))}">${esc((r.eis_depts||[]).join(', '))||'—'}</td>`},
+  {label:'Progress',    sortKey:'eis_ca_done',       render:r=>`<td style="font-size:11px;text-align:center;color:${r.eis_ca_done===r.eis_ca_total&&r.eis_ca_total?'var(--green)':'var(--muted)'}">${r.eis_ca_done||0}/${r.eis_ca_total||0}</td>`},
+];
+
+const AF_SCHEMAS = {
+  _default: { cols: AF_DEFAULT_COLS },
+  [EIS_TITLE]: { cols: AF_EIS_COLS, rowClick: 'showEisDetail' },
+};
+
+// ── EIS lazy-load (per-CA) ────────────────────────────────────
+let eisLoaded = false;
+let eisDescMap = {};   // report_id -> { 'Primary Source':…, MEDA:[…], … }
+let eisCAMap   = {};   // report_id -> [ {action,classification,dept,target,completed,voi,status,age}, … ]
+
+const EIS_DESC_FIELDS = ['Primary Source','Event investigation summary number','Investigation',
+  'Main Cause','Error','Violation',
+  'Impact and losses: [The direct and indirect consequences of the incident]',
+  'Immediate action(s)','Detailed Description','Contributing Factors Checklist MEDA'];
+const EIS_CA_FIELDS = ['Corrective Action(s)','Corrective Action Classification','Department',
+  'Target date','Date completed','Verification of implementation (VOI)'];
+
+async function loadEisDetail(){
+  const eisIds = new Set(allData.filter(r=>r.report_title===EIS_TITLE).map(r=>r.report_id));
+  if(!eisIds.size){ eisLoaded=true; return; }
+
+  const descFilter = EIS_DESC_FIELDS.map(f=>`field_name eq '${f.replace(/'/g,"''")}'`).join(' or ');
+  const caFilter   = EIS_CA_FIELDS.map(f=>`field_name eq '${f.replace(/'/g,"''")}'`).join(' or ');
+
+  try{
+    const [descRaw, caRaw] = await Promise.all([
+      // single-value desc: form_section_field (text_value) — fetch by field_name only, post-filter by Set
+      fetchAll(G_URL+'dwanalytics_report_form_section_field'+
+        '?$select=report_id,field_name,text_value,report_field_created_date'+
+        '&$filter='+encodeURIComponent(descFilter))
+        .catch(e=>{console.warn('EIS desc fetch failed:',e);return[];}),
+      // repeater CA: report_field (value_text + section_id) — fetch by field_name only, post-filter by Set, group by section_id
+      fetchAll(G_URL+'dwanalytics_report_field'+
+        '?$select=report_id,field_name,value_text,section_id,report_field_created_date'+
+        '&$filter='+encodeURIComponent(caFilter), true)
+        .catch(e=>{console.warn('EIS CA fetch failed:',e);return[];}),
+    ]);
+
+    // ── desc map (single value, keep first non-empty; MEDA = array) ──
+    eisDescMap = {};
+    descRaw.forEach(f=>{
+      if(!eisIds.has(f.report_id)) return;
+      const v = (f.text_value||'').trim();
+      if(!v || f.field_name==='VietJet_Air_logo.svg' || f.field_name==='CORRECTIVE ACTIONS') return;
+      const d = eisDescMap[f.report_id] || (eisDescMap[f.report_id]={MEDA:[]});
+      if(f.field_name==='Contributing Factors Checklist MEDA'){ d.MEDA.push(v); }
+      else if(d[f.field_name]==null){ d[f.field_name]=v; }
+    });
+
+    // ── CA map (group by section_id) ──
+    const bySec = {};   // report_id -> section_id -> partial CA
+    caRaw.forEach(f=>{
+      if(!eisIds.has(f.report_id) || !f.section_id) return;
+      const byR = bySec[f.report_id] || (bySec[f.report_id]={});
+      const ca  = byR[f.section_id] || (byR[f.section_id]={});
+      const v = f.value_text!=null ? String(f.value_text).trim() : '';
+      switch(f.field_name){
+        case 'Corrective Action(s)':                      ca.action=v; break;
+        case 'Corrective Action Classification':          ca.classification=v; break;
+        case 'Department':                                ca.dept=v; break;
+        case 'Target date':                               ca.target=v||null; break;
+        case 'Date completed':                            ca.completed=v||null; break;
+        case 'Verification of implementation (VOI)':      ca.voi=v; break;
+      }
+    });
+
+    eisCAMap = {};
+    Object.entries(bySec).forEach(([rid, secs])=>{
+      const cas = Object.values(secs)
+        .filter(c=>c.action || c.target || c.dept)        // bỏ section rỗng
+        .map(c=>({
+          action:c.action||'', classification:c.classification||'',
+          dept:c.dept||'', target:c.target||null, completed:c.completed||null,
+          voi:c.voi||'',
+          status: semCalc('Open', c.completed||null, c.target||null),
+          age:    ageCalc(c.target||null),
+        }));
+      eisCAMap[rid] = cas;
+    });
+  }catch(e){ console.warn('EIS load error:',e); }
+  eisLoaded = true;
+}
+
+// Tạo bản clone giàu thông tin cho 1 report EIS (KHÔNG mutate allData)
+function enrichEis(r){
+  const cas = eisCAMap[r.report_id] || [];
+  const desc = eisDescMap[r.report_id] || {};
+  const targets = cas.map(c=>c.target).filter(Boolean);
+  const rollup  = targets.length ? targets.reduce((a,b)=> a>b ? a : b) : (r.Target_date||null); // latest
+  const done    = cas.filter(c=>c.completed).length;
+  const allDone = cas.length>0 && done===cas.length;
+  let status;
+  if(allDone){
+    const maxC = cas.map(c=>c.completed).filter(Boolean).reduce((a,b)=> a>b ? a : b);
+    status = (!rollup || maxC<=rollup) ? 'On-time Closed' : 'Lately Closed';
+  } else {
+    status = semCalc('Open', null, rollup);
+  }
+  const depts = [...new Set(cas.map(c=>c.dept).filter(Boolean))];
+  return {
+    ...r,
+    semantic_status: status,
+    Target_date:     rollup,
+    report_ageing:   ageCalc(rollup),
+    eis_primary_source: desc['Primary Source']||null,
+    eis_ca_total:    cas.length,
+    eis_ca_done:     done,
+    eis_ca_overdue:  cas.filter(c=>c.status==='Overdue').length,
+    eis_depts:       depts,
+  };
+}
+
 function renderAF() {
   const ff=g('afFormF')?.value||'';
   const srch=(g('afSrch')?.value||'').toLowerCase();
   const ts=TS.af;
 
-  let data=allData.filter(r=>{
+  const SCH = AF_SCHEMAS[ff] || AF_SCHEMAS._default;
+
+  // EIS cần dữ liệu per-CA: lazy-load 1 lần, hiện loading rồi tự re-render
+  if(ff===EIS_TITLE && !eisLoaded){
+    g('afHead').innerHTML = '<tr>'+SCH.cols.map(c=>`<th>${c.label}</th>`).join('')+'</tr>';
+    g('afBody').innerHTML = '<tr><td colspan="20" style="text-align:center;padding:32px;color:var(--muted)">Loading Corrective Actions…</td></tr>';
+    loadEisDetail().then(renderAF);
+    return;
+  }
+
+  // Nguồn dữ liệu: EIS dùng bản enrich (roll-up due/status), còn lại giữ nguyên allData
+  let rows = (ff===EIS_TITLE)
+    ? allData.filter(r=>r.report_title===EIS_TITLE).map(enrichEis)
+    : allData;
+
+  let data=rows.filter(r=>{
     if(ts.sf!=='all' && r.semantic_status!==ts.sf) return false;
     if(ff && r.report_title!==ff) return false;
     if(!ymHas('afYearF', r.raised_year)) return false;
     if(srch){
-      const t=[r.report_number,r.report_title,r.audit_title,r.semantic_status,r.finding_level,r.audit_ref].join(' ').toLowerCase();
+      const t=[r.report_number,r.report_title,r.audit_title,r.semantic_status,r.finding_level,r.audit_ref,r.eis_primary_source,(r.eis_depts||[]).join(' ')].join(' ').toLowerCase();
       if(!t.includes(srch))return false;
     }
     return true;
   });
 
   data=sortD(data,ts.sort,ts.asc);
-  renderPaged('afBody','afInfo','afPg','afCnt',data,ts,r=>`
-    <tr>
-      <td><b>${esc(r.report_number)||'—'}</b></td>
-      <td><span style="font-size:11px;background:rgba(255,255,255,0.06);padding:2px 6px;border-radius:4px">${esc(r.report_title)||'—'}</span></td>
-      <td>${sBadge(r.semantic_status)}</td>
-      <td style="font-size:11px;color:var(--muted)">${esc(r.owner_name)||'—'}</td>
-      <td style="font-size:11px;color:var(--muted)">${fd(r.raised_date)}</td>
-      <td>${fd(r.Target_date)}</td>
-      <td>${ageDis(r.report_ageing,r.semantic_status)}</td>
-      <td>${cBadge(r.overdue_cat)}</td>
-      <td>${esc(r.finding_level)||'—'}</td>
-      <td style="font-size:11px;color:var(--muted)">${fd(r.completed_date)}</td>
-      <td style="font-size:11px;color:var(--muted)">${fd(r.close_date)}</td>
-      <td style="font-size:11px;color:var(--muted)">${esc(r.audit_ref)||'—'}</td>
-      <td style="font-size:11px;color:var(--blue)">${esc(r.audit_number)||'—'}</td>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)">${esc(r.audit_title)||'—'}</td>
-    </tr>`);
+
+  // thead từ schema (sortKey → click sort)
+  g('afHead').innerHTML = '<tr>'+SCH.cols.map(c=>
+    c.sortKey ? `<th onclick="afSort('${c.sortKey}')">${c.label} ↕</th>` : `<th>${c.label}</th>`
+  ).join('')+'</tr>';
+
+  // body từ schema
+  const click = SCH.rowClick;
+  renderPaged('afBody','afInfo','afPg','afCnt',data,ts,r=>
+    `<tr${click?` style="cursor:pointer" onclick="${click}('${r.report_id}')"`:''}>`+
+    SCH.cols.map(c=>c.render(r)).join('')+
+    `</tr>`);
 }
 
 // ── PAGINATION ────────────────────────────────────────────────
@@ -4634,6 +4795,60 @@ function showCmrDetail(report_id){
 function closeCmrModal(e){
   if(e&&e.target!==g('cmrModal'))return;
   g('cmrModal').style.display='none';
+}
+
+function showEisDetail(report_id){
+  const base = allData.find(x=>x.report_id===report_id);
+  if(!base) return;
+  const r = enrichEis(base);
+  const desc = eisDescMap[report_id] || {};
+  const cas  = eisCAMap[report_id] || [];
+
+  s('eisMTitle', r.report_number||'—');
+  s('eisMSub', `${r.semantic_status} · Due (latest) ${fd(r.Target_date)} · ${r.eis_ca_done}/${r.eis_ca_total} CA done`);
+
+  const block=(label,val)=>val?`
+    <div style="margin-bottom:10px">
+      <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">${label}</div>
+      <div style="font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.5">${esc(val)}</div>
+    </div>`:'';
+
+  const caCard=(c,i)=>`
+    <div style="margin-bottom:8px;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid ${
+      c.status==='Overdue'?'#ff6b6b':c.status==='Open'?'var(--blue)':'var(--green)'}">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px">
+        <div style="font-size:10px;color:var(--muted);font-weight:600">CA ${i+1}${c.dept?' · '+esc(c.dept):''}${c.classification?' · '+esc(c.classification):''}</div>
+        ${sBadge(c.status)}
+      </div>
+      <div style="font-size:12px;color:var(--text);white-space:pre-wrap;line-height:1.5;margin-bottom:6px">${esc(c.action)||'—'}</div>
+      <div style="font-size:11px;color:var(--muted)">Target: ${fd(c.target)} · Completed: ${fd(c.completed)}</div>
+      ${c.voi?`<div style="font-size:11px;color:var(--text-2);margin-top:4px;white-space:pre-wrap"><b>VOI:</b> ${esc(c.voi)}</div>`:''}
+    </div>`;
+
+  const meda = (desc.MEDA&&desc.MEDA.length)
+    ? `<div style="margin-bottom:10px"><div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Contributing Factors (MEDA)</div>
+       <div style="display:flex;flex-wrap:wrap;gap:6px">${desc.MEDA.map(m=>`<span style="font-size:11px;background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:10px">${esc(m)}</span>`).join('')}</div></div>`
+    : '';
+
+  safeHTML(g('eisMBody'), `
+    ${block('Primary Source', desc['Primary Source'])}
+    ${block('Investigation', desc['Investigation'])}
+    ${block('Detailed Description', desc['Detailed Description'])}
+    ${block('Main Cause', desc['Main Cause'])}
+    ${block('Error', desc['Error'])}
+    ${block('Violation', desc['Violation'])}
+    ${block('Impact and losses', desc['Impact and losses: [The direct and indirect consequences of the incident]'])}
+    ${block('Immediate action(s)', desc['Immediate action(s)'])}
+    ${meda}
+    <div style="margin-top:6px;border-top:1px solid var(--border);padding-top:12px">
+      <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Corrective Actions (${cas.length})</div>
+      ${cas.length ? cas.map(caCard).join('') : '<div style="font-size:12px;color:var(--muted)">No corrective actions found.</div>'}
+    </div>`);
+  g('eisModal').style.display='flex';
+}
+function closeEisModal(e){
+  if(e&&e.target!==g('eisModal'))return;
+  g('eisModal').style.display='none';
 }
 
 function pdfSafe(str){
@@ -6625,7 +6840,8 @@ async function loadUsers() {
           ${u.role==='pending'?`<button class="btn-approve" onclick="approveUser('${esc(u.id)}','${esc(u.email)}')">✓ Approve</button><button class="btn-reject" onclick="rejectUser('${esc(u.id)}')">✗ Reject</button>`:''}
           ${u.role==='approved'&&u.email!==curUser.email?`<button class="btn-make-admin" onclick="makeAdmin('${esc(u.id)}')">★ Admin</button><button class="btn-reject" onclick="rejectUser('${esc(u.id)}')">✗ Revoke</button>`:''}
           ${u.role==='rejected'?`<button class="btn-approve" onclick="approveUser('${esc(u.id)}','${esc(u.email)}')">✓ Re-approve</button>`:''}
-          ${u.role==='admin'?'<span style="font-size:11px;color:var(--muted)">—</span>':''}
+          ${u.role==='admin'?'<span style="font-size:11px;color:var(--muted)">admin</span>':''}
+          ${u.email!==curUser.email?`<button class="btn-reject" onclick="deleteUser('${esc(u.id)}','${esc(u.email)}','${esc(u.role)}')">🗑 Delete</button>`:''}
         </div></td></tr>`).join('');
   } catch(e){toast('Error loading users: '+e.message,'err');}
 }
@@ -6642,6 +6858,17 @@ async function makeAdmin(id){
   if(!confirm('Grant Admin rights to this user?'))return;
   try{const{error}=await sb.from('users').update({role:'admin'}).eq('id',id);if(error)throw error;toast('✓ Admin rights granted','ok');loadUsers();}
   catch(e){toast('Error: '+e.message,'err');}
+}
+async function deleteUser(id,email,role){
+  if(!curUser||curUser.role!=='admin')return;
+  if(email===curUser.email){ toast('You cannot delete your own account','err'); return; }
+  if(!confirm(`Permanently delete "${email}"?\nThis removes their login and profile. This cannot be undone.`)) return;
+  try{
+    const {data,error}=await sb.functions.invoke('delete-user',{body:{target_id:id}});
+    if(error) throw new Error(error.message||'Request failed');
+    if(data&&data.error) throw new Error(data.error);
+    toast('✓ Deleted: '+email,'ok'); loadUsers();
+  }catch(e){ toast('Error: '+e.message,'err'); }
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────
