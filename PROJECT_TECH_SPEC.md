@@ -2,8 +2,8 @@
 
 **File:** `index.html` (single-file SPA, không build step)
 **Repo:** `ThaiBaHoa/qa-amo-dashboard` · **Domain:** `vjc-qa-amo.com` (GitHub Pages)
-**Version hiện tại:** `2026.06.08-r103`
-**Cập nhật spec:** 2026-06-08 — phản ánh code thực tế (gồm r81–r103, MCAR cột Raised by, Target_date lấy từ Report, MCAR deadline check, copyholder on-time so theo ngày, lọc Cancelled/Deleted, auto-refresh kiosk, multi-year filter, admin export, SPI, KPI2, PAVOI RFI)
+**Version hiện tại:** `2026.06.10-r104`
+**Cập nhật spec:** 2026-06-10 — phản ánh code thực tế (gồm r81–r104, **r104: User delete qua Edge Function + EIS form-specific schema/roll-up ở All Forms**, MCAR cột Raised by, Target_date lấy từ Report, MCAR deadline check, copyholder on-time so theo ngày, lọc Cancelled/Deleted, auto-refresh kiosk, multi-year filter, admin export, SPI, KPI2, PAVOI RFI)
 
 > Tài liệu này mô tả TOÀN BỘ kiến trúc, dữ liệu, logic và quy ước của dashboard. Dùng làm nguồn tham chiếu chuẩn khi sửa code. Số dòng (Lxxxx) là tương đối, dùng để định vị nhanh.
 
@@ -57,7 +57,7 @@ Dashboard nội bộ cho **QA AMO** (Quality Assurance — Approved Maintenance 
 | `SUPA_KEY` | `sb_publishable_…` | anon key |
 | `G_URL` | `https://galileo-proxy.thaibahoa2308.workers.dev/proxy/` | Galileo proxy |
 | `ORG_UNIT` | `'QA AMO'` | filter chính cho mọi query report |
-| `APP_REV` | `'2026.06.08-r103'` | version (hiển thị footer sidebar + User Guide + PDF; nhãn User Guide nạp động từ `APP_REV` qua `#guideVer`/`#guideFooter`) |
+| `APP_REV` | `'2026.06.10-r104'` | version (hiển thị footer sidebar + User Guide + PDF; nhãn User Guide nạp động từ `APP_REV` qua `#guideVer`/`#guideFooter`) |
 | `AUTO_REFRESH_MS` | `12*60*60*1000` (12h) | chu kỳ auto-refresh kiosk (xem §5.6) |
 | `AUTO_REFRESH_CHECK_MS` | `5*60*1000` (5 phút) | nhịp heartbeat kiểm tra tới hạn |
 | `PS` | `25` | page size pagination |
@@ -131,6 +131,7 @@ Spread `...summary` + các field suy:
 ### 5.5 Loaders phụ (lazy, org_unit khác)
 - **loadCmr()** (L~4170): `org_unit_name eq 'TQA' and report_title eq 'CMR CAR'` → `cmrData` (aircraft_reg, findingRows, ata_chapter, nc_type, defect_class, cap, final_action, issued_to, verified_by, rca…). Dùng thêm `dwanalytics_report_field` (ghép finding theo section_id).
 - **loadEcar()** (L~4528): `org_unit_name eq 'TQA' and report_title eq 'ECAR'` → `ecarData` (aircraft_reg, findings, ata_chapter, issued_by…).
+- **loadEisDetail()** (r104, xem §8.7): lazy-load per-CA cho form *MQA Event Investigation Summary* (chỉ khi mở All Forms với form EIS). 2 fetch song song theo `field_name` (post-filter `Set` report_id — Invariant I3): desc (`dwanalytics_report_form_section_field.text_value`) + Corrective Actions repeater (`dwanalytics_report_field.value_text` + `section_id`). Ghép CA **theo `section_id`** (KHÔNG theo created_date). Kết quả vào `eisCAMap`/`eisDescMap`, flag `eisLoaded`. KHÔNG mutate `allData`.
 - **loadPavoiRfi()** (xem §8.1), **loadKpi2()**, SPI loader (xem §7).
 
 ### 5.6 Caching (L2623–2670)
@@ -207,7 +208,9 @@ Chỉ áp cho MCAR. Tính hạn kỳ vọng theo quy trình rồi cảnh báo kh
 ### 7.2 Bảng dữ liệu (cột chính)
 - **Open Reports** `renderOpen` (chỉ Open+Overdue): No, Form, Status, Owner, Raised, Target, Days, CAT, Finding Level, **Repetitive**, Audit Title.
 - **Overdue** `renderOv`: No, Form, Raised, Target, Days, CAT, Finding Level, Audit Title (+ KPI CAT I/II/III + doughnut).
-- **All Forms** `renderAF` (mọi status): No, Form, Status, Owner, Raised, Target, Days, CAT, Finding Level, **Completed, Close Date**, Audit Ref, Audit No, Audit Title. (Repetitive đã thay bằng Completed+Close ở r81.)
+- **All Forms** `renderAF` (mọi status) — **r104: schema-driven** qua registry `AF_SCHEMAS{report_title → {cols[], rowClick?}}`, `_default` fallback = 14 cột cũ; `renderAF` sinh **cả thead (`#afHead`) lẫn body** từ schema. Form chưa khai báo → `_default`, hành vi cũ không đổi.
+  - **`_default`** (14 cột): No, Form, Status, Owner, Raised, Target, Days, CAT, Finding Level, **Completed, Close Date**, Audit Ref, Audit No, Audit Title. (Repetitive đã thay bằng Completed+Close ở r81.)
+  - **EIS** (`MQA Event Investigation Summary`, xem §8.7): cột riêng No, Status, Owner, **Primary Source**, Raised, **Target (latest)**, Days, **CAs** (badge "n overdue"), **Departments**, **Progress** (done/total). Row click → `showEisDetail`. Dữ liệu = `allData.filter(EIS).map(enrichEis)` (clone roll-up, KHÔNG mutate `allData`); lazy-load per-CA 1 lần (hiện "Loading…" rồi tự re-render).
 - **PAVOI** `renderPavoi`: No, Status, Raised, Target, Days, Report Ref, RFV, Verification Result, Department, **RFI**, Audit No, Audit Title. Row click → modal.
 - **CMR-CAR** `renderCmr`: No, Aircraft, Status, Finding Count, Dept, Raised, Target, Days (+ filter aircraft/quarter/ATA).
 - **ECAR** `renderEcar`: No, Aircraft, Status, Finding Desc, Raised, Target, Days, Detail (+ quarter multi-select, issued-by).
@@ -233,6 +236,7 @@ Thay toàn bộ `<select>` year (17 chỗ) bằng **dropdown checkbox** cho phé
 - `#pavoiModal` (L2134): RFI Monitor — 4 KPI (Total/Open/Overdue/Completed) + bảng RFI (Owner/Status/Target/Completed/Days). Trigger `showPavoiDetail` (async, fetch tươi).
 - `#ecarModal` (L2117): chi tiết finding ECAR.
 - `#docModal` (L2014): tab Copyholders + Workflow stages.
+- `#eisModal` (r104): chi tiết EIS — desc blocks (Primary Source/Investigation/Main Cause/Error/Violation/Impact/Immediate action) + chip MEDA + card từng Corrective Action (badge status per-CA, Target/Completed/VOI). Trigger `showEisDetail` / `closeEisModal`. Xem §8.7.
 - CMR detail: `showCmrDetail`.
 
 ---
@@ -261,10 +265,22 @@ Thay toàn bộ `<select>` year (17 chỗ) bằng **dropdown checkbox** cho phé
 
 ### 8.5 User Management (admin, L6364)
 - `loadUsers()` từ Supabase `users` (id, email, full_name, role, created_at). Actions: `approveUser`→approved, `rejectUser`→rejected, `makeAdmin`→admin. Filter `userFilter`.
+- **r104 — Xóa user hoàn toàn:** nút 🗑 Delete (class `.btn-reject`, ẩn với chính tài khoản đang đăng nhập) → `deleteUser(id,email,role)` gọi **Supabase Edge Function** `delete-user` qua `sb.functions.invoke` (xóa cả `auth.users` lẫn `public.users`). **service_role KHÔNG ở client** — Edge Function tự verify caller là admin bằng JWT, chặn tự xóa mình + xóa admin cuối; CORS whitelist origin. Client cũng chặn tự xóa (double-guard) + confirm. FK `users_supabase_id_fkey ON DELETE CASCADE` dọn profile mồ côi → email xóa xong đăng ký lại được. *(Edge Function `supabase/functions/delete-user/` + FK do Eric deploy phía Supabase, không nằm trong `index.html`. Spec: `USER_DELETE_SPEC.md`.)*
 
 ### 8.6 Documents (L6788+)
 - `showDocDetail(revId,…)`: tab Copyholders (`dwreporting_document_task` — **`$select` gọn + retry 3× backoff** chống timeout proxy; GUID không nháy) → `_docTasks` list, status ontime/late/overdue/inprogress, KPI Total/OnTime/Late/Overdue. **r98:** `_docTasks` lọc bỏ `task_status ∈ {Cancelled, Deleted}` **trước** `.map` (copyholder đã gỡ khỏi distribution — Galileo ẩn ở tab Copyholders nhưng vẫn giữ dòng task, `delivery_status='overdue'` gây đếm sai). Lọc trước map nên `dtk-total` + mọi KPI tự đúng. ⚠️ Nếu sau này có chỗ khác đếm `dwreporting_document_task` cấp dòng → áp cùng bộ lọc. **Cột sort được** (`docTaskSort`/`renderDocTaskTable`): mặc định Status xếp overdue→in-progress→late→on-time để gom người **chưa acknowledge** lên đầu. + Workflow (`dwreporting_document_workflow` group theo stage_id). Cache `docTaskCache`/`docWorkflowCache`; lỗi → link "Thử lại" (xóa cache + refetch).
 - Cây doc_type: `buildDocTypeTree`/`countDocsPerType`/`renderDocTree`, 15 root (ROOT_ORDER).
+
+### 8.7 MQA Event Investigation Summary — form-specific (r104, spec `FORM_EIS_DESIGN.md`)
+EIS không khớp khung 14 cột chung (thiếu CAT/Finding Level/Audit Ref/MNT No) và **due tính sai**: 1 report EIS có **nhiều Corrective Action**, mỗi CA có **Target date riêng**. Đúng nghiệp vụ: **due của report = Target date lớn nhất (latest) trong chuỗi CA**.
+- **2 nhóm field (2 view khác nhau):**
+  - *Mô tả sự kiện — single-instance:* `dwanalytics_report_form_section_field`, cột giá trị **`text_value`** (Primary Source, Investigation, Main Cause, Error/Violation, `Impact and losses: [...]` (field_name dài, match chính xác), Immediate action(s), Detailed Description (lặp → giữ non-empty đầu), `Contributing Factors Checklist MEDA` (multi → mảng)).
+  - *Corrective Actions — repeater:* `dwanalytics_report_field`, cột giá trị **`value_text`** + `section_id` (Corrective Action(s), Classification, Department, Target date, Date completed, VOI).
+- **KHÓA GHÉP = `section_id`** (KHÔNG dùng created_date — Galileo ghi field xen kẽ giữa các CA, ghép theo thời gian cho sai dept). Cùng pattern `applySecIdOverlay` của CMR/ECAR.
+- **Quirks:** loại field rác `VietJet_Air_logo.svg` / `CORRECTIVE ACTIONS` (header rỗng); 2 field `Date` (event vs report, `section_name` null không phân biệt được) → **tạm bỏ**; `text_value` vs `value_text` KHÔNG hoán đổi; fetch theo `field_name` post-filter `Set` (I3).
+- **Roll-up (`enrichEis`, clone — KHÔNG mutate `allData`):** `Target_date` = max(target CA); `report_ageing` = `ageCalc(rollup)`; `semantic_status` roll-up = Open/Overdue theo `today` vs latest target, On-time/Lately Closed khi mọi CA đã có Date completed. Status từng CA dùng lại `semCalc('Open', completed, target)`. Badge "n overdue CA" vẫn hiện CA lẻ quá hạn trong popup.
+- **⚠ Phạm vi:** roll-up CHỈ ở *All Forms*; **KPI/Overview/Overdue vẫn dùng `Target_date` cũ** của EIS trong `allData` (sửa toàn cục = follow-up r10x kèm giải trình stakeholder). Không tự ý mutate `allData`.
+- Hàm: `loadEisDetail`, `enrichEis`, `showEisDetail`/`closeEisModal`; registry `AF_SCHEMAS`; state `eisLoaded`/`eisCAMap`/`eisDescMap` (§10).
 
 ---
 
@@ -296,7 +312,7 @@ Thay toàn bộ `<select>` year (17 chỗ) bằng **dropdown checkbox** cho phé
 ## 10. State toàn cục (L2369–2401, 2378–2389)
 
 - **Data:** `curUser, allData[], auditData[], docData[], cmrData[], ecarData[], stageAggregate`.
-- **Cache/flags:** `cmrLoaded, ecarLoaded, pavoiRfiLoaded, pavoiRfiMap{}, pavoiRfiDone(Set), docTaskCache{}, docWorkflowCache{}, isLoading`.
+- **Cache/flags:** `cmrLoaded, ecarLoaded, pavoiRfiLoaded, pavoiRfiMap{}, pavoiRfiDone(Set), docTaskCache{}, docWorkflowCache{}, isLoading`. **r104:** `eisLoaded, eisCAMap{}, eisDescMap{}` (reset cạnh `pavoiRfi*` đầu `loadData` để ↻ Refresh kéo lại per-CA).
 - **Doc tree:** `docTypeTree/Flat/Index/ByTitle, selectedTypeId, expandedTreeNodes(Set), currentDocRevId`.
 - **TS (sort/filter từng bảng):** `TS.open/ov/af/pavoi/audit/docs/cmr/ecar/amoecar/mcar`, mỗi cái `{page, sort, asc, sf, ff, yr, srch, …}` (thêm `cat/ac/qr/qrs[]/issuedBy/typeF/wfCatF/prefixF` tùy bảng).
 - **Charts:** `charts{}, rptCharts{}, qbChart, dbCharts{}`.
@@ -343,7 +359,7 @@ Thay toàn bộ `<select>` year (17 chỗ) bằng **dropdown checkbox** cho phé
 ## 13. Quy ước phát triển
 
 - **Edit surgical:** chỉ chạm điểm cần sửa, không refactor lan man.
-- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r103. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.) Nhãn version ở User Guide nạp động từ `APP_REV` (không hardcode "vN").
+- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r104. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.) Nhãn version ở User Guide nạp động từ `APP_REV` (không hardcode "vN").
 - **Deploy:** sửa `index.html` (bản OneDrive) → copy vào clone repo → `git diff` review → commit + push `main` (commit message dùng `git commit -F` để tránh lỗi shell với ký tự `/`). GitHub Pages tự build ~1–2 phút.
 - **Tận dụng helper có sẵn** (fetchAll, g, s, esc, fd, toast, setOv, renderPaged, sortD, ageCalc) — không viết trùng.
 - **Tài liệu liên quan:** `PAVOI_RFI_Spec.md` (RFI chi tiết), `CAR report types & KPI2` (MCAR/AMO-ECAR vs CMR-CAR/ECAR; KPI2 Phase-1), `GALILEO_QUIRKS.md`, `GALILEO_DATA_QUALITY.md`.
@@ -354,6 +370,7 @@ Thay toàn bộ `<select>` year (17 chỗ) bằng **dropdown checkbox** cho phé
 
 | Rev | Nội dung |
 |---|---|
+| r104 | **(2 spec chung 1 bump)** (1) **User delete** — nút 🗑 Delete ở User Management → `deleteUser` gọi Edge Function `delete-user` (xóa cả `auth.users`+`public.users`, service_role server-side, verify admin qua JWT, chặn tự xóa/admin cuối, CORS whitelist, FK cascade). Edge Function + FK do Eric deploy phía Supabase. Xem §8.5, `USER_DELETE_SPEC.md`. (2) **EIS form-specific ở All Forms** — `renderAF` schema-driven (`AF_SCHEMAS`, `_default` giữ nguyên 14 cột), EIS có cột riêng + popup per-CA (`#eisModal`), lazy-load `loadEisDetail` ghép CA theo `section_id`, **due roll-up = latest Target date** (`enrichEis`, clone — KHÔNG mutate `allData`; KPI/Overview giữ giá trị cũ). Xem §8.7, `FORM_EIS_DESIGN.md`. |
 | r81 | All Forms: thêm cột Completed/Close Date; fix Target date cho SR/AISC qua workflow stage; helper `deriveStageDates`. |
 | r82 | PAVOI: cột RFI + Detail modal (khởi tạo RFI monitor). |
 | r83 | RFI: ưu tiên hiển thị RFI overdue dài nhất (thay vì badge "N open"). |
