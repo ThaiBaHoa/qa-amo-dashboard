@@ -2,8 +2,8 @@
 
 **File:** `index.html` (single-file SPA, không build step)
 **Repo:** `ThaiBaHoa/qa-amo-dashboard` · **Domain:** `vjc-qa-amo.com` (GitHub Pages)
-**Version hiện tại:** `2026.06.10-r105`
-**Cập nhật spec:** 2026-06-10 — phản ánh code thực tế (gồm r81–r105, **r104: User delete qua Edge Function + EIS form-specific schema/roll-up ở All Forms; r105: fix EIS per-CA load — revert về field_name + post-filter Set (I3)**, MCAR cột Raised by, Target_date lấy từ Report, MCAR deadline check, copyholder on-time so theo ngày, lọc Cancelled/Deleted, auto-refresh kiosk, multi-year filter, admin export, SPI, KPI2, PAVOI RFI)
+**Version hiện tại:** `2026.06.10-r106`
+**Cập nhật spec:** 2026-06-10 — phản ánh code thực tế (gồm r81–r106, **r104: User delete qua Edge Function + EIS form-specific schema/roll-up ở All Forms; r105: fix EIS per-CA load — revert về field_name + post-filter Set (I3); r106: EIS đóng/mở theo cấp report (không suy từ CA Date completed)**, MCAR cột Raised by, Target_date lấy từ Report, MCAR deadline check, copyholder on-time so theo ngày, lọc Cancelled/Deleted, auto-refresh kiosk, multi-year filter, admin export, SPI, KPI2, PAVOI RFI)
 
 > Tài liệu này mô tả TOÀN BỘ kiến trúc, dữ liệu, logic và quy ước của dashboard. Dùng làm nguồn tham chiếu chuẩn khi sửa code. Số dòng (Lxxxx) là tương đối, dùng để định vị nhanh.
 
@@ -57,7 +57,7 @@ Dashboard nội bộ cho **QA AMO** (Quality Assurance — Approved Maintenance 
 | `SUPA_KEY` | `sb_publishable_…` | anon key |
 | `G_URL` | `https://galileo-proxy.thaibahoa2308.workers.dev/proxy/` | Galileo proxy |
 | `ORG_UNIT` | `'QA AMO'` | filter chính cho mọi query report |
-| `APP_REV` | `'2026.06.10-r105'` | version (hiển thị footer sidebar + User Guide + PDF; nhãn User Guide nạp động từ `APP_REV` qua `#guideVer`/`#guideFooter`) |
+| `APP_REV` | `'2026.06.10-r106'` | version (hiển thị footer sidebar + User Guide + PDF; nhãn User Guide nạp động từ `APP_REV` qua `#guideVer`/`#guideFooter`) |
 | `AUTO_REFRESH_MS` | `12*60*60*1000` (12h) | chu kỳ auto-refresh kiosk (xem §5.6) |
 | `AUTO_REFRESH_CHECK_MS` | `5*60*1000` (5 phút) | nhịp heartbeat kiểm tra tới hạn |
 | `PS` | `25` | page size pagination |
@@ -281,7 +281,11 @@ EIS không khớp khung 14 cột chung (thiếu CAT/Finding Level/Audit Ref/MNT 
 - **Fetch scope (r105 — fix lỗi r104 patch):** **Fetch theo `field_name`, POST-FILTER bằng `Set` report_id** (đúng I3 + đúng pattern `loadCmr`/`loadEcar`) + **`skipOv=true`** cả 2 call.
   - ⚠️ **Vết xe đổ (đừng lặp lại):** patch `EIS_PATCH_r104` từng thử **scope cả 2 view theo `report_id`** (`(field_name…) and (report_id eq <uuid> or …)`, chunk 20) để né "treo". Kết quả: **2 view analytics EAV (`report_form_section_field` + `report_field`) trả VỀ RỖNG khi có `report_id` trong `$filter`** → trên UI mọi EIS hiện `CAs=0 · Departments=— · Progress=0/0`, status/due rớt về `Target_date` gốc (EIS-017 = 30/05 Overdue thay vì 30/06 Open). Đây **chính là lý do tồn tại I3**. r105 revert về field_name-only + post-filter.
   - "Treo load" mà patch lo thực ra là do **thiếu `skipOv`** ở call desc (chiếm overlay toàn cục + text rác "Loading documents…", vết r41), KHÔNG phải do field_name-only. `loadCmr` fetch `report_field` theo `field_name` (`CMR_RF`) + post-filter `cmrIdSet` vẫn chạy ổn → minh chứng field_name-only an toàn. r105 giữ `skipOv=true` cả 2 call.
-- **Roll-up (`enrichEis`, clone — KHÔNG mutate `allData`):** `Target_date` = max(target CA); `report_ageing` = `ageCalc(rollup)`; `semantic_status` roll-up = Open/Overdue theo `today` vs latest target, On-time/Lately Closed khi mọi CA đã có Date completed. Status từng CA dùng lại `semCalc('Open', completed, target)`. Badge "n overdue CA" vẫn hiện CA lẻ quá hạn trong popup.
+- **Roll-up (`enrichEis`, clone — KHÔNG mutate `allData`):** `Target_date` = max(target CA) (fallback `r.Target_date` nếu 0 CA); `report_ageing` = `ageCalc(rollup)`. Status từng CA dùng lại `semCalc('Open', completed, target)`. Badge "n overdue CA" vẫn hiện CA lẻ quá hạn trong popup.
+- **Đóng/mở quyết định Ở CẤP REPORT (r106 — sửa lỗi r10x):** `reportClosed = !!r.close_date || r.semantic_status ∈ {On-time/Lately/Closed}`. **KHÔNG** suy đóng/mở từ việc CA đã điền `Date completed` hay chưa (vd EIS-2025/005 đã đóng ở report nhưng 1 CA thiếu Date completed → trước r106 bị tính **Overdue** sai). Logic:
+  - `reportClosed || allDone` → **đóng**: On-time/Lately so **ngày đóng** (`r.close_date`, fallback max(Date completed của CA)) với **due roll-up** bằng `dDay`. (Giữ `allDone` làm tín hiệu phụ để report đang hiện Closed không đổi hành vi.)
+  - còn lại → **mở**: `semCalc('Open', null, rollup)` = Open/Overdue theo `today` vs latest target.
+  - *Lưu ý:* report 0 CA & đã đóng → vẫn Closed, `Target (latest)` = `r.Target_date` gốc (không có CA để roll-up). Badge "(n overdue)" vẫn có thể xuất hiện trên report đã đóng nếu CA thiếu Date completed (chất lượng dữ liệu — cố ý phơi bày).
 - **⚠ Phạm vi:** roll-up CHỈ ở *All Forms*; **KPI/Overview/Overdue vẫn dùng `Target_date` cũ** của EIS trong `allData` (sửa toàn cục = follow-up r10x kèm giải trình stakeholder). Không tự ý mutate `allData`.
 - Hàm: `loadEisDetail`, `enrichEis`, `showEisDetail`/`closeEisModal`; registry `AF_SCHEMAS`; state `eisLoaded`/`eisCAMap`/`eisDescMap` (§10).
 
@@ -362,7 +366,7 @@ EIS không khớp khung 14 cột chung (thiếu CAT/Finding Level/Audit Ref/MNT 
 ## 13. Quy ước phát triển
 
 - **Edit surgical:** chỉ chạm điểm cần sửa, không refactor lan man.
-- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r105. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.) Nhãn version ở User Guide nạp động từ `APP_REV` (không hardcode "vN").
+- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r106. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.) Nhãn version ở User Guide nạp động từ `APP_REV` (không hardcode "vN").
 - **Deploy:** sửa `index.html` (bản OneDrive) → copy vào clone repo → `git diff` review → commit + push `main` (commit message dùng `git commit -F` để tránh lỗi shell với ký tự `/`). GitHub Pages tự build ~1–2 phút.
 - **Tận dụng helper có sẵn** (fetchAll, g, s, esc, fd, toast, setOv, renderPaged, sortD, ageCalc) — không viết trùng.
 - **Tài liệu liên quan:** `PAVOI_RFI_Spec.md` (RFI chi tiết), `CAR report types & KPI2` (MCAR/AMO-ECAR vs CMR-CAR/ECAR; KPI2 Phase-1), `GALILEO_QUIRKS.md`, `GALILEO_DATA_QUALITY.md`.
@@ -373,6 +377,7 @@ EIS không khớp khung 14 cột chung (thiếu CAT/Finding Level/Audit Ref/MNT 
 
 | Rev | Nội dung |
 |---|---|
+| r106 | **Fix EIS đóng/mở theo cấp report:** `enrichEis` trước đây suy đóng/mở từ "mọi CA đã có Date completed" → report **đã đóng** nhưng CA thiếu Date completed (vd EIS-2025/004 0 CA, /005 3/4, /009 2/3) bị tính **Overdue** sai. r106: `reportClosed = close_date \|\| semantic_status ∈ {On-time/Lately/Closed}`; `reportClosed \|\| allDone` → đóng (On-time/Lately so ngày đóng vs due roll-up bằng `dDay`), còn lại → Open/Overdue theo latest target. Giữ `allDone` làm fallback (không regress). Report 0 CA → `Target (latest)` = `Target_date` gốc. Xem §8.7. |
 | r105 | **Fix EIS per-CA load (lỗi từ delta r104):** patch r104 scope 2 view analytics theo `report_id` → **trả rỗng** (2 view EAV không hỗ trợ filter report_id — đúng I3) → UI mọi EIS hiện `CAs=0/Departments=—/Progress=0/0`, due rớt về `Target_date` gốc. r105 **revert `loadEisDetail` về fetch theo `field_name` + post-filter `Set`** (đúng pattern `loadCmr`/`loadEcar`), giữ `skipOv=true` cả 2 call (fix overlay r41 — thủ phạm "treo" thật sự). Giữ nguyên popup rút gọn + roll-up. Xem §8.7. |
 | r104 | **(2 spec chung 1 bump)** (1) **User delete** — nút 🗑 Delete ở User Management → `deleteUser` gọi Edge Function `delete-user` (xóa cả `auth.users`+`public.users`, service_role server-side, verify admin qua JWT, chặn tự xóa/admin cuối, CORS whitelist, FK cascade). Edge Function + FK do Eric deploy phía Supabase. Xem §8.5, `USER_DELETE_SPEC.md`. (2) **EIS form-specific ở All Forms** — `renderAF` schema-driven (`AF_SCHEMAS`, `_default` giữ nguyên 14 cột), EIS có cột riêng + popup per-CA (`#eisModal`), lazy-load `loadEisDetail` ghép CA theo `section_id`, **due roll-up = latest Target date** (`enrichEis`, clone — KHÔNG mutate `allData`; KPI/Overview giữ giá trị cũ). Xem §8.7, `FORM_EIS_DESIGN.md`. **Delta `EIS_PATCH_r104` (cùng rev, không bump):** thêm `skipOv=true` mọi call (hết chiếm overlay/text rác, vết r41) + rút gọn popup (bỏ Main Cause/Error/Violation/Detailed Description khỏi `EIS_DESC_FIELDS` + `showEisDetail`) — **2 phần này giữ lại**. ⚠️ Phần scope `loadEisDetail` theo `report_id` (chunk 20) **GÂY LỖI rỗng CA → đã revert ở r105** (xem r105). |
 | r81 | All Forms: thêm cột Completed/Close Date; fix Target date cho SR/AISC qua workflow stage; helper `deriveStageDates`. |

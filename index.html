@@ -2222,7 +2222,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.10-r105';
+const APP_REV = '2026.06.10-r106';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -4265,15 +4265,25 @@ function enrichEis(r){
   const cas = eisCAMap[r.report_id] || [];
   const desc = eisDescMap[r.report_id] || {};
   const targets = cas.map(c=>c.target).filter(Boolean);
-  const rollup  = targets.length ? targets.reduce((a,b)=> a>b ? a : b) : (r.Target_date||null); // latest
+  const rollup  = targets.length ? targets.reduce((a,b)=> a>b ? a : b) : (r.Target_date||null); // latest target
   const done    = cas.filter(c=>c.completed).length;
   const allDone = cas.length>0 && done===cas.length;
+
+  // ĐÓNG/MỞ lấy theo CẤP REPORT (workflow) — KHÔNG suy từ việc CA đã điền Date completed hay chưa.
+  // (vd EIS-2025/005 đã đóng ở report nhưng 1 CA thiếu Date completed → trước r106 bị tính Overdue.)
+  // Giữ thêm `allDone` như tín hiệu phụ để các report đang hiện Closed (CA đủ) không đổi hành vi.
+  const CLOSED = ['On-time Closed','Lately Closed','Closed'];
+  const reportClosed = !!r.close_date || CLOSED.includes(r.semantic_status);
   let status;
-  if(allDone){
-    const maxC = cas.map(c=>c.completed).filter(Boolean).reduce((a,b)=> a>b ? a : b);
-    status = (!rollup || maxC<=rollup) ? 'On-time Closed' : 'Lately Closed';
+  if(reportClosed || allDone){
+    // ngày đóng = close_date của report (ưu tiên), fallback max(Date completed của CA); so với due roll-up
+    const compl = cas.map(c=>c.completed).filter(Boolean);
+    const cd = r.close_date || (compl.length ? compl.reduce((a,b)=> a>b ? a : b) : null);
+    status = (!rollup || !cd)
+      ? (CLOSED.includes(r.semantic_status) ? r.semantic_status : 'Closed')
+      : (dDay(cd) <= dDay(rollup) ? 'On-time Closed' : 'Lately Closed');
   } else {
-    status = semCalc('Open', null, rollup);
+    status = semCalc('Open', null, rollup);   // report MỞ → Open/Overdue theo due roll-up
   }
   const depts = [...new Set(cas.map(c=>c.dept).filter(Boolean))];
   return {
