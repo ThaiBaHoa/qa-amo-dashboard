@@ -4188,76 +4188,82 @@ let eisDescMap = {};   // report_id -> { 'Primary Source':…, MEDA:[…], … }
 let eisCAMap   = {};   // report_id -> [ {action,classification,dept,target,completed,voi,status,age}, … ]
 
 const EIS_DESC_FIELDS = ['Primary Source','Event investigation summary number','Investigation',
-  'Main Cause','Error','Violation',
   'Impact and losses: [The direct and indirect consequences of the incident]',
-  'Immediate action(s)','Detailed Description','Contributing Factors Checklist MEDA'];
+  'Immediate action(s)','Contributing Factors Checklist MEDA'];
 const EIS_CA_FIELDS = ['Corrective Action(s)','Corrective Action Classification','Department',
   'Target date','Date completed','Verification of implementation (VOI)'];
 
+// (1) fetchAll mặc định skipOv=false → bật overlay TOÀN CỤC + xài text cũ trong #ovText (vết r41).
+//     Mọi call lazy PHẢI truyền skipOv=true (đối số 2).
+// (2) report_field VÀ form_section_field đều SCOPE theo report_id của EIS.
+//     'Target date'/'Department'/'Date completed'/'Detailed Description' dùng chung mọi form —
+//     lọc chỉ theo field_name sẽ quét cả warehouse → treo. 15 EIS × 2 node < 100.
 async function loadEisDetail(){
-  const eisIds = new Set(allData.filter(r=>r.report_title===EIS_TITLE).map(r=>r.report_id));
-  if(!eisIds.size){ eisLoaded=true; return; }
+  const eisRows = allData.filter(r=>r.report_title===EIS_TITLE);
+  const eisIds  = [...new Set(eisRows.map(r=>r.report_id).filter(Boolean))];
+  if(!eisIds.length){ eisLoaded=true; return; }
+  const eisIdSet = new Set(eisIds);
 
-  const descFilter = EIS_DESC_FIELDS.map(f=>`field_name eq '${f.replace(/'/g,"''")}'`).join(' or ');
-  const caFilter   = EIS_CA_FIELDS.map(f=>`field_name eq '${f.replace(/'/g,"''")}'`).join(' or ');
+  const q = v => `'${String(v).replace(/'/g,"''")}'`;
+  const descFieldClause = EIS_DESC_FIELDS.map(f=>`field_name eq ${q(f)}`).join(' or ');
+  const caFieldClause   = EIS_CA_FIELDS.map(f=>`field_name eq ${q(f)}`).join(' or ');
+
+  // Scope theo report_id (UUID KHÔNG quote), chunk 20 → mỗi query < MaxNodeCount(100)
+  const chunks=[]; for(let i=0;i<eisIds.length;i+=20) chunks.push(eisIds.slice(i,i+20));
+  const mkIdClause = ch => ch.map(id=>`report_id eq ${id}`).join(' or ');
+  const descUrls = chunks.map(ch=>G_URL+'dwanalytics_report_form_section_field'
+    +'?$select=report_id,field_name,text_value'
+    +'&$filter='+encodeURIComponent(`(${descFieldClause}) and (${mkIdClause(ch)})`));
+  const caUrls = chunks.map(ch=>G_URL+'dwanalytics_report_field'
+    +'?$select=report_id,field_name,value_text,section_id'
+    +'&$filter='+encodeURIComponent(`(${caFieldClause}) and (${mkIdClause(ch)})`));
 
   try{
-    const [descRaw, caRaw] = await Promise.all([
-      // single-value desc: form_section_field (text_value) — fetch by field_name only, post-filter by Set
-      fetchAll(G_URL+'dwanalytics_report_form_section_field'+
-        '?$select=report_id,field_name,text_value,report_field_created_date'+
-        '&$filter='+encodeURIComponent(descFilter))
-        .catch(e=>{console.warn('EIS desc fetch failed:',e);return[];}),
-      // repeater CA: report_field (value_text + section_id) — fetch by field_name only, post-filter by Set, group by section_id
-      fetchAll(G_URL+'dwanalytics_report_field'+
-        '?$select=report_id,field_name,value_text,section_id,report_field_created_date'+
-        '&$filter='+encodeURIComponent(caFilter), true)
-        .catch(e=>{console.warn('EIS CA fetch failed:',e);return[];}),
+    // skipOv=true (đối số 2) — KHÔNG chiếm overlay loading toàn cục
+    const [descParts, caParts] = await Promise.all([
+      Promise.all(descUrls.map(u=>fetchAll(u,true).catch(e=>{console.warn('EIS desc chunk failed:',e);return[];}))),
+      Promise.all(caUrls.map(u=>fetchAll(u,true).catch(e=>{console.warn('EIS CA chunk failed:',e);return[];}))),
     ]);
+    const descRaw = descParts.flat();
+    const caRaw   = caParts.flat();
 
     // ── desc map (single value, keep first non-empty; MEDA = array) ──
     eisDescMap = {};
     descRaw.forEach(f=>{
-      if(!eisIds.has(f.report_id)) return;
-      const v = (f.text_value||'').trim();
+      if(!eisIdSet.has(f.report_id)) return;
+      const v=(f.text_value||'').trim();
       if(!v || f.field_name==='VietJet_Air_logo.svg' || f.field_name==='CORRECTIVE ACTIONS') return;
-      const d = eisDescMap[f.report_id] || (eisDescMap[f.report_id]={MEDA:[]});
-      if(f.field_name==='Contributing Factors Checklist MEDA'){ d.MEDA.push(v); }
-      else if(d[f.field_name]==null){ d[f.field_name]=v; }
+      const d=eisDescMap[f.report_id]||(eisDescMap[f.report_id]={MEDA:[]});
+      if(f.field_name==='Contributing Factors Checklist MEDA') d.MEDA.push(v);
+      else if(d[f.field_name]==null) d[f.field_name]=v;
     });
 
     // ── CA map (group by section_id) ──
-    const bySec = {};   // report_id -> section_id -> partial CA
+    const bySec={};
     caRaw.forEach(f=>{
-      if(!eisIds.has(f.report_id) || !f.section_id) return;
-      const byR = bySec[f.report_id] || (bySec[f.report_id]={});
-      const ca  = byR[f.section_id] || (byR[f.section_id]={});
-      const v = f.value_text!=null ? String(f.value_text).trim() : '';
+      if(!eisIdSet.has(f.report_id) || !f.section_id) return;
+      const byR=bySec[f.report_id]||(bySec[f.report_id]={});
+      const ca =byR[f.section_id]||(byR[f.section_id]={});
+      const v=f.value_text!=null?String(f.value_text).trim():'';
       switch(f.field_name){
-        case 'Corrective Action(s)':                      ca.action=v; break;
-        case 'Corrective Action Classification':          ca.classification=v; break;
-        case 'Department':                                ca.dept=v; break;
-        case 'Target date':                               ca.target=v||null; break;
-        case 'Date completed':                            ca.completed=v||null; break;
-        case 'Verification of implementation (VOI)':      ca.voi=v; break;
+        case 'Corrective Action(s)':                 ca.action=v; break;
+        case 'Corrective Action Classification':     ca.classification=v; break;
+        case 'Department':                           ca.dept=v; break;
+        case 'Target date':                          ca.target=v||null; break;
+        case 'Date completed':                       ca.completed=v||null; break;
+        case 'Verification of implementation (VOI)': ca.voi=v; break;
       }
     });
-
-    eisCAMap = {};
-    Object.entries(bySec).forEach(([rid, secs])=>{
-      const cas = Object.values(secs)
-        .filter(c=>c.action || c.target || c.dept)        // bỏ section rỗng
-        .map(c=>({
-          action:c.action||'', classification:c.classification||'',
-          dept:c.dept||'', target:c.target||null, completed:c.completed||null,
-          voi:c.voi||'',
-          status: semCalc('Open', c.completed||null, c.target||null),
-          age:    ageCalc(c.target||null),
-        }));
-      eisCAMap[rid] = cas;
+    eisCAMap={};
+    Object.entries(bySec).forEach(([rid,secs])=>{
+      eisCAMap[rid]=Object.values(secs)
+        .filter(c=>c.action||c.target||c.dept)
+        .map(c=>({action:c.action||'',classification:c.classification||'',dept:c.dept||'',
+          target:c.target||null,completed:c.completed||null,voi:c.voi||'',
+          status:semCalc('Open',c.completed||null,c.target||null), age:ageCalc(c.target||null)}));
     });
   }catch(e){ console.warn('EIS load error:',e); }
-  eisLoaded = true;
+  eisLoaded=true;
 }
 
 // Tạo bản clone giàu thông tin cho 1 report EIS (KHÔNG mutate allData)
@@ -4833,10 +4839,6 @@ function showEisDetail(report_id){
   safeHTML(g('eisMBody'), `
     ${block('Primary Source', desc['Primary Source'])}
     ${block('Investigation', desc['Investigation'])}
-    ${block('Detailed Description', desc['Detailed Description'])}
-    ${block('Main Cause', desc['Main Cause'])}
-    ${block('Error', desc['Error'])}
-    ${block('Violation', desc['Violation'])}
     ${block('Impact and losses', desc['Impact and losses: [The direct and indirect consequences of the incident]'])}
     ${block('Immediate action(s)', desc['Immediate action(s)'])}
     ${meda}
