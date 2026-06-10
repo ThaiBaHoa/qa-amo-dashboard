@@ -2222,7 +2222,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.10-r104';
+const APP_REV = '2026.06.10-r105';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -4193,39 +4193,33 @@ const EIS_DESC_FIELDS = ['Primary Source','Event investigation summary number','
 const EIS_CA_FIELDS = ['Corrective Action(s)','Corrective Action Classification','Department',
   'Target date','Date completed','Verification of implementation (VOI)'];
 
-// (1) fetchAll mặc định skipOv=false → bật overlay TOÀN CỤC + xài text cũ trong #ovText (vết r41).
-//     Mọi call lazy PHẢI truyền skipOv=true (đối số 2).
-// (2) report_field VÀ form_section_field đều SCOPE theo report_id của EIS.
-//     'Target date'/'Department'/'Date completed'/'Detailed Description' dùng chung mọi form —
-//     lọc chỉ theo field_name sẽ quét cả warehouse → treo. 15 EIS × 2 node < 100.
+// FETCH theo `field_name` rồi POST-FILTER bằng `Set` report_id — KHÔNG nhồi report_id vào $filter.
+// Lý do (Invariant I3): 2 view analytics EAV (`report_form_section_field` + `report_field`) KHÔNG
+// hỗ trợ filter theo report_id → query có `report_id eq <uuid>` trả VỀ RỖNG (đã sai ở patch trước:
+// CAs=0/Departments=—). Đây đúng pattern loadCmr/loadEcar (CMR_RF + applySecIdOverlay) đang chạy ổn.
+// Cả 2 fetch truyền `skipOv=true` (đối số 2) → KHÔNG chiếm overlay loading toàn cục (vết r41).
 async function loadEisDetail(){
-  const eisRows = allData.filter(r=>r.report_title===EIS_TITLE);
-  const eisIds  = [...new Set(eisRows.map(r=>r.report_id).filter(Boolean))];
-  if(!eisIds.length){ eisLoaded=true; return; }
-  const eisIdSet = new Set(eisIds);
+  const eisIds = new Set(allData.filter(r=>r.report_title===EIS_TITLE).map(r=>r.report_id).filter(Boolean));
+  if(!eisIds.size){ eisLoaded=true; return; }
+  const eisIdSet = eisIds;
 
   const q = v => `'${String(v).replace(/'/g,"''")}'`;
-  const descFieldClause = EIS_DESC_FIELDS.map(f=>`field_name eq ${q(f)}`).join(' or ');
-  const caFieldClause   = EIS_CA_FIELDS.map(f=>`field_name eq ${q(f)}`).join(' or ');
-
-  // Scope theo report_id (UUID KHÔNG quote), chunk 20 → mỗi query < MaxNodeCount(100)
-  const chunks=[]; for(let i=0;i<eisIds.length;i+=20) chunks.push(eisIds.slice(i,i+20));
-  const mkIdClause = ch => ch.map(id=>`report_id eq ${id}`).join(' or ');
-  const descUrls = chunks.map(ch=>G_URL+'dwanalytics_report_form_section_field'
-    +'?$select=report_id,field_name,text_value'
-    +'&$filter='+encodeURIComponent(`(${descFieldClause}) and (${mkIdClause(ch)})`));
-  const caUrls = chunks.map(ch=>G_URL+'dwanalytics_report_field'
-    +'?$select=report_id,field_name,value_text,section_id'
-    +'&$filter='+encodeURIComponent(`(${caFieldClause}) and (${mkIdClause(ch)})`));
+  const descFilter = EIS_DESC_FIELDS.map(f=>`field_name eq ${q(f)}`).join(' or ');
+  const caFilter   = EIS_CA_FIELDS.map(f=>`field_name eq ${q(f)}`).join(' or ');
 
   try{
-    // skipOv=true (đối số 2) — KHÔNG chiếm overlay loading toàn cục
-    const [descParts, caParts] = await Promise.all([
-      Promise.all(descUrls.map(u=>fetchAll(u,true).catch(e=>{console.warn('EIS desc chunk failed:',e);return[];}))),
-      Promise.all(caUrls.map(u=>fetchAll(u,true).catch(e=>{console.warn('EIS CA chunk failed:',e);return[];}))),
+    const [descRaw, caRaw] = await Promise.all([
+      // single-value desc: form_section_field (text_value) — fetch theo field_name, post-filter Set
+      fetchAll(G_URL+'dwanalytics_report_form_section_field'+
+        '?$select=report_id,field_name,text_value'+
+        '&$filter='+encodeURIComponent(descFilter), true)
+        .catch(e=>{console.warn('EIS desc fetch failed:',e);return[];}),
+      // repeater CA: report_field (value_text + section_id) — fetch theo field_name, post-filter Set, group by section_id
+      fetchAll(G_URL+'dwanalytics_report_field'+
+        '?$select=report_id,field_name,value_text,section_id'+
+        '&$filter='+encodeURIComponent(caFilter), true)
+        .catch(e=>{console.warn('EIS CA fetch failed:',e);return[];}),
     ]);
-    const descRaw = descParts.flat();
-    const caRaw   = caParts.flat();
 
     // ── desc map (single value, keep first non-empty; MEDA = array) ──
     eisDescMap = {};
