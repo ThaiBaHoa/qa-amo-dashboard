@@ -775,7 +775,7 @@ tr:last-child td{border-bottom:none}
                   <th>ATA Chapter</th>
                   <th style="text-align:center;color:var(--blue)">Internal (N−1)</th>
                   <th style="text-align:center;color:#ff6b6b">ECAR (N)</th>
-                  <th style="text-align:center">Ratio %</th>
+                  <th style="text-align:center">Ratio</th>
                   <th style="text-align:center">Assessment</th>
                 </tr></thead>
                 <tbody id="ataCompareBody"></tbody>
@@ -2239,7 +2239,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.12-r108';
+const APP_REV = '2026.06.12-r108-i1';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3672,7 +3672,7 @@ function renderATACompare() {
 
   // cập nhật sub
   const subEl = g('ataCompareSub');
-  if(subEl) subEl.textContent = `Tử = CMR-CAR + QC Spot Check ${numYM}  ÷  Mẫu = ECAR ${denYM}  × 100%`;
+  if(subEl) subEl.textContent = `Ratio = (CMR-CAR + QC Spot Check ${numYM}) ÷ (ECAR ${denYM}) — số thập phân`;
 
   // ── đếm finding con per-ATA ──
   const numCount = {};   // tử: CMR + QCS (tháng N−1)
@@ -3734,26 +3734,26 @@ function renderATACompare() {
   const tbody = g('ataCompareBody');
   if(!tbody) return;
 
-  // badge edge case: num=tử(internal), den=mẫu(ECAR)
+  // badge edge case: num=tử(internal), den=mẫu(ECAR). Ratio = số thập phân (num/den).
   const cell = (num, den) => {
     if(den>0){
-      const pct = Math.round(num/den*100);
-      if(num>=den)      return {ratio:pct+'%', badge:`<span class="badge b-on"   style="font-size:10px">✅ Effective</span>`, bad:false};
-      if(num>0)         return {ratio:pct+'%', badge:`<span class="badge b-over" style="font-size:10px">⚠ Under</span>`,     bad:true};
-      return                   {ratio:'0%',     badge:`<span class="badge b-over" style="font-size:10px">❌ Missed</span>`,    bad:true};
+      const r = (num/den).toFixed(2);
+      if(num>=den)      return {ratio:r,      badge:`<span class="badge b-on"   style="font-size:10px">✅ Effective</span>`, bad:false};
+      if(num>0)         return {ratio:r,      badge:`<span class="badge b-over" style="font-size:10px">⚠ Under</span>`,     bad:true};
+      return                   {ratio:'0.00', badge:`<span class="badge b-over" style="font-size:10px">❌ Missed</span>`,    bad:true};
     }
     if(num>0) return {ratio:'∞', badge:`<span class="badge b-open" style="font-size:10px">↑ Over-detect</span>`, bad:false};
-    return            {ratio:'—', badge:`<span style="color:var(--muted);font-size:10px">—</span>`, bad:false};
+    return            {ratio:'0', badge:`<span style="color:var(--muted);font-size:10px">—</span>`, bad:false};
   };
 
-  // dòng TOTAL (Σ tử / Σ mẫu) — headline KPI
-  const totNum = Object.values(numCount).reduce((a,b)=>a+b,0);
-  const totDen = Object.values(denCount).reduce((a,b)=>a+b,0);
+  // dòng TOTAL: CHỈ cộng phần CÓ ATA (khớp đúng tổng các dòng per-ATA hiển thị; No-ATA để riêng dòng dưới) — headline KPI
+  const totNum = allATAFull.reduce((s,a)=>s+(numCount[a]||0),0);
+  const totDen = allATAFull.reduce((s,a)=>s+(denCount[a]||0),0);
   const tc = cell(totNum, totDen);
   let html = `<tr style="border-bottom:2px solid var(--border);background:rgba(88,166,255,0.06);font-weight:700">
-    <td style="font-size:12px">TOTAL · ${numYM} ÷ ${denYM}</td>
-    <td style="text-align:center;color:var(--blue)">${totNum||'—'}</td>
-    <td style="text-align:center;color:#ff6b6b">${totDen||'—'}</td>
+    <td style="font-size:12px">TOTAL (ATA) · Internal ${numYM} ÷ ECAR ${denYM}</td>
+    <td style="text-align:center;color:var(--blue)">${totNum}</td>
+    <td style="text-align:center;color:#ff6b6b">${totDen}</td>
     <td style="text-align:center">${tc.ratio}</td>
     <td style="text-align:center">${tc.badge}</td>
   </tr>`;
@@ -3764,8 +3764,8 @@ function renderATACompare() {
     const label = level===2 && ATA_LABELS[a] ? ATA_LABELS[a] : a;
     return `<tr style="${c.bad?'background:rgba(255,107,107,0.05)':''}">
       <td style="font-size:11px;font-weight:500">${esc(label)}</td>
-      <td style="text-align:center;color:var(--blue);font-weight:600">${num||'—'}</td>
-      <td style="text-align:center;color:#ff6b6b;font-weight:600">${den||'—'}</td>
+      <td style="text-align:center;color:var(--blue);font-weight:600">${num}</td>
+      <td style="text-align:center;color:#ff6b6b;font-weight:600">${den}</td>
       <td style="text-align:center;font-size:11px">${c.ratio}</td>
       <td style="text-align:center">${c.badge}</td>
     </tr>`;
@@ -3776,8 +3776,8 @@ function renderATACompare() {
   if(numOther>0 || denOther>0){
     html += `<tr style="border-top:1px solid var(--border);opacity:0.6">
       <td style="font-size:11px;color:var(--muted)">No-ATA / Non-numeric</td>
-      <td style="text-align:center;color:var(--blue)">${numOther||'—'}</td>
-      <td style="text-align:center;color:#ff6b6b">${denOther||'—'}</td>
+      <td style="text-align:center;color:var(--blue)">${numOther}</td>
+      <td style="text-align:center;color:#ff6b6b">${denOther}</td>
       <td style="text-align:center;font-size:11px">—</td>
       <td style="text-align:center"><span style="color:var(--muted);font-size:10px">N/A</span></td>
     </tr>`;
@@ -3894,7 +3894,7 @@ async function exportATAComparePDF() {
 
   doc.autoTable({
     startY:y,
-    head:[['ATA Chapter','Internal (N-1)','ECAR (N)','Ratio %','Assessment']],
+    head:[['ATA Chapter','Internal (N-1)','ECAR (N)','Ratio','Assessment']],
     body:tRows,
     headStyles:{fillColor:[30,64,175],textColor:[255,255,255],fontSize:8,fontStyle:'bold'},
     bodyStyles:{fontSize:7.5,valign:'middle',textColor:[30,30,30]},
