@@ -2088,6 +2088,23 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- QC SPOT CHECK DETAIL MODAL -->
+<div class="overlay" id="qcsModal" onclick="closeQcsModal(event)" style="z-index:215;display:none">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:95%;max-width:860px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0">
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">QC Spot Check Report</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text);margin-top:2px" id="qcsMTitle">—</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px" id="qcsMSub">—</div>
+      </div>
+      <button onclick="closeQcsModal()" style="background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);font-size:16px;cursor:pointer;padding:3px 10px;border-radius:6px;flex-shrink:0;margin-left:12px">✕</button>
+    </div>
+    <div style="overflow:auto;flex:1;padding:16px 18px">
+      <div id="qcsMBody"></div>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="auditModal" onclick="closeAuditModal(event)" style="z-index:210">
   <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:93%;max-width:1020px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
     <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0">
@@ -2222,7 +2239,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.10-r106';
+const APP_REV = '2026.06.12-r107';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2720,6 +2737,7 @@ async function loadData(forceRefresh=false) {
   isLoading=true;
   pavoiRfiLoaded = false; pavoiRfiMap = {}; pavoiRfiDone = new Set();   // reset RFI để Refresh kéo lại bản mới
   eisLoaded=false; eisCAMap={}; eisDescMap={};   // reset EIS per-CA cache để Refresh kéo lại
+  qcsLoaded=false; qcsMap={};                     // reset QC Spot Check cache để Refresh kéo lại
   setOv(true,'[1/6] Connecting to Galileo...','',5);
   try {
 
@@ -4180,6 +4198,7 @@ const AF_EIS_COLS = [
 const AF_SCHEMAS = {
   _default: { cols: AF_DEFAULT_COLS },
   [EIS_TITLE]: { cols: AF_EIS_COLS, rowClick: 'showEisDetail' },
+  [QCS_TITLE]: { cols: AF_QCS_COLS, rowClick: 'showQcsDetail' },
 };
 
 // ── EIS lazy-load (per-CA) ────────────────────────────────────
@@ -4299,6 +4318,86 @@ function enrichEis(r){
   };
 }
 
+// ── QC SPOT CHECK lazy-load (detail trong All Forms, modal riêng) ──
+const QCS_TITLE = 'QC Spot Check Report';
+const QCS_HEADER_FIELDS = ['Aircraft Registration','A/C Type','Spot Check Type','Audit Ref. No',
+  'Area of standard','Department','Issued to (person)','Verified by (auditor)',
+  'Certifying Staff/Foreman Name & Auth. #','Issue Date','Target date','Date completed',
+  'Date verified','Flight No.','Immediate action(s)','Verification of implementation (VOI)','Reference details'];
+const QCS_FINDING_FIELDS = ['Finding description','ATA Chapter','Defect Classification','Position','AOG'];
+
+const AF_QCS_COLS = [
+  {label:'Report No',      sortKey:'report_number',     render:r=>`<td><b style="color:var(--blue)">${esc(r.report_number)||'—'}</b></td>`},
+  {label:'Aircraft',                                     render:r=>_tdMuted(esc(r.qcs_aircraft)||'—')},
+  {label:'A/C Type',                                     render:r=>_tdMuted(esc(r.qcs_ac_type)||'—')},
+  {label:'Spot Check Type',                              render:r=>_tdMuted(esc(r.qcs_spot_type)||'—')},
+  {label:'Status',         sortKey:'semantic_status',    render:r=>`<td>${sBadge(r.semantic_status)}</td>`},
+  {label:'Findings',       sortKey:'qcs_finding_count',  render:r=>`<td style="text-align:center"><b style="color:var(--blue)">${r.qcs_finding_count||0}</b></td>`},
+  {label:'Raised Date',    sortKey:'raised_date',        render:r=>_tdMuted(fd(r.raised_date))},
+  {label:'Target Date',    sortKey:'Target_date',        render:r=>`<td>${fd(r.Target_date)}</td>`},
+  {label:'Days to Due',    sortKey:'report_ageing',      render:r=>`<td>${ageDis(r.report_ageing,r.semantic_status)}</td>`},
+  {label:'Audit Ref',                                    render:r=>_tdMuted(esc(r.audit_ref)||'—')},
+];
+
+let qcsLoaded = false;
+let qcsMap    = {};   // report_id -> { header:{field:val}, findings:[{desc,ata,defect,pos,aog}] }
+
+// FETCH theo field_name → post-filter Set (invariant I3, giống loadEisDetail/loadCmr). skipOv=true.
+async function loadQcsDetail(){
+  const qcsIds = new Set(allData.filter(r=>r.report_title===QCS_TITLE).map(r=>r.report_id).filter(Boolean));
+  if(!qcsIds.size){ qcsLoaded=true; return; }
+  const q = v => `'${String(v).replace(/'/g,"''")}'`;
+  const filter = [...QCS_HEADER_FIELDS, ...QCS_FINDING_FIELDS].map(f=>`field_name eq ${q(f)}`).join(' or ');
+  try{
+    const raw = await fetchAll(G_URL+'dwanalytics_report_field'+
+      '?$select=report_id,field_name,value_text,section_id'+
+      '&$filter='+encodeURIComponent(filter), true)
+      .catch(e=>{console.warn('QCS fetch failed:',e);return[];});
+
+    // group: report_id -> section_id -> { field_name: value } (giữ giá trị đầu trong section)
+    const bySec={};
+    raw.forEach(f=>{
+      if(!qcsIds.has(f.report_id) || !f.section_id) return;
+      const byR = bySec[f.report_id] || (bySec[f.report_id]={});
+      const sec = byR[f.section_id] || (byR[f.section_id]={});
+      const v = f.value_text!=null ? String(f.value_text).trim() : '';
+      if(sec[f.field_name]==null) sec[f.field_name]=v;
+    });
+
+    qcsMap={};
+    Object.entries(bySec).forEach(([rid,secs])=>{
+      const header={}, findings=[];
+      Object.values(secs).forEach(sec=>{
+        if(sec['Finding description']){            // finding section
+          findings.push({
+            desc:   sec['Finding description']||'',
+            ata:    sec['ATA Chapter']||'',
+            defect: sec['Defect Classification']||'',
+            pos:    sec['Position']||'',
+            aog:    sec['AOG']||'',
+          });
+        } else {                                   // header/other section → merge non-empty
+          Object.entries(sec).forEach(([k,v])=>{ if(v && header[k]==null) header[k]=v; });
+        }
+      });
+      qcsMap[rid]={header, findings};
+    });
+  }catch(e){ console.warn('QCS load error:',e); }
+  qcsLoaded=true;
+}
+
+// Clone giàu thông tin cho 1 report QCS (KHÔNG mutate allData) — chỉ THÊM field hiển thị bảng.
+function enrichQcs(r){
+  const m = qcsMap[r.report_id] || {header:{},findings:[]};
+  return {
+    ...r,
+    qcs_aircraft:      m.header['Aircraft Registration']||null,
+    qcs_ac_type:       m.header['A/C Type']||null,
+    qcs_spot_type:     m.header['Spot Check Type']||null,
+    qcs_finding_count: m.findings.length,
+  };
+}
+
 function renderAF() {
   const ff=g('afFormF')?.value||'';
   const srch=(g('afSrch')?.value||'').toLowerCase();
@@ -4314,9 +4413,19 @@ function renderAF() {
     return;
   }
 
-  // Nguồn dữ liệu: EIS dùng bản enrich (roll-up due/status), còn lại giữ nguyên allData
+  // QC Spot Check cần finding per-section: lazy-load 1 lần
+  if(ff===QCS_TITLE && !qcsLoaded){
+    g('afHead').innerHTML = '<tr>'+SCH.cols.map(c=>`<th>${c.label}</th>`).join('')+'</tr>';
+    g('afBody').innerHTML = '<tr><td colspan="20" style="text-align:center;padding:32px;color:var(--muted)">Loading Spot Check findings…</td></tr>';
+    loadQcsDetail().then(renderAF);
+    return;
+  }
+
+  // Nguồn dữ liệu: EIS/QCS dùng bản enrich (thêm field detail), còn lại giữ nguyên allData
   let rows = (ff===EIS_TITLE)
     ? allData.filter(r=>r.report_title===EIS_TITLE).map(enrichEis)
+    : (ff===QCS_TITLE)
+    ? allData.filter(r=>r.report_title===QCS_TITLE).map(enrichQcs)
     : allData;
 
   let data=rows.filter(r=>{
@@ -4855,6 +4964,71 @@ function showEisDetail(report_id){
 function closeEisModal(e){
   if(e&&e.target!==g('eisModal'))return;
   g('eisModal').style.display='none';
+}
+
+function showQcsDetail(report_id){
+  const r = allData.find(x=>x.report_id===report_id && x.report_title===QCS_TITLE);
+  if(!r) return;
+  const m = qcsMap[report_id] || {header:{},findings:[]};
+  const h = m.header, fnds = m.findings;
+
+  s('qcsMTitle', r.report_number||'—');
+  s('qcsMSub', [h['Aircraft Registration'], h['A/C Type'], h['Spot Check Type']].filter(Boolean).join(' · ')||'—');
+
+  const row=(label,val)=>val?`
+    <div style="display:flex;gap:8px;margin-bottom:5px">
+      <div style="font-size:11px;color:var(--muted);min-width:135px;flex-shrink:0">${label}</div>
+      <div style="font-size:12px;color:var(--text)">${esc(val)}</div>
+    </div>`:'';
+  const block=(label,val)=>val?`
+    <div style="margin-bottom:10px">
+      <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">${label}</div>
+      <div style="font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.5">${esc(val)}</div>
+    </div>`:'';
+  const findingCard=(f,i)=>`
+    <div style="margin-bottom:8px;padding:10px 12px;background:var(--card2);border-radius:8px;border-left:3px solid var(--blue)">
+      <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:4px">FINDING ${i+1}${f.ata?' · <span style="color:var(--blue)">ATA '+esc(f.ata)+'</span>':''}${f.defect?' · '+esc(f.defect):''}${f.pos?' · POS '+esc(f.pos):''}${f.aog==='Yes'?' · <span style="color:#ff6b6b">AOG</span>':''}</div>
+      <div style="font-size:12px;color:var(--text);white-space:pre-wrap;line-height:1.5">${esc(f.desc)||'—'}</div>
+    </div>`;
+
+  safeHTML(g('qcsMBody'), `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:14px">
+      <div>
+        ${row('Aircraft Reg.', h['Aircraft Registration'])}
+        ${row('A/C Type', h['A/C Type'])}
+        ${row('Spot Check Type', h['Spot Check Type'])}
+        ${row('Area of standard', h['Area of standard'])}
+        ${row('Department', h['Department'])}
+        ${row('Flight No.', h['Flight No.'])}
+      </div>
+      <div>
+        ${row('Raised Date', fd(r.raised_date))}
+        ${row('Issue Date', h['Issue Date']?fd(h['Issue Date']):'')}
+        ${row('Target Date', (h['Target date']||r.Target_date)?fd(h['Target date']||r.Target_date):'')}
+        ${row('Date Completed', h['Date completed']?fd(h['Date completed']):'')}
+        ${row('Date Verified', h['Date verified']?fd(h['Date verified']):'')}
+        ${row('Audit Ref. No', h['Audit Ref. No'])}
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:10px">
+      ${row('Issued To', h['Issued to (person)'])}
+      ${row('Verified By', h['Verified by (auditor)'])}
+      ${row('Cert. Staff/Foreman', h['Certifying Staff/Foreman Name & Auth. #'])}
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:12px">
+      <div style="font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Findings (${fnds.length})</div>
+      ${fnds.length ? fnds.map(findingCard).join('') : '<div style="font-size:12px;color:var(--muted)">No findings found.</div>'}
+    </div>
+    <div style="margin-top:6px;border-top:1px solid var(--border);padding-top:12px">
+      ${block('Immediate action(s)', h['Immediate action(s)'])}
+      ${block('Verification of implementation (VOI)', h['Verification of implementation (VOI)'])}
+      ${block('Reference details', h['Reference details'])}
+    </div>`);
+  g('qcsModal').style.display='flex';
+}
+function closeQcsModal(e){
+  if(e&&e.target!==g('qcsModal'))return;
+  g('qcsModal').style.display='none';
 }
 
 function pdfSafe(str){
