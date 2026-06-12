@@ -4343,17 +4343,37 @@ function enrichEis(r){
 let qcsLoaded = false;
 let qcsMap    = {};   // report_id -> { header:{field:val}, findings:[{desc,ata,defect,pos,aog}] }
 
-// FETCH theo field_name → post-filter Set (invariant I3, giống loadEisDetail/loadCmr). skipOv=true.
+// FETCH theo field_name → post-filter Set (invariant I3: report_id eq → HTTP 400, KHÔNG filter được).
+// 'Finding description' có ~14k row toàn hệ thống → quét theo field_name không thôi sẽ TIMEOUT.
+// → thu hẹp bằng `report_raised_date ge <QCS raised sớm nhất − 2 ngày>` (suy ra động từ allData; QCS là
+//   form mới nên mọi report raised gần đây). Chunk field list (8/lần) để giữ node count < MaxNodeCount.
 async function loadQcsDetail(){
-  const qcsIds = new Set(allData.filter(r=>r.report_title===QCS_TITLE).map(r=>r.report_id).filter(Boolean));
+  const qcsReports = allData.filter(r=>r.report_title===QCS_TITLE);
+  const qcsIds = new Set(qcsReports.map(r=>r.report_id).filter(Boolean));
   if(!qcsIds.size){ qcsLoaded=true; return; }
   const q = v => `'${String(v).replace(/'/g,"''")}'`;
-  const filter = [...QCS_HEADER_FIELDS, ...QCS_FINDING_FIELDS].map(f=>`field_name eq ${q(f)}`).join(' or ');
+
+  // mốc ngày thu hẹp: report QCS raised sớm nhất, lùi 2 ngày cho an toàn biên/timezone
+  let cutoff = qcsReports.map(r=>r.raised_date).filter(Boolean).sort()[0] || null;
+  if(cutoff){
+    const d = new Date(cutoff); d.setUTCDate(d.getUTCDate()-2);
+    cutoff = d.toISOString().replace(/\.\d{3}Z$/,'Z');
+  }
+  const dateClause = cutoff ? ` and report_raised_date ge ${cutoff}` : '';
+
+  // chunk 8 field/lần (mỗi query ~ vài chục node < 100), fetch song song rồi gộp
+  const allFields = [...QCS_HEADER_FIELDS, ...QCS_FINDING_FIELDS];
+  const chunks = [];
+  for(let i=0;i<allFields.length;i+=8) chunks.push(allFields.slice(i,i+8));
   try{
-    const raw = await fetchAll(G_URL+'dwanalytics_report_field'+
-      '?$select=report_id,field_name,value_text,section_id'+
-      '&$filter='+encodeURIComponent(filter), true)
-      .catch(e=>{console.warn('QCS fetch failed:',e);return[];});
+    const results = await Promise.all(chunks.map(ch=>{
+      const fnFilter = ch.map(f=>`field_name eq ${q(f)}`).join(' or ');
+      return fetchAll(G_URL+'dwanalytics_report_field'+
+        '?$select=report_id,field_name,value_text,section_id'+
+        '&$filter='+encodeURIComponent('('+fnFilter+')'+dateClause), true)
+        .catch(e=>{console.warn('QCS fetch chunk failed:',e);return[];});
+    }));
+    const raw = results.flat();
 
     // group: report_id -> section_id -> { field_name: value } (giữ giá trị đầu trong section)
     const bySec={};
