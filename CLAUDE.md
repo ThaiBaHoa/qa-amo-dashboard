@@ -71,6 +71,15 @@ Galileo proxy is also remote — local run hits production data.
   Management live under the sidebar `#adminNav` block. Every export button carries the
   `.admin-only` class (hidden for viewers) AND its handler re-checks `curUser.role==='admin'`.
   `showPage` also blocks direct navigation to those pages for non-admins.
+- **Versioning** (`APP_REV = YYYY.MM.DD-rNN[-iM]`): **bump the rev (`rNN→r(NN+1)`)** only for a
+  new feature, a layout change, or removing functionality. A **pure bug fix keeps `rNN` and
+  bumps an issue suffix** (`r107-i1`, `r107-i2`) so the rev doesn't inflate from every hotfix.
+  Next feature → `r(NN+1)`, issue counter resets. Log fixes as "Issue 1/2/3" under that rev.
+- **Repeater grouping** (multiple findings/CAs per report from `dwanalytics_report_field`):
+  group by **`section_id`, never by `created_date`/time order** — Galileo interleaves a
+  report's fields across instances, so time-ordering mixes them up (wrong dept/finding).
+  Group `report_id → section_id` (group report_id first; header section_id can be shared
+  across reports of the same form). Used by EIS, QC Spot Check, CMR/ECAR.
 
 ## Known issues / gotchas
 
