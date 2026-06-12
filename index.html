@@ -748,8 +748,8 @@ tr:last-child td{border-bottom:none}
           <div class="chart-card" style="flex-shrink:0;margin-top:8px">
             <div class="chart-head" style="margin-bottom:10px">
               <div>
-                <div class="chart-title">CMR-CAR vs ECAR — Findings by ATA Chapter</div>
-                <div class="chart-sub">Top 15 ATA · ECAR &gt; CMR-CAR → CMR-CAR is under-detecting findings there</div>
+                <div class="chart-title">Internal (CMR-CAR + QC Spot Check) vs ECAR — by ATA</div>
+                <div class="chart-sub" id="ataCompareSub">Tử = CMR-CAR + QC Spot Check tháng N−1 · Mẫu = ECAR tháng N</div>
               </div>
               <div style="display:flex;gap:6px;align-items:center">
                 <select class="sel" id="ataGroupLevel" onchange="renderATACompare()" style="font-size:11px">
@@ -757,15 +757,15 @@ tr:last-child td{border-bottom:none}
                   <option value="4">Section (XX-XX)</option>
                   <option value="6">Subject (XX-XX-XX)</option>
                 </select>
-                <div class="ymulti" id="ataCompareYear"></div>
+                <select class="sel" id="ataYear" onchange="renderATACompare()" style="font-size:11px"></select>
+                <select class="sel" id="ataMonth" onchange="renderATACompare()" style="font-size:11px"></select>
                 <button class="btn-sm admin-only" onclick="exportATAComparePDF()" style="white-space:nowrap;flex-shrink:0">⬇ PDF</button>
               </div>
             </div>
             <!-- Legend -->
             <div style="display:flex;gap:16px;margin-bottom:10px;font-size:11px">
-              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#58A6FF;border-radius:2px;display:inline-block"></span>CMR-CAR</span>
-              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#ff6b6b;border-radius:2px;display:inline-block"></span>ECAR</span>
-              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:rgba(240,136,62,0.5);border:1px solid var(--orange);border-radius:2px;display:inline-block"></span>ECAR &gt; CMR-CAR (under-detection)</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#58A6FF;border-radius:2px;display:inline-block"></span>Internal (CMR-CAR + QC Spot Check) · tháng N−1</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#ff6b6b;border-radius:2px;display:inline-block"></span>ECAR (authority) · tháng N</span>
             </div>
             <div class="ch-wrap" style="height:380px"><canvas id="cATACompare"></canvas></div>
             <!-- Detail table -->
@@ -773,9 +773,9 @@ tr:last-child td{border-bottom:none}
               <table class="stat-tbl" id="ataCompareTable">
                 <thead><tr>
                   <th>ATA Chapter</th>
-                  <th style="text-align:center;color:var(--blue)">CMR-CAR</th>
-                  <th style="text-align:center;color:#ff6b6b">ECAR</th>
-                  <th style="text-align:center">Ratio ECAR/CMR</th>
+                  <th style="text-align:center;color:var(--blue)">Internal (N−1)</th>
+                  <th style="text-align:center;color:#ff6b6b">ECAR (N)</th>
+                  <th style="text-align:center">Ratio %</th>
                   <th style="text-align:center">Assessment</th>
                 </tr></thead>
                 <tbody id="ataCompareBody"></tbody>
@@ -2239,7 +2239,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.12-r107';
+const APP_REV = '2026.06.12-r108';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3619,116 +3619,107 @@ const ATA_LABELS = {
   '77':'77 – Engine Indicating','78':'78 – Exhaust','79':'79 – Oil','80':'80 – Starting',
 };
 
+// Year+Month picker cho KPI ATA (default tháng hiện tại). Populate 1 lần.
+function populateAtaYM(){
+  const ySel=g('ataYear'), mSel=g('ataMonth'), now=new Date();
+  if(ySel && ySel.options.length===0){
+    const yrs=[...new Set([...cmrData.map(r=>r.raised_year),...ecarData.map(r=>r.raised_year),now.getFullYear()].filter(Boolean))].sort((a,b)=>b-a);
+    ySel.innerHTML=yrs.map(y=>`<option value="${y}">${y}</option>`).join('');
+    ySel.value=String(now.getFullYear());
+  }
+  if(mSel && mSel.options.length===0){
+    const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    mSel.innerHTML=MN.map((m,i)=>`<option value="${i+1}">${i+1} · ${m}</option>`).join('');
+    mSel.value=String(now.getMonth()+1);
+  }
+}
+
+// QCS finding list [{ym,ata}] từ qcsMap (r107) + raised_date của allData
+function qcsFindingList(){
+  const out=[];
+  Object.entries(qcsMap||{}).forEach(([rid,m])=>{
+    const rep=allData.find(r=>r.report_id===rid);
+    const ym=rep&&rep.raised_date?String(rep.raised_date).slice(0,7):'';
+    (m.findings||[]).forEach(f=>{ if(f && f.ata!=null && f.ata!=='') out.push({ym,ata:f.ata}); });
+  });
+  return out;
+}
+
 function renderATACompare() {
-  // This comparison needs BOTH the CMR-CAR and ECAR datasets. They are lazy-loaded
-  // only when their own pages are opened, so on the KPI page one side could still be
-  // missing → it rendered as all-zero (∞ ratio, everything "Ineffective"). Ensure
-  // both are loaded, then re-render once they arrive.
-  if((!cmrLoaded || !ecarLoaded) && !renderATACompare._loading){
+  // Cần CMR + ECAR + QCS finding data (lazy-load 1 lần rồi tự re-render)
+  if((!cmrLoaded || !ecarLoaded || !qcsLoaded) && !renderATACompare._loading){
     renderATACompare._loading = true;
     const jobs = [];
-    if(!cmrLoaded) jobs.push(loadCmr());
+    if(!cmrLoaded)  jobs.push(loadCmr());
     if(!ecarLoaded) jobs.push(loadEcar());
+    if(!qcsLoaded)  jobs.push(loadQcsDetail());
     Promise.all(jobs).finally(()=>{ renderATACompare._loading = false; renderATACompare(); });
   }
   if(!cmrLoaded && !ecarLoaded) return;
+
   const level = parseInt(g('ataGroupLevel')?.value || '2');
+  populateAtaYM();
+  const now = new Date();
+  const Y = parseInt(g('ataYear')?.value  || now.getFullYear());
+  const M = parseInt(g('ataMonth')?.value || (now.getMonth()+1));
 
-  // Populate year filter (multi-year)
-  const years = [...new Set([
-    ...cmrData.map(r=>r.raised_year),
-    ...ecarData.map(r=>r.raised_year)
-  ].filter(Boolean))].sort((a,b)=>b-a);
-  initYearMulti('ataCompareYear', years, {onChange:renderATACompare});
+  // mẫu = (Y,M) ECAR ; tử = (Y,M−1) CMR+QCS, rollover tháng 1 → tháng 12 năm trước
+  const pad = n => String(n).padStart(2,'0');
+  const denYM = `${Y}-${pad(M)}`;
+  const nY = M===1 ? Y-1 : Y, nM = M===1 ? 12 : M-1;
+  const numYM = `${nY}-${pad(nM)}`;
+  const ymOf = d => d ? String(d).slice(0,7) : '';
 
-  // Filter by year
-  const cmrF = cmrData.filter(r=>ymHas('ataCompareYear', r.raised_year));
-  const ecarF = ecarData.filter(r=>ymHas('ataCompareYear', r.raised_year));
+  // cập nhật sub
+  const subEl = g('ataCompareSub');
+  if(subEl) subEl.textContent = `Tử = CMR-CAR + QC Spot Check ${numYM}  ÷  Mẫu = ECAR ${denYM}  × 100%`;
 
-  // Count by normalized ATA — use findingRows for per-finding ATA accuracy
-  const cmrCount = {}, ecarCount = {};
+  // ── đếm finding con per-ATA ──
+  const numCount = {};   // tử: CMR + QCS (tháng N−1)
+  const denCount = {};   // mẫu: ECAR (tháng N)
+  const add = (map, ataRaw) => { const a = normalizeATA(ataRaw, level); if(!a) return; map[a]=(map[a]||0)+1; };
 
-  cmrF.forEach(r => {
-    if(r.findingRows && r.findingRows.length > 0){
-      // Each finding row has its own ATA — count each individually
-      r.findingRows.forEach(fr => {
-        const ata = normalizeATA(fr.ata || r.ata_chapter, level);
-        if(!ata) return;
-        cmrCount[ata] = (cmrCount[ata]||0) + 1;
-      });
-    } else {
-      // Fallback: no findingRows data → use report-level ATA + finding_count
-      const ata = normalizeATA(r.ata_chapter, level);
-      if(!ata) return;
-      cmrCount[ata] = (cmrCount[ata]||0) + Math.max(r.finding_count||1, 1);
-    }
+  // CMR-CAR tháng N−1
+  cmrData.filter(r=>ymOf(r.raised_date)===numYM).forEach(r=>{
+    if(r.findingRows && r.findingRows.length) r.findingRows.forEach(fr=>add(numCount, fr.ata||r.ata_chapter));
+    else add(numCount, r.ata_chapter);
+  });
+  // QC Spot Check tháng N−1
+  qcsFindingList().filter(f=>f.ym===numYM).forEach(f=>add(numCount, f.ata));
+  // ECAR tháng N
+  ecarData.filter(r=>ymOf(r.raised_date)===denYM).forEach(r=>{
+    if(r.findingRows && r.findingRows.length) r.findingRows.forEach(fr=>add(denCount, fr.ata||r.ata_chapter));
+    else add(denCount, r.ata_chapter);
   });
 
-  ecarF.forEach(r => {
-    if(r.findingRows && r.findingRows.length > 0){
-      r.findingRows.forEach(fr => {
-        const ata = normalizeATA(fr.ata || r.ata_chapter, level);
-        if(!ata) return;
-        ecarCount[ata] = (ecarCount[ata]||0) + 1;
-      });
-    } else {
-      const ata = normalizeATA(r.ata_chapter, level);
-      if(!ata) return;
-      ecarCount[ata] = (ecarCount[ata]||0) + 1;
-    }
-  });
-
-  // Full list for table (all ATA, sorted by total desc)
-  const allATAFull = [...new Set([...Object.keys(cmrCount), ...Object.keys(ecarCount)])]
+  // ── danh sách ATA (bỏ Other, sort theo tổng desc) ──
+  const allATAFull = [...new Set([...Object.keys(numCount), ...Object.keys(denCount)])]
     .filter(a => a !== 'Other')
-    .sort((a,b) => ((cmrCount[b]||0)+(ecarCount[b]||0)) - ((cmrCount[a]||0)+(ecarCount[a]||0)));
+    .sort((a,b) => ((numCount[b]||0)+(denCount[b]||0)) - ((numCount[a]||0)+(denCount[a]||0)));
 
-  // Top 15 for chart (sorted by CMR-CAR desc, reversed so highest is at top of horizontal bar)
-  const allATA = allATAFull
-    .slice()
-    .sort((a,b) => (cmrCount[b]||0) - (cmrCount[a]||0))
-    .slice(0, 15)
-    .reverse();
+  // Top 15 cho chart (sort theo tổng, reverse cho bar ngang)
+  const topATA = allATAFull.slice().sort((a,b)=>((numCount[b]||0)+(denCount[b]||0))-((numCount[a]||0)+(denCount[a]||0))).slice(0,15).reverse();
+  const numVals = topATA.map(a=>numCount[a]||0);
+  const denVals = topATA.map(a=>denCount[a]||0);
+  const labels  = topATA.map(a=>{ const ch=a.split('-')[0]; return (level===2 && ATA_LABELS[ch]) ? ATA_LABELS[ch] : a; });
 
-  const cmrVals = allATA.map(a => cmrCount[a]||0);
-  const ecarVals = allATA.map(a => ecarCount[a]||0);
-
-  // Colors: dim CMR when ECAR > CMR (ineffective), highlight ECAR orange-red
-  const cmrColors = allATA.map((a,i) =>
-    ecarVals[i] > cmrVals[i] ? 'rgba(88,166,255,0.4)' : 'rgba(88,166,255,0.85)'
-  );
-  const ecarColors = allATA.map((a,i) =>
-    ecarVals[i] > cmrVals[i] ? 'rgba(240,136,62,0.9)' : 'rgba(255,107,107,0.5)'
-  );
-
-  // Labels: full ATA name
-  const labels = allATA.map(a => {
-    const ch = a.split('-')[0];
-    if(level===2 && ATA_LABELS[ch]) return ATA_LABELS[ch];
-    return a;
-  });
-
-  // Horizontal grouped bar chart
+  // ── chart (grouped bar ngang: Internal vs ECAR) ──
   dc('cATACompare');
   const ctx = g('cATACompare');
-  if(ctx) {
+  if(ctx){
     charts['cATACompare'] = new Chart(ctx, {
       type:'bar',
-      data:{
-        labels,
-        datasets:[
-          {label:'CMR-CAR',data:cmrVals,backgroundColor:cmrColors,borderRadius:3,barPercentage:0.6},
-          {label:'ECAR',data:ecarVals,backgroundColor:ecarColors,borderRadius:3,barPercentage:0.6},
-        ]
-      },
+      data:{ labels, datasets:[
+        {label:'Internal (CMR+QCS)', data:numVals, backgroundColor:'rgba(88,166,255,0.85)', borderRadius:3, barPercentage:0.6},
+        {label:'ECAR',               data:denVals, backgroundColor:'rgba(255,107,107,0.7)', borderRadius:3, barPercentage:0.6},
+      ]},
       options:{
-        indexAxis:'y',
-        responsive:true,maintainAspectRatio:false,
+        indexAxis:'y', responsive:true, maintainAspectRatio:false,
         plugins:{
           legend:{display:false},
           tooltip:{callbacks:{
-            title: (items) => items[0].label,
-            label: (item) => ` ${item.dataset.label}: ${item.raw.toLocaleString('vi-VN')} findings`
+            title:(items)=>items[0].label,
+            label:(item)=>` ${item.dataset.label}: ${item.raw.toLocaleString('vi-VN')} findings`
           }}
         },
         scales:{
@@ -3739,46 +3730,60 @@ function renderATACompare() {
     });
   }
 
-  // Detail table
+  // ── bảng: TOTAL + per-ATA + No-ATA ──
   const tbody = g('ataCompareBody');
   if(!tbody) return;
-  const rows = allATAFull.map(a => ({
-    ata: a,
-    cmr: cmrCount[a]||0,
-    ecar: ecarCount[a]||0,
-  }));
 
-  // Add Other row at end
-  const otherCmr = cmrCount['Other']||0;
-  const otherEcar = ecarCount['Other']||0;
+  // badge edge case: num=tử(internal), den=mẫu(ECAR)
+  const cell = (num, den) => {
+    if(den>0){
+      const pct = Math.round(num/den*100);
+      if(num>=den)      return {ratio:pct+'%', badge:`<span class="badge b-on"   style="font-size:10px">✅ Effective</span>`, bad:false};
+      if(num>0)         return {ratio:pct+'%', badge:`<span class="badge b-over" style="font-size:10px">⚠ Under</span>`,     bad:true};
+      return                   {ratio:'0%',     badge:`<span class="badge b-over" style="font-size:10px">❌ Missed</span>`,    bad:true};
+    }
+    if(num>0) return {ratio:'∞', badge:`<span class="badge b-open" style="font-size:10px">↑ Over-detect</span>`, bad:false};
+    return            {ratio:'—', badge:`<span style="color:var(--muted);font-size:10px">—</span>`, bad:false};
+  };
 
-  tbody.innerHTML = rows.map(({ata,cmr,ecar}) => {
-    const ratio = cmr > 0 ? (ecar/cmr).toFixed(2) : (ecar > 0 ? '∞' : '—');
-    const isBad  = (ecar > cmr && cmr > 0) || (cmr === 0 && ecar > 0);
-    const label  = level===2 && ATA_LABELS[ata] ? ATA_LABELS[ata] : ata;
-    let badge = '';
-    if(isBad)                          badge = `<span class="badge b-over" style="font-size:10px">❌ Ineffective</span>`;
-    else if(cmr > 0 && ecar < cmr)     badge = `<span class="badge b-on"   style="font-size:10px">✅ OK</span>`;
-    else                               badge = `<span style="color:var(--muted);font-size:10px">—</span>`;
-    return `<tr style="${isBad?'background:rgba(255,107,107,0.05)':''}">
+  // dòng TOTAL (Σ tử / Σ mẫu) — headline KPI
+  const totNum = Object.values(numCount).reduce((a,b)=>a+b,0);
+  const totDen = Object.values(denCount).reduce((a,b)=>a+b,0);
+  const tc = cell(totNum, totDen);
+  let html = `<tr style="border-bottom:2px solid var(--border);background:rgba(88,166,255,0.06);font-weight:700">
+    <td style="font-size:12px">TOTAL · ${numYM} ÷ ${denYM}</td>
+    <td style="text-align:center;color:var(--blue)">${totNum||'—'}</td>
+    <td style="text-align:center;color:#ff6b6b">${totDen||'—'}</td>
+    <td style="text-align:center">${tc.ratio}</td>
+    <td style="text-align:center">${tc.badge}</td>
+  </tr>`;
+
+  // per-ATA
+  html += allATAFull.map(a=>{
+    const num=numCount[a]||0, den=denCount[a]||0, c=cell(num,den);
+    const label = level===2 && ATA_LABELS[a] ? ATA_LABELS[a] : a;
+    return `<tr style="${c.bad?'background:rgba(255,107,107,0.05)':''}">
       <td style="font-size:11px;font-weight:500">${esc(label)}</td>
-      <td style="text-align:center;color:var(--blue);font-weight:600">${cmr||'—'}</td>
-      <td style="text-align:center;color:#ff6b6b;font-weight:600">${ecar||'—'}</td>
-      <td style="text-align:center;font-size:11px">${ratio}</td>
-      <td style="text-align:center">${badge}</td>
+      <td style="text-align:center;color:var(--blue);font-weight:600">${num||'—'}</td>
+      <td style="text-align:center;color:#ff6b6b;font-weight:600">${den||'—'}</td>
+      <td style="text-align:center;font-size:11px">${c.ratio}</td>
+      <td style="text-align:center">${c.badge}</td>
     </tr>`;
   }).join('');
 
-  // Other row
-  if(otherCmr > 0 || otherEcar > 0) {
-    tbody.innerHTML += `<tr style="border-top:1px solid var(--border);opacity:0.6">
-      <td style="font-size:11px;color:var(--muted)">Other / Non-ATA</td>
-      <td style="text-align:center;color:var(--blue)">${otherCmr||'—'}</td>
-      <td style="text-align:center;color:#ff6b6b">${otherEcar||'—'}</td>
+  // dòng No-ATA (finding thiếu ATA — chủ yếu ECAR cũ), không tính ratio
+  const numOther = numCount['Other']||0, denOther = denCount['Other']||0;
+  if(numOther>0 || denOther>0){
+    html += `<tr style="border-top:1px solid var(--border);opacity:0.6">
+      <td style="font-size:11px;color:var(--muted)">No-ATA / Non-numeric</td>
+      <td style="text-align:center;color:var(--blue)">${numOther||'—'}</td>
+      <td style="text-align:center;color:#ff6b6b">${denOther||'—'}</td>
       <td style="text-align:center;font-size:11px">—</td>
       <td style="text-align:center"><span style="color:var(--muted);font-size:10px">N/A</span></td>
     </tr>`;
   }
+
+  tbody.innerHTML = html;
 }
 
 // ── TABLE: OPEN RFI ──────────────────────────────────────────
@@ -3833,14 +3838,18 @@ async function exportATAComparePDF() {
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
   const W=doc.internal.pageSize.getWidth(), M=10;
   const level=parseInt(g('ataGroupLevel')?.value||'2');
-  const yr=ymText('ataCompareYear');
+  const _y=parseInt(g('ataYear')?.value||new Date().getFullYear());
+  const _m=parseInt(g('ataMonth')?.value||(new Date().getMonth()+1));
+  const _pad=n=>String(n).padStart(2,'0');
+  const _denYM=`${_y}-${_pad(_m)}`, _numYM=`${_m===1?_y-1:_y}-${_pad(_m===1?12:_m-1)}`;
+  const yr=`${_numYM} div ${_denYM}`;
   const lvlLabel=level===2?'Chapter':level===4?'Section':'Subject';
 
   // Header bar — ASCII only (jsPDF default font: no Vietnamese/emoji)
   doc.setFillColor(13,17,23);
   doc.rect(0,0,W,16,'F');
   doc.setFontSize(11);doc.setFont(undefined,'bold');doc.setTextColor(230,237,243);
-  doc.text('CMR-CAR vs ECAR - Findings by ATA '+lvlLabel,M,11);
+  doc.text('Internal (CMR-CAR + QC Spot Check) vs ECAR by ATA '+lvlLabel,M,11);
   doc.setFontSize(8);doc.setFont(undefined,'normal');doc.setTextColor(163,174,184);
   doc.text('Year: '+yr,W/2,11,{align:'center'});
   doc.text('Rev '+APP_REV,W-M,11,{align:'right'});
@@ -3885,7 +3894,7 @@ async function exportATAComparePDF() {
 
   doc.autoTable({
     startY:y,
-    head:[['ATA Chapter','CMR-CAR','ECAR','Ratio ECAR/CMR','Ket qua']],
+    head:[['ATA Chapter','Internal (N-1)','ECAR (N)','Ratio %','Assessment']],
     body:tRows,
     headStyles:{fillColor:[30,64,175],textColor:[255,255,255],fontSize:8,fontStyle:'bold'},
     bodyStyles:{fontSize:7.5,valign:'middle',textColor:[30,30,30]},
