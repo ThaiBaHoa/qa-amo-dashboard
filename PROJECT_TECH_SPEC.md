@@ -2,8 +2,8 @@
 
 **File:** `index.html` (single-file SPA, không build step)
 **Repo:** `ThaiBaHoa/qa-amo-dashboard` · **Domain:** `vjc-qa-amo.com` (GitHub Pages)
-**Version hiện tại:** `2026.06.10-r106`
-**Cập nhật spec:** 2026-06-10 — phản ánh code thực tế (gồm r81–r106, **r104: User delete qua Edge Function + EIS form-specific schema/roll-up ở All Forms; r105: fix EIS per-CA load — revert về field_name + post-filter Set (I3); r106: EIS đóng/mở theo cấp report (không suy từ CA Date completed)**, MCAR cột Raised by, Target_date lấy từ Report, MCAR deadline check, copyholder on-time so theo ngày, lọc Cancelled/Deleted, auto-refresh kiosk, multi-year filter, admin export, SPI, KPI2, PAVOI RFI)
+**Version hiện tại:** `2026.06.12-r107`
+**Cập nhật spec:** 2026-06-12 — phản ánh code thực tế (gồm r81–r107, **r104: User delete qua Edge Function + EIS form-specific schema/roll-up ở All Forms; r105: fix EIS per-CA load — revert về field_name + post-filter Set (I3); r106: EIS đóng/mở theo cấp report (không suy từ CA Date completed); r107: QC Spot Check Report detail ở All Forms (+ hotfix TDZ thứ tự khai báo & timeout report_field — xem §8.8, I11)**, MCAR cột Raised by, Target_date lấy từ Report, MCAR deadline check, copyholder on-time so theo ngày, lọc Cancelled/Deleted, auto-refresh kiosk, multi-year filter, admin export, SPI, KPI2, PAVOI RFI)
 
 > Tài liệu này mô tả TOÀN BỘ kiến trúc, dữ liệu, logic và quy ước của dashboard. Dùng làm nguồn tham chiếu chuẩn khi sửa code. Số dòng (Lxxxx) là tương đối, dùng để định vị nhanh.
 
@@ -211,6 +211,7 @@ Chỉ áp cho MCAR. Tính hạn kỳ vọng theo quy trình rồi cảnh báo kh
 - **All Forms** `renderAF` (mọi status) — **r104: schema-driven** qua registry `AF_SCHEMAS{report_title → {cols[], rowClick?}}`, `_default` fallback = 14 cột cũ; `renderAF` sinh **cả thead (`#afHead`) lẫn body** từ schema. Form chưa khai báo → `_default`, hành vi cũ không đổi.
   - **`_default`** (14 cột): No, Form, Status, Owner, Raised, Target, Days, CAT, Finding Level, **Completed, Close Date**, Audit Ref, Audit No, Audit Title. (Repetitive đã thay bằng Completed+Close ở r81.)
   - **EIS** (`MQA Event Investigation Summary`, xem §8.7): cột riêng No, Status, Owner, **Primary Source**, Raised, **Target (latest)**, Days, **CAs** (badge "n overdue"), **Departments**, **Progress** (done/total). Row click → `showEisDetail`. Dữ liệu = `allData.filter(EIS).map(enrichEis)` (clone roll-up, KHÔNG mutate `allData`); lazy-load per-CA 1 lần (hiện "Loading…" rồi tự re-render).
+  - **QCS** (`QC Spot Check Report`, r107, xem §8.8): cột riêng No, **Aircraft**, **A/C Type**, **Spot Check Type**, Status, **Findings** (đếm finding/report), Raised, Target, Days, **Audit Ref**. Row click → `showQcsDetail` (`#qcsModal`). Dữ liệu = `allData.filter(QCS).map(enrichQcs)` (clone, chỉ THÊM field hiển thị — KHÔNG recompute `Target_date`/`semantic_status`, đã đúng trong `allData`); lazy-load finding per-section 1 lần.
 - **PAVOI** `renderPavoi`: No, Status, Raised, Target, Days, Report Ref, RFV, Verification Result, Department, **RFI**, Audit No, Audit Title. Row click → modal.
 - **CMR-CAR** `renderCmr`: No, Aircraft, Status, Finding Count, Dept, Raised, Target, Days (+ filter aircraft/quarter/ATA).
 - **ECAR** `renderEcar`: No, Aircraft, Status, Finding Desc, Raised, Target, Days, Detail (+ quarter multi-select, issued-by).
@@ -237,6 +238,7 @@ Thay toàn bộ `<select>` year (17 chỗ) bằng **dropdown checkbox** cho phé
 - `#ecarModal` (L2117): chi tiết finding ECAR.
 - `#docModal` (L2014): tab Copyholders + Workflow stages.
 - `#eisModal` (r104): chi tiết EIS — desc blocks **(rút gọn sau patch: Primary Source · Investigation · Impact and losses · Immediate action(s))** + chip MEDA + card từng Corrective Action (badge status per-CA, Target/Completed/VOI). *(Patch bỏ Main Cause/Error/Violation/Detailed Description khỏi cả fetch lẫn popup.)* Trigger `showEisDetail` / `closeEisModal`. Xem §8.7.
+- `#qcsModal` (r107): chi tiết QC Spot Check — header 2 cột (Aircraft/A-C Type/Spot Check Type/Area/Dept/Flight + Raised/Issue/Target/Completed/Verified/Audit Ref), block Issued To / Verified By / Foreman, **card từng Finding** (desc + badge ATA · Defect · POS · AOG), 3 block dài Immediate action(s) / VOI / Reference details. Trigger `showQcsDetail` / `closeQcsModal`. Xem §8.8.
 - CMR detail: `showCmrDetail`.
 
 ---
@@ -289,6 +291,15 @@ EIS không khớp khung 14 cột chung (thiếu CAT/Finding Level/Audit Ref/MNT 
 - **⚠ Phạm vi:** roll-up CHỈ ở *All Forms*; **KPI/Overview/Overdue vẫn dùng `Target_date` cũ** của EIS trong `allData` (sửa toàn cục = follow-up r10x kèm giải trình stakeholder). Không tự ý mutate `allData`.
 - Hàm: `loadEisDetail`, `enrichEis`, `showEisDetail`/`closeEisModal`; registry `AF_SCHEMAS`; state `eisLoaded`/`eisCAMap`/`eisDescMap` (§10).
 
+### 8.8 QC Spot Check Report — form-specific (r107)
+Form `QC Spot Check Report` (org **QA AMO**, đã có sẵn trong `allData`) hiển thị trong *All Forms* với cột riêng kiểu CMR-CAR + modal `#qcsModal`. Mirror cơ chế EIS: schema trong `AF_SCHEMAS`, lazy-load 1 lần khi chọn form filter, modal riêng. **KHÔNG** thêm page sidebar, **KHÔNG** đụng `loadData()` chính, **KHÔNG** recompute `Target_date`/`semantic_status` (đã đúng trong `allData`).
+- **Data shape:** mọi field QCS nằm ở `dwanalytics_report_field` → `value_text` + `section_id`. Section có field `Finding description` = 1 finding (gồm Finding description / ATA Chapter / Defect Classification / Position / AOG); section còn lại = header. **Group theo `report_id` → `section_id`** (header section_id dùng chung giữa các report cùng form → bắt buộc group report_id TRƯỚC). Số finding/report đúng theo data probe: SCR-0001=2, 0002=4, 0003=6.
+- **Fetch (đúng I3 + I11):** fetch theo `field_name` + post-filter `Set` report_id, `skipOv=true`.
+  - ⚠️ **Bẫy đã sập (r107 hotfix):** field `'Finding description'` là tên **generic, ~14k row toàn hệ thống** (nhiều form khác cũng dùng) → query field_name-only **timeout 30s** trong `fetchAll` → `catch` → `[]` → mọi cột "—" + Findings 0. `report_id eq` thì **HTTP 400** (không filter được — I3). **Cách thoát:** thêm vế **`report_raised_date ge <QCS raised sớm nhất − 2 ngày>`** (suy ra động từ `allData`, KHÔNG hard-code) → cắt 14k → ~vài trăm row → nhanh. **Chunk** 22 field thành 8/query (`Promise.all`) giữ node count < MaxNodeCount. (EIS không sập vì field name của nó hiếm hơn — cùng code shape vẫn vỡ với QCS. Xem I11.)
+- **Enrich (`enrichQcs`, clone — KHÔNG mutate `allData`):** chỉ THÊM `qcs_aircraft`/`qcs_ac_type`/`qcs_spot_type`/`qcs_finding_count` cho bảng. Mọi ngày qua `fd()`, text qua `esc()`, body modal qua `safeHTML()`.
+- **TDZ — vị trí khai báo (r107 hotfix):** `AF_SCHEMAS` dùng computed key `[QCS_TITLE]` + value `AF_QCS_COLS` → 2 hằng này **PHẢI khai báo TRƯỚC `const AF_SCHEMAS`** (giống `EIS_TITLE`/`AF_EIS_COLS`). Lần đầu đặt nhầm ở khối trước `renderAF()` (sau `AF_SCHEMAS`) → `ReferenceError: Cannot access 'QCS_TITLE' before initialization` lúc chạy top-level → **vỡ cả script, dashboard trắng data**. Hằng runtime-only (`qcsLoaded`/`qcsMap`/`loadQcsDetail`/`enrichQcs`) đặt sau thì OK.
+- Hàm: `loadQcsDetail`, `enrichQcs`, `showQcsDetail`/`closeQcsModal`; registry `AF_SCHEMAS`; state `qcsLoaded`/`qcsMap` (§10); constants `QCS_TITLE`/`QCS_HEADER_FIELDS`/`QCS_FINDING_FIELDS`/`AF_QCS_COLS` (khai báo ngay trước `AF_SCHEMAS`).
+
 ---
 
 ## 9. Design system (CSS)
@@ -319,7 +330,7 @@ EIS không khớp khung 14 cột chung (thiếu CAT/Finding Level/Audit Ref/MNT 
 ## 10. State toàn cục (L2369–2401, 2378–2389)
 
 - **Data:** `curUser, allData[], auditData[], docData[], cmrData[], ecarData[], stageAggregate`.
-- **Cache/flags:** `cmrLoaded, ecarLoaded, pavoiRfiLoaded, pavoiRfiMap{}, pavoiRfiDone(Set), docTaskCache{}, docWorkflowCache{}, isLoading`. **r104:** `eisLoaded, eisCAMap{}, eisDescMap{}` (reset cạnh `pavoiRfi*` đầu `loadData` để ↻ Refresh kéo lại per-CA).
+- **Cache/flags:** `cmrLoaded, ecarLoaded, pavoiRfiLoaded, pavoiRfiMap{}, pavoiRfiDone(Set), docTaskCache{}, docWorkflowCache{}, isLoading`. **r104:** `eisLoaded, eisCAMap{}, eisDescMap{}`. **r107:** `qcsLoaded, qcsMap{}` (report_id → `{header:{}, findings:[]}`). Tất cả reset cạnh `pavoiRfi*` đầu `loadData` để ↻ Refresh kéo lại detail mới.
 - **Doc tree:** `docTypeTree/Flat/Index/ByTitle, selectedTypeId, expandedTreeNodes(Set), currentDocRevId`.
 - **TS (sort/filter từng bảng):** `TS.open/ov/af/pavoi/audit/docs/cmr/ecar/amoecar/mcar`, mỗi cái `{page, sort, asc, sf, ff, yr, srch, …}` (thêm `cat/ac/qr/qrs[]/issuedBy/typeF/wfCatF/prefixF` tùy bảng).
 - **Charts:** `charts{}, rptCharts{}, qbChart, dbCharts{}`.
@@ -352,7 +363,8 @@ EIS không khớp khung 14 cột chung (thiếu CAT/Finding Level/Audit Ref/MNT 
 |---|---|
 | I1 | KHÔNG đổi `ORG_UNIT` / filter `org_unit_name` cho report QA AMO. CMR/ECAR dùng `'TQA'`. |
 | I2 | **GUID trong `$filter` KHÔNG bọc nháy:** `report_id eq f937…` |
-| I3 | KHÔNG nhồi `report_id` vào `$filter` của bảng EAV `dwanalytics_report_form_section_field` (post-filter client). |
+| I3 | KHÔNG nhồi `report_id` vào `$filter` của bảng EAV `dwanalytics_report_form_section_field` **và `dwanalytics_report_field`** (post-filter client). Trên `report_field`, `report_id eq '<uuid>'` trả **HTTP 400** (cột không filter được), không phải rỗng. |
+| I11 | **`dwanalytics_report_field` fetch theo `field_name`-only có thể TIMEOUT** nếu field name generic (vd `'Finding description'` ~14k row toàn hệ thống) → `fetchAll` quá 30s → rỗng âm thầm. Thu hẹp bằng **`report_raised_date ge <ISO>`** (cột này filter được; literal trần, không nháy: `report_raised_date ge 2026-06-01T00:00:00Z`), suy mốc động từ report sớm nhất trong `allData`. Chunk field list (~8/query, `Promise.all`) giữ node count < 100. Xem §8.8. |
 | I4 | **OData giới hạn 100 node/filter** → chuỗi `or` tối đa ~16 `report_id eq`; batch ≤15. |
 | I5 | Mọi date hiển thị qua `fd()`; tính ngày qua `ageCalc/dDay` (KHÔNG `toLocaleDateString` trực tiếp). |
 | I6 | Proxy yêu cầu `Origin` hợp lệ (chỉ chạy từ domain deploy / localhost). |
@@ -366,7 +378,7 @@ EIS không khớp khung 14 cột chung (thiếu CAT/Finding Level/Audit Ref/MNT 
 ## 13. Quy ước phát triển
 
 - **Edit surgical:** chỉ chạm điểm cần sửa, không refactor lan man.
-- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r106. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.) Nhãn version ở User Guide nạp động từ `APP_REV` (không hardcode "vN").
+- **Versioning:** bump `APP_REV` mỗi thay đổi (`YYYY.MM.DD-rNN`). Hiện r107. (Luôn nối tiếp số thực tế trong file, KHÔNG lùi — vd spec ghi r85 nhưng file đã r86 → bump r87.) Nhãn version ở User Guide nạp động từ `APP_REV` (không hardcode "vN").
 - **Deploy:** sửa `index.html` (bản OneDrive) → copy vào clone repo → `git diff` review → commit + push `main` (commit message dùng `git commit -F` để tránh lỗi shell với ký tự `/`). GitHub Pages tự build ~1–2 phút.
 - **Tận dụng helper có sẵn** (fetchAll, g, s, esc, fd, toast, setOv, renderPaged, sortD, ageCalc) — không viết trùng.
 - **Tài liệu liên quan:** `PAVOI_RFI_Spec.md` (RFI chi tiết), `CAR report types & KPI2` (MCAR/AMO-ECAR vs CMR-CAR/ECAR; KPI2 Phase-1), `GALILEO_QUIRKS.md`, `GALILEO_DATA_QUALITY.md`.
@@ -377,6 +389,7 @@ EIS không khớp khung 14 cột chung (thiếu CAT/Finding Level/Audit Ref/MNT 
 
 | Rev | Nội dung |
 |---|---|
+| r107 | **QC Spot Check Report detail ở All Forms** (mirror EIS): schema `AF_QCS_COLS` + `#qcsModal`, lazy-load `loadQcsDetail` group finding theo `report_id→section_id`, `enrichQcs` clone (KHÔNG mutate `allData`). Xem §8.8. **2 hotfix cùng rev:** (1) **TDZ** — `QCS_TITLE`/`AF_QCS_COLS` ban đầu khai báo SAU `AF_SCHEMAS` (chỗ dùng chúng làm computed key) → `ReferenceError` lúc top-level → **trắng toàn bộ data**; chuyển 4 hằng lên TRƯỚC `AF_SCHEMAS`. (2) **Timeout** — query `field_name eq 'Finding description'` (~14k row) timeout 30s → detail rỗng; thêm vế `report_raised_date ge <raised sớm nhất − 2d>` + chunk 8 field/query (xem I11). `report_id eq` trên `report_field` = HTTP 400 (I3). Verify trên API thật: 13941→213 row, 18 row khớp QCS. |
 | r106 | **Fix EIS đóng/mở theo cấp report:** `enrichEis` trước đây suy đóng/mở từ "mọi CA đã có Date completed" → report **đã đóng** nhưng CA thiếu Date completed (vd EIS-2025/004 0 CA, /005 3/4, /009 2/3) bị tính **Overdue** sai. r106: `reportClosed = close_date \|\| semantic_status ∈ {On-time/Lately/Closed}`; `reportClosed \|\| allDone` → đóng (On-time/Lately so ngày đóng vs due roll-up bằng `dDay`), còn lại → Open/Overdue theo latest target. Giữ `allDone` làm fallback (không regress). Report 0 CA → `Target (latest)` = `Target_date` gốc. Xem §8.7. |
 | r105 | **Fix EIS per-CA load (lỗi từ delta r104):** patch r104 scope 2 view analytics theo `report_id` → **trả rỗng** (2 view EAV không hỗ trợ filter report_id — đúng I3) → UI mọi EIS hiện `CAs=0/Departments=—/Progress=0/0`, due rớt về `Target_date` gốc. r105 **revert `loadEisDetail` về fetch theo `field_name` + post-filter `Set`** (đúng pattern `loadCmr`/`loadEcar`), giữ `skipOv=true` cả 2 call (fix overlay r41 — thủ phạm "treo" thật sự). Giữ nguyên popup rút gọn + roll-up. Xem §8.7. |
 | r104 | **(2 spec chung 1 bump)** (1) **User delete** — nút 🗑 Delete ở User Management → `deleteUser` gọi Edge Function `delete-user` (xóa cả `auth.users`+`public.users`, service_role server-side, verify admin qua JWT, chặn tự xóa/admin cuối, CORS whitelist, FK cascade). Edge Function + FK do Eric deploy phía Supabase. Xem §8.5, `USER_DELETE_SPEC.md`. (2) **EIS form-specific ở All Forms** — `renderAF` schema-driven (`AF_SCHEMAS`, `_default` giữ nguyên 14 cột), EIS có cột riêng + popup per-CA (`#eisModal`), lazy-load `loadEisDetail` ghép CA theo `section_id`, **due roll-up = latest Target date** (`enrichEis`, clone — KHÔNG mutate `allData`; KPI/Overview giữ giá trị cũ). Xem §8.7, `FORM_EIS_DESIGN.md`. **Delta `EIS_PATCH_r104` (cùng rev, không bump):** thêm `skipOv=true` mọi call (hết chiếm overlay/text rác, vết r41) + rút gọn popup (bỏ Main Cause/Error/Violation/Detailed Description khỏi `EIS_DESC_FIELDS` + `showEisDetail`) — **2 phần này giữ lại**. ⚠️ Phần scope `loadEisDetail` theo `report_id` (chunk 20) **GÂY LỖI rỗng CA → đã revert ở r105** (xem r105). |

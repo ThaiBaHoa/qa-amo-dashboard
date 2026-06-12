@@ -38,6 +38,12 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
   sessionStorage login is never touched. Started at the end of `initApp`; no-ops after
   logout via an `if(!curUser)` guard.
 - `fetchAll` — paginated OData fetch with 30s `AbortController` timeout.
+- `renderAF` — All Forms table, **schema-driven** via `AF_SCHEMAS{report_title → {cols[], rowClick?}}`
+  (`_default` = 14-col fallback). Form-specific views: EIS (`loadEisDetail`/`enrichEis`/
+  `showEisDetail`) and QC Spot Check (`loadQcsDetail`/`enrichQcs`/`showQcsDetail`, r107) —
+  each lazy-loads detail once and renders a dedicated modal. **When adding a form here:**
+  declare its `*_TITLE` + `AF_*_COLS` consts *before* `const AF_SCHEMAS` (it uses them as a
+  computed key) or you get a TDZ `ReferenceError` that blanks the whole app at load.
 - `renderAll` — renders every page from `allData`.
 - `showPage` — sidebar nav / page switching.
 - `setOv` / `showLoadError` — loading overlay + error/retry state.
@@ -71,6 +77,14 @@ Galileo proxy is also remote — local run hits production data.
 - **Galileo HTTP 524**: the report-summary query is slow; the Cloudflare Worker
   times out (~100s) intermittently. `fetchAll` caps each request at 30s and
   `loadData` shows a retry overlay on failure. The root slowness is backend.
+- **`dwanalytics_report_field` EAV query traps** (detail/finding views): `report_id` is
+  NOT filterable — `report_id eq '<uuid>'` returns **HTTP 400**, so fetch by `field_name`
+  and post-filter a `Set` of report_ids client-side. But a `field_name`-only query on a
+  *generic* field name (e.g. `'Finding description'` ≈ 14k rows system-wide) blows past the
+  30s `fetchAll` timeout and silently yields empty data. Narrow with a
+  `report_raised_date ge <ISO>` clause (derive the cutoff from the form's earliest report in
+  `allData`) and chunk long `field_name eq … or …` lists (~8/request) to stay under the
+  ~100-node OData filter cap. See PROJECT_TECH_SPEC §8.8 / invariant I11.
 - **Auth is Supabase Auth** (passwords are NOT stored in `public.users` — earlier
   docs claimed plaintext storage; that was wrong). The remaining hardening item is
   **Row Level Security** on `public.users`: it's still readable with the publishable

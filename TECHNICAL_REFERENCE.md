@@ -261,6 +261,8 @@ sớm" nếu tồn tại ≥1 MCAR thỏa **cả hai**:
 | MaxNodeCount | 100 nodes | Mỗi `or` trong `$filter` tốn 2 nodes |
 | Cách tính | n terms `or` nhau = `2n-1` nodes | 50 `report_id` = 99 nodes ❌ |
 | Pattern an toàn | Chỉ filter `field_name` (≤15 terms = 29 nodes) | Fetch hết rồi post-filter JS |
+| ⚠ Timeout (r107) | `field_name`-only mà tên field generic (vd `'Finding description'` ~14k row) | Quá 30s → rỗng âm thầm. Thêm `report_raised_date ge <ISO>` để thu hẹp + chunk ~8 field/query. |
+| ⚠ `report_id` 400 | `report_id eq '<uuid>'` trên `report_field`/`report_form_section_field` | Trả **HTTP 400** (cột không filter được) — bắt buộc post-filter JS. |
 
 ---
 
@@ -296,7 +298,8 @@ const ALLOWED_ORIGINS = [
 ## Quy tắc khi sửa code
 
 1. **Không đổi `org_unit_name` của CMR-CAR và ECAR** — luôn là `'TQA'`, không phải `ORG_UNIT`
-2. **Không thêm `report_id` vào `$filter`** của `dwanalytics_report_form_section_field` — sẽ vượt MaxNodeCount 100 nodes
+2. **Không thêm `report_id` vào `$filter`** của `dwanalytics_report_form_section_field` **và `dwanalytics_report_field`** — trên `report_field` trả **HTTP 400** (cột không filter được), không chỉ là chuyện MaxNodeCount. Luôn fetch theo `field_name` + post-filter JS bằng `Set` report_id.
+   - ⚠ **Field name generic timeout (r107):** `'Finding description'` ~14k row toàn hệ thống → query `field_name`-only quá 30s → rỗng. Thu hẹp bằng `report_raised_date ge <raised sớm nhất − 2d>` (suy động từ `allData`) + chunk ~8 field/query. Xem `loadQcsDetail`, PROJECT_TECH_SPEC §8.8 / I11.
 3. **Không đổi `ORG_UNIT`** — ảnh hưởng tất cả pages chính
 4. **Không bật `ALLOWED_ORIGINS = '*'`** trong Worker
 5. **Không xóa `SECURITY DEFINER`** khỏi `get_my_role()` — sẽ gây infinite recursion RLS
