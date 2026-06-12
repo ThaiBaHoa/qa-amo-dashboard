@@ -4195,6 +4195,27 @@ const AF_EIS_COLS = [
   {label:'Progress',    sortKey:'eis_ca_done',       render:r=>`<td style="font-size:11px;text-align:center;color:${r.eis_ca_done===r.eis_ca_total&&r.eis_ca_total?'var(--green)':'var(--muted)'}">${r.eis_ca_done||0}/${r.eis_ca_total||0}</td>`},
 ];
 
+// ── QC SPOT CHECK schema (khai báo TRƯỚC AF_SCHEMAS để tránh TDZ ở computed key) ──
+const QCS_TITLE = 'QC Spot Check Report';
+const QCS_HEADER_FIELDS = ['Aircraft Registration','A/C Type','Spot Check Type','Audit Ref. No',
+  'Area of standard','Department','Issued to (person)','Verified by (auditor)',
+  'Certifying Staff/Foreman Name & Auth. #','Issue Date','Target date','Date completed',
+  'Date verified','Flight No.','Immediate action(s)','Verification of implementation (VOI)','Reference details'];
+const QCS_FINDING_FIELDS = ['Finding description','ATA Chapter','Defect Classification','Position','AOG'];
+
+const AF_QCS_COLS = [
+  {label:'Report No',      sortKey:'report_number',     render:r=>`<td><b style="color:var(--blue)">${esc(r.report_number)||'—'}</b></td>`},
+  {label:'Aircraft',                                     render:r=>_tdMuted(esc(r.qcs_aircraft)||'—')},
+  {label:'A/C Type',                                     render:r=>_tdMuted(esc(r.qcs_ac_type)||'—')},
+  {label:'Spot Check Type',                              render:r=>_tdMuted(esc(r.qcs_spot_type)||'—')},
+  {label:'Status',         sortKey:'semantic_status',    render:r=>`<td>${sBadge(r.semantic_status)}</td>`},
+  {label:'Findings',       sortKey:'qcs_finding_count',  render:r=>`<td style="text-align:center"><b style="color:var(--blue)">${r.qcs_finding_count||0}</b></td>`},
+  {label:'Raised Date',    sortKey:'raised_date',        render:r=>_tdMuted(fd(r.raised_date))},
+  {label:'Target Date',    sortKey:'Target_date',        render:r=>`<td>${fd(r.Target_date)}</td>`},
+  {label:'Days to Due',    sortKey:'report_ageing',      render:r=>`<td>${ageDis(r.report_ageing,r.semantic_status)}</td>`},
+  {label:'Audit Ref',                                    render:r=>_tdMuted(esc(r.audit_ref)||'—')},
+];
+
 const AF_SCHEMAS = {
   _default: { cols: AF_DEFAULT_COLS },
   [EIS_TITLE]: { cols: AF_EIS_COLS, rowClick: 'showEisDetail' },
@@ -4318,27 +4339,7 @@ function enrichEis(r){
   };
 }
 
-// ── QC SPOT CHECK lazy-load (detail trong All Forms, modal riêng) ──
-const QCS_TITLE = 'QC Spot Check Report';
-const QCS_HEADER_FIELDS = ['Aircraft Registration','A/C Type','Spot Check Type','Audit Ref. No',
-  'Area of standard','Department','Issued to (person)','Verified by (auditor)',
-  'Certifying Staff/Foreman Name & Auth. #','Issue Date','Target date','Date completed',
-  'Date verified','Flight No.','Immediate action(s)','Verification of implementation (VOI)','Reference details'];
-const QCS_FINDING_FIELDS = ['Finding description','ATA Chapter','Defect Classification','Position','AOG'];
-
-const AF_QCS_COLS = [
-  {label:'Report No',      sortKey:'report_number',     render:r=>`<td><b style="color:var(--blue)">${esc(r.report_number)||'—'}</b></td>`},
-  {label:'Aircraft',                                     render:r=>_tdMuted(esc(r.qcs_aircraft)||'—')},
-  {label:'A/C Type',                                     render:r=>_tdMuted(esc(r.qcs_ac_type)||'—')},
-  {label:'Spot Check Type',                              render:r=>_tdMuted(esc(r.qcs_spot_type)||'—')},
-  {label:'Status',         sortKey:'semantic_status',    render:r=>`<td>${sBadge(r.semantic_status)}</td>`},
-  {label:'Findings',       sortKey:'qcs_finding_count',  render:r=>`<td style="text-align:center"><b style="color:var(--blue)">${r.qcs_finding_count||0}</b></td>`},
-  {label:'Raised Date',    sortKey:'raised_date',        render:r=>_tdMuted(fd(r.raised_date))},
-  {label:'Target Date',    sortKey:'Target_date',        render:r=>`<td>${fd(r.Target_date)}</td>`},
-  {label:'Days to Due',    sortKey:'report_ageing',      render:r=>`<td>${ageDis(r.report_ageing,r.semantic_status)}</td>`},
-  {label:'Audit Ref',                                    render:r=>_tdMuted(esc(r.audit_ref)||'—')},
-];
-
+// ── QC SPOT CHECK lazy-load (constants AF_QCS_COLS/QCS_TITLE khai báo TRƯỚC AF_SCHEMAS) ──
 let qcsLoaded = false;
 let qcsMap    = {};   // report_id -> { header:{field:val}, findings:[{desc,ata,defect,pos,aog}] }
 
