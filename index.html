@@ -748,7 +748,7 @@ tr:last-child td{border-bottom:none}
           <div class="chart-card" style="flex-shrink:0;margin-top:8px">
             <div class="chart-head" style="margin-bottom:10px">
               <div>
-                <div class="chart-title">Internal (CMR-CAR + QC Spot Check) vs ECAR — by ATA</div>
+                <div class="chart-title">KPI QC — (CMR-CAR gán cờ QC + QC Spot Check) vs ECAR theo ATA</div>
                 <div class="chart-sub" id="ataCompareSub">Tử = CMR-CAR + QC Spot Check tháng N−1 · Mẫu = ECAR tháng N</div>
               </div>
               <div style="display:flex;gap:6px;align-items:center">
@@ -764,7 +764,7 @@ tr:last-child td{border-bottom:none}
             </div>
             <!-- Legend -->
             <div style="display:flex;gap:16px;margin-bottom:10px;font-size:11px">
-              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#58A6FF;border-radius:2px;display:inline-block"></span>Internal (CMR-CAR + QC Spot Check) · tháng N−1</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#58A6FF;border-radius:2px;display:inline-block"></span>QC (CMR-CAR gán cờ + QC Spot Check) · tháng N−1</span>
               <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#ff6b6b;border-radius:2px;display:inline-block"></span>ECAR (authority) · tháng N</span>
             </div>
             <div class="ch-wrap" style="height:380px"><canvas id="cATACompare"></canvas></div>
@@ -2213,6 +2213,7 @@ const SUPA_KEY  = 'sb_publishable_eGdEXBCSD_19tu4sOV8NWQ_8mZmUqqq';
 const G_URL     = 'https://galileo-proxy.thaibahoa2308.workers.dev/proxy/';
 // G_KEY removed — stored securely in Cloudflare Worker environment
 const ORG_UNIT  = 'QA AMO';
+const QC_CAT_UUID = '7e5ccacc-563d-4fde-bef7-905870d68aca';  // Category "QC MQA Physical Finding" (cấp report)
 // Danh sách auditor QA AMO — dùng để filter audit plan
 // Thêm tên mới vào đây khi có auditor mới
 const QA_AMO_AUDITORS = new Set([
@@ -2239,7 +2240,7 @@ const QA_AMO_AUDITORS = new Set([
   'Tran Ngoc Son',
 ]);
 
-const APP_REV = '2026.06.12-r108-i1';
+const APP_REV = '2026.06.26-r109';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3672,15 +3673,15 @@ function renderATACompare() {
 
   // cập nhật sub
   const subEl = g('ataCompareSub');
-  if(subEl) subEl.textContent = `Ratio = (CMR-CAR + QC Spot Check ${numYM}) ÷ (ECAR ${denYM}) — số thập phân`;
+  if(subEl) subEl.textContent = `Ratio QC = (CMR-CAR gán cờ QC + QC Spot Check ${numYM}) ÷ (ECAR ${denYM}) — số thập phân`;
 
   // ── đếm finding con per-ATA ──
   const numCount = {};   // tử: CMR + QCS (tháng N−1)
   const denCount = {};   // mẫu: ECAR (tháng N)
   const add = (map, ataRaw) => { const a = normalizeATA(ataRaw, level); if(!a) return; map[a]=(map[a]||0)+1; };
 
-  // CMR-CAR tháng N−1
-  cmrData.filter(r=>ymOf(r.raised_date)===numYM).forEach(r=>{
+  // CMR-CAR tháng N−1 — CHỈ report gán cờ "QC MQA Physical Finding"
+  cmrData.filter(r=>ymOf(r.raised_date)===numYM && r.category_id===QC_CAT_UUID).forEach(r=>{
     if(r.findingRows && r.findingRows.length) r.findingRows.forEach(fr=>add(numCount, fr.ata||r.ata_chapter));
     else add(numCount, r.ata_chapter);
   });
@@ -3710,7 +3711,7 @@ function renderATACompare() {
     charts['cATACompare'] = new Chart(ctx, {
       type:'bar',
       data:{ labels, datasets:[
-        {label:'Internal (CMR+QCS)', data:numVals, backgroundColor:'rgba(88,166,255,0.85)', borderRadius:3, barPercentage:0.6},
+        {label:'QC (CMR gán cờ + QCS)', data:numVals, backgroundColor:'rgba(88,166,255,0.85)', borderRadius:3, barPercentage:0.6},
         {label:'ECAR',               data:denVals, backgroundColor:'rgba(255,107,107,0.7)', borderRadius:3, barPercentage:0.6},
       ]},
       options:{
@@ -4733,7 +4734,7 @@ async function loadCmr(){
   try{
     const raw=await fetchAll(
       G_URL+'dwreporting_report_summary'+
-      '?$select=report_id,report_number,report_status,audit_title,raised_date,modified_date'+
+      '?$select=report_id,report_number,report_status,audit_title,raised_date,modified_date,category_id'+
       '&$filter='+encodeURIComponent("org_unit_name eq 'TQA' and report_title eq 'CMR CAR'")
     );
     const map={};
