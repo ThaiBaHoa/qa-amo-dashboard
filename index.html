@@ -2239,7 +2239,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.07.11-r111';
+const APP_REV = '2026.07.12-r112';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2566,10 +2566,14 @@ async function doLogout() {
   g('authTabs').style.display=''; switchAuth('login');
   g('lUsername').value=g('lPass').value=''; showAl(g('loginAlert'),'','');
   g('pendingBox').style.display='none';
+  if(g('aiFab'))g('aiFab').style.display='none';   // AI Assistant — ẩn khi logout
+  if(g('aiPanel'))g('aiPanel').classList.remove('open');
+  if(typeof aiClear==='function')aiClear(true);
 }
 
 function initApp() {
   g('authWrap').style.display='none'; g('app').style.display='block';
+  if(g('aiFab'))g('aiFab').style.display='flex';   // AI Assistant — chỉ hiện sau khi đăng nhập
   g('sideAvatar').textContent=curUser.full_name[0].toUpperCase();
   g('sideName').textContent=curUser.full_name;
   g('sideRole').textContent=curUser.role==='admin'?'🔑 Administrator':'👤 Viewer';
@@ -9187,6 +9191,365 @@ async function showSPIPage(btn){
     console.error(e);
     if (grid) grid.innerHTML = '<div class="muted" style="padding:40px 16px;text-align:center">⚠ Failed to load SPI: '+esc(e.message)+'</div>';
     toast('Failed to load SPI: ' + e.message);
+  }
+}
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     AI ASSISTANT (r112) — Hỏi đáp dữ liệu findings & audit
+     Client gọi Worker galileo-ai (Anthropic API proxy). Claude dùng
+     "tool use": sinh truy vấn → JS chạy trên allData/auditData ngay
+     tại browser → trả kết quả về Claude → Claude trả lời.
+     Dữ liệu KHÔNG được upload toàn bộ lên API — chỉ kết quả truy vấn.
+     ═══════════════════════════════════════════════════════════════ -->
+<style>
+#aiFab{position:fixed;right:22px;bottom:22px;z-index:9990;width:52px;height:52px;border-radius:50%;
+  border:none;cursor:pointer;display:none;align-items:center;justify-content:center;
+  background:linear-gradient(160deg,#E30613 0%,#a80010 100%);color:#fff;font-size:22px;
+  box-shadow:0 6px 20px rgba(227,6,19,.35);transition:transform .15s ease}
+#aiFab:hover{transform:scale(1.08)}
+#aiPanel{position:fixed;right:22px;bottom:86px;z-index:9991;width:min(400px,calc(100vw - 28px));
+  height:min(600px,calc(100vh - 120px));display:none;flex-direction:column;overflow:hidden;
+  background:var(--card);border:1px solid var(--border);border-radius:16px;
+  box-shadow:0 18px 50px rgba(0,0,0,.35)}
+#aiPanel.open{display:flex}
+.ai-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;
+  border-bottom:1px solid var(--border);background:var(--card2)}
+.ai-head-t{font-weight:700;font-size:14px}
+.ai-beta{font-size:10px;font-weight:600;color:var(--accent);border:1px solid var(--accent);
+  border-radius:6px;padding:1px 5px;margin-left:6px;vertical-align:2px}
+.ai-hbtn{background:none;border:none;cursor:pointer;color:var(--muted);font-size:15px;padding:4px 7px;border-radius:8px}
+.ai-hbtn:hover{background:var(--hover);color:var(--accent)}
+.ai-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.ai-bub{max-width:88%;padding:9px 12px;border-radius:12px;font-size:13px;line-height:1.55;
+  white-space:normal;word-wrap:break-word}
+.ai-bub.user{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.ai-bub.bot{align-self:flex-start;background:var(--card2);border:1px solid var(--border-soft);border-bottom-left-radius:4px}
+.ai-bub.err{align-self:flex-start;background:var(--red-soft);border:1px solid var(--accent);color:var(--accent)}
+.ai-bub.bot table{border-collapse:collapse;margin:6px 0;font-size:12px;width:100%}
+.ai-bub.bot th,.ai-bub.bot td{border:1px solid var(--border);padding:3px 7px;text-align:left}
+.ai-bub.bot th{background:var(--hover);font-weight:700}
+.ai-bub.bot code{background:var(--hover);padding:1px 4px;border-radius:4px;font-size:12px}
+.ai-bub.bot ul{margin:4px 0 4px 18px;padding:0}
+.ai-tool{align-self:flex-start;font-size:11px;color:var(--muted);padding:0 4px;font-style:italic}
+.ai-typing{align-self:flex-start;color:var(--muted);font-size:12px;padding:4px 8px}
+.ai-typing i{animation:aiBlink 1.2s infinite;font-style:normal}
+@keyframes aiBlink{0%,100%{opacity:.2}50%{opacity:1}}
+.ai-empty{color:var(--muted);font-size:13px}
+.ai-chip{display:block;width:100%;text-align:left;margin-top:8px;padding:8px 11px;font-size:12.5px;
+  background:var(--card2);border:1px solid var(--border);border-radius:10px;cursor:pointer;color:inherit}
+.ai-chip:hover{border-color:var(--accent);color:var(--accent)}
+.ai-inrow{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--border);background:var(--card2)}
+#aiInput{flex:1;resize:none;border:1px solid var(--border);background:var(--card);color:inherit;
+  border-radius:10px;padding:8px 11px;font-size:13px;font-family:inherit;max-height:110px;outline:none}
+#aiInput:focus{border-color:var(--accent)}
+#aiSendBtn{border:none;border-radius:10px;background:var(--accent);color:#fff;width:40px;cursor:pointer;font-size:15px}
+#aiSendBtn:disabled{opacity:.5;cursor:default}
+</style>
+
+<button id="aiFab" onclick="aiToggle()" title="AI Assistant — hỏi đáp dữ liệu">✦</button>
+<div id="aiPanel">
+  <div class="ai-head">
+    <div class="ai-head-t">✦ AI Assistant<span class="ai-beta">BETA</span></div>
+    <div>
+      <button class="ai-hbtn" onclick="aiClear()" title="Xoá hội thoại">⟲</button>
+      <button class="ai-hbtn" onclick="aiToggle()" title="Đóng">✕</button>
+    </div>
+  </div>
+  <div class="ai-msgs" id="aiMsgsBox">
+    <div class="ai-empty" id="aiEmpty">
+      Hỏi bất kỳ điều gì về dữ liệu findings &amp; audit đang có trên dashboard. Ví dụ:
+      <button class="ai-chip" onclick="aiAsk(this.textContent)">Năm nay có bao nhiêu finding overdue, chia theo CAT?</button>
+      <button class="ai-chip" onclick="aiAsk(this.textContent)">On-time rate năm nay theo từng loại form?</button>
+      <button class="ai-chip" onclick="aiAsk(this.textContent)">Liệt kê 10 finding quá hạn lâu nhất</button>
+      <button class="ai-chip" onclick="aiAsk(this.textContent)">Audit nào đang InProgress? Ai là lead auditor?</button>
+    </div>
+  </div>
+  <div class="ai-inrow">
+    <textarea id="aiInput" rows="1" placeholder="Hỏi về dữ liệu findings, audit…" onkeydown="aiKey(event)"></textarea>
+    <button id="aiSendBtn" onclick="aiSend()">➤</button>
+  </div>
+</div>
+
+<script>
+// ── AI ASSISTANT ────────────────────────────────────────────
+const AI_URL = 'https://galileo-ai.thaibahoa2308.workers.dev';
+let aiMsgs = [], aiBusy = false;
+
+// Tool schema gửi cho Claude — thực thi tại client trên allData/auditData
+const AI_TOOLS = [
+  {
+    name: 'get_data_overview',
+    description: 'Tổng quan dữ liệu đang có trên dashboard: tổng số finding, các năm, số lượng theo loại form, theo trạng thái, tổng số audit. Gọi tool này trước nếu chưa chắc dữ liệu có gì.',
+    input_schema: { type: 'object', properties: {} }
+  },
+  {
+    name: 'query_findings',
+    description: 'Truy vấn danh sách finding/report QA AMO (MCAR, PAVOI, CMR-CAR, ECAR, Surveillance, AISC...). Lọc, đếm, nhóm và tính on-time rate. semantic_status gồm: "Open", "Overdue", "Closed", "On-time Closed", "Lately Closed". overdue_cat gồm "CAT I" (quá hạn ≤30 ngày), "CAT II" (30–60), "CAT III" (>60).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        year:            { type: 'integer', description: 'Lọc theo năm phát sinh (raised_year), vd 2026' },
+        ym_from:         { type: 'string',  description: 'Từ tháng, dạng YYYY-MM' },
+        ym_to:           { type: 'string',  description: 'Đến tháng, dạng YYYY-MM' },
+        report_title:    { type: 'array', items: { type: 'string' }, description: 'Lọc loại form, vd ["MCAR","PAVOI"]' },
+        semantic_status: { type: 'array', items: { type: 'string' }, description: 'Lọc trạng thái thực tế' },
+        overdue_cat:     { type: 'array', items: { type: 'string' }, description: 'Lọc CAT quá hạn: "CAT I"/"CAT II"/"CAT III"' },
+        finding_level:   { type: 'array', items: { type: 'string' }, description: 'Lọc mức finding: "Level 1"/"Level 2"/"Level 3"' },
+        owner_contains:  { type: 'string', description: 'Lọc theo tên owner (chứa chuỗi, không phân biệt hoa thường)' },
+        audit_contains:  { type: 'string', description: 'Lọc theo số hoặc tiêu đề audit liên quan' },
+        repetitive:      { type: 'boolean', description: 'true = chỉ finding lặp lại (repetitive)' },
+        group_by:        { type: 'string', enum: ['report_title','semantic_status','overdue_cat','owner_name','raised_ym','raised_year','finding_level','dept','audit_number'], description: 'Nhóm kết quả và đếm theo trường này' },
+        include_ontime_rate: { type: 'boolean', description: 'true = tính on-time rate (%) = OnTime/(OnTime+Late)' },
+        return_records:  { type: 'boolean', description: 'true = trả về danh sách record chi tiết' },
+        sort_by:         { type: 'string', enum: ['most_overdue','newest','oldest'], description: 'Sắp xếp khi return_records' },
+        limit:           { type: 'integer', description: 'Số record tối đa trả về (mặc định 10, tối đa 30)' }
+      }
+    }
+  },
+  {
+    name: 'query_audits',
+    description: 'Truy vấn Audit Plan (Internal Audit / Inspection) của QA AMO: lọc theo năm, trạng thái, lead auditor; nhóm & đếm; trả danh sách audit kèm số finding liên quan.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        year:              { type: 'integer', description: 'Năm theo scheduled_start_date' },
+        status_contains:   { type: 'string',  description: 'Lọc trạng thái (chứa chuỗi), vd "InProgress", "Closed", "Scheduled"' },
+        lead_contains:     { type: 'string',  description: 'Lọc theo tên lead auditor (chứa chuỗi)' },
+        type_contains:     { type: 'string',  description: 'Lọc loại audit, vd "Internal", "Inspection"' },
+        group_by:          { type: 'string', enum: ['status','lead_auditor_name','sched_ym','audit_type'], description: 'Nhóm và đếm theo trường này' },
+        return_records:    { type: 'boolean', description: 'true = trả danh sách audit chi tiết' },
+        limit:             { type: 'integer', description: 'Số audit tối đa trả về (mặc định 10, tối đa 30)' }
+      }
+    }
+  }
+];
+
+function aiSystem(){
+  const today = new Date().toISOString().slice(0,10);
+  return 'Bạn là trợ lý AI nhúng trong QA AMO Dashboard của VietJet Air (bộ phận Quality Assurance AMO). '
+    + 'Người dùng hỏi về dữ liệu findings/reports (từ Galileo GRC) và Audit Plan đang hiển thị trên dashboard.\n\n'
+    + 'ĐỊNH NGHĨA:\n'
+    + '- semantic_status: "Open" (đang mở, chưa tới hạn), "Overdue" (đang mở, quá target date), "On-time Closed" (đóng đúng hạn), "Lately Closed" (đóng trễ hạn), "Closed" (đóng, không có target date).\n'
+    + '- overdue_cat: CAT I = quá hạn ≤30 ngày, CAT II = 30–60 ngày, CAT III = >60 ngày (chỉ có khi đang Overdue).\n'
+    + '- On-time rate = On-time Closed / (On-time Closed + Lately Closed) × 100%. Chỉ tính form có target date; Surveillance và AISC thường không có target date.\n'
+    + '- Các loại form: MCAR, PAVOI, CMR-CAR, ECAR, AMO-ECAR, Surveillance, AISC, SPI...\n\n'
+    + 'QUY TẮC:\n'
+    + '1. LUÔN dùng tool để lấy số liệu — tuyệt đối không tự bịa số. Nếu chưa chắc dữ liệu có giá trị gì, gọi get_data_overview trước.\n'
+    + '2. Trả lời NGẮN GỌN bằng ngôn ngữ người dùng đang dùng (mặc định tiếng Việt). Dùng bảng markdown khi liệt kê nhiều dòng.\n'
+    + '3. Khi nêu kết quả, ghi rõ phạm vi lọc (năm, loại form...) để tránh hiểu nhầm.\n'
+    + '4. Nếu câu hỏi ngoài phạm vi dữ liệu dashboard (không liên quan findings/audit), lịch sự từ chối và gợi ý câu hỏi phù hợp.\n\n'
+    + 'Hôm nay là ' + today + '. Dữ liệu trên dashboard: ' + allData.length + ' findings, ' + auditData.length + ' audits.';
+}
+
+// ── Thực thi tool tại client ────────────────────────────────
+function aiRunTool(name, inp){
+  try{
+    inp = inp || {};
+    if(name === 'get_data_overview') return aiOverview();
+    if(name === 'query_findings')    return aiQF(inp);
+    if(name === 'query_audits')      return aiQA(inp);
+    return { error: 'Unknown tool: ' + name };
+  }catch(e){ return { error: String(e && e.message || e) }; }
+}
+
+function aiCount(rows, key){
+  const m = {};
+  rows.forEach(r => { const k = (r[key]==null||r[key]==='') ? '(trống)' : String(r[key]); m[k]=(m[k]||0)+1; });
+  return m;
+}
+
+function aiOverview(){
+  if(!allData.length) return { error: 'Dữ liệu chưa được tải — người dùng cần bấm Refresh hoặc chờ dashboard load xong.' };
+  return {
+    total_findings: allData.length,
+    years: [...new Set(allData.map(r=>r.raised_year).filter(Boolean))].sort(),
+    by_form: aiCount(allData,'report_title'),
+    by_status: aiCount(allData,'semantic_status'),
+    total_audits: auditData.length,
+    audits_by_status: aiCount(auditData,'status')
+  };
+}
+
+function aiQF(q){
+  if(!allData.length) return { error: 'Dữ liệu chưa được tải.' };
+  let rows = allData;
+  if(q.year)    rows = rows.filter(r=>r.raised_year===q.year);
+  if(q.ym_from) rows = rows.filter(r=>r.raised_ym && r.raised_ym>=q.ym_from);
+  if(q.ym_to)   rows = rows.filter(r=>r.raised_ym && r.raised_ym<=q.ym_to);
+  const lcIn = (arr,v)=>arr.map(x=>String(x).toLowerCase()).includes(String(v||'').toLowerCase());
+  if(q.report_title&&q.report_title.length)       rows=rows.filter(r=>lcIn(q.report_title,r.report_title));
+  if(q.semantic_status&&q.semantic_status.length) rows=rows.filter(r=>lcIn(q.semantic_status,r.semantic_status));
+  if(q.overdue_cat&&q.overdue_cat.length)         rows=rows.filter(r=>lcIn(q.overdue_cat,r.overdue_cat));
+  if(q.finding_level&&q.finding_level.length)     rows=rows.filter(r=>lcIn(q.finding_level,r.finding_level));
+  if(q.owner_contains){ const s=q.owner_contains.toLowerCase(); rows=rows.filter(r=>(r.owner_name||'').toLowerCase().includes(s)); }
+  if(q.audit_contains){ const s=q.audit_contains.toLowerCase(); rows=rows.filter(r=>((r.audit_number||'')+' '+(r.audit_title||'')).toLowerCase().includes(s)); }
+  if(typeof q.repetitive==='boolean') rows=rows.filter(r=>!!r.is_rep===q.repetitive);
+
+  const onRate = rs => {
+    const on=rs.filter(r=>r.semantic_status==='On-time Closed').length,
+          late=rs.filter(r=>r.semantic_status==='Lately Closed').length;
+    return (on+late) ? +(on/(on+late)*100).toFixed(1) : null;
+  };
+  const out = { total_matched: rows.length };
+  if(q.group_by){
+    const m = aiCount(rows, q.group_by);
+    let groups = Object.entries(m).sort((a,b)=>b[1]-a[1]);
+    if(groups.length>40){ out.groups_truncated_to_40 = true; groups = groups.slice(0,40); }
+    out.groups = groups.map(([k,v])=>{
+      const gRow = { key:k, count:v };
+      if(q.include_ontime_rate)
+        gRow.ontime_rate_pct = onRate(rows.filter(r=>((r[q.group_by]==null||r[q.group_by]==='')?'(trống)':String(r[q.group_by]))===k));
+      return gRow;
+    });
+  }
+  if(q.include_ontime_rate) out.ontime_rate_pct_overall = onRate(rows);
+  if(q.return_records){
+    let rs=[...rows]; const sb=q.sort_by||'most_overdue';
+    if(sb==='most_overdue')  rs.sort((a,b)=>((a.report_ageing==null?1e9:a.report_ageing))-((b.report_ageing==null?1e9:b.report_ageing)));
+    else if(sb==='newest')   rs.sort((a,b)=>String(b.raised_date||'').localeCompare(String(a.raised_date||'')));
+    else                     rs.sort((a,b)=>String(a.raised_date||'').localeCompare(String(b.raised_date||'')));
+    out.records = rs.slice(0, Math.min(q.limit||10,30)).map(r=>({
+      report_number:r.report_number, form:r.report_title, status:r.semantic_status,
+      cat:r.overdue_cat||undefined, owner:r.owner_name||undefined,
+      raised:String(r.raised_date||'').slice(0,10)||undefined,
+      target:String(r.Target_date||'').slice(0,10)||undefined,
+      closed:String(r.close_date||'').slice(0,10)||undefined,
+      days_to_target:r.report_ageing, audit:r.audit_number||undefined,
+      level:r.finding_level||undefined, repetitive:r.is_rep||undefined
+    }));
+  }
+  return out;
+}
+
+function aiQA(q){
+  if(!auditData.length) return { error: 'Chưa có dữ liệu audit.' };
+  let rows = auditData;
+  if(q.year) rows = rows.filter(a=>a.sched_year===q.year);
+  if(q.status_contains){ const s=q.status_contains.toLowerCase(); rows=rows.filter(a=>(a.status||'').toLowerCase().includes(s)); }
+  if(q.lead_contains){   const s=q.lead_contains.toLowerCase();   rows=rows.filter(a=>(a.lead_auditor_name||'').toLowerCase().includes(s)); }
+  if(q.type_contains){   const s=q.type_contains.toLowerCase();   rows=rows.filter(a=>(a.audit_type||'').toLowerCase().includes(s)); }
+  const out = { total_matched: rows.length };
+  if(q.group_by){
+    out.groups = Object.entries(aiCount(rows,q.group_by)).sort((a,b)=>b[1]-a[1]).slice(0,40)
+      .map(([k,v])=>({ key:k, count:v }));
+  }
+  if(q.return_records){
+    out.records = rows.slice(0, Math.min(q.limit||10,30)).map(a=>({
+      number:a.number, title:a.title, type:a.audit_type, status:a.status,
+      lead:a.lead_auditor_name||undefined,
+      scheduled:String(a.scheduled_start_date||'').slice(0,10)||undefined,
+      closed:String(a.closed_date||'').slice(0,10)||undefined,
+      findings:a.finding_count, open:a.open_count, overdue:a.overdue_count
+    }));
+  }
+  return out;
+}
+
+// ── UI ──────────────────────────────────────────────────────
+function aiToggle(){
+  const p=g('aiPanel'); p.classList.toggle('open');
+  if(p.classList.contains('open')) setTimeout(()=>g('aiInput').focus(),50);
+}
+function aiClear(silent){
+  aiMsgs=[];
+  const box=g('aiMsgsBox');
+  if(box){ box.querySelectorAll('.ai-bub,.ai-tool,.ai-typing').forEach(el=>el.remove()); }
+  if(g('aiEmpty')) g('aiEmpty').style.display='';
+  if(!silent && typeof toast==='function') toast('Đã xoá hội thoại AI');
+}
+function aiKey(ev){
+  if(ev.key==='Enter' && !ev.shiftKey){ ev.preventDefault(); aiSend(); }
+}
+function aiAsk(text){ g('aiInput').value=text.trim(); aiSend(); }
+function aiBubble(cls, html){
+  const box=g('aiMsgsBox'), d=document.createElement('div');
+  d.className=cls; d.innerHTML=html; box.appendChild(d);
+  box.scrollTop=box.scrollHeight; return d;
+}
+// Markdown tối giản: bảng | bold | code | bullet
+function aiMd(t){
+  const esc0=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const inline=s=>esc0(s)
+    .replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')
+    .replace(/`([^`]+)`/g,'<code>$1</code>');
+  const lines=String(t||'').split('\n'); let html='',i=0;
+  while(i<lines.length){
+    const L=lines[i];
+    if(/^\s*\|.*\|\s*$/.test(L) && i+1<lines.length && /^\s*\|[\s:\-|]+\|\s*$/.test(lines[i+1])){
+      const cells=r=>r.trim().replace(/^\||\|$/g,'').split('|').map(c=>inline(c.trim()));
+      html+='<table><tr>'+cells(L).map(c=>'<th>'+c+'</th>').join('')+'</tr>';
+      i+=2;
+      while(i<lines.length && /^\s*\|.*\|\s*$/.test(lines[i])){
+        html+='<tr>'+cells(lines[i]).map(c=>'<td>'+c+'</td>').join('')+'</tr>'; i++;
+      }
+      html+='</table>'; continue;
+    }
+    if(/^\s*[-*]\s+/.test(L)){
+      html+='<ul>';
+      while(i<lines.length && /^\s*[-*]\s+/.test(lines[i])){
+        html+='<li>'+inline(lines[i].replace(/^\s*[-*]\s+/,''))+'</li>'; i++;
+      }
+      html+='</ul>'; continue;
+    }
+    html+=inline(L)+'<br>'; i++;
+  }
+  return html.replace(/(<br>)+$/,'');
+}
+
+async function aiCallWorker(){
+  const res = await fetch(AI_URL, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ system: aiSystem(), tools: AI_TOOLS, messages: aiMsgs })
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok){
+    const msg = (data && (data.error && data.error.message || data.error)) || ('HTTP '+res.status);
+    throw new Error(typeof msg==='string' ? msg : JSON.stringify(msg));
+  }
+  return data;
+}
+
+async function aiSend(){
+  if(aiBusy) return;
+  const inp=g('aiInput'), text=inp.value.trim();
+  if(!text) return;
+  inp.value='';
+  if(g('aiEmpty')) g('aiEmpty').style.display='none';
+  aiBubble('ai-bub user', aiMd(text));
+  // Giữ hội thoại gọn: tối đa ~20 lượt gần nhất (cắt theo cặp để không lệch tool_use/tool_result)
+  if(aiMsgs.length>24) aiMsgs=aiMsgs.slice(-16);
+  if(aiMsgs.length && aiMsgs[0].role!=='user') aiMsgs=aiMsgs.slice(1);
+  aiMsgs.push({ role:'user', content:text });
+
+  aiBusy=true; g('aiSendBtn').disabled=true;
+  const typing=aiBubble('ai-typing','Đang phân tích <i>●</i><i>●</i><i>●</i>');
+  try{
+    for(let round=0; round<6; round++){
+      const resp=await aiCallWorker();
+      const content=resp.content||[];
+      aiMsgs.push({ role:'assistant', content:content });
+      const txt=content.filter(b=>b.type==='text').map(b=>b.text).join('\n').trim();
+      if(txt) aiBubble('ai-bub bot', aiMd(txt));
+      const tools=content.filter(b=>b.type==='tool_use');
+      if(resp.stop_reason==='tool_use' && tools.length){
+        aiBubble('ai-tool','🔍 Đang truy vấn dữ liệu ('+tools.map(t=>t.name).join(', ')+')…');
+        aiMsgs.push({ role:'user', content: tools.map(tu=>({
+          type:'tool_result', tool_use_id:tu.id,
+          content: JSON.stringify(aiRunTool(tu.name, tu.input))
+        }))});
+        continue;
+      }
+      break;
+    }
+  }catch(e){
+    console.error('[AI]',e);
+    aiBubble('ai-bub err','⚠ '+aiMd(e.message||'Lỗi không xác định')
+      +'<br><span style="font-size:11px">Kiểm tra Worker <code>galileo-ai</code> đã deploy và có ANTHROPIC_API_KEY chưa.</span>');
+    // Loại message user cuối để có thể hỏi lại
+    while(aiMsgs.length && aiMsgs[aiMsgs.length-1].role!=='assistant') aiMsgs.pop();
+  }finally{
+    typing.remove(); aiBusy=false; g('aiSendBtn').disabled=false; g('aiInput').focus();
   }
 }
 </script>
