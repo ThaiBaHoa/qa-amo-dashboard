@@ -2239,7 +2239,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.07.12-r112';
+const APP_REV = '2026.07.12-r112-i1';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -9292,7 +9292,8 @@ const AI_TOOLS = [
         year:            { type: 'integer', description: 'Lọc theo năm phát sinh (raised_year), vd 2026' },
         ym_from:         { type: 'string',  description: 'Từ tháng, dạng YYYY-MM' },
         ym_to:           { type: 'string',  description: 'Đến tháng, dạng YYYY-MM' },
-        report_title:    { type: 'array', items: { type: 'string' }, description: 'Lọc loại form, vd ["MCAR","PAVOI"]' },
+        report_title:    { type: 'array', items: { type: 'string' }, description: 'Lọc loại form theo CHUỖI CON (khớp gần đúng, không phân biệt hoa thường), vd ["MCAR"] hay ["Surveillance"] — không cần tên đầy đủ' },
+        report_number_contains: { type: 'string', description: 'Tìm theo số report, vd "MCAR-2026-001" hoặc "SR-"' },
         semantic_status: { type: 'array', items: { type: 'string' }, description: 'Lọc trạng thái thực tế' },
         overdue_cat:     { type: 'array', items: { type: 'string' }, description: 'Lọc CAT quá hạn: "CAT I"/"CAT II"/"CAT III"' },
         finding_level:   { type: 'array', items: { type: 'string' }, description: 'Lọc mức finding: "Level 1"/"Level 2"/"Level 3"' },
@@ -9333,7 +9334,8 @@ function aiSystem(){
     + '- semantic_status: "Open" (đang mở, chưa tới hạn), "Overdue" (đang mở, quá target date), "On-time Closed" (đóng đúng hạn), "Lately Closed" (đóng trễ hạn), "Closed" (đóng, không có target date).\n'
     + '- overdue_cat: CAT I = quá hạn ≤30 ngày, CAT II = 30–60 ngày, CAT III = >60 ngày (chỉ có khi đang Overdue).\n'
     + '- On-time rate = On-time Closed / (On-time Closed + Lately Closed) × 100%. Chỉ tính form có target date; Surveillance và AISC thường không có target date.\n'
-    + '- Các loại form: MCAR, PAVOI, CMR-CAR, ECAR, AMO-ECAR, Surveillance, AISC, SPI...\n\n'
+    + '- Các form THỰC TẾ đang có trong dữ liệu (kèm số lượng): ' + Object.entries(aiCount(allData,'report_title')).sort((a,b)=>b[1]-a[1]).map(([k,v])=>'"'+k+'" ('+v+')').join(', ') + '.\n'
+    + '- Viết tắt thường gặp: SR = Surveillance Report; EIS = MQA Event Investigation Summary; QC/SCR = QC Spot Check Report; IA = Internal Audit; CMR = CMR-CAR. Người dùng hay gõ tắt/gần đúng — hãy TỰ đối chiếu với danh sách form thực tế ở trên và chọn form khớp nhất rồi truy vấn ngay (filter report_title khớp chuỗi con, không cần tên đầy đủ). CHỈ hỏi lại khi thật sự không suy ra được.\n\n'
     + 'QUY TẮC:\n'
     + '1. LUÔN dùng tool để lấy số liệu — tuyệt đối không tự bịa số. Nếu chưa chắc dữ liệu có giá trị gì, gọi get_data_overview trước.\n'
     + '2. Trả lời NGẮN GỌN bằng ngôn ngữ người dùng đang dùng (mặc định tiếng Việt). Dùng bảng markdown khi liệt kê nhiều dòng.\n'
@@ -9378,7 +9380,11 @@ function aiQF(q){
   if(q.ym_from) rows = rows.filter(r=>r.raised_ym && r.raised_ym>=q.ym_from);
   if(q.ym_to)   rows = rows.filter(r=>r.raised_ym && r.raised_ym<=q.ym_to);
   const lcIn = (arr,v)=>arr.map(x=>String(x).toLowerCase()).includes(String(v||'').toLowerCase());
-  if(q.report_title&&q.report_title.length)       rows=rows.filter(r=>lcIn(q.report_title,r.report_title));
+  if(q.report_title&&q.report_title.length){      // khớp gần đúng 2 chiều: "Surveillance" ↔ "Surveillance Report"
+    const ss=q.report_title.map(x=>String(x).toLowerCase());
+    rows=rows.filter(r=>{const t=(r.report_title||'').toLowerCase(); return ss.some(s=>t.includes(s)||s.includes(t));});
+  }
+  if(q.report_number_contains){ const s=q.report_number_contains.toLowerCase(); rows=rows.filter(r=>(r.report_number||'').toLowerCase().includes(s)); }
   if(q.semantic_status&&q.semantic_status.length) rows=rows.filter(r=>lcIn(q.semantic_status,r.semantic_status));
   if(q.overdue_cat&&q.overdue_cat.length)         rows=rows.filter(r=>lcIn(q.overdue_cat,r.overdue_cat));
   if(q.finding_level&&q.finding_level.length)     rows=rows.filter(r=>lcIn(q.finding_level,r.finding_level));
