@@ -165,6 +165,10 @@ Known Galileo data quirks — **do not "fix" them in Galileo data**, keep these 
 
 ## Probe-before-spec workflow
 
+> Đóng gói thành skill **`probe-spec`** (`.claude/skills/probe-spec/`). Việc bump rev +
+> commit là skill **`cap-nhat-revision`**. Cả hai được version hóa trong repo (clone máy
+> khác là có ngay). Skill chỉ tóm tắt — mục này vẫn là nguồn chi tiết đầy đủ.
+
 ```
 (1) PROBE → (2) SPEC → (3) IMPLEMENT
 ```

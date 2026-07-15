@@ -1,3 +1,5 @@
 .playwright-mcp/
 *.png
-.claude/
+# Ignore local Claude config, NHƯNG version hóa skills để clone máy khác là có ngay
+.claude/*
+!.claude/skills/
