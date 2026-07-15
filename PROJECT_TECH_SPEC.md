@@ -2,8 +2,8 @@
 
 **File:** `index.html` (single-file SPA, không build step)
 **Repo:** `ThaiBaHoa/qa-amo-dashboard` · **Domain:** `vjc-qa-amo.com` (GitHub Pages)
-**Version hiện tại:** `2026.06.26-r109`
-**Cập nhật spec:** 2026-06-26 — phản ánh code thực tế (gồm r81–r109, **r104: User delete qua Edge Function + EIS form-specific schema/roll-up ở All Forms; r105: fix EIS per-CA load — revert về field_name + post-filter Set (I3); r106: EIS đóng/mở theo cấp report (không suy từ CA Date completed); r107: QC Spot Check Report detail ở All Forms (+ hotfix TDZ thứ tự khai báo & timeout report_field — xem §8.8, I11); r108: KPI ATA = (CMR-CAR + QC Spot Check)÷ECAR lệch tháng N−1/N (§6.4c); r109: tử số CMR-CAR chỉ tính report gán cờ "QC MQA Physical Finding" (category_id)**, MCAR cột Raised by, Target_date lấy từ Report, MCAR deadline check, copyholder on-time so theo ngày, lọc Cancelled/Deleted, auto-refresh kiosk, multi-year filter, admin export, SPI, KPI2, PAVOI RFI)
+**Version hiện tại:** `2026.07.12-r112-i1`
+**Cập nhật spec:** 2026-07-15 — phản ánh code thực tế (gồm r81–r112-i1, **r110: cập nhật roster `QA_AMO_AUDITORS`; r111: nút Feedback / Bug Report (Google Form) ở sidebar; r112: AI Assistant chat — hỏi-đáp dữ liệu qua Worker `galileo-ai` (tool-use client-side) — xem §8.9; r112-i1: AI Assistant fuzzy form matching + alias (SR/EIS/QC)**; r104: User delete qua Edge Function + EIS form-specific schema/roll-up ở All Forms; r105: fix EIS per-CA load — revert về field_name + post-filter Set (I3); r106: EIS đóng/mở theo cấp report (không suy từ CA Date completed); r107: QC Spot Check Report detail ở All Forms (+ hotfix TDZ thứ tự khai báo & timeout report_field — xem §8.8, I11); r108: KPI ATA = (CMR-CAR + QC Spot Check)÷ECAR lệch tháng N−1/N (§6.4c); r109: tử số CMR-CAR chỉ tính report gán cờ "QC MQA Physical Finding" (category_id), MCAR cột Raised by, Target_date lấy từ Report, MCAR deadline check, copyholder on-time so theo ngày, lọc Cancelled/Deleted, auto-refresh kiosk, multi-year filter, admin export, SPI, KPI2, PAVOI RFI)
 
 > Tài liệu này mô tả TOÀN BỘ kiến trúc, dữ liệu, logic và quy ước của dashboard. Dùng làm nguồn tham chiếu chuẩn khi sửa code. Số dòng (Lxxxx) là tương đối, dùng để định vị nhanh.
 
@@ -19,7 +19,7 @@ Dashboard nội bộ cho **QA AMO** (Quality Assurance — Approved Maintenance 
 - **PAVOI RFI** (Request For Information monitor).
 - Công cụ admin: Export (PDF/Excel), Query Builder, My Dashboard, User Management.
 
-**Đặc điểm kiến trúc:** 1 file `index.html` (~8050 dòng) chứa toàn bộ HTML + CSS + JS. Không framework, không bundler. Dữ liệu lấy runtime từ **Galileo OData API** (qua Cloudflare Worker proxy) + **Supabase** (auth & user roles).
+**Đặc điểm kiến trúc:** 1 file `index.html` (~9560 dòng) chứa toàn bộ HTML + CSS + JS. Không framework, không bundler. Dữ liệu lấy runtime từ **Galileo OData API** (qua Cloudflare Worker proxy) + **Supabase** (auth & user roles). AI Assistant (r112) gọi thêm Worker `galileo-ai` (Anthropic API proxy).
 
 ---
 
@@ -41,11 +41,12 @@ Dashboard nội bộ cho **QA AMO** (Quality Assurance — Approved Maintenance 
 - **Galileo OData** `vietjet.ideagendata.com/odata` — KHÔNG gọi trực tiếp.
 - **Cloudflare Worker proxy** `G_URL = 'https://galileo-proxy.thaibahoa2308.workers.dev/proxy/'` — giấu API key, kiểm tra `Origin` (chỉ `vjc-qa-amo.com` / `127.0.0.1:5500` / `localhost:5500`).
 - **Supabase** `SUPA_URL = 'https://czftzgdcnpnspbbegwjt.supabase.co'`, `SUPA_KEY = 'sb_publishable_eGdEXBCSD_19tu4sOV8NWQ_8mZmUqqq'` (publishable/anon).
+- **Cloudflare Worker `galileo-ai`** `AI_URL = 'https://galileo-ai.thaibahoa2308.workers.dev'` (r112) — proxy Anthropic API cho AI Assistant, giữ `ANTHROPIC_API_KEY` secret server-side. Nhận `{system, tools, messages}` (POST), trả nguyên response Messages API. Xem §8.9.
 
 ### 2.3 Deployment
 - Push `main` → GitHub Pages tự deploy (no build). `CNAME` = `vjc-qa-amo.com`.
 - `_headers` (Cloudflare/Netlify format): `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=()`, `X-XSS-Protection: 1; mode=block`.
-- **Repo files:** `index.html`, `CNAME`, `_headers`, `CLAUDE.md`, `PROJECT_TECH_SPEC.md`, `TECHNICAL_REFERENCE.md`, `KPI2_DECISION_POINTS.md`, `PAVOI_RFI_Spec.md`, `.gitignore`. (Không có package.json/node_modules.)
+- **Repo files:** `index.html`, `CNAME`, `_headers`, `CLAUDE.md`, `PROJECT_TECH_SPEC.md`, `TECHNICAL_REFERENCE.md`, `KPI2_DECISION_POINTS.md`, `PAVOI_RFI_Spec.md`, `.gitignore`, `scripts/gen-changelog.sh`, `.claude/skills/` (skill `cap-nhat-revision`, `probe-spec`). (Không có package.json/node_modules.)
 
 ---
 
@@ -311,6 +312,27 @@ Form `QC Spot Check Report` (org **QA AMO**, đã có sẵn trong `allData`) hi�
 - **TDZ — vị trí khai báo (r107 hotfix):** `AF_SCHEMAS` dùng computed key `[QCS_TITLE]` + value `AF_QCS_COLS` → 2 hằng này **PHẢI khai báo TRƯỚC `const AF_SCHEMAS`** (giống `EIS_TITLE`/`AF_EIS_COLS`). Lần đầu đặt nhầm ở khối trước `renderAF()` (sau `AF_SCHEMAS`) → `ReferenceError: Cannot access 'QCS_TITLE' before initialization` lúc chạy top-level → **vỡ cả script, dashboard trắng data**. Hằng runtime-only (`qcsLoaded`/`qcsMap`/`loadQcsDetail`/`enrichQcs`) đặt sau thì OK.
 - Hàm: `loadQcsDetail`, `enrichQcs`, `showQcsDetail`/`closeQcsModal`; registry `AF_SCHEMAS`; state `qcsLoaded`/`qcsMap` (§10); constants `QCS_TITLE`/`QCS_HEADER_FIELDS`/`QCS_FINDING_FIELDS`/`AF_QCS_COLS` (khai báo ngay trước `AF_SCHEMAS`).
 
+### 8.9 AI Assistant — hỏi-đáp dữ liệu (r112, block `L9199–9561`)
+
+Trợ lý chat nổi (FAB `#aiFab` góc phải-dưới, panel `#aiPanel`, badge **BETA**) cho phép hỏi bằng ngôn ngữ tự nhiên về findings/audit đang có trên dashboard. **Chỉ hiện sau khi đăng nhập** (`aiFab` display `flex` cuối luồng login `L2576`, ẩn khi logout `L2569`).
+
+**Kiến trúc agentic (tool-use client-side) — đây là điểm mấu chốt:**
+- Client POST `{system, tools, messages}` tới Worker **`galileo-ai`** (`AI_URL`, §2.2) — Worker chỉ là **proxy Anthropic Messages API**, giữ `ANTHROPIC_API_KEY` server-side. Claude không tự chạy được gì; nó **sinh `tool_use`** → **JS chạy tool ngay trên `allData`/`auditData` tại browser** (`aiRunTool`) → đẩy `tool_result` về → lặp. Vòng lặp `aiSend()` tối đa **6 round** (`stop_reason==='tool_use'` thì chạy tool rồi `continue`).
+- **Riêng tư dữ liệu (quan trọng):** KHÔNG upload toàn bộ dữ liệu lên API — chỉ **kết quả truy vấn** (số đếm/nhóm/danh sách rút gọn) được gửi. Dữ liệu thô nằm lại trong browser.
+
+**3 tool (`AI_TOOLS`), thực thi bằng JS thuần trên state có sẵn:**
+| Tool | Hàm | Việc |
+|---|---|---|
+| `get_data_overview` | `aiOverview()` | Tổng quan: tổng finding, các năm, đếm theo form/status, tổng audit. Gọi trước khi chưa chắc dữ liệu. |
+| `query_findings` | `aiQF(q)` | Lọc/đếm/nhóm finding theo year, ym, `report_title` (khớp **chuỗi con**, không cần tên đầy đủ), `semantic_status`, `overdue_cat` (CAT I ≤30d / II 30–60 / III >60), `finding_level`, owner, audit, repetitive; `group_by`; `include_ontime_rate`; `return_records`+`sort_by`+`limit`. |
+| `query_audits` | `aiQA(q)` | Lọc/nhóm Audit Plan theo year/status/lead/type, trả danh sách + số finding liên quan. |
+
+**System prompt (`aiSystem()`)** nhúng động: ngày hôm nay, tổng finding/audit, **danh sách form THỰC TẾ trong `allData` kèm số lượng** (để Claude tự khớp), định nghĩa `semantic_status`/`overdue_cat`/on-time rate, và bảng viết tắt (SR=Surveillance, EIS=MQA Event Investigation Summary, QC/SCR=QC Spot Check, IA=Internal Audit, CMR=CMR-CAR).
+- **r112-i1 (fuzzy matching):** yêu cầu Claude **tự đối chiếu tên gõ tắt/gần đúng với danh sách form thực tế rồi truy vấn ngay**, chỉ hỏi lại khi thật sự không suy được — thay vì hỏi tên form chính xác.
+
+**Hiển thị:** `aiMd()` render markdown rút gọn (bảng/list/inline code/bold) sang HTML; bong bóng user/bot/err. Hội thoại cắt còn ~20 lượt gần nhất (`aiMsgs.slice(-16)`), cắt theo cặp để không lệch `tool_use`/`tool_result`. Lỗi Worker → gợi ý kiểm tra `galileo-ai` đã deploy + có `ANTHROPIC_API_KEY`.
+- Hàm chính: `aiToggle`/`aiSend`/`aiAsk`/`aiCallWorker`/`aiRunTool`/`aiQF`/`aiQA`/`aiOverview`/`aiMd`; state `aiMsgs`/`aiBusy`; const `AI_URL`/`AI_TOOLS`.
+
 ---
 
 ## 9. Design system (CSS)
@@ -405,6 +427,10 @@ Form `QC Spot Check Report` (org **QA AMO**, đã có sẵn trong `allData`) hi�
 
 | Rev | Nội dung |
 |---|---|
+| r112-i1 | **AI Assistant — fuzzy form matching (Issue, KHÔNG nâng rev):** system prompt yêu cầu Claude tự đối chiếu tên form gõ tắt/gần đúng (SR/EIS/QC/SCR/IA/CMR) với danh sách form thực tế trong `allData` rồi truy vấn ngay (filter `report_title` khớp chuỗi con), chỉ hỏi lại khi không suy được. Xem §8.9. |
+| r112 | **AI Assistant chat (nâng rev = tính năng mới):** FAB `#aiFab` + panel `#aiPanel` (BETA), hỏi-đáp NL về findings/audit. Kiến trúc **tool-use client-side**: client → Worker `galileo-ai` (proxy Anthropic API, giữ `ANTHROPIC_API_KEY`) → Claude sinh `tool_use` → JS chạy 3 tool (`get_data_overview`/`query_findings`/`query_audits`) trên `allData`/`auditData` tại browser → `tool_result` → lặp ≤6 round. **KHÔNG upload dữ liệu thô — chỉ kết quả truy vấn.** Chỉ hiện sau login. Xem §2.2, §8.9. |
+| r111 | **Nút Feedback / Bug Report ở sidebar (additive):** `nav-item` mở Google Form (`docs.google.com/forms/d/e/1FAIpQLSdzEq_…/viewform`) tab mới cho bug report / feature request. (Ban đầu nhãn tiếng Việt, sau đổi sang tiếng Anh "Feedback / Bug Report".) |
+| r110 | **Cập nhật roster `QA_AMO_AUDITORS`** (`const … = new Set([...])`, ~L2220) — tập tên lead auditor dùng lọc Audit Plan về đúng phạm vi QA AMO (`QA_AMO_AUDITORS.has(a.lead_auditor_name)`). Chỉ thêm/sửa tên, không đổi logic. |
 | r109 | **KPI ATA: tử số chỉ phần QC (nâng rev = đổi logic):** CMR-CAR vào tử **chỉ khi gán Category "QC MQA Physical Finding"** (`QC_CAT_UUID = 7e5ccacc-…-905870d68aca`, cấp report). `loadCmr` thêm `category_id` vào `$select` (mang qua `cmrData` bằng `...r`); vòng đếm CMR lọc `r.category_id===QC_CAT_UUID`. QC Spot Check (toàn bộ finding) + mẫu số ECAR + TOTAL/No-ATA/badge giữ nguyên r108. Title/sub/legend/dataset đổi nhãn "QC". *(Giữ ratio số thập phân theo r108-i1, KHÔNG dùng "×100%" trong spec gốc.)* Forward-looking: data cờ QC mới từ 2026-05/06. Xem §6.4c. |
 | r108 | **KPI ATA đổi nghĩa (nâng rev = tính năng):** chart/bảng `cATACompare` rebuild thành internal-vs-authority `Ratio[ATA] = (CMR-CAR + QC Spot Check finding N−1) ÷ (ECAR finding N)` (thay ratio cũ ECAR/CMR). Filter year-multi → Year+Month single (default tháng hiện tại, rollover tháng 1). Đếm finding con per-ATA (CMR/ECAR `findingRows`, QCS `qcsMap.findings` — phụ thuộc r107). Bảng TOTAL/per-ATA/No-ATA, guard `den>0`. PDF cập nhật label/title/head. Xem §6.4c. **Issue 1 (`r108-i1`):** ratio đổi sang **số thập phân** (không phải %); ô count rỗng = `0` (không phải `—`); dòng TOTAL **chỉ cộng phần CÓ ATA** (khớp tổng các dòng per-ATA, No-ATA để riêng). |
 | r107 | **QC Spot Check Report detail ở All Forms** (mirror EIS, **nâng rev = thêm tính năng**): schema `AF_QCS_COLS` + `#qcsModal`, lazy-load `loadQcsDetail` group finding theo `report_id→section_id` (I12), `enrichQcs` clone (KHÔNG mutate `allData`). Xem §8.8. **2 bug fix cùng rev (Issue, KHÔNG nâng rev):** **Issue 1 (`r107-i1`) — TDZ:** `QCS_TITLE`/`AF_QCS_COLS` ban đầu khai báo SAU `AF_SCHEMAS` (chỗ dùng chúng làm computed key) → `ReferenceError` lúc top-level → **trắng toàn bộ data**; chuyển 4 hằng lên TRƯỚC `AF_SCHEMAS`. **Issue 2 (`r107-i2`) — Timeout:** query `field_name eq 'Finding description'` (~14k row) timeout 30s → detail rỗng; thêm vế `report_raised_date ge <raised sớm nhất − 2d>` + chunk 8 field/query (I11). `report_id eq` trên `report_field` = HTTP 400 (I3). Verify trên API thật: 13941→213 row, 18 row khớp QCS. |

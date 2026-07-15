@@ -4,6 +4,7 @@
 
 ```javascript
 const G_URL     = 'https://galileo-proxy.thaibahoa2308.workers.dev/proxy/';
+const AI_URL    = 'https://galileo-ai.thaibahoa2308.workers.dev';  // AI Assistant (r112)
 const SUPA_URL  = 'https://czftzgdcnpnspbbegwjt.supabase.co';
 const ORG_UNIT  = 'QA AMO';   // Dùng cho loadData() chính
 ```
@@ -279,7 +280,11 @@ sessionStorage.setItem('qaCache', JSON.stringify({ ts: Date.now(), data: allData
 
 ---
 
-## Cloudflare Worker (galileo-proxy)
+## Cloudflare Workers
+
+App có **2 Worker riêng** — đừng nhầm:
+
+### 1. `galileo-proxy` (dữ liệu — `G_URL`)
 
 ```javascript
 const ALLOWED_ORIGINS = [
@@ -292,6 +297,13 @@ const ALLOWED_ORIGINS = [
 // API Key Galileo lưu trong Worker secret GALILEO_KEY
 // Timeout: 30s
 ```
+
+### 2. `galileo-ai` (AI Assistant — `AI_URL`, r112)
+
+- Proxy **Anthropic Messages API** cho AI Assistant. Giữ secret **`ANTHROPIC_API_KEY`** server-side (client không bao giờ thấy key).
+- Nhận **POST** `{ system, tools, messages }`, trả nguyên response Messages API (`content[]`, `stop_reason`).
+- Client chạy **tool-use tại browser**: Claude sinh `tool_use` → JS truy vấn `allData`/`auditData` → `tool_result` → lặp ≤6 round. **Chỉ kết quả truy vấn được gửi lên API, KHÔNG upload dữ liệu thô.**
+- Chi tiết kiến trúc: `PROJECT_TECH_SPEC.md` §8.9.
 
 ---
 
