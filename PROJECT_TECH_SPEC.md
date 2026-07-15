@@ -46,7 +46,7 @@ Dashboard nội bộ cho **QA AMO** (Quality Assurance — Approved Maintenance 
 ### 2.3 Deployment
 - Push `main` → GitHub Pages tự deploy (no build). `CNAME` = `vjc-qa-amo.com`.
 - `_headers` (Cloudflare/Netlify format): `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy: geolocation=(), camera=(), microphone=(), payment=()`, `X-XSS-Protection: 1; mode=block`.
-- **Repo files:** `index.html`, `CNAME`, `_headers`, `CLAUDE.md`, `PROJECT_TECH_SPEC.md`, `TECHNICAL_REFERENCE.md`, `KPI2_DECISION_POINTS.md`, `PAVOI_RFI_Spec.md`, `.gitignore`, `scripts/gen-changelog.sh`, `.claude/skills/` (skill `cap-nhat-revision`, `probe-spec`). (Không có package.json/node_modules.)
+- **Repo files:** `index.html`, `CNAME`, `_headers`, `CLAUDE.md`, `PROJECT_TECH_SPEC.md`, `TECHNICAL_REFERENCE.md`, `KPI2_DECISION_POINTS.md`, `PAVOI_RFI_Spec.md`, `.gitignore`, `scripts/gen-changelog.sh`, `.claude/skills/` (skill `quy-trinh-chuan`, `cap-nhat-revision`, `probe-spec`). (Không có package.json/node_modules.)
 
 ---
 

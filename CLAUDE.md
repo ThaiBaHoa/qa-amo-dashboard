@@ -4,6 +4,21 @@ QA AMO Dashboard — VietJet Air Quality Assurance reporting portal.
 
 ---
 
+## Quy trình chuẩn & skills
+
+Toàn bộ vòng đời một thay đổi (sửa code → bump rev → cập nhật tài liệu kèm theo →
+commit → hook backup → push/deploy → ghi nhận) được chuẩn hóa trong skill
+**`quy-trinh-chuan`** (`.claude/skills/quy-trinh-chuan/`) — **mở skill này khi bắt đầu
+một thay đổi hoặc khi chưa chắc bước tiếp theo**. Các skill con:
+
+- **`probe-spec`** — Probe→Spec→Implement cho dữ liệu Galileo OData.
+- **`cap-nhat-revision`** — bump `APP_REV` r### + commit đúng luật.
+- (workspace) **`bao-cao-tuan`** — báo cáo tuần `.docx`; **`kiem-tra-dong-bo`** — check sync.
+
+Skills được version hóa trong repo (`.claude/skills/`) → clone máy khác là có ngay.
+
+---
+
 ## Behavior principles (Karpathy)
 
 These apply to every task in this repo.
