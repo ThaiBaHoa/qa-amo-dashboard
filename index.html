@@ -11,6 +11,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- xlsx-js-style: drop-in superset of SheetJS 0.18.5, adds cell styling (fill/border/font)
+     for the styled Overdue Report export. Loads AFTER xlsx so it overrides window.XLSX;
+     if this CDN fails, XLSX falls back to the cdnjs build above and all exports still work. -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -1220,9 +1224,10 @@ tr:last-child td{border-bottom:none}
                   <div id="rptFormChecks"></div>
                 </div>
               </div>
-              <div style="display:flex;gap:8px">
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button class="admin-only" onclick="exportPDF()" style="padding:7px 14px;border-radius:8px;border:none;background:#E30613;color:white;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;display:none">📄 PDF</button>
                 <button class="admin-only" onclick="exportExcel()" style="padding:7px 14px;border-radius:8px;border:none;background:#1D6F42;color:white;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;display:none">📊 Excel</button>
+                <button class="admin-only" onclick="exportOverdueReport()" title="Weekly overdue snapshot: findings already overdue + findings due within the next 7 days" style="padding:7px 14px;border-radius:8px;border:none;background:#2F5496;color:white;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;display:none">📋 Overdue Report</button>
               </div>
             </div>
           </div>
@@ -1609,6 +1614,20 @@ tr:last-child td{border-bottom:none}
                     • <b>Sheet 3 — Detail Data:</b> All findings with full field data<br><br>
                     Filename is auto-generated with the report title and export date.
                   </div>
+                </div>
+              </div>
+
+              <div style="background:rgba(47,84,150,0.10);border:1px solid rgba(47,84,150,0.35);border-radius:10px;padding:14px;margin-bottom:14px">
+                <div style="font-size:13px;font-weight:600;color:#5B8DEF;margin-bottom:8px">📋 Overdue Report (weekly snapshot)</div>
+                <div style="font-size:12px;color:var(--muted);line-height:1.7">
+                  A ready-to-send <b style="color:var(--text)">styled .xlsx</b> matching the printed overdue template
+                  (blue banners, bordered cells). It ignores the filters above and always takes a live snapshot
+                  of <b style="color:var(--text)">all forms</b> in two sections:<br>
+                  • <b style="color:var(--text)">OVERDUE FINDINGS — WEEK n/YYYY:</b> every finding currently overdue (sorted most-overdue first)<br>
+                  • <b style="color:var(--text)">OVERDUE FINDINGS WITHIN NEXT 7 DAYS:</b> open findings due in the next 0–7 days<br><br>
+                  Columns: Audit No. · MCAR/PAVOI/SR No. · Date Raised · Finding Summary · Department ·
+                  Deadline · Extension 1 · Extension 2 · Overdue (days) · Status. The
+                  <b style="color:var(--text)">Overdue (days)</b> column is negative when past due, positive when still within deadline.
                 </div>
               </div>
 
@@ -2239,7 +2258,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.07.12-r112-i1';
+const APP_REV = '2026.07.19-r113';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -7025,6 +7044,82 @@ function exportExcel(){
     XLSX.writeFile(wb,`QA_AMO_${getRptTitle().replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`);
     toast('✓ Excel exported!','ok');
   }catch(e){toast('Excel error: '+e.message,'err');}
+  finally{setOv(false);}
+}
+
+// ── OVERDUE REPORT (weekly snapshot, styled .xlsx) ─────────────
+// Two sections matching the QA overdue template:
+//   A) Findings already overdue      (semantic_status === 'Overdue')
+//   B) Findings due within 7 days     (Open, report_ageing 0..7)
+// Styling (blue banners/headers, cell borders) requires xlsx-js-style
+// (loaded in <head>); on plain SheetJS the .s styles are simply ignored.
+function isoWeekNum(d){
+  const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const day=dt.getUTCDay()||7; dt.setUTCDate(dt.getUTCDate()+4-day);
+  const yStart=new Date(Date.UTC(dt.getUTCFullYear(),0,1));
+  return {week:Math.ceil(((dt-yStart)/86400000+1)/7), year:dt.getUTCFullYear()};
+}
+// dd-Mmm-yy to match the printed template (fd() uses dd/mm/yyyy)
+function fdShort(d){
+  if(!d)return'';
+  let dt;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(d)){const[y,m,dy]=d.split('-').map(Number);dt=new Date(Date.UTC(y,m-1,dy));}
+  else{const t=new Date(d);if(isNaN(t))return String(d);dt=new Date(Date.UTC(t.getUTCFullYear(),t.getUTCMonth(),t.getUTCDate()));}
+  if(isNaN(dt))return'';
+  const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return String(dt.getUTCDate()).padStart(2,'0')+'-'+M[dt.getUTCMonth()]+'-'+String(dt.getUTCFullYear()).slice(-2);
+}
+function exportOverdueReport(){
+  if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
+  if(!allData||!allData.length){toast('No data loaded','err');return;}
+  setOv(true,'Generating Overdue Report...','');
+  try{
+    const overdue=allData.filter(r=>r.semantic_status==='Overdue')
+      .sort((a,b)=>(a.report_ageing??0)-(b.report_ageing??0));               // most overdue first
+    const soon=allData.filter(r=>r.semantic_status==='Open'&&r.report_ageing!=null&&r.report_ageing>=0&&r.report_ageing<=7)
+      .sort((a,b)=>(a.report_ageing??0)-(b.report_ageing??0));               // soonest due first
+    const {week,year}=isoWeekNum(new Date());
+    const headers=['Audit No.','MCAR / PAVOI / SR No.','Date Raised','Finding Summary','Department','Deadline','Extension 1','Extension 2','Overdue (days)','Status'];
+    const NC=headers.length, AGE_C=8;
+    const rowOf=r=>[r.audit_number||r.audit_ref||'',r.report_number||'',fdShort(r.raised_date),
+      r.finding_desc||'',r.dept||'',fdShort(r.Target_date),fdShort(r.ext1_date),fdShort(r.ext2_date),
+      r.report_ageing??'',r.semantic_status||''];
+    const aoa=[],merges=[],secs=[];
+    const pushSection=(title,rows)=>{
+      const banner=aoa.length; aoa.push([title,...Array(NC-1).fill('')]);
+      merges.push({s:{r:banner,c:0},e:{r:banner,c:NC-1}});
+      const header=aoa.length; aoa.push(headers.slice());
+      const dataStart=aoa.length;
+      if(rows.length) rows.forEach(r=>aoa.push(rowOf(r)));
+      else{aoa.push(['No findings.',...Array(NC-1).fill('')]);merges.push({s:{r:dataStart,c:0},e:{r:dataStart,c:NC-1}});}
+      secs.push({banner,header,dataStart,dataEnd:aoa.length-1});
+      aoa.push(Array(NC).fill(''));                                          // spacer row
+    };
+    pushSection('OVERDUE FINDINGS - WEEK '+week+'/'+year,overdue);
+    pushSection('OVERDUE FINDINGS WITHIN NEXT 7 DAYS',soon);
+
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    ws['!merges']=merges;
+    ws['!cols']=[{wch:16},{wch:16},{wch:12},{wch:60},{wch:22},{wch:12},{wch:12},{wch:12},{wch:11},{wch:16}];
+    const B={style:'thin',color:{rgb:'808080'}}, border={top:B,bottom:B,left:B,right:B};
+    const bannerStyle={fill:{fgColor:{rgb:'8EAADB'}},font:{bold:true,sz:12,color:{rgb:'1F3864'}},alignment:{vertical:'center'},border};
+    const headStyle  ={fill:{fgColor:{rgb:'BDD7EE'}},font:{bold:true,sz:10,color:{rgb:'1F3864'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border};
+    const cellStyle  ={font:{sz:9},alignment:{vertical:'top',wrapText:true},border};
+    const numStyle   ={font:{sz:9},alignment:{horizontal:'center',vertical:'top'},border};
+    const setStyle=(r,c,s)=>{const ref=XLSX.utils.encode_cell({r,c});if(!ws[ref])ws[ref]={t:'s',v:''};ws[ref].s=s;};
+    secs.forEach(sec=>{
+      for(let c=0;c<NC;c++) setStyle(sec.banner,c,bannerStyle);
+      for(let c=0;c<NC;c++) setStyle(sec.header,c,headStyle);
+      for(let r=sec.dataStart;r<=sec.dataEnd;r++)
+        for(let c=0;c<NC;c++) setStyle(r,c, c===AGE_C?numStyle:cellStyle);
+    });
+    ws['!rows']=aoa.map((_,i)=>secs.some(s=>s.banner===i)?{hpt:22}:(secs.some(s=>s.header===i)?{hpt:30}:{}));
+
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Overdue W'+week);
+    XLSX.writeFile(wb,'QA_AMO_Overdue_W'+week+'-'+year+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
+    toast('✓ Overdue report exported ('+overdue.length+' overdue, '+soon.length+' due ≤7d)','ok');
+  }catch(e){toast('Overdue export error: '+e.message,'err');}
   finally{setOv(false);}
 }
 // ── ADMIN ─────────────────────────────────────────────────────
