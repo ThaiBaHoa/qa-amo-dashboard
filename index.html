@@ -1227,7 +1227,6 @@ tr:last-child td{border-bottom:none}
               <div style="display:flex;gap:8px;flex-wrap:wrap">
                 <button class="admin-only" onclick="exportPDF()" style="padding:7px 14px;border-radius:8px;border:none;background:#E30613;color:white;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;display:none">📄 PDF</button>
                 <button class="admin-only" onclick="exportExcel()" style="padding:7px 14px;border-radius:8px;border:none;background:#1D6F42;color:white;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;display:none">📊 Excel</button>
-                <select class="sel admin-only" id="ovrFormF" title="Overdue Report — filter by form type" style="padding:7px 10px;font-size:12px;display:none"><option value="">All forms</option></select>
                 <button class="admin-only" onclick="exportOverdueReport()" title="Weekly overdue snapshot: findings already overdue + findings due within the next 7 days" style="padding:7px 14px;border-radius:8px;border:none;background:#2F5496;color:white;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;display:none">📋 Overdue Report</button>
               </div>
             </div>
@@ -2259,7 +2258,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.07.19-r113-i2';
+const APP_REV = '2026.07.19-r113-i3';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -6669,7 +6668,6 @@ function initReportFilters(){
   const forms=[...new Set(allData.map(r=>r.report_title).filter(Boolean))].sort();
   rptFormSelected=[];
   g('rptFormChecks').innerHTML=forms.map(f=>`<label style="display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;font-size:13px"><input type="checkbox" class="rptFormItem" value="${f.replace(/"/g,'&quot;')}" onchange="rptFormItemChange()" checked> ${f}</label>`).join('');
-  const ovrF=g('ovrFormF'); if(ovrF) ovrF.innerHTML='<option value="">All forms</option>'+forms.map(f=>`<option value="${esc(f)}">${esc(f)}</option>`).join('');
   updateRptFormLabel();
   updateReportFilters();
 }
@@ -7078,13 +7076,17 @@ function fdShort(d){
 // batch report_id cho đúng các PAVOI trong báo cáo; tái dùng pavoiRfiMap nếu đã có.
 async function ovrFetchPavoiOwners(reportIds){
   const map={}, todo=[];
-  const distinct=list=>[...new Set((list||[]).filter(t=>t.task_status!=='Deleted').map(t=>t.task_owner).filter(Boolean))];
+  // "Chưa trả lời" = owner của RFI đang MỞ (chưa Completed & chưa có completed_date; bỏ Deleted).
+  // Bỏ qua các RFI đã hoàn thành (kể cả của QC Inspector) để cột chỉ còn người đang nợ trả lời.
+  const distinct=list=>[...new Set((list||[])
+    .filter(t=>t.task_status!=='Deleted'&&t.task_status!=='Completed'&&!t.task_completed_date)
+    .map(t=>t.task_owner).filter(Boolean))];
   reportIds.forEach(id=>{ if(pavoiRfiMap[id]) map[id]=distinct(pavoiRfiMap[id]); else todo.push(id); });
   const CHUNK=15;
   for(let i=0;i<todo.length;i+=CHUNK){
     const ids=todo.slice(i,i+CHUNK);
     const orClause=ids.map(id=>'report_id eq '+id).join(' or ');            // GUID không bọc nháy
-    const url=G_URL+'dwreporting_report_task?$select=report_id,task_owner,task_status,task_title&$filter='+
+    const url=G_URL+'dwreporting_report_task?$select=report_id,task_owner,task_status,task_completed_date,task_title&$filter='+
       encodeURIComponent('('+orClause+") and task_title eq 'Request For Information'");
     try{
       const raw=await fetchAll(url,true);
@@ -7097,10 +7099,10 @@ async function ovrFetchPavoiOwners(reportIds){
 async function exportOverdueReport(){
   if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
   if(!allData||!allData.length){toast('No data loaded','err');return;}
-  const formF=g('ovrFormF')?.value||'';                                     // '' = all forms
+  const forms=rptFormSelected||[];                                          // [] = all forms (dùng chung dropdown "Form Type")
   setOv(true,'Generating Overdue Report...','');
   try{
-    const inScope=r=>!formF||r.report_title===formF;
+    const inScope=r=>!forms.length||forms.includes(r.report_title);
     const overdue=allData.filter(r=>r.semantic_status==='Overdue'&&inScope(r))
       .sort((a,b)=>(a.report_ageing??0)-(b.report_ageing??0));               // most overdue first
     const soon=allData.filter(r=>r.semantic_status==='Open'&&r.report_ageing!=null&&r.report_ageing>=0&&r.report_ageing<=7&&inScope(r))
@@ -7110,9 +7112,9 @@ async function exportOverdueReport(){
     const pavIds=[...new Set([...overdue,...soon].filter(r=>r.report_title==='PAVOI'&&r.report_id).map(r=>r.report_id))];
     const pavOwners=pavIds.length?await ovrFetchPavoiOwners(pavIds):{};
 
-    // Department: MCAR/ECAR = 'Department - Issued to (person)'; PAVOI = chỉ tên người
-    // phụ trách (RFI owner) — vì Department gốc của PAVOI là 'QA AMO' (đơn vị tạo, không
-    // phải đơn vị trả lời) và không có field phòng của người trả lời.
+    // Department: MCAR/ECAR = 'Department - Issued to (person)'; PAVOI = người CHƯA trả lời
+    // = owner của RFI đang mở (pavOwners đã lọc open-only). Nếu PAVOI đã trả lời hết RFI
+    // (nhưng report vẫn Overdue) → không có ai đang nợ → để trống.
     const deptOf=r=>{
       if(r.report_title==='PAVOI'){ const o=pavOwners[r.report_id]; return (o&&o.length)?o.join(', '):(r.dept||''); }
       const p=r.issued_person; return (r.dept||'')+(p?((r.dept?' - ':'')+p):'');
@@ -7162,7 +7164,7 @@ async function exportOverdueReport(){
 
     const wb=XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb,ws,'Overdue W'+week);
-    const formTag=formF?('_'+formF.replace(/[^a-zA-Z0-9]/g,'')):'';
+    const formTag=forms.length===1?('_'+forms[0].replace(/[^a-zA-Z0-9]/g,'')):(forms.length?('_'+forms.length+'forms'):'');
     XLSX.writeFile(wb,'QA_AMO_Overdue_W'+week+'-'+year+formTag+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
     toast('✓ Overdue report exported ('+overdue.length+' overdue, '+soon.length+' due ≤7d)','ok');
   }catch(e){toast('Overdue export error: '+e.message,'err');}
