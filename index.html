@@ -2258,7 +2258,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.07.19-r113';
+const APP_REV = '2026.07.19-r113-i1';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -7081,8 +7081,13 @@ function exportOverdueReport(){
     const {week,year}=isoWeekNum(new Date());
     const headers=['Audit No.','MCAR / PAVOI / SR No.','Date Raised','Finding Summary','Department','Deadline','Extension 1','Extension 2','Overdue (days)','Status'];
     const NC=headers.length, AGE_C=8;
-    const rowOf=r=>[r.audit_number||r.audit_ref||'',r.report_number||'',fdShort(r.raised_date),
-      r.finding_desc||'',r.dept||'',fdShort(r.Target_date),fdShort(r.ext1_date),fdShort(r.ext2_date),
+    // Audit No.: MCAR/ECAR carry it in audit_number (MNT-####); PAVOI leaves that
+    // null and stores the ref in report_ref (e.g. MQA-EIS-001-2025). audit_ref is
+    // unreliable (can differ from audit_number) so it sits between the two as a fallback.
+    // Finding Summary: MCAR/ECAR use finding_desc; PAVOI leaves it null and puts the
+    // text in rfv (Request For Verification).
+    const rowOf=r=>[r.audit_number||r.audit_ref||r.report_ref||'',r.report_number||'',fdShort(r.raised_date),
+      r.finding_desc||r.rfv||'',r.dept||'',fdShort(r.Target_date),fdShort(r.ext1_date),fdShort(r.ext2_date),
       r.report_ageing??'',r.semantic_status||''];
     const aoa=[],merges=[],secs=[];
     const pushSection=(title,rows)=>{
