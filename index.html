@@ -2258,7 +2258,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.07.19-r113-i3';
+const APP_REV = '2026.07.19-r113-i4';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -7116,7 +7116,7 @@ async function exportOverdueReport(){
     // = owner của RFI đang mở (pavOwners đã lọc open-only). Nếu PAVOI đã trả lời hết RFI
     // (nhưng report vẫn Overdue) → không có ai đang nợ → để trống.
     const deptOf=r=>{
-      if(r.report_title==='PAVOI'){ const o=pavOwners[r.report_id]; return (o&&o.length)?o.join(', '):(r.dept||''); }
+      if(r.report_title==='PAVOI'){ const o=pavOwners[r.report_id]; return (o&&o.length)?o.join(', '):''; }   // trống nếu không còn RFI open (đã trả lời hết)
       const p=r.issued_person; return (r.dept||'')+(p?((r.dept?' - ':'')+p):'');
     };
 
