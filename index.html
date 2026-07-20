@@ -2260,7 +2260,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.07.20-r115';
+const APP_REV = '2026.07.20-r115-i1';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2423,6 +2423,25 @@ try {
   console.error('Supabase failed to load:', e);
 }
 
+// ── PASSWORD RECOVERY (reset link) ───────────────────────────
+// Đăng ký listener recovery NGAY sau createClient. Với detectSessionInUrl (mặc định
+// bật), supabase-js bóc link reset và bắn PASSWORD_RECOVERY ngay khi khởi tạo client —
+// thường TRƯỚC DOMContentLoaded. Nếu đăng ký muộn (trong DOMContentLoaded) sẽ bị race
+// và có thể lỡ sự kiện → modal đổi mật khẩu không hiện.
+let _recoveryMode = false;
+if (sb) {
+  sb.auth.onAuthStateChange((event) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      _recoveryMode = true;
+      if (document.readyState !== 'loading') enterRecoveryUI();
+    }
+  });
+}
+function enterRecoveryUI() {
+  const aw = g('authWrap'); if (aw) aw.style.display = 'none';
+  showChangePass();
+}
+
 // ── STATE ────────────────────────────────────────────────────
 let curUser = null, allData = [], auditData = [], docData = [], cmrData = [], ecarData = [], docTaskCache = {}, charts = {}, userFilter = 'all', isLoading = false;
 let _docTasks = [], _docTaskSort = { col:'status', asc:true };   // copyholder list + sort (modal Document)
@@ -2580,6 +2599,14 @@ async function doChangePass() {
   try {
     const {error}=await sb.auth.updateUser({password:np});
     if(error) throw error;
+    if(_recoveryMode){
+      // Vào qua reset-link: authWrap đã bị ẩn và app chưa init. Nạp lại URL sạch
+      // (bỏ hash/query) để luồng restore-session bình thường tự đăng nhập user vào app,
+      // tránh màn hình trắng sau khi đổi mật khẩu.
+      showAl(al,'success','Password updated! Signing you in…');
+      setTimeout(()=>{ window.location.replace(window.location.origin + window.location.pathname); },1500);
+      return;
+    }
     showAl(al,'success','Password updated successfully!');
     setTimeout(()=>hideChangePass(),1500);
   } catch(e){showAl(al,'error',e.message);}
@@ -2631,15 +2658,14 @@ window.addEventListener('DOMContentLoaded', async ()=>{
     return;
   }
 
-  // Handle password reset redirect từ email link
-  const hash = window.location.hash;
-  if(hash.includes('type=recovery')) {
-    sb.auth.onAuthStateChange(async (event, session) => {
-      if(event === 'PASSWORD_RECOVERY') {
-        document.getElementById('authWrap').style.display='none';
-        showChangePass();
-      }
-    });
+  // Reset-link redirect: listener recovery đã đăng ký sớm (ngay sau createClient) để
+  // không lỡ PASSWORD_RECOVERY. Ở đây chỉ hiện UI nếu sự kiện đã bắn, hoặc thoát khỏi
+  // luồng khôi phục-session bình thường trong lúc chờ listener bắn.
+  const isRecovery = _recoveryMode
+    || window.location.hash.includes('type=recovery')
+    || new URLSearchParams(window.location.search).get('reset') === '1';
+  if(isRecovery) {
+    if(_recoveryMode) enterRecoveryUI();
     return;
   }
 
