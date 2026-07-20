@@ -2260,7 +2260,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.07.19-r114';
+const APP_REV = '2026.07.20-r115';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2472,11 +2472,20 @@ async function doLogin() {
   if(!email||!pass){showAl(al,'error','Please enter email and password.');g('btnLogin').disabled=false;return;}
   try {
     const {data:auth,error:authErr}=await sb.auth.signInWithPassword({email,password:pass});
-    if(authErr||!auth.user){
-      _loginFails++;
-      if(_loginFails>=5){_loginLockUntil=Date.now()+60000;_loginFails=0;}
-      throw new Error('Incorrect email or password.');
+    if(authErr){
+      // Chỉ báo "sai mật khẩu" khi Supabase thật sự từ chối credential (400 invalid_credentials).
+      // Lỗi mạng / 5xx / rate-limit KHÔNG phải sai pass — báo đúng để user không đi reset oan.
+      const st=authErr.status;
+      const isCred = st===400 && /invalid|credential/i.test(authErr.message||'');
+      if(isCred){
+        _loginFails++;
+        if(_loginFails>=5){_loginLockUntil=Date.now()+60000;_loginFails=0;}
+        throw new Error('Incorrect email or password.');
+      }
+      if(st===429) throw new Error('Too many attempts. Please wait a moment and try again.');
+      throw new Error('Cannot reach the login server. Check your connection and try again — your password was NOT rejected.');
     }
+    if(!auth.user) throw new Error('Incorrect email or password.');
     _loginFails=0; _loginLockUntil=0;
     const {data:profile,error:profErr}=await sb.from('users').select('id,email,full_name,role').eq('supabase_id',auth.user.id).single();
     if(profErr||!profile) throw new Error('Account profile not found.');
