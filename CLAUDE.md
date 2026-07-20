@@ -47,7 +47,8 @@ tasks, state a brief plan with per-step verification checkpoints before starting
 
 A single-page dashboard for VietJet Air's QA AMO (Aircraft Maintenance Organization)
 quality reports: open RFIs, overdue findings, KPI charts, audit plans, exports.
-UI language is Vietnamese.
+**UI language is English.** All user-facing dashboard text is English; Vietnamese is
+used only for developer conversation and code comments, never in what the user sees.
 
 ---
 
@@ -110,7 +111,8 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
 
 - Plain ES (no modules). Globals: `curUser`, `allData`, `auditData`, `charts`.
 - `g(id)` = `getElementById`; `s(id,txt)` = set textContent. Used everywhere.
-- Vietnamese strings in UI text and toasts — keep new user-facing text Vietnamese.
+- **All user-facing text is English** — UI labels, toasts, alerts, error messages, exports.
+  Vietnamese is allowed only in code comments / developer discussion, never in what the user sees.
 - Edits are surgical: this is one giant file, match the existing inline style.
 - **Year filters are multi-year** via `initYearMulti(id, years, {onChange, default})`.
   Each page mounts a `<div class="ymulti" id="...">`. Read selections with:
