@@ -1195,23 +1195,16 @@ tr:last-child td{border-bottom:none}
           <div class="chart-card" style="margin-bottom:12px">
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:10px;align-items:end">
               <div>
-                <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500">Filter by</div>
-                <select class="sel" id="rptFilterType" onchange="updateReportFilters()" style="width:100%;padding:7px 10px">
-                  <option value="month">By Month/Year</option>
-                  <option value="quarter">By Quarter/Year</option>
-                  <option value="form">By Form Type</option>
-                  <option value="all">All</option>
-                </select>
-              </div>
-              <div>
                 <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500">Year</div>
                 <div class="ymulti ym-full" id="rptYear" style="width:100%"></div>
               </div>
-              <div id="rptPeriodWrap">
-                <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500" id="rptPeriodLabel">Month</div>
-                <select class="sel" id="rptPeriod" onchange="generateReport()" style="width:100%;padding:7px 10px">
-                  <option value="all">All</option>
-                </select>
+              <div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500">Month</div>
+                <div class="ymulti ym-full" id="rptMonth" style="width:100%"></div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500">Status</div>
+                <div class="ymulti ym-full" id="rptStatus" style="width:100%"></div>
               </div>
               <div style="position:relative">
                 <div style="font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:500">Form Type</div>
@@ -2261,7 +2254,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.07.21-r116-i1';
+const APP_REV = '2026.07.21-r117';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3262,6 +3255,11 @@ function initYearMulti(id, years, opts){
   years = [...new Set(years.map(String))];
   const st = _YM[id] || (_YM[id] = { sel:new Set(), cb:null, defaulted:false });
   if(opts.onChange) st.cb = opts.onChange;
+  // Tuỳ biến để tái dùng cho Month/Status… (mặc định = hành vi Year cũ, không đổi các filter Year khác)
+  st.icon     = opts.icon     || st.icon     || '📅';
+  st.allLabel = opts.allLabel || st.allLabel || 'All years';
+  st.sortFn   = opts.sortFn   || st.sortFn   || ((a,b)=>b-a);
+  st.labelOf  = opts.labelOf  || st.labelOf  || (v=>v);
   const sameYears = st.years && st.years.length===years.length && st.years.every((y,i)=>y===years[i]);
   st.years = years;
   if(!st.defaulted){
@@ -3282,20 +3280,20 @@ function initYearMulti(id, years, opts){
 function _ymRender(id){
   const host = g(id), st = _YM[id]; if(!host || !st) return;
   host.classList.add('ymulti');
-  const label = st.sel.size===0 ? 'All years' : [...st.sel].sort((a,b)=>b-a).join(', ');
+  const label = st.sel.size===0 ? st.allLabel : [...st.sel].sort(st.sortFn).map(st.labelOf).join(', ');
   host.innerHTML =
     `<button type="button" class="ym-btn" onclick="_ymToggle('${id}',event)">`+
-      `<span class="ym-lbl">📅 ${esc(label)}</span><span class="ym-caret">▾</span></button>`+
+      `<span class="ym-lbl">${st.icon} ${esc(label)}</span><span class="ym-caret">▾</span></button>`+
     `<div class="ym-pop" style="display:none" onclick="event.stopPropagation()">`+
-      `<label class="ym-opt"><input type="checkbox" class="ym-all" ${st.sel.size===0?'checked':''} onchange="_ymSetAll('${id}')"><span>All years</span></label>`+
+      `<label class="ym-opt"><input type="checkbox" class="ym-all" ${st.sel.size===0?'checked':''} onchange="_ymSetAll('${id}')"><span>${esc(st.allLabel)}</span></label>`+
       `<div class="ym-sep"></div>`+
-      st.years.map(y=>`<label class="ym-opt"><input type="checkbox" class="ym-yr" value="${y}" ${st.sel.has(y)?'checked':''} onchange="_ymPick('${id}','${y}',this.checked)"><span>${y}</span></label>`).join('')+
+      st.years.map(y=>`<label class="ym-opt"><input type="checkbox" class="ym-yr" value="${esc(y)}" ${st.sel.has(y)?'checked':''} onchange="_ymPick('${id}','${y.replace(/'/g,"\\'")}',this.checked)"><span>${esc(st.labelOf(y))}</span></label>`).join('')+
     `</div>`;
 }
 function _ymSync(id){
   const host = g(id), st = _YM[id]; if(!host || !st) return;
   const lbl = host.querySelector('.ym-lbl');
-  if(lbl) lbl.textContent = '📅 '+(st.sel.size===0 ? 'All years' : [...st.sel].sort((a,b)=>b-a).join(', '));
+  if(lbl) lbl.textContent = st.icon+' '+(st.sel.size===0 ? st.allLabel : [...st.sel].sort(st.sortFn).map(st.labelOf).join(', '));
   const allCb = host.querySelector('.ym-all'); if(allCb) allCb.checked = st.sel.size===0;
 }
 function _ymToggle(id,ev){
@@ -3319,7 +3317,7 @@ function _ymPick(id,y,checked){
 function _ymFire(id){ const st=_YM[id]; if(st && st.cb){ try{ st.cb(); }catch(e){ console.warn('[year-filter]',id,e); } } }
 function ymVal(id){ const st=_YM[id]; return st ? [...st.sel] : []; }
 function ymHas(id,v){ const st=_YM[id]; if(!st || st.sel.size===0) return true; return st.sel.has(String(v)); }
-function ymText(id){ const st=_YM[id]; return (!st || st.sel.size===0) ? 'All' : [...st.sel].sort((a,b)=>b-a).join(', '); }
+function ymText(id){ const st=_YM[id]; return (!st || st.sel.size===0) ? 'All' : [...st.sel].sort(st.sortFn||((a,b)=>b-a)).map(st.labelOf||(v=>v)).join(', '); }
 function ymReset(id){ const st=_YM[id]; if(st){ st.sel=new Set(); _ymRender(id); } }
 function ymBuilt(id){ const st=_YM[id]; return !!(st && st.years && st.years.length); }
 // Close any open year popover when clicking elsewhere.
@@ -6687,66 +6685,46 @@ function updateRptFormLabel(){
   else lbl.textContent=`${checked.length} forms selected`;
 }
 
-function updateReportFilters(){
-  const type=g('rptFilterType').value;
-  const pw=g('rptPeriodWrap'), pl=g('rptPeriodLabel'), ps=g('rptPeriod');
-  if(type==='month'){
-    pw.style.display=''; pl.textContent='Month';
-    ps.innerHTML='<option value="all">All months</option>'+Array.from({length:12},(_,i)=>`<option value="${i+1}">Month ${i+1}</option>`).join('');
-  } else if(type==='quarter'){
-    pw.style.display=''; pl.textContent='Quarter';
-    ps.innerHTML='<option value="all">All quarters</option>'+['Q1 (Jan-Mar)','Q2 (Apr-Jun)','Q3 (Jul-Sep)','Q4 (Oct-Dec)'].map((q,i)=>`<option value="${i+1}">${q}</option>`).join('');
-  } else { pw.style.display='none'; }
-  generateReport();
-}
-
 function initReportFilters(){
   const years=[...new Set(allData.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
   initYearMulti('rptYear', years, {onChange:generateReport});
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  initYearMulti('rptMonth', ['1','2','3','4','5','6','7','8','9','10','11','12'],
+    {onChange:generateReport, icon:'📆', allLabel:'All months', sortFn:(a,b)=>a-b, labelOf:v=>MN[+v-1]||v});
+  initYearMulti('rptStatus', ['Open','Overdue','On-time Closed','Lately Closed','Closed'],
+    {onChange:generateReport, icon:'◐', allLabel:'All status', sortFn:()=>0,
+     labelOf:v=>({'On-time Closed':'On-time','Lately Closed':'Lately'}[v]||v)});
   const forms=[...new Set(allData.map(r=>r.report_title).filter(Boolean))].sort();
   rptFormSelected=[];
   g('rptFormChecks').innerHTML=forms.map(f=>`<label style="display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;font-size:13px"><input type="checkbox" class="rptFormItem" value="${f.replace(/"/g,'&quot;')}" onchange="rptFormItemChange()" checked> ${f}</label>`).join('');
   updateRptFormLabel();
-  updateReportFilters();
+  generateReport();
 }
 
 function getRptData(){
-  const type=g('rptFilterType').value;
-  const period=g('rptPeriod')?.value||'all';
   const sel=rptFormSelected;
   return allData.filter(r=>{
     if(sel.length&&!sel.includes(r.report_title))return false;
     if(!ymHas('rptYear', r.raised_year))return false;
-    if(type==='month'&&period!=='all'){const m=r.raised_date?new Date(r.raised_date).getMonth()+1:null;if(m!==parseInt(period))return false;}
-    if(type==='quarter'&&period!=='all'){const m=r.raised_date?new Date(r.raised_date).getMonth()+1:null;const q=Math.ceil(m/3);if(q!==parseInt(period))return false;}
+    const m=r.raised_date?new Date(r.raised_date).getMonth()+1:null;
+    if(!ymHas('rptMonth', m))return false;
+    if(!ymHas('rptStatus', r.semantic_status))return false;
     return true;
   });
 }
 
-function getRptTitle(){
-  const type=g('rptFilterType').value;
-  const period=g('rptPeriod')?.value||'all';
-  const sel=rptFormSelected;
+function _rptTitle(dash){
+  const sel=rptFormSelected, mv=ymVal('rptMonth'), sv=ymVal('rptStatus');
   let t='QA AMO';
-  if(sel.length===1)t+=` — ${sel[0]}`;
-  else if(sel.length>1)t+=` — ${sel.length} form`;
-  if(type==='month'&&period!=='all')t+=` Month ${period}`;
-  else if(type==='quarter'&&period!=='all')t+=` Q${period}`;
+  if(sel.length===1)t+=`${dash}${sel[0]}`;
+  else if(sel.length>1)t+=`${dash}${sel.length} forms`;
+  if(mv.length===1)t+=` Month ${mv[0]}`; else if(mv.length>1)t+=` ${mv.length} months`;
+  if(sv.length===1)t+=`${dash}${ymText('rptStatus')}`; else if(sv.length>1)t+=`${dash}${sv.length} status`;
   if(ymVal('rptYear').length)t+=` ${ymText('rptYear')}`;
   return t;
 }
-function getRptTitleEn(){
-  const type=g('rptFilterType').value;
-  const period=g('rptPeriod')?.value||'all';
-  const sel=rptFormSelected;
-  let t='QA AMO';
-  if(sel.length===1)t+=` - ${sel[0]}`;
-  else if(sel.length>1)t+=` - ${sel.length} forms`;
-  if(type==='month'&&period!=='all')t+=` Month ${period}`;
-  else if(type==='quarter'&&period!=='all')t+=` Q${period}`;
-  if(ymVal('rptYear').length)t+=` ${ymText('rptYear')}`;
-  return t;
-}
+function getRptTitle(){ return _rptTitle(' — '); }
+function getRptTitleEn(){ return _rptTitle(' - '); }
 
 function generateReport(){
   if(!allData.length)return;
@@ -6756,14 +6734,11 @@ function generateReport(){
   s('rptDate',new Date().toLocaleDateString('en-GB'));
   s('rptTotal',total+' records');
   // subtitle
-  const type=g('rptFilterType').value, yLabel=ymText('rptYear');
-  const period=g('rptPeriod')?.value||'all';
-  const sel=rptFormSelected;
-  let sub='';
-  if(type==='month')sub=period==='all'?`Year ${yLabel}`:`Month ${period}/${yLabel}`;
-  else if(type==='quarter')sub=period==='all'?`Year ${yLabel}`:`Q${period} — ${yLabel}`;
-  else if(type==='form')sub=sel.length===0?'All forms':sel.length===1?sel[0]:`${sel.length} forms`;
-  else sub='All QA AMO';
+  const mv=ymVal('rptMonth'), sv=ymVal('rptStatus'), sel=rptFormSelected;
+  let sub='Year '+ymText('rptYear');
+  if(mv.length)sub+=' · Month '+ymText('rptMonth');
+  if(sel.length)sub+=' · '+(sel.length===1?sel[0]:sel.length+' forms');
+  if(sv.length)sub+=' · '+ymText('rptStatus');
   s('rptSubtitle',sub);
 
   // KPIs
@@ -6888,10 +6863,11 @@ function exportPDF(){
       headStyles:{fillColor:HEAD,textColor:[160,160,170],fontSize:8,fontStyle:'bold',halign:'center'},
       bodyStyles:{fontSize:10,halign:'center',fontStyle:'bold',fillColor:BG2,textColor:[220,220,220]},
       columnStyles:{
-        1:{textColor:[88,166,255]},2:{textColor:[255,100,100]},
-        3:{textColor:[63,185,80]},4:{textColor:[210,153,34]},
-        5:{textColor:[110,118,129]},6:{textColor:[240,136,62]},
-        7:{textColor:[240,136,62]},8:{textColor:[255,100,100]},9:{textColor:[200,0,0]},
+        0:{cellWidth:27.7},
+        1:{cellWidth:27.7,textColor:[88,166,255]},2:{cellWidth:27.7,textColor:[255,100,100]},
+        3:{cellWidth:27.7,textColor:[63,185,80]},4:{cellWidth:27.7,textColor:[210,153,34]},
+        5:{cellWidth:27.7,textColor:[110,118,129]},6:{cellWidth:27.7,textColor:[240,136,62]},
+        7:{cellWidth:27.7,textColor:[240,136,62]},8:{cellWidth:27.7,textColor:[255,100,100]},9:{cellWidth:27.7,textColor:[200,0,0]},
       },
       margin:{left:10,right:10},
     });
@@ -7005,16 +6981,24 @@ function exportPDF(){
       'On-time Closed':'On-time','Lately Closed':'Lately','Closed':'Closed',
     }[s]||s||'—');
 
-    const detailRows=d.map(r=>[
-      r.report_number||'—',
-      r.report_title||'—',
-      sLabel(r.semantic_status),
-      fd(r.raised_date),
-      fd(r.Target_date),
-      r.report_ageing!=null?((r.semantic_status==='Open'||r.semantic_status==='Overdue')?`+${r.report_ageing}d`:r.report_ageing+'d'):'—',
-      r.overdue_cat||'—',
-      r.audit_title||'—',
-    ]);
+    // Gom nhóm theo Form: mỗi nhóm 1 dòng tiêu đề (banner) rồi tới các phiếu của form đó.
+    // meta[] song song để didParseCell tô màu đúng (banner → null → bỏ qua).
+    const grpForms=[...new Set(d.map(r=>r.report_title||'—'))].sort();
+    const detailRows=[], meta=[];
+    grpForms.forEach(f=>{
+      const rows=d.filter(r=>(r.report_title||'—')===f).sort((a,b)=>(a.raised_date||'').localeCompare(b.raised_date||''));
+      detailRows.push([{content:`${f}  —  ${rows.length} record${rows.length>1?'s':''}`,colSpan:8,styles:{fillColor:HEAD,textColor:[240,136,62],fontStyle:'bold',halign:'left',fontSize:8}}]);
+      meta.push(null);
+      rows.forEach(r=>{
+        detailRows.push([
+          r.report_number||'—', r.report_title||'—', sLabel(r.semantic_status),
+          fd(r.raised_date), fd(r.Target_date),
+          r.report_ageing!=null?((r.semantic_status==='Open'||r.semantic_status==='Overdue')?`+${r.report_ageing}d`:r.report_ageing+'d'):'—',
+          r.overdue_cat||'—', r.audit_title||'—',
+        ]);
+        meta.push(r);
+      });
+    });
     pdf.autoTable({
       startY:19,
       head:[['Report No','Form','Status','Raised','Target','Days','CAT','Audit / Activity']],
@@ -7036,9 +7020,10 @@ function exportPDF(){
       margin:{left:10,right:10},
       didParseCell:(data)=>{
         if(data.section!=='body')return;
-        if(data.column.index===2) data.cell.styles.textColor=sColor(d[data.row.index]?.semantic_status);
+        const r=meta[data.row.index]; if(!r)return;   // dòng banner form → bỏ tô màu
+        if(data.column.index===2) data.cell.styles.textColor=sColor(r.semantic_status);
         if(data.column.index===5){
-          const s=d[data.row.index]?.semantic_status;
+          const s=r.semantic_status;
           if(s==='Overdue') data.cell.styles.textColor=[255,100,100];
           else if(s==='Open') data.cell.styles.textColor=[63,185,80];
         }
@@ -7078,7 +7063,7 @@ function exportExcel(){
     const ws2=XLSX.utils.aoa_to_sheet([['Form','Open','Overdue','On-time','Lately','Closed','Total','%'],...forms.map(f=>{const rows=d.filter(r=>r.report_title===f);return[f,rows.filter(r=>r.semantic_status==='Open').length,rows.filter(r=>r.semantic_status==='Overdue').length,rows.filter(r=>r.semantic_status==='On-time Closed').length,rows.filter(r=>r.semantic_status==='Lately Closed').length,rows.filter(r=>r.semantic_status==='Closed').length,rows.length,Math.round(rows.length/total*100)+'%'];}),['TOTAL',open,ov,on,late,cls,total,'100%']]);
     ws2['!cols']=[{wch:35},{wch:8},{wch:10},{wch:12},{wch:12},{wch:10},{wch:8},{wch:6}];
     XLSX.utils.book_append_sheet(wb,ws2,'Form Summary');
-    const ws3=XLSX.utils.aoa_to_sheet([['Report No','Form','Status','Raised','Target','Days','CAT','Finding Level','Repetitive','MNT No','Audit Title'],...d.map(r=>[r.report_number||'',r.report_title||'',r.semantic_status||'',fd(r.raised_date),fd(r.Target_date),r.report_ageing??'',r.overdue_cat||'',r.finding_level||'',r.is_rep?'Yes':'No',r.audit_number||'',r.audit_title||''])]);
+    const ws3=XLSX.utils.aoa_to_sheet([['Report No','Form','Status','Raised','Target','Days','CAT','Finding Level','Repetitive','MNT No','Audit Title'],...[...d].sort((a,b)=>(a.report_title||'').localeCompare(b.report_title||'')||(a.raised_date||'').localeCompare(b.raised_date||'')).map(r=>[r.report_number||'',r.report_title||'',r.semantic_status||'',fd(r.raised_date),fd(r.Target_date),r.report_ageing??'',r.overdue_cat||'',r.finding_level||'',r.is_rep?'Yes':'No',r.audit_number||'',r.audit_title||''])]);
     ws3['!cols']=[{wch:15},{wch:30},{wch:16},{wch:12},{wch:12},{wch:10},{wch:8},{wch:15},{wch:10},{wch:12},{wch:40}];
     XLSX.utils.book_append_sheet(wb,ws3,'Detail Data');
     XLSX.writeFile(wb,`QA_AMO_${getRptTitle().replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`);
