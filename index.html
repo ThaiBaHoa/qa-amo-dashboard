@@ -2254,7 +2254,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.07.21-r118-i2';
+const APP_REV = '2026.07.21-r118-i3';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -6865,7 +6865,7 @@ async function exportPDF(){
     const fc={}; d.forEach(r=>{const f=r.report_title||'?';fc[f]=(fc[f]||0)+1;});
     const sf=Object.entries(fc).sort((a,b)=>b[1]-a[1]).slice(0,10);
     const [imgStatus,imgForm]=await Promise.all([
-      lightChart({type:'doughnut',data:{labels:scNames.map(k=>({'On-time Closed':'On-time','Lately Closed':'Lately'}[k]||k)),datasets:[{data:scData,backgroundColor:scNames.map(k=>SC[k]),borderColor:'#fff',borderWidth:2}]},options:{responsive:false,animation:false,cutout:'58%',plugins:{legend:{position:'right',labels:{color:'#48506a',font:{size:13},boxWidth:12,padding:10}}}}}, 800,301),
+      lightChart({type:'doughnut',data:{labels:scNames.map(k=>({'On-time Closed':'On-time','Lately Closed':'Lately'}[k]||k)),datasets:[{data:scData,backgroundColor:scNames.map(k=>SC[k]),borderColor:'#fff',borderWidth:2}]},options:{responsive:false,animation:false,cutout:'58%',plugins:{legend:{position:'right',labels:{color:'#48506a',font:{size:13},boxWidth:12,padding:10}}}},plugins:[{id:'donutNums',afterDraw(ch){const ctx=ch.ctx,m=ch.getDatasetMeta(0),ds=ch.data.datasets[0].data,tot=ds.reduce((a,b)=>a+(+b||0),0);ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';m.data.forEach((a,i)=>{const v=ds[i];if(!v)return;const mid=(a.startAngle+a.endAngle)/2,r=(a.innerRadius+a.outerRadius)/2,x=a.x+Math.cos(mid)*r,y=a.y+Math.sin(mid)*r;ctx.font='bold 18px Arial';ctx.lineWidth=3;ctx.strokeStyle='rgba(0,0,0,.45)';ctx.strokeText(String(v),x,y);ctx.fillStyle='#fff';ctx.fillText(String(v),x,y);});const c=m.data[0];if(c){ctx.fillStyle='#1a1f2b';ctx.font='bold 30px Arial';ctx.fillText(String(tot),c.x,c.y-5);ctx.fillStyle='#8a90a0';ctx.font='normal 12px Arial';ctx.fillText('Total',c.x,c.y+16);}ctx.restore();}}]}, 800,301),
       lightChart({type:'bar',data:{labels:sf.map(f=>f[0]),datasets:[{data:sf.map(f=>f[1]),backgroundColor:'#E30613',borderRadius:3}]},options:{responsive:false,animation:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:AX,y:{grid:{color:'rgba(20,30,60,.08)'},ticks:{color:'#39415a',font:{size:12,weight:'600'}}}}}}, 800,301)
     ]);
 
