@@ -2261,7 +2261,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.07.21-r116';
+const APP_REV = '2026.07.21-r116-i1';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -7262,7 +7262,7 @@ async function exportOverduePDF(){
       startY, head:[bannerRow(title), colHead], body,
       styles:{font:bodyFont,fontStyle:'normal',fontSize:8,cellPadding:1.4,overflow:'linebreak',valign:'top',lineColor:[130,130,130],lineWidth:0.1,textColor:[0,0,0]},
       headStyles:{font:'helvetica',fontStyle:'bold',fillColor:[189,215,238],textColor:[31,56,100],halign:'center',fontSize:8,lineColor:[130,130,130],lineWidth:0.1},
-      columnStyles:{0:C(20),1:C(22),2:C(16,'center'),3:C('auto'),4:C(32),5:C(16,'center'),6:C(16,'center'),7:C(16,'center'),8:C(15,'center'),9:C(18,'center')},
+      columnStyles:{0:C(26),1:C(28),2:C(16,'center'),3:C('auto'),4:C(28),5:C(16,'center'),6:C(16,'center'),7:C(16,'center'),8:C(15,'center'),9:C(18,'center')},
       margin:{top:topH,bottom:botH,left:8,right:8}, rowPageBreak:'avoid'
     });
 
