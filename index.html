@@ -2254,7 +2254,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.07.21-r118-i1';
+const APP_REV = '2026.07.21-r118-i2';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -6864,13 +6864,9 @@ async function exportPDF(){
     const scData=scNames.map(k=>cnt(k));
     const fc={}; d.forEach(r=>{const f=r.report_title||'?';fc[f]=(fc[f]||0)+1;});
     const sf=Object.entries(fc).sort((a,b)=>b[1]-a[1]).slice(0,10);
-    const mm={}; d.forEach(r=>{ if(!r.raised_ym)return; (mm[r.raised_ym]||(mm[r.raised_ym]={o:0,c:0,ov:0})); if(r.semantic_status==='Open')mm[r.raised_ym].o++; else if(r.semantic_status==='Overdue')mm[r.raised_ym].ov++; else mm[r.raised_ym].c++; });
-    const mk=Object.keys(mm).sort();
-
-    const [imgStatus,imgForm,imgMonth]=await Promise.all([
-      lightChart({type:'doughnut',data:{labels:scNames.map(k=>({'On-time Closed':'On-time','Lately Closed':'Lately'}[k]||k)),datasets:[{data:scData,backgroundColor:scNames.map(k=>SC[k]),borderColor:'#fff',borderWidth:2}]},options:{responsive:false,animation:false,cutout:'58%',plugins:{legend:{position:'right',labels:{color:'#48506a',font:{size:12},boxWidth:10,padding:8}}}}}, 560,330),
-      lightChart({type:'bar',data:{labels:sf.map(f=>f[0]),datasets:[{data:sf.map(f=>f[1]),backgroundColor:'#E30613',borderRadius:3}]},options:{responsive:false,animation:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:AX,y:{grid:{color:'rgba(20,30,60,.08)'},ticks:{color:'#39415a',font:{size:11,weight:'600'}}}}}}, 560,330),
-      lightChart({type:'bar',data:{labels:mk,datasets:[{label:'Closed',data:mk.map(k=>mm[k].c),backgroundColor:'#2E9E57',stack:'s'},{label:'Open',data:mk.map(k=>mm[k].o),backgroundColor:'#2F7ED8',stack:'s'},{label:'Overdue',data:mk.map(k=>mm[k].ov),backgroundColor:'#E03B3B',stack:'s'}]},options:{responsive:false,animation:false,plugins:{legend:{labels:{color:'#48506a',font:{size:11},boxWidth:10}}},scales:{x:{stacked:true,ticks:{color:'#6b7280',font:{size:9},maxRotation:45},grid:{color:'rgba(20,30,60,.08)'}},y:{stacked:true,ticks:{color:'#6b7280',font:{size:11}},grid:{color:'rgba(20,30,60,.08)'}}}}}, 560,330)
+    const [imgStatus,imgForm]=await Promise.all([
+      lightChart({type:'doughnut',data:{labels:scNames.map(k=>({'On-time Closed':'On-time','Lately Closed':'Lately'}[k]||k)),datasets:[{data:scData,backgroundColor:scNames.map(k=>SC[k]),borderColor:'#fff',borderWidth:2}]},options:{responsive:false,animation:false,cutout:'58%',plugins:{legend:{position:'right',labels:{color:'#48506a',font:{size:13},boxWidth:12,padding:10}}}}}, 800,301),
+      lightChart({type:'bar',data:{labels:sf.map(f=>f[0]),datasets:[{data:sf.map(f=>f[1]),backgroundColor:'#E30613',borderRadius:3}]},options:{responsive:false,animation:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:AX,y:{grid:{color:'rgba(20,30,60,.08)'},ticks:{color:'#39415a',font:{size:12,weight:'600'}}}}}}, 800,301)
     ]);
 
     // ═══ PAGE 1 ═══
@@ -6885,8 +6881,8 @@ async function exportPDF(){
       columnStyles:{0:{cellWidth:39.57},1:{cellWidth:39.57,textColor:[47,126,216]},2:{cellWidth:39.57,textColor:[224,59,59]},3:{cellWidth:39.57,textColor:[46,158,87]},4:{cellWidth:39.57,textColor:[201,150,19]},5:{cellWidth:39.57,textColor:[107,114,128]},6:{cellWidth:39.57,textColor:[217,119,10]}},
       margin:{left:10,right:10}
     });
-    const cy=doc.lastAutoTable.finalY+6, gap=6, chW=(W-20-2*gap)/3, chH=58;
-    [['Status Distribution',imgStatus],['Top Forms',imgForm],['Monthly Trend',imgMonth]].forEach((c,i)=>{
+    const cy=doc.lastAutoTable.finalY+6, gap=6, chW=(W-20-gap)/2, chH=60;
+    [['Status Distribution',imgStatus],['Top Forms',imgForm]].forEach((c,i)=>{
       const x=10+i*(chW+gap);
       doc.setFillColor(255,255,255); doc.setDrawColor(LINE[0],LINE[1],LINE[2]); doc.setLineWidth(0.2); doc.roundedRect(x,cy,chW,chH,2,2,'FD');
       doc.setFillColor(244,246,250); doc.rect(x+0.2,cy+0.2,chW-0.4,7,'F');
