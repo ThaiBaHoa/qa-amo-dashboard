@@ -9,6 +9,9 @@ const SUPA_URL  = 'https://czftzgdcnpnspbbegwjt.supabase.co';
 const ORG_UNIT  = 'QA AMO';   // Dùng cho loadData() chính
 ```
 
+> 🗺️ **Sơ đồ trực quan luồng dữ liệu** (nguồn → trường → biến → công thức, 6 tầng):
+> workspace `build app cho cong ty/SO_DO_CAU_TRUC.html` · artifact `https://claude.ai/code/artifact/2f1b2666-7235-410d-be92-ec5058094ccb` (đồng bộ r118-i3).
+
 ---
 
 ## Bảng mapping: Page → Data source → Filter
@@ -74,7 +77,11 @@ GET dwanalytics_report_form_section_field
         or field_name eq 'Department'
         or field_name eq 'Finding description'
         or field_name eq 'Nature of finding'
+        or field_name eq 'Issued to (person)'
+        or field_name eq 'First extension approved?'
+        or field_name eq 'Second extension agreed?'
 ```
+→ 16 field (2 cờ `…approved?`/`…agreed?` thêm r101 cho MCAR deadline check; `Issued to (person)` → `issued_person`).
 → Build `fMap[report_id][field_name] = text_value`. Giữ giá trị đầu tiên (không ghi đè).
 → `Finding description` → `r.finding_desc`, `Nature of finding` → `r.nature_raw` (dùng cho KPI 2 và cột mô tả ở 2 trang AMO-ECAR/MCAR). Xem [§7 KPI 2](#7-kpi-2--early-detection-tự-động).
 

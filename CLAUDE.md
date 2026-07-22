@@ -260,7 +260,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.06.12-r107
+Rev current: 2026.07.21-r118-i3
 
 ORG_UNIT = 'QA AMO'   ← main pages (never change without cross-page intent)
                          CMR-CAR and ECAR use org_unit = 'TQA' — fetched separately
