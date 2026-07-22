@@ -65,6 +65,15 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
   `F:\Onedrive - personal\OneDrive\build app cho cong ty\index.html` after every commit.
   Never edit that OneDrive copy — it is overwritten on the next commit. Delete the hook
   to disable syncing.
+- **Doc↔code drift guard.** The auto-sync above covers ONLY `index.html` — the `.md`
+  spec docs are hand-maintained and once drifted to r107/r112 while code was r118. A
+  `pre-commit` hook (`.git/hooks/pre-commit`) now runs `scripts/check-doc-sync.sh` when a
+  commit touches `index.html`: it blocks if the code's major `rNN` isn't reflected in
+  `CLAUDE.md` (Rev current) + `PROJECT_TECH_SPEC.md` (Version + §14). `TECHNICAL_REFERENCE.md`
+  content (fields/flows) still needs a manual read — see `SO_DO_CAU_TRUC.html`.
+  **Hooks aren't versioned** — on a fresh clone reinstall both (`post-commit`, `pre-commit`)
+  from the snippets here; the check *script* IS versioned in `scripts/`. Bypass once with
+  `git commit --no-verify`.
 
 ### Two backends — do not confuse them
 

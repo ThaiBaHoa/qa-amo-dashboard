@@ -37,7 +37,20 @@ giới này quyết định số tăng thế nào.
    ```
 2. **Cập nhật giá trị** theo luật trên (sửa cả phần ngày). Đây thường là chỗ duy nhất
    cần đổi cho việc bump — đừng đụng code khác.
-3. **Commit** với message bắt đầu bằng token phiên bản:
+3. **Đồng bộ tài liệu (BẮT BUỘC khi lên rev MAJOR `rNN`)** — tránh lệch doc↔code:
+   - `CLAUDE.md`: cập nhật dòng `Rev current: …`.
+   - `PROJECT_TECH_SPEC.md`: cập nhật `Version hiện tại` + thêm 1 dòng ở **§14 Lịch sử version**.
+   - `TECHNICAL_REFERENCE.md`: rà lại **nếu nguồn/field/công thức đổi** (vd thêm `field_name`
+     ở bước [5/6] `loadData`, đổi org_unit, đổi cách tính). Grep không bắt được nội dung này
+     → phải đọc tay. Xem `SO_DO_CAU_TRUC.html` (sơ đồ luồng) để đối chiếu.
+   - Bump `-iM` thuần bugfix: doc thường không cần đổi (rNN đã có sẵn trong doc).
+4. **Chốt trước commit — chạy check tự động:**
+   ```
+   sh scripts/check-doc-sync.sh
+   ```
+   Exit 1 = còn doc tụt rev → sửa cho xong rồi mới commit. (Pre-commit hook cũng tự chặn
+   nếu bạn quên — nhưng chạy tay trước cho chủ động.)
+5. **Commit** với message bắt đầu bằng token phiên bản:
    ```
    git add index.html <file khác nếu có>
    git commit -m "rNN[-iM]: <mô tả ngắn việc đã làm>"
@@ -46,9 +59,9 @@ giới này quyết định số tăng thế nào.
      để changelog nhận diện. Commit hạ tầng/tài liệu (không phải rev app) thì dùng
      tiền tố khác (`build:`, `docs:`) — chúng sẽ hiện dạng thường trong changelog.
    - Kết message bằng dòng `Co-Authored-By` theo quy ước repo.
-4. **Sau commit, hook tự chạy** (`post-commit`): backup `index.html` sang OneDrive +
+6. **Sau commit, hook tự chạy** (`post-commit`): backup `index.html` sang OneDrive +
    sinh lại `NHAT_KY_CAP_NHAT_APP.md`. Không cần làm tay. Xác nhận output hook hiện ra.
-5. **Push khi người dùng muốn deploy** — `git push` (deploy = GitHub Pages trên `main`).
+7. **Push khi người dùng muốn deploy** — `git push` (deploy = GitHub Pages trên `main`).
    Đừng tự push nếu người dùng chưa yêu cầu.
 
 ## Ví dụ message
