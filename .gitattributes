@@ -1,0 +1,2 @@
+# Shell scripts phải giữ LF — CRLF làm `sh` lỗi `\r` (hook + check-doc-sync).
+*.sh text eol=lf
