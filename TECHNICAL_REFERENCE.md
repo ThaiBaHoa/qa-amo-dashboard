@@ -10,7 +10,7 @@ const ORG_UNIT  = 'QA AMO';   // Dùng cho loadData() chính
 ```
 
 > 🗺️ **Sơ đồ trực quan luồng dữ liệu** (nguồn → trường → biến → công thức, 6 tầng):
-> workspace `build app cho cong ty/SO_DO_CAU_TRUC.html` · artifact `https://claude.ai/code/artifact/2f1b2666-7235-410d-be92-ec5058094ccb` (đồng bộ r118-i3).
+> workspace `build app cho cong ty/MQA dashboard website/SO_DO_CAU_TRUC.html` · artifact `https://claude.ai/code/artifact/2f1b2666-7235-410d-be92-ec5058094ccb` (đồng bộ r118-i3).
 
 ---
 
