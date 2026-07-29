@@ -522,6 +522,7 @@ tr:last-child td{border-bottom:none}
         <button class="nav-item" onclick="showPage('overdue',this)"><span class="nav-ic" data-ic="alert"></span>Overdue</button>
         <button class="nav-item" onclick="showPage('kpi',this)"><span class="nav-ic" data-ic="chart"></span>KPI Charts</button>
         <button class="nav-item" onclick="showSPIPage(this)"><span class="nav-icon">📈</span>SPI</button>
+        <button class="nav-item" onclick="showPage('safety',this)"><span class="nav-ic" data-ic="shield"></span>Safety</button>
         <div class="nav-sec" style="margin-top:6px">Detail</div>
         <button class="nav-item" onclick="showPage('allforms',this)"><span class="nav-ic" data-ic="list"></span>All Forms</button>
         <button class="nav-item" onclick="showPage('pavoi',this)"><span class="nav-ic" data-ic="doc"></span>PAVOI Detail</button>
@@ -624,6 +625,19 @@ tr:last-child td{border-bottom:none}
                 <div class="ov-lg" id="ovAmo-lg"></div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- SAFETY — MSAG Report Status -->
+        <div class="page" id="page-safety">
+          <div class="tbl-card">
+            <div class="tbl-bar" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+              <div style="font-weight:700">Report Status — OSR / MOSR theo MSAG
+                <span style="color:var(--text-3);font-weight:400;font-size:12px">· nguồn Coruson/Galileo (live) · lọc theo owner ∈ nhóm MSAG</span>
+              </div>
+              <button class="pill" onclick="safetyLoaded=false;loadSafety()">↻ Refresh</button>
+            </div>
+            <div id="safetyHost" style="overflow-x:auto;padding:16px"></div>
           </div>
         </div>
 
@@ -2254,7 +2268,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.07.21-r118-i3';
+const APP_REV = '2026.07.29-r119';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -7227,7 +7241,78 @@ async function deleteUser(id,email,role){
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────
-const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',spi:'SPI — Safety Performance Indicators',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',ecar:'ECAR Detail',amoecar:'AMO-ECAR',mcar:'MCAR',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management',querybuilder:'Query Builder',mydashboard:'My Dashboard',kpi2:'KPI 2 — Early Detection'};
+const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',spi:'SPI — Safety Performance Indicators',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',ecar:'ECAR Detail',amoecar:'AMO-ECAR',mcar:'MCAR',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management',querybuilder:'Query Builder',mydashboard:'My Dashboard',kpi2:'KPI 2 — Early Detection',safety:'Safety — MSAG Report Status (OSR / MOSR)'};
+// ── SAFETY — MSAG Report Status (OSR / MOSR) ─────────────────
+// Owner ∈ nhóm MSAG = report thuộc ban MQA (MOSR mặc nhiên thuộc MQA;
+// OSR là báo cáo chung nên phải lọc theo owner). Mỗi report 1 status →
+// Closed = status Closed, Open = status Open. Không lọc category.
+let safetyLoaded=false, safetyData=null;
+const SAFETY_ROLE_RE=/Coordinator|Member|Team Leader|Evaluator/i;   // loại nhóm role, giữ nhóm trạm/dept
+const SAFETY_LINE_ORDER=["AMO - Line MSAG","AMO - TPS MSAG","AMO - Line MSAG - Store","AMO - Line MSAG - SGN","AMO - Line MSAG - HAN","AMO - Line MSAG - DAD","AMO - Line MSAG - CXR","AMO - Line MSAG - PQC","AMO - Line MSAG - VCA","AMO - Line MSAG - HPH","AMO - Line MSAG - VII"];
+function safetyDateStr(){const d=new Date();const m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return String(d.getDate()).padStart(2,'0')+'-'+m[d.getMonth()]+'-'+d.getFullYear();}
+async function loadSafety(){
+  setOv(true,'Loading Safety report status...','');
+  try{
+    // 1) nhóm MSAG (owner) — loại role + archived
+    const gr=await fetchAll(G_URL+'dwanalytics_user_group?$select=group_id,name,is_archived&$filter='+encodeURIComponent("contains(name,'MSAG')"));
+    const groups=gr.filter(x=>!x.is_archived && !SAFETY_ROLE_RE.test(x.name||''));
+    const id2name={}; groups.forEach(x=>id2name[x.group_id]=(x.name||'').trim());
+    const ids=groups.map(x=>x.group_id);
+    if(!ids.length) throw new Error('Không tìm thấy nhóm MSAG');
+    // 2) report owned bởi các nhóm MSAG (bản hiện hành valid_to null)
+    const flt='('+ids.map(i=>'owner_id eq '+i).join(' or ')+') and valid_to eq null';
+    const raw=await fetchAll(G_URL+'dwreporting_report_summary?$select=report_id,report_status,owner_id,form_name,report_number&$filter='+encodeURIComponent(flt));
+    const seen=new Set(),rows=[];
+    raw.forEach(r=>{ if(r.report_id&&!seen.has(r.report_id)){seen.add(r.report_id);rows.push(r);} });
+    // 3) phân OSR/MOSR + đếm theo status
+    const cls=r=>{const s=(r.form_name||'')+' '+(r.report_number||'');return /MOSR/i.test(s)?'MOSR':/OSR/i.test(s)?'OSR':null;};
+    const A={}; ids.forEach(i=>{A[id2name[i]]={OSR:{C:0,O:0},MOSR:{C:0,O:0}};});
+    rows.forEach(r=>{const nm=id2name[r.owner_id],f=cls(r);if(!nm||!f)return;
+      if(r.report_status==='Closed')A[nm][f].C++; else if(r.report_status==='Open')A[nm][f].O++;});
+    const mk=n=>{const a=A[n]||{OSR:{C:0,O:0},MOSR:{C:0,O:0}};return{coruson:n,osrC:a.OSR.C,osrO:a.OSR.O,osrT:a.OSR.C+a.OSR.O,mosrC:a.MOSR.C,mosrO:a.MOSR.O,mosrT:a.MOSR.C+a.MOSR.O};};
+    const knownLine=SAFETY_LINE_ORDER.filter(n=>A[n]);
+    const extra=Object.keys(A).filter(n=>!SAFETY_LINE_ORDER.includes(n)&&n!=='AMO - Base MSAG'&&n!=='AMO - Workshop MSAG');
+    safetyData={ updated:safetyDateStr(), line:[...knownLine,...extra].map(mk), base:mk('AMO - Base MSAG'), workshop:mk('AMO - Workshop MSAG') };
+    safetyLoaded=true;
+  }catch(e){ console.error('Safety load error:',e); toast('Error loading Safety: '+e.message,'err'); }
+  setOv(false);
+  renderSafety();
+}
+function renderSafety(){
+  const host=g('safetyHost'); if(!host) return;
+  if(!safetyData){ host.innerHTML='<div style="padding:32px;text-align:center;color:var(--muted)">No data</div>'; return; }
+  host.innerHTML=buildSafetyTable(safetyData);
+}
+function buildSafetyTable(d){
+  const bd="1px solid #8ea9db";
+  const th="background:#9dc3e6;border:"+bd+";padding:6px 10px;font-weight:700;color:#1f3864;text-align:center;font-size:13px";
+  const sub="background:#ddebf7;border:"+bd+";padding:5px 10px;font-weight:700;color:#1f3864;text-align:center;font-size:12px";
+  const subO="background:#ddebf7;border:"+bd+";padding:5px 10px;font-weight:700;color:#c00000;text-align:center;font-size:12px";
+  const cell="border:"+bd+";padding:5px 10px;text-align:center;font-size:13px;color:#222";
+  const cellL="border:"+bd+";padding:5px 10px;text-align:left;font-size:13px;color:#222;white-space:nowrap";
+  const grp="border:"+bd+";padding:5px 10px;text-align:center;font-size:13px;color:#222;font-weight:600;background:#f2f6fc";
+  const op=v=>'<td style="'+cell+(v>0?';color:#c00000;font-weight:700':'')+'">'+v+'</td>';
+  const numrow=r=>'<td style="'+cellL+'">'+r.coruson+'</td>'+
+    '<td style="'+cell+'">'+r.osrC+'</td>'+op(r.osrO)+'<td style="'+cell+'">'+r.osrT+'</td>'+
+    '<td style="'+cell+'">'+r.mosrC+'</td>'+op(r.mosrO)+'<td style="'+cell+'">'+r.mosrT+'</td>';
+  const all=[...d.line,d.base,d.workshop];
+  const t=all.reduce((a,r)=>({osrC:a.osrC+r.osrC,osrO:a.osrO+r.osrO,osrT:a.osrT+r.osrT,mosrC:a.mosrC+r.mosrC,mosrO:a.mosrO+r.mosrO,mosrT:a.mosrT+r.mosrT}),{osrC:0,osrO:0,osrT:0,mosrC:0,mosrO:0,mosrT:0});
+  const totOpen=t.osrO+t.mosrO;
+  const tot="background:#bdd7ee;border:"+bd+";padding:6px 10px;font-weight:700;color:#1f3864;text-align:center;font-size:13px";
+  const totO="background:#bdd7ee;border:"+bd+";padding:6px 10px;font-weight:700;color:#c00000;text-align:center;font-size:13px";
+  let h='<table style="border-collapse:collapse;background:#fff;font-family:Calibri,Segoe UI,sans-serif;box-shadow:0 2px 14px rgba(0,0,0,.25)">';
+  h+='<tr><td colspan="9" style="background:#e2efda;border:'+bd+';padding:9px;text-align:center;font-weight:700;color:#375623;font-size:15px">REPORT STATUS &nbsp;-&nbsp; Updated to '+d.updated+'</td></tr>';
+  h+='<tr><td rowspan="2" style="'+th+'">No.</td><td rowspan="2" style="'+th+'">MSAG</td><td rowspan="2" style="'+th+'">Group on Coruson</td><td colspan="3" style="'+th+'">OSR</td><td colspan="3" style="'+th+'">MOSR</td></tr>';
+  h+='<tr><td style="'+sub+'">Closed</td><td style="'+subO+'">Open</td><td style="'+sub+'">Total</td><td style="'+sub+'">Closed</td><td style="'+subO+'">Open</td><td style="'+sub+'">Total</td></tr>';
+  d.line.forEach((r,i)=>{h+='<tr>';if(i===0)h+='<td rowspan="'+d.line.length+'" style="'+grp+'">1</td><td rowspan="'+d.line.length+'" style="'+grp+'">Line MSAG</td>';h+=numrow(r)+'</tr>';});
+  h+='<tr><td style="'+grp+'">2</td><td style="'+grp+'">Base MSAG</td>'+numrow(d.base)+'</tr>';
+  h+='<tr><td style="'+grp+'">3</td><td style="'+grp+'">Workshop MSAG</td>'+numrow(d.workshop)+'</tr>';
+  h+='<tr><td colspan="3" style="'+tot+'">Total of Report:</td><td style="'+tot+'">'+t.osrC+'</td><td style="'+totO+'">'+t.osrO+'</td><td style="'+tot+'">'+t.osrT+'</td><td style="'+tot+'">'+t.mosrC+'</td><td style="'+totO+'">'+t.mosrO+'</td><td style="'+tot+'">'+t.mosrT+'</td></tr>';
+  h+='<tr><td colspan="3" style="background:#deeaf6;border:'+bd+';padding:7px 10px;font-weight:700;color:#c00000;text-align:center;font-size:14px;text-decoration:underline">Total Open Reports</td><td colspan="6" style="border:'+bd+';padding:7px 10px;text-align:center;font-weight:700;color:#c00000;font-size:16px">'+totOpen+'</td></tr>';
+  h+='</table>';
+  return h;
+}
+
 function showPage(name,btn){
   if((name==='reports'||name==='admin'||name==='querybuilder'||name==='mydashboard')&&(!curUser||curUser.role!=='admin')){
     toast('You do not have permission to access this page','err');return;
@@ -7251,6 +7336,7 @@ function showPage(name,btn){
   if(name==='kpi2'){ if(!kpi2Loaded) loadKpi2(); else renderKpi2(); }
   if(name==='overdue'){ renderOv(); }
   if(name==='pavoi'){ if(!pavoiRfiLoaded) loadPavoiRfi(); else renderPavoi(); }
+  if(name==='safety'){ if(!safetyLoaded) loadSafety(); else renderSafety(); }
   if(name==='overview'){
     setTimeout(()=>{
       Object.values(charts).forEach(c=>{ try{c.resize()}catch(e){} });
