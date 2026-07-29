@@ -2,7 +2,7 @@
 
 **File:** `index.html` (single-file SPA, không build step)
 **Repo:** `ThaiBaHoa/qa-amo-dashboard` · **Domain:** `vjc-qa-amo.com` (GitHub Pages)
-**Version hiện tại:** `2026.07.29-r119`
+**Version hiện tại:** `2026.07.29-r120`
 **Cập nhật spec:** 2026-07-22 — phản ánh code thực tế (gồm r81–r118-i3; **r113–r118 = phân hệ Export/Login, KHÔNG đổi luồng dữ liệu chính** — xem §14; **delta luồng duy nhất từ r112: bước [5/6] `loadData` thêm field `Issued to (person)` → `issued_person`, tổng 16 field**), **r110: cập nhật roster `QA_AMO_AUDITORS`; r111: nút Feedback / Bug Report (Google Form) ở sidebar; r112: AI Assistant chat — hỏi-đáp dữ liệu qua Worker `galileo-ai` (tool-use client-side) — xem §8.9; r112-i1: AI Assistant fuzzy form matching + alias (SR/EIS/QC)**; r104: User delete qua Edge Function + EIS form-specific schema/roll-up ở All Forms; r105: fix EIS per-CA load — revert về field_name + post-filter Set (I3); r106: EIS đóng/mở theo cấp report (không suy từ CA Date completed); r107: QC Spot Check Report detail ở All Forms (+ hotfix TDZ thứ tự khai báo & timeout report_field — xem §8.8, I11); r108: KPI ATA = (CMR-CAR + QC Spot Check)÷ECAR lệch tháng N−1/N (§6.4c); r109: tử số CMR-CAR chỉ tính report gán cờ "QC MQA Physical Finding" (category_id), MCAR cột Raised by, Target_date lấy từ Report, MCAR deadline check, copyholder on-time so theo ngày, lọc Cancelled/Deleted, auto-refresh kiosk, multi-year filter, admin export, SPI, KPI2, PAVOI RFI)
 
 > Tài liệu này mô tả TOÀN BỘ kiến trúc, dữ liệu, logic và quy ước của dashboard. Dùng làm nguồn tham chiếu chuẩn khi sửa code. Số dòng (Lxxxx) là tương đối, dùng để định vị nhanh.
@@ -427,6 +427,7 @@ Trợ lý chat nổi (FAB `#aiFab` góc phải-dưới, panel `#aiPanel`, badge 
 
 | Rev | Nội dung |
 |---|---|
+| r120 | **Safety — redesign giao diện (đổi layout = nâng rev):** thay bảng Excel-style bằng UI dashboard-native theme-aware (dùng var CSS): 4 KPI card (Tổng / OSR / MOSR / **Total Open** nổi accent), badge bo tròn cho Open, phân nhóm Line/Base/Workshop bằng section divider chấm màu, cột OSR/MOSR accent xanh/amber. **Chỉ đổi `buildSafetyTable` + container `page-safety`; logic/nguồn dữ liệu giữ nguyên r119.** |
 | r119 | **Safety — MSAG Report Status (nâng rev = tính năng):** tab mới ở MAIN + trang bảng OSR/MOSR Closed/Open/Total theo nhóm MSAG (giống bảng Coruson). **Nguồn mới owner-based:** `dwanalytics_user_group` (map `owner_id`→tên nhóm MSAG) + `dwreporting_report_summary` lọc `owner_id ∈ nhóm MSAG` & `valid_to eq null` — **tách khỏi luồng `org_unit='QA AMO'`** (OSR/MOSR nằm rải nhiều org_unit). Đếm theo `report_status` (Closed/Open), không lọc category. MOSR mặc nhiên thuộc MQA; OSR lọc bằng owner. |
 | r118 (+i1/i2/i3) | **Export Report redesign (nâng rev = layout):** letterhead VietJet, document sáng, chart sáng. i1: fix treo khi render chart (`requestAnimationFrame`→`setTimeout`); i2: bỏ chart Monthly Trend; i3: hiện số trên donut Status. Consumer của `allData`, không đổi nguồn. |
 | r117 | **Export Report — multi-month + status filter (nâng rev = tính năng):** lọc nhiều tháng + trạng thái, detail nhóm, ô KPI đều. |

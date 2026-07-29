@@ -630,15 +630,7 @@ tr:last-child td{border-bottom:none}
 
         <!-- SAFETY — MSAG Report Status -->
         <div class="page" id="page-safety">
-          <div class="tbl-card">
-            <div class="tbl-bar" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-              <div style="font-weight:700">Report Status — OSR / MOSR theo MSAG
-                <span style="color:var(--text-3);font-weight:400;font-size:12px">· nguồn Coruson/Galileo (live) · lọc theo owner ∈ nhóm MSAG</span>
-              </div>
-              <button class="pill" onclick="safetyLoaded=false;loadSafety()">↻ Refresh</button>
-            </div>
-            <div id="safetyHost" style="overflow-x:auto;padding:16px"></div>
-          </div>
+          <div id="safetyHost" style="overflow-x:auto;padding:6px 2px"></div>
         </div>
 
         <!-- OPEN RFI -->
@@ -2268,7 +2260,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.07.29-r119';
+const APP_REV = '2026.07.29-r120';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -7284,33 +7276,56 @@ function renderSafety(){
   host.innerHTML=buildSafetyTable(safetyData);
 }
 function buildSafetyTable(d){
-  const bd="1px solid #8ea9db";
-  const th="background:#9dc3e6;border:"+bd+";padding:6px 10px;font-weight:700;color:#1f3864;text-align:center;font-size:13px";
-  const sub="background:#ddebf7;border:"+bd+";padding:5px 10px;font-weight:700;color:#1f3864;text-align:center;font-size:12px";
-  const subO="background:#ddebf7;border:"+bd+";padding:5px 10px;font-weight:700;color:#c00000;text-align:center;font-size:12px";
-  const cell="border:"+bd+";padding:5px 10px;text-align:center;font-size:13px;color:#222";
-  const cellL="border:"+bd+";padding:5px 10px;text-align:left;font-size:13px;color:#222;white-space:nowrap";
-  const grp="border:"+bd+";padding:5px 10px;text-align:center;font-size:13px;color:#222;font-weight:600;background:#f2f6fc";
-  const op=v=>'<td style="'+cell+(v>0?';color:#c00000;font-weight:700':'')+'">'+v+'</td>';
-  const numrow=r=>'<td style="'+cellL+'">'+r.coruson+'</td>'+
-    '<td style="'+cell+'">'+r.osrC+'</td>'+op(r.osrO)+'<td style="'+cell+'">'+r.osrT+'</td>'+
-    '<td style="'+cell+'">'+r.mosrC+'</td>'+op(r.mosrO)+'<td style="'+cell+'">'+r.mosrT+'</td>';
+  const num=n=>Number(n).toLocaleString('en-US');
   const all=[...d.line,d.base,d.workshop];
   const t=all.reduce((a,r)=>({osrC:a.osrC+r.osrC,osrO:a.osrO+r.osrO,osrT:a.osrT+r.osrT,mosrC:a.mosrC+r.mosrC,mosrO:a.mosrO+r.mosrO,mosrT:a.mosrT+r.mosrT}),{osrC:0,osrO:0,osrT:0,mosrC:0,mosrO:0,mosrT:0});
-  const totOpen=t.osrO+t.mosrO;
-  const tot="background:#bdd7ee;border:"+bd+";padding:6px 10px;font-weight:700;color:#1f3864;text-align:center;font-size:13px";
-  const totO="background:#bdd7ee;border:"+bd+";padding:6px 10px;font-weight:700;color:#c00000;text-align:center;font-size:13px";
-  let h='<table style="border-collapse:collapse;background:#fff;font-family:Calibri,Segoe UI,sans-serif;box-shadow:0 2px 14px rgba(0,0,0,.25)">';
-  h+='<tr><td colspan="9" style="background:#e2efda;border:'+bd+';padding:9px;text-align:center;font-weight:700;color:#375623;font-size:15px">REPORT STATUS &nbsp;-&nbsp; Updated to '+d.updated+'</td></tr>';
-  h+='<tr><td rowspan="2" style="'+th+'">No.</td><td rowspan="2" style="'+th+'">MSAG</td><td rowspan="2" style="'+th+'">Group on Coruson</td><td colspan="3" style="'+th+'">OSR</td><td colspan="3" style="'+th+'">MOSR</td></tr>';
-  h+='<tr><td style="'+sub+'">Closed</td><td style="'+subO+'">Open</td><td style="'+sub+'">Total</td><td style="'+sub+'">Closed</td><td style="'+subO+'">Open</td><td style="'+sub+'">Total</td></tr>';
-  d.line.forEach((r,i)=>{h+='<tr>';if(i===0)h+='<td rowspan="'+d.line.length+'" style="'+grp+'">1</td><td rowspan="'+d.line.length+'" style="'+grp+'">Line MSAG</td>';h+=numrow(r)+'</tr>';});
-  h+='<tr><td style="'+grp+'">2</td><td style="'+grp+'">Base MSAG</td>'+numrow(d.base)+'</tr>';
-  h+='<tr><td style="'+grp+'">3</td><td style="'+grp+'">Workshop MSAG</td>'+numrow(d.workshop)+'</tr>';
-  h+='<tr><td colspan="3" style="'+tot+'">Total of Report:</td><td style="'+tot+'">'+t.osrC+'</td><td style="'+totO+'">'+t.osrO+'</td><td style="'+tot+'">'+t.osrT+'</td><td style="'+tot+'">'+t.mosrC+'</td><td style="'+totO+'">'+t.mosrO+'</td><td style="'+tot+'">'+t.mosrT+'</td></tr>';
-  h+='<tr><td colspan="3" style="background:#deeaf6;border:'+bd+';padding:7px 10px;font-weight:700;color:#c00000;text-align:center;font-size:14px;text-decoration:underline">Total Open Reports</td><td colspan="6" style="border:'+bd+';padding:7px 10px;text-align:center;font-weight:700;color:#c00000;font-size:16px">'+totOpen+'</td></tr>';
-  h+='</table>';
-  return h;
+  const totOpen=t.osrO+t.mosrO, grand=t.osrT+t.mosrT;
+  const OSR='var(--c-blue)', MOSR='var(--c-amber)';
+  const badge=v=>v>0?`<span style="display:inline-block;min-width:26px;padding:2px 9px;border-radius:999px;background:var(--red-soft);color:var(--accent);font-weight:800;font-size:12.5px">${v}</span>`:`<span style="color:var(--text-3)">0</span>`;
+  const card=(label,value,sub,color,hero)=>`<div style="flex:1;min-width:148px;background:${hero?'var(--red-soft)':'var(--surface-2)'};border:1px solid ${hero?'var(--accent)':'var(--border)'};border-radius:var(--r);padding:15px 18px;box-shadow:var(--shadow)"><div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--text-3);font-weight:700">${label}</div><div style="font-size:31px;font-weight:800;color:${color};line-height:1.1;margin-top:5px;font-variant-numeric:tabular-nums">${value}</div><div style="font-size:12px;color:var(--text-2);margin-top:3px">${sub}</div></div>`;
+  const tdN='padding:11px 12px;text-align:center;font-size:13.5px;color:var(--text);font-variant-numeric:tabular-nums;border-bottom:1px solid var(--border-soft)';
+  const tdC='padding:11px 16px;text-align:left;font-size:13.5px;color:var(--text-2);border-bottom:1px solid var(--border-soft);white-space:nowrap';
+  const bl='border-left:1px solid var(--border-soft)';
+  const row=(r,zeb)=>`<tr style="background:${zeb?'var(--surface-2)':'transparent'}"><td style="${tdC}">${r.coruson}</td><td style="${tdN}">${num(r.osrC)}</td><td style="${tdN}">${badge(r.osrO)}</td><td style="${tdN};font-weight:700">${num(r.osrT)}</td><td style="${tdN};${bl}">${num(r.mosrC)}</td><td style="${tdN}">${badge(r.mosrO)}</td><td style="${tdN};font-weight:700">${num(r.mosrT)}</td></tr>`;
+  const sect=(name,color,arr)=>`<tr><td colspan="7" style="padding:9px 16px;background:var(--surface-2);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:${color};font-weight:800;border-bottom:1px solid var(--border)"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:8px;vertical-align:middle"></span>${name}</td></tr>`+arr.map((r,i)=>row(r,i%2)).join('');
+  const hcell=(x,i)=>`<th style="padding:7px 12px;text-align:center;font-size:11px;font-weight:700;color:${x==='Open'?'var(--accent)':'var(--text-3)'};text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--border)${i===3?';'+bl:''}">${x}</th>`;
+  return `<div style="max-width:1080px;margin:0 auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+      <div><div style="font-size:19px;font-weight:800;color:var(--text)">Safety — MSAG Report Status</div><div style="font-size:12.5px;color:var(--text-2);margin-top:2px">OSR / MOSR theo nhóm MSAG · nguồn Coruson/Galileo (live) · lọc theo owner ∈ nhóm MSAG</div></div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:12px;color:var(--text-2);background:var(--surface-2);border:1px solid var(--border);padding:6px 12px;border-radius:999px">🕒 Updated ${d.updated}</span>
+        <button onclick="safetyLoaded=false;loadSafety()" style="font-size:12.5px;color:var(--text-2);background:var(--surface-2);border:1px solid var(--border);padding:6px 12px;border-radius:999px;cursor:pointer">↻ Refresh</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:14px;margin-bottom:18px;flex-wrap:wrap">
+      ${card('Tổng báo cáo',num(grand),`OSR ${num(t.osrT)} · MOSR ${num(t.mosrT)}`,'var(--text)',false)}
+      ${card('OSR',num(t.osrT),`Closed ${num(t.osrC)} · Open ${t.osrO}`,OSR,false)}
+      ${card('MOSR',num(t.mosrT),`Closed ${num(t.mosrC)} · Open ${t.mosrO}`,MOSR,false)}
+      ${card('Total Open Reports',totOpen,'Đang chờ xử lý','var(--accent)',true)}
+    </div>
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:var(--surface-2)">
+            <th rowspan="2" style="padding:12px 16px;text-align:left;font-size:12px;color:var(--text-2);font-weight:700;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)">Group on Coruson</th>
+            <th colspan="3" style="padding:9px;text-align:center;font-size:13px;font-weight:800;color:${OSR};border-bottom:2px solid ${OSR};letter-spacing:.05em">OSR</th>
+            <th colspan="3" style="padding:9px;text-align:center;font-size:13px;font-weight:800;color:${MOSR};border-bottom:2px solid ${MOSR};${bl};letter-spacing:.05em">MOSR</th>
+          </tr>
+          <tr style="background:var(--surface-2)">${['Closed','Open','Total','Closed','Open','Total'].map(hcell).join('')}</tr>
+        </thead>
+        <tbody>
+          ${sect('Line MSAG','var(--c-blue)',d.line)}
+          ${sect('Base MSAG','var(--c-green)',[d.base])}
+          ${sect('Workshop MSAG','var(--c-amber)',[d.workshop])}
+          <tr style="background:var(--surface-2)">
+            <td style="padding:13px 16px;font-weight:800;color:var(--text);font-size:14px">Total of Report</td>
+            <td style="${tdN};font-weight:800">${num(t.osrC)}</td><td style="${tdN}">${badge(t.osrO)}</td><td style="${tdN};font-weight:800;color:${OSR}">${num(t.osrT)}</td>
+            <td style="${tdN};${bl};font-weight:800">${num(t.mosrC)}</td><td style="${tdN}">${badge(t.mosrO)}</td><td style="${tdN};font-weight:800;color:${MOSR}">${num(t.mosrT)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>`;
 }
 
 function showPage(name,btn){
