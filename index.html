@@ -2260,7 +2260,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.07.29-r120';
+const APP_REV = '2026.07.29-r120-i1';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -7256,8 +7256,10 @@ async function loadSafety(){
     const raw=await fetchAll(G_URL+'dwreporting_report_summary?$select=report_id,report_status,owner_id,form_name,report_number&$filter='+encodeURIComponent(flt));
     const seen=new Set(),rows=[];
     raw.forEach(r=>{ if(r.report_id&&!seen.has(r.report_id)){seen.add(r.report_id);rows.push(r);} });
-    // 3) phân OSR/MOSR + đếm theo status
-    const cls=r=>{const s=(r.form_name||'')+' '+(r.report_number||'');return /MOSR/i.test(s)?'MOSR':/OSR/i.test(s)?'OSR':null;};
+    // 3) phân OSR/MOSR theo form_name (Coruson categorize theo form), KHÔNG theo report_number.
+    //    LOẠI các form "Confidential OSR"/"4. Confidential OSR" — Coruson không tính vào thống kê.
+    //    (r120-i1: trước đây lọc theo report_number → gộp nhầm Confidential OSR làm Closed cao hơn.)
+    const cls=r=>{const f=r.form_name||''; if(/confidential/i.test(f)) return null; return /MOSR/i.test(f)?'MOSR':/OSR/i.test(f)?'OSR':null;};
     const A={}; ids.forEach(i=>{A[id2name[i]]={OSR:{C:0,O:0},MOSR:{C:0,O:0}};});
     rows.forEach(r=>{const nm=id2name[r.owner_id],f=cls(r);if(!nm||!f)return;
       if(r.report_status==='Closed')A[nm][f].C++; else if(r.report_status==='Open')A[nm][f].O++;});

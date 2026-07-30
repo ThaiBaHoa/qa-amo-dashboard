@@ -12,8 +12,10 @@ const ORG_UNIT  = 'QA AMO';   // Dùng cho loadData() chính
 > ⚠️ **Ngoại lệ nguồn — trang Safety (r119):** KHÔNG dùng `ORG_UNIT='QA AMO'`. OSR/MOSR nằm
 > rải nhiều org_unit (Flight Crew Dept…) và chỉ nhận diện qua **owner (nhóm MSAG)**. Luồng riêng:
 > `dwanalytics_user_group?$filter=contains(name,'MSAG')` (loại role/archived) → map `group_id`→tên →
-> `dwreporting_report_summary?$filter=(owner_id eq …) and valid_to eq null`. Phân OSR/MOSR theo
-> `form_name`/`report_number`; đếm theo `report_status` (Closed/Open); Total=Closed+Open. Không lọc category.
+> `dwreporting_report_summary?$filter=(owner_id eq …) and valid_to eq null`. **Phân OSR/MOSR theo
+> `form_name`** (KHÔNG theo report_number): MOSR = form `MOSR`; OSR = form `1. OSR`/`OSR`; **LOẠI
+> form `Confidential OSR`/`4. Confidential OSR`** (Coruson không tính — r120-i1). Đếm theo
+> `report_status` (Closed/Open); Total=Closed+Open. Không lọc category.
 
 > 🗺️ **Sơ đồ trực quan luồng dữ liệu** (nguồn → trường → biến → công thức, 6 tầng):
 > workspace `build app cho cong ty/MQA dashboard website/SO_DO_CAU_TRUC.html` · artifact `https://claude.ai/code/artifact/2f1b2666-7235-410d-be92-ec5058094ccb` (đồng bộ r119).
