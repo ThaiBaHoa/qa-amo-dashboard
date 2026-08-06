@@ -1090,9 +1090,8 @@ tr:last-child td{border-bottom:none}
               <!-- Filter group 1: Scope -->
               <div class="filter-group">
                 <span class="filter-group-label">Scope</span>
-                <button class="pill on" id="ap-scope-qa-amo" onclick="setAuditPrefix('qa-amo',this)">QA AMO</button>
+                <button class="pill on" id="ap-scope-qa-amo" onclick="setAuditPrefix('qa-amo',this)">MNT</button>
                 <button class="pill" id="ap-scope-all" onclick="setAuditPrefix('all',this)">All</button>
-                <button class="pill" id="ap-scope-MNT" onclick="setAuditPrefix('MNT',this)">MNT</button>
               </div>
 
               <div class="filter-sep"></div>
@@ -1118,6 +1117,7 @@ tr:last-child td{border-bottom:none}
               </div>
 
               <div class="ymulti" id="auditYearF"></div>
+              <div class="ymulti" id="auditMonthF"></div>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
                 <input class="srch" id="auditSrch" placeholder="Search..." oninput="dRenderAudit()">
               </div>
@@ -2260,7 +2260,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.07.29-r120-i1';
+const APP_REV = '2026.08.06-r121';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3050,6 +3050,7 @@ async function loadData(forceRefresh=false) {
           prefix,
           is_qa_amo_scope: QA_AMO_PREFIXES.includes(prefix),
           sched_year: a.scheduled_start_date ? String(a.scheduled_start_date).slice(0,4) : null,
+          sched_month: a.scheduled_start_date ? String(Number(String(a.scheduled_start_date).slice(5,7))) : null,
           workflow_category: deriveWorkflowCategory(a),
         };
       }).filter(a => a.prefix !== 'MPS');
@@ -5890,6 +5891,15 @@ function deriveWorkflowCategory(audit) {
 function populateAuditYearFilter() {
   const auYears = [...new Set(auditData.map(a => a.sched_year).filter(Boolean))].sort((a,b) => b-a);
   initYearMulti('auditYearF', auYears, {onChange:renderAudit});
+  // Month filter — reuse the multi-select widget (data sẵn ở sched_month "1".."12")
+  const MONTH_ABBR = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  initYearMulti('auditMonthF', ['1','2','3','4','5','6','7','8','9','10','11','12'], {
+    onChange: renderAudit,
+    icon:     '🗓',
+    allLabel: 'All months',
+    sortFn:   (a,b) => a-b,
+    labelOf:  v => MONTH_ABBR[+v] || v,
+  });
 }
 
 // Get the currently visible filtered audits (for bottleneck panel / export)
@@ -5946,6 +5956,7 @@ function resetAuditFilters() {
   TS.audit.wfCatF  = 'all';
   TS.audit.page    = 1;
   ymReset('auditYearF');
+  ymReset('auditMonthF');
   const srch = g('auditSrch'); if (srch) srch.value = '';
   // Reset pills: activate default buttons
   ['ap-scope-qa-amo','ap-cat-all','ap-sf-all'].forEach(id => {
@@ -6316,6 +6327,8 @@ function renderAudit() {
     if (ts.sf !== 'all' && a.status !== ts.sf) return false;
     // 4. Year
     if (!ymHas('auditYearF', a.sched_year)) return false;
+    // 4b. Month (từ scheduled_start_date; audit không có ngày sẽ bị loại khi chọn tháng)
+    if (!ymHas('auditMonthF', a.sched_month)) return false;
     // 5. Search
     if (srch) {
       const t = [a.number,a.title,a.audit_type,a.workflow_category,a.status,a.lead_auditor_name,a.primary_scope_item_name,a.prefix].join(' ').toLowerCase();
