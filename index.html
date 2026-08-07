@@ -2260,13 +2260,50 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.07-r123';
+const APP_REV = '2026.08.07-r124';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
   Chart.defaults.borderColor = 'rgba(140,148,163,.18)';
   if (Chart.defaults.font) Chart.defaults.font.family = 'Manrope, system-ui, sans-serif';
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CFG — NGUỒN SỰ THẬT DÙNG CHUNG (single source of truth).  [r124]
+// Sửa MÀU / NHÃN / NGƯỠNG / ĐỊNH-NGHĨA-TRẠNG-THÁI ở ĐÂY — mọi nơi khác GỌI LẠI,
+// đừng chép hằng số hay viết 'Closed' tay (tránh lệch như bug By-status r122).
+// Bản đồ "khái niệm dùng ở đâu" xem TECHNICAL_REFERENCE.md §Bản đồ truy vết.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// 1) Trạng thái AUDIT (dwreporting_audit_summary.status) — Overview, Audit Plan
+const AUDIT_STATUS = {
+  Scheduled : { label:'Scheduled',   color:'#58A6FF' },
+  InProgress: { label:'In Progress', color:'#D29922' },
+  Performed : { label:'Performed',   color:'#A78BFA' },
+  Closed    : { label:'Closed',      color:'#3FB950' },
+  Cancelled : { label:'Cancelled',   color:'#6E7681' },
+};
+const AUDIT_STATUS_ORDER = ['Scheduled','InProgress','Performed','Closed','Cancelled'];
+
+// 2) Semantic status của REPORT (semCalc) — mọi donut/badge/bảng report (màn hình)
+//    Biến thể IN/PDF cố tình khác (xem SYNC ở buildReportPdf ~L5752 & renderReportCharts ~L6855).
+const SEM = {
+  'Open'          : { color:'#58A6FF' },
+  'Overdue'       : { color:'#ff6b6b' },
+  'On-time Closed': { color:'#3FB950' },
+  'Lately Closed' : { color:'#D29922' },
+  'Closed'        : { color:'#6E7681' },
+};
+const SEM_ORDER = ['Open','Overdue','On-time Closed','Lately Closed','Closed'];
+const semColorMap = () => Object.fromEntries(SEM_ORDER.map(k => [k, SEM[k].color])); // {status:color}
+
+// 3) Định nghĩa ĐÓNG / MỞ cho record AUDIT (.status) — dùng chung, đừng so 'Closed' tay
+const isClosed    = a => !!a && a.status === 'Closed';
+const isCancelled = a => !!a && a.status === 'Cancelled';
+const isActive    = a => !!a && a.status !== 'Closed' && a.status !== 'Cancelled'; // đang mở/tiến hành
+
+// 4) Mốc thời gian theo quy trình, tính từ ngày Raise (ngày) — 1 nơi khai báo
+const DEADLINE_DAYS = { rfi: 14, target: 45, ext1: 30 };
 
 // Nature of finding: ánh xạ mục con -> nhóm cha (từ danh mục gốc Galileo dwreporting_general_lists)
 const NATURE_PARENT = {
@@ -3362,12 +3399,10 @@ function renderOverview(d) {
   let mnt = auditData.filter(a => a.prefix === 'MNT' && ymHas('ovYearFilter', a.sched_year));
   s('ov-mnt-cnt', `(${mnt.length})`);
 
-  // Donut: by status
-  const ST_ORDER = ['Scheduled','InProgress','Performed','Closed','Cancelled'];
-  const ST_LABEL = {Scheduled:'Scheduled',InProgress:'In Progress',Performed:'Performed',Closed:'Closed',Cancelled:'Cancelled'};
-  const ST_COLOR = {Scheduled:'#58A6FF',InProgress:'#D29922',Performed:'#A78BFA',Closed:'#3FB950',Cancelled:'#6E7681'};
+  // Donut: by status — dùng CFG.AUDIT_STATUS (nguồn chung với ô bar bên cạnh)
   const stLabels=[], stData=[], stColors=[];
-  ST_ORDER.forEach(st=>{ const n=mnt.filter(a=>a.status===st).length; if(n>0){ stLabels.push(ST_LABEL[st]); stData.push(n); stColors.push(ST_COLOR[st]); } });
+  AUDIT_STATUS_ORDER.forEach(st=>{ const n=mnt.filter(a=>a.status===st).length;
+    if(n>0){ stLabels.push(AUDIT_STATUS[st].label); stData.push(n); stColors.push(AUDIT_STATUS[st].color); } });
   ovDonut('ovAuditStatus', stLabels, stData, stColors);
 
   // Bar: Audit vs Inspection — stack theo status; TỔNG luôn khớp donut "By status".
@@ -3378,9 +3413,9 @@ function renderOverview(d) {
   const hasOther = mnt.some(a => typeOf(a)==='Other');
   const types    = hasOther ? ['Audit','Inspection','Other'] : ['Audit','Inspection'];
   const cntBy = (t,pred) => mnt.filter(a=>typeOf(a)===t && pred(a)).length;
-  const closedByType = types.map(t => cntBy(t, a=>a.status==='Closed'));
-  const openByType   = types.map(t => cntBy(t, a=>a.status!=='Closed' && a.status!=='Cancelled'));
-  const cancelByType = types.map(t => cntBy(t, a=>a.status==='Cancelled'));
+  const closedByType = types.map(t => cntBy(t, isClosed));
+  const openByType   = types.map(t => cntBy(t, isActive));
+  const cancelByType = types.map(t => cntBy(t, isCancelled));
   const dsets = [
     {label:'Closed',      data:closedByType, color:'#3FB950'},
     {label:'In progress', data:openByType,   color:'#D29922'},
@@ -3465,8 +3500,8 @@ function ovStackBar(id, labels, datasets){
 // Donut 1 loại report theo semantic_status + dòng count/on-time
 function ovReportDonut(title, d, canvasId, cntId){
   const rows = d.filter(r => r.report_title === title);
-  const SC={'Open':'#58A6FF','Overdue':'#ff6b6b','On-time Closed':'#3FB950','Lately Closed':'#D29922','Closed':'#6E7681'};
-  const ORDER=['Open','Overdue','On-time Closed','Lately Closed','Closed'];
+  const SC=semColorMap();            // CFG.SEM
+  const ORDER=SEM_ORDER;
   const labels=[],data=[],colors=[];
   ORDER.forEach(st=>{ const n=rows.filter(r=>r.semantic_status===st).length; if(n>0){ labels.push(st); data.push(n); colors.push(SC[st]); } });
   ovDonut(canvasId, labels, data, colors);
@@ -3477,8 +3512,8 @@ function ovReportDonut(title, d, canvasId, cntId){
 }
 
 function buildChartsFor(d) {
-  const SC={'Open':'#58A6FF','Overdue':'#ff6b6b','On-time Closed':'#3FB950','Lately Closed':'#D29922','Closed':'#6E7681'};
-  const VALID=new Set(['Open','Overdue','On-time Closed','Lately Closed','Closed']);
+  const SC=semColorMap();            // CFG.SEM
+  const VALID=new Set(SEM_ORDER);
   dc('cStatus');
   const sc={};
   d.filter(r=>VALID.has(r.semantic_status)).forEach(r=>{sc[r.semantic_status]=(sc[r.semantic_status]||0)+1});
@@ -5749,6 +5784,7 @@ async function exportEcarPDF(){
 
     // Findings grouped by aircraft or ATA (with per-finding ATA from findingRows)
     const ecarGroupBy=g('ecarExportGroup')?.value||'aircraft';
+    // SYNC: biến thể RGB cho PDF (đậm hơn để in) của CFG.SEM — đổi màu ở SEM thì cân nhắc chỉnh cả đây.
     const sc={'Open':[30,80,220],'Overdue':[185,28,28],'On-time Closed':[21,128,61],'Lately Closed':[161,98,7],'Closed':[100,100,100]};
 
     if(ecarGroupBy==='aircraft'){
@@ -6163,14 +6199,14 @@ function renderMiniStagePipeline(audit) {
   const cat    = audit.workflow_category || 'Audit';
   const stages = getStagesForCategory(cat);
   const curIdx = getCurrentStageIdx(audit, stages);
-  const isClosed = audit.status === 'Closed';
-  const isCancel = audit.status === 'Cancelled';
+  const closed = isClosed(audit);          // CFG predicate
+  const isCancel = isCancelled(audit);
 
   const dots = stages.map((name, i) => {
     let cls, title;
     if (isCancel) {
       cls = 'stage-dot stage-dot-skip'; title = name + ': Cancelled';
-    } else if (isClosed || i < curIdx) {
+    } else if (closed || i < curIdx) {
       cls = 'stage-dot stage-dot-done'; title = name + ': Completed';
     } else if (i === curIdx) {
       cls = 'stage-dot stage-dot-active'; title = name + ': In Progress';
@@ -6789,7 +6825,7 @@ function generateReport(){
   // Charts
   ['rptCStatus','rptCForm','rptCMonth','rptCCat'].forEach(id=>{if(rptCharts[id]){rptCharts[id].destroy();delete rptCharts[id];}});
   const CO2={responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8B949E',font:{size:10},boxWidth:8}}},scales:{x:{ticks:{color:'#8B949E',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#8B949E',font:{size:9}},grid:{color:'rgba(255,255,255,0.04)'}}}};
-  const SC={'Open':'#58A6FF','Overdue':'#ff6b6b','On-time Closed':'#3FB950','Lately Closed':'#D29922','Closed':'#6E7681'};
+  const SC=semColorMap();            // CFG.SEM
   const sc={};
   d.filter(r=>SC[r.semantic_status]).forEach(r=>{sc[r.semantic_status]=(sc[r.semantic_status]||0)+1});
   rptCharts['rptCStatus']=new Chart(g('rptCStatus'),{type:'doughnut',data:{labels:Object.keys(sc),datasets:[{data:Object.values(sc),backgroundColor:Object.keys(sc).map(k=>SC[k]),borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#8B949E',font:{size:10},boxWidth:8}}}}});
@@ -6852,6 +6888,7 @@ async function exportPDF(){
     if(window.VJ_FONT){ try{ doc.addFileToVFS('Roboto-Regular.ttf',VJ_FONT); doc.addFont('Roboto-Regular.ttf','Roboto','normal'); bodyFont='Roboto'; }catch(e){} }
 
     const INK=[26,31,43], MUT=[122,129,148], LINE=[214,220,228], HEADBG=[36,48,73], HEADTX=[223,230,242], STRIPE=[247,249,252];
+    // SYNC: biến thể màu SÁNG cho báo cáo in (nền trắng) của CFG.SEM — đổi màu ở SEM thì cân nhắc chỉnh cả đây.
     const SC={'Open':'#2F7ED8','Overdue':'#E03B3B','On-time Closed':'#2E9E57','Lately Closed':'#C99613','Closed':'#9AA4B2'};
     const cnt=s=>d.filter(r=>r.semantic_status===s).length;
     const open=cnt('Open'), ov=cnt('Overdue'), on=cnt('On-time Closed'), late=cnt('Lately Closed'), cls=cnt('Closed');
