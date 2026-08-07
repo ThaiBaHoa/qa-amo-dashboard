@@ -523,6 +523,7 @@ tr:last-child td{border-bottom:none}
         <button class="nav-item" onclick="showPage('kpi',this)"><span class="nav-ic" data-ic="chart"></span>KPI Charts</button>
         <button class="nav-item" onclick="showSPIPage(this)"><span class="nav-icon">📈</span>SPI</button>
         <button class="nav-item" onclick="showPage('safety',this)"><span class="nav-ic" data-ic="shield"></span>Safety</button>
+        <button class="nav-item" onclick="showAuditPlanPage(this)"><span class="nav-ic" data-ic="calendar"></span>Audit Plan</button>
         <div class="nav-sec" style="margin-top:6px">Detail</div>
         <button class="nav-item" onclick="showPage('allforms',this)"><span class="nav-ic" data-ic="list"></span>All Forms</button>
         <button class="nav-item" onclick="showPage('pavoi',this)"><span class="nav-ic" data-ic="doc"></span>PAVOI Detail</button>
@@ -530,7 +531,6 @@ tr:last-child td{border-bottom:none}
         <button class="nav-item" onclick="showPage('ecar',this)"><span class="nav-ic" data-ic="shield"></span>ECAR</button>
         <button class="nav-item" onclick="showPage('amoecar',this)"><span class="nav-ic" data-ic="shield"></span>AMO-ECAR</button>
         <button class="nav-item" onclick="showPage('mcar',this)"><span class="nav-ic" data-ic="list"></span>MCAR</button>
-        <button class="nav-item" onclick="showAuditPlanPage(this)"><span class="nav-ic" data-ic="calendar"></span>Audit Plan</button>
         <button class="nav-item" onclick="showPage('docs',this)"><span class="nav-ic" data-ic="folder"></span>Documents</button>
         <button class="nav-item" onclick="showPage('help',this)"><span class="nav-ic" data-ic="doc"></span>User Guide</button>
         <button class="nav-item" onclick="window.open('https://docs.google.com/forms/d/e/1FAIpQLSdzEq_BPTZ1ZCkLtpf3gG4NhnZ8kfojbrgIWeye56wYOmqo-A/viewform','_blank','noopener')"><span class="nav-icon">💬</span>Feedback / Bug Report</button>
@@ -2260,7 +2260,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.07-r122';
+const APP_REV = '2026.08.07-r123';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
