@@ -2260,7 +2260,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.07-r124';
+const APP_REV = '2026.08.07-r125';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3282,6 +3282,32 @@ function renderAll() {
   renderPavoi();
   renderAudit();
   filterKpiYear();
+  runSelfChecks();
+}
+
+// Tự kiểm bất biến dữ liệu (dev safety net) — cảnh báo console khi số liệu LỆCH. [r125]
+// KHÔNG throw, KHÔNG chặn render. Mở DevTools Console để thấy. Xem TECHNICAL_REFERENCE §D.
+function runSelfChecks(){
+  try{
+    const warn=[];
+    const AU = (typeof auditData!=='undefined' && Array.isArray(auditData)) ? auditData : [];
+    const AL = (typeof allData!=='undefined'   && Array.isArray(allData))   ? allData   : [];
+    // 1) status audit lạ → donut "By status" bỏ sót (chỉ vẽ status trong CFG.AUDIT_STATUS)
+    const badAu = [...new Set(AU.filter(a=>a.status && !AUDIT_STATUS[a.status]).map(a=>a.status))];
+    if(badAu.length) warn.push('Audit status lạ (thêm vào CFG.AUDIT_STATUS): '+badAu.join(', '));
+    // 2) semantic_status lạ → donut/bảng report bỏ sót (không có trong CFG.SEM)
+    const badSem = [...new Set(AL.filter(r=>r.semantic_status && !SEM[r.semantic_status]).map(r=>r.semantic_status))];
+    if(badSem.length) warn.push('semantic_status lạ (thêm vào CFG.SEM): '+badSem.join(', '));
+    // 3) Overview tie-out: ô "By status" phải KHỚP ô "Audit vs Inspection" (mọi năm)
+    const mnt = AU.filter(a=>a.prefix==='MNT');
+    const donutSum = AUDIT_STATUS_ORDER.reduce((s,st)=>s+mnt.filter(a=>a.status===st).length,0);
+    const barSum   = mnt.filter(isClosed).length + mnt.filter(isActive).length + mnt.filter(isCancelled).length;
+    if(donutSum!==barSum) warn.push(`Overview lệch: By-status(${donutSum}) ≠ Audit-vs-Inspection(${barSum}) — do status audit lạ, thêm vào CFG.AUDIT_STATUS`);
+    // Kết quả
+    if(warn.length){ console.warn('%c[self-check] '+warn.length+' cảnh báo:','color:#D29922;font-weight:700'); warn.forEach(w=>console.warn('  • '+w)); }
+    else console.log('%c[self-check] OK — By-status=Audit-vs-Inspection='+donutSum+' · status/semantic hợp lệ','color:#3FB950');
+    return warn;
+  }catch(e){ console.warn('[self-check] lỗi khi chạy:', e); return null; }
 }
 
 // ── REUSABLE MULTI-YEAR FILTER ───────────────────────────────
