@@ -22,6 +22,51 @@ const ORG_UNIT  = 'QA AMO';   // Dùng cho loadData() chính
 
 ---
 
+## 🗺️ Bản đồ truy vết (Traceability) — "sửa chỗ này thì kiểm chỗ nào"
+
+> Mục đích: app là **1 file `index.html` ~9.000 dòng**, một khái niệm dùng ở nhiều nơi.
+> Trước khi sửa, tra bảng dưới để biết **đụng cái gì thì ảnh hưởng đâu**. Từ r124 các
+> khái niệm dùng chung đã gom vào block **`CFG`** đầu file (grep `// CFG —`).
+
+### A. Nguồn sự thật dùng chung (CFG) — sửa 1 nơi, ăn mọi nơi
+
+| Khái niệm (CFG) | Định nghĩa tại | Dùng ở (gọi lại) | Ghi chú |
+|---|---|---|---|
+| `AUDIT_STATUS` + `AUDIT_STATUS_ORDER` (màu/nhãn/thứ tự status audit) | block CFG | `renderOverview` (donut By-status **và** ô bar Audit-vs-Inspection) | Đổi màu/nhãn status audit → chỉ sửa CFG |
+| `SEM` + `SEM_ORDER` + `semColorMap()` (palette semantic-status màn hình) | block CFG | `ovReportDonut`, `buildChartsFor`, `renderReportCharts` | Đổi màu semantic → sửa CFG; **nhớ 2 biến thể IN** ở mục C |
+| `isClosed` / `isActive` / `isCancelled` (record audit `.status`) | block CFG | `renderOverview` (bar), `renderMiniStagePipeline` | Đổi định nghĩa "đóng/mở" audit → sửa predicate, mọi nơi theo |
+| `DEADLINE_DAYS` (rfi 14 / target 45 / ext1 30) | block CFG | (đang wire dần) `buildMcarDeadlineChk`, hiển thị RFI/Target | Đổi quy trình ngày → sửa CFG; xem mục C nếu còn +14/+45 viết tay |
+
+### B. Chuỗi phụ thuộc dữ liệu: Coruson/Galileo field → suy ra → hiển thị
+
+| Khái niệm | Field OData nguồn | Suy ra ở hàm | Hiển thị / dùng ở |
+|---|---|---|---|
+| Trạng thái report | `report_status` + ngày close/target | `semCalc` → `semantic_status` | mọi donut/badge/bảng report |
+| Trạng thái audit | `dwreporting_audit_summary.status` | (trực tiếp) + `isClosed/isActive` | Overview, Audit Plan, pipeline |
+| Loại audit | `audit_type`, `number` | `deriveWorkflowCategory` → `workflow_category` | Overview bar, Audit Plan |
+| Mốc deadline | `raised_date` (+ custom `Target date`) | `deriveStageDates`, `ageCalc`, `DEADLINE_DAYS` | Overdue, EIS/MCAR detail |
+| Prefix (MNT/MCAR…) | `number` | `extractAuditPrefix` / `report_number` | lọc theo nhóm form |
+
+→ **Quy tắc:** đổi cách đọc/suy 1 field ở cột "suy ra" thì rà mọi "hiển thị" của cùng dòng.
+
+### C. Ràng buộc KHÔNG tự-dedup được → phải sửa TAY cho khớp (grep `SYNC:`)
+
+| Khi sửa… | Nhớ kiểm/sửa luôn… |
+|---|---|
+| Màu trong `CFG.SEM` | biến thể **RGB cho PDF** (`buildReportPdf`, grep `SYNC:`) + biến thể **màu sáng in** (`renderReportCharts`, grep `SYNC:`) |
+| Công thức deadline (14/45/30) | định nghĩa "đóng trễ/đúng hạn" trong **SOP/ISO** (ngoài code) + `DEADLINE_DAYS` |
+| Bump `APP_REV` (r###) | `CLAUDE.md` (Rev current) + `PROJECT_TECH_SPEC.md` (Version + §14) — **hook pre-commit bắt buộc**; rà file này nếu field/luồng đổi |
+| Nguồn/field dữ liệu | bảng "Page → Data source" (dưới) + `SO_DO_CAU_TRUC.html` (sơ đồ) |
+
+### D. Công cụ "tìm liên kết" trong 1 file
+
+- **Grep là trình dò phụ thuộc.** Tìm mọi nơi dùng 1 khái niệm: `grep -n "workflow_category" index.html`.
+- Đặt tên hằng/hàm **unique** để grep ra sạch (vd `AUDIT_STATUS`, `semColorMap`).
+- Chỗ buộc phải trùng thủ công → đánh dấu comment **`// SYNC: …`** để `grep "SYNC:"` liệt kê hết.
+- Số liệu lệch giữa các ô → `runSelfChecks()` cảnh báo console (xem bước ③).
+
+---
+
 ## Bảng mapping: Page → Data source → Filter
 
 | Page | Function | API Table | org_unit_name | Filter bổ sung |
