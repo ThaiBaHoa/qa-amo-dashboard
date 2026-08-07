@@ -596,7 +596,7 @@ tr:last-child td{border-bottom:none}
               </div>
             </div>
             <div class="chart-card">
-              <div style="font-size:13px;font-weight:600;margin-bottom:8px">Audit vs Inspection <span style="font-size:11px;color:var(--muted);font-weight:400">· closed vs in-progress</span></div>
+              <div style="font-size:13px;font-weight:600;margin-bottom:8px">Audit vs Inspection <span style="font-size:11px;color:var(--muted);font-weight:400">· tổng khớp By status</span></div>
               <div style="height:230px;position:relative"><canvas id="ovAuditType"></canvas></div>
               <div class="ov-lg h" id="ovAuditType-lg"></div>
             </div>
@@ -2260,7 +2260,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.06-r121';
+const APP_REV = '2026.08.07-r122';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3370,14 +3370,23 @@ function renderOverview(d) {
   ST_ORDER.forEach(st=>{ const n=mnt.filter(a=>a.status===st).length; if(n>0){ stLabels.push(ST_LABEL[st]); stData.push(n); stColors.push(ST_COLOR[st]); } });
   ovDonut('ovAuditStatus', stLabels, stData, stColors);
 
-  // Bar: Audit vs Inspection — stacked Closed vs In-progress
-  const types = ['Audit','Inspection'];
-  const closedByType = types.map(t => mnt.filter(a=>a.workflow_category===t && a.status==='Closed').length);
-  const openByType   = types.map(t => mnt.filter(a=>a.workflow_category===t && a.status!=='Closed' && a.status!=='Cancelled').length);
-  ovStackBar('ovAuditType', types, [
+  // Bar: Audit vs Inspection — stack theo status; TỔNG luôn khớp donut "By status".
+  // (r122) Trước đây ô này bỏ Cancelled + bỏ record type khác 'Audit'/'Inspection' nên
+  // tổng lệch donut. Nay: mọi record MNT đều vào 1 cột (type khác → 'Other' chỉ hiện khi có)
+  // và 1 đoạn (Closed / In progress / Cancelled) → Σ bar = Σ donut = mnt.length.
+  const typeOf   = a => (a.workflow_category==='Audit' || a.workflow_category==='Inspection') ? a.workflow_category : 'Other';
+  const hasOther = mnt.some(a => typeOf(a)==='Other');
+  const types    = hasOther ? ['Audit','Inspection','Other'] : ['Audit','Inspection'];
+  const cntBy = (t,pred) => mnt.filter(a=>typeOf(a)===t && pred(a)).length;
+  const closedByType = types.map(t => cntBy(t, a=>a.status==='Closed'));
+  const openByType   = types.map(t => cntBy(t, a=>a.status!=='Closed' && a.status!=='Cancelled'));
+  const cancelByType = types.map(t => cntBy(t, a=>a.status==='Cancelled'));
+  const dsets = [
     {label:'Closed',      data:closedByType, color:'#3FB950'},
-    {label:'In progress', data:openByType,   color:'#D29922'}
-  ]);
+    {label:'In progress', data:openByType,   color:'#D29922'},
+  ];
+  if (cancelByType.some(n=>n>0)) dsets.push({label:'Cancelled', data:cancelByType, color:'#6E7681'});
+  ovStackBar('ovAuditType', types, dsets);
 
   // ── Section 2: report-type donuts (semantic_status) ──
   ovReportDonut('MCAR',     d, 'ovMcar', 'ov-mcar-cnt');
