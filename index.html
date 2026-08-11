@@ -2260,7 +2260,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.07-r125';
+const APP_REV = '2026.08.11-r126';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2996,18 +2996,19 @@ async function loadData(forceRefresh=false) {
         if (!auMap[a.audit_id]) auMap[a.audit_id] = a;
       });
 
-      // Giữ audit liên quan QA AMO:
-      // 1. Audit đã có report từ QA AMO (auditIdSet)
-      // 2. Audit type = Internal Audit hoặc Inspection
-      //    VÀ có lead auditor là người QA AMO
-      // → Load hết rồi filter: chỉ lấy Internal Audit + Inspection
-      //   (các types khác như CMR, MPS không liên quan QA AMO)
-      // Chỉ lấy 2 types: Internal Audit và Inspection
+      // Giữ audit liên quan QA AMO — 3 nhánh OR:
+      // 1. Audit đã có report từ QA AMO (auditIdSet).
+      // 2. Audit có số hiệu prefix QA AMO (MNT) — bất kể audit_type/lead auditor.
+      //    → Bắt trọn audit KẾ HOẠCH tương lai (chưa có report) dù type là
+      //      "MQA Internal Cross Audit", "VJC AMO"… hay lead còn "Assign Lead Auditor".
+      //      (r126 fix: whitelist type + danh sách lead cũ làm rớt Q4 kế hoạch, vd MNT-1045..1048.)
+      // 3. Fallback ngoài prefix MNT: Internal Audit/Inspection do QA AMO auditor dẫn.
       const RELEVANT_TYPES = new Set(['Internal Audit', 'Inspection']);
 
       const allAudits = Object.values(auMap).filter(a =>
-        auditIdSet.has(a.audit_id) ||    // có report QA AMO
-        (                                // hoặc là audit của QA AMO auditor
+        auditIdSet.has(a.audit_id) ||                              // (1) có report QA AMO
+        QA_AMO_PREFIXES.includes(extractAuditPrefix(a.number)) ||  // (2) mọi audit prefix MNT
+        (                                                          // (3) hoặc audit của QA AMO auditor
           RELEVANT_TYPES.has(a.audit_type) &&
           QA_AMO_AUDITORS.has(a.lead_auditor_name)
         )

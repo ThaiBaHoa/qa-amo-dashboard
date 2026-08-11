@@ -144,9 +144,9 @@ GET dwreporting_audit_summary
   $select: audit_id, number, title, audit_type, status,
            scheduled_start_date, actual_start_date, closed_date,
            lead_auditor_name, primary_scope_item_name, location_name
-  (không filter — chỉ 86 records, lấy hết)
+  (không filter — lấy hết, dedup theo audit_id)
 ```
-→ Filter client-side: giữ audit có `audit_id` trong QA AMO reports, HOẶC là `Internal Audit`/`Inspection` do `QA_AMO_AUDITORS` dẫn.
+→ Filter client-side (3 nhánh OR): giữ audit khi **(1)** `audit_id` có trong QA AMO reports, **HOẶC (2)** số hiệu có prefix QA AMO (`QA_AMO_PREFIXES`=`MNT`) — bất kể `audit_type`/lead, **HOẶC (3)** là `Internal Audit`/`Inspection` do `QA_AMO_AUDITORS` dẫn. Nhánh (2) thêm ở **r126** để bắt trọn audit **kế hoạch tương lai** (chưa có report) có type khác (`MQA Internal Cross Audit`, `VJC AMO`…) hoặc lead còn `"Assign Lead Auditor"` — trước đó bị whitelist type + danh sách lead làm rớt (vd Q4/2026 mất MNT-1045..1048).
 
 **Bước 6 — Audit Workflow**
 ```
