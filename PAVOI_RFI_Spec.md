@@ -1,8 +1,8 @@
 # Tech Spec — PAVOI RFI Monitor (cột RFI + Detail modal)
 
 **Target file:** `index.html` (single-file SPA, repo `ThaiBaHoa/qa-amo-dashboard`)
-**Trạng thái:** ĐÃ TRIỂN KHAI — version hiện tại `2026.06.05-r86`
-**Lịch sử:** r82 (khởi tạo) → r83 (ưu tiên overdue) → r84 (fetch theo report_id) → r85 (retry + per-report) → r86 (load theo PAVOI Open + modal fetch tươi)
+**Trạng thái:** ĐÃ TRIỂN KHAI — version hiện tại `2026.08.11-r127`
+**Lịch sử:** r82 (khởi tạo) → r83 (ưu tiên overdue) → r84 (fetch theo report_id) → r85 (retry + per-report) → r86 (load theo PAVOI Open + modal fetch tươi) → **r127 (popup con: Instructions + Response mỗi RFI)**
 **Phạm vi:** trang `page-pavoi`, `renderPavoi()`, loader + modal RFI. KHÔNG chạm phần khác.
 
 ---
@@ -32,8 +32,14 @@ RFI nằm ở đây (KHÔNG phải `dwreporting_report_workflow`). Quan hệ: 1 
 | `task_delivery_status` | Cờ Galileo tự tính: `overdue` / `in progress` / `completed early` / `completed late` / `no target set` |
 | `task_target_date` | Deadline của RFI |
 | `task_completed_date` | Ngày RFI hoàn tất (null nếu chưa) |
+| `task_id` | GUID duy nhất mỗi RFI — khoá tra popup Instructions/Response (r127) |
+| `task_instructions` | **Nội dung yêu cầu** auditor gửi (text thuần, không phải HTML — probe r127) — hiện trong popup con |
+| `task_response` | **Phản hồi** của owner (null nếu chưa trả lời) — hiện trong popup con |
+| `task_related_section_name` | Section nguồn của RFI (vd `Verification Result`, `PAVOI Correction`) — hiện ở sub-header popup |
 
-**Field KHÔNG dùng** (đã bỏ khỏi `$select` để giảm payload): `task_instructions` (HTML lớn), `task_related_section_name`, `task_response`, `stage_*`, `modified_date`, `id`.
+**Field KHÔNG dùng** (đã bỏ khỏi `$select` để giảm payload): `stage_*`, `modified_date`, `id`, `workflow_*`, `report_created_date`, `task_acceptable_response_time`.
+
+> **Probe r127 (data thật):** trên PAVOI, `task_instructions` populate **40/40**, `task_response` **31/40** (RFI chưa hoàn tất thì `task_response = null` — hợp lệ). Cả hai là **cột trực tiếp** của `dwreporting_report_task`, KHÔNG phải EAV → không cần fetch `report_field`/`report_form_section_field`.
 
 ### 1.2 Quy tắc phân loại RFI (đã xác minh bằng data thật)
 
@@ -156,6 +162,11 @@ async function showPavoiDetail(report_id){
 if(e&&e.target!==g('pavoiModal'))return; g('pavoiModal').style.display='none';
 ```
 
+### 5.8 `showRfiDetail(report_id, task_id)` + `closeRfiModal(e)` — popup con (r127)
+- Không fetch thêm: tra `pavoiRfiMap[report_id]` theo `task_id` (data đã có từ `fetchPavoiRfiOne` khi mở modal cha).
+- Đổ `task_owner` → `#rfiMOwner`; sub-header = `Section · status · Completed/Target date`; `task_instructions` → `#rfiMInstr`; `task_response` → `#rfiMResp` (rỗng → "No response yet").
+- Text qua `esc()` + `white-space:pre-wrap` để giữ xuống dòng. `closeRfiModal` cùng pattern `closePavoiModal`.
+
 ---
 
 ## 6 — UI
@@ -178,6 +189,12 @@ if(e&&e.target!==g('pavoiModal'))return; g('pavoiModal').style.display='none';
 - Header: tiêu đề + sub (Ref / dept / raised date) + nút ✕.
 - 4 KPI card: Total RFI / Open / Overdue / Completed (`pvk-total/open/over/done`).
 - Bảng `#pavoiRfiBody`: Owner / Status / Target / Completed / Days. Class badge: `b-over / b-open / b-on / b-late`, ngày: `a-crit / a-ok`.
+- **Row click (r127):** mỗi `<tr>` có `cursor:pointer` + `onclick="showRfiDetail('${report_id}','${t.task_id}')"` (owner kèm chevron ›).
+
+### 6.3b Modal con `#rfiModal` (sau `#pavoiModal`, r127)
+- Overlay riêng `z-index:225` (trên `#pavoiModal` 215) → đóng nó chỉ quay lại modal cha, không mất context.
+- Header: `RFI Detail · Request For Information` / owner (`#rfiMOwner`) / sub `#rfiMSub`.
+- 2 khối: **📋 Instructions** (`#rfiMInstr`) + **💬 Response** (`#rfiMResp`), nền nhạt, `white-space:pre-wrap`.
 
 ### 6.4 Trigger trong `showPage()`
 ```js
