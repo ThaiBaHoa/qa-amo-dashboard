@@ -2280,7 +2280,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.11-r127';
+const APP_REV = '2026.08.11-r128';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2808,6 +2808,9 @@ function cacheLoad() {
     if (!raw) return false;
     const c = JSON.parse(raw);
     if (!c.ts || !c.a || Date.now() - c.ts > CACHE_TTL) return false;
+    // Vứt cache khi lên rev mới (deploy đổi logic/field) → tránh phục vụ data cũ
+    // tính theo code cũ. Vd r126 nới filter Audit Plan nhưng cache r125 vẫn thiếu audit.
+    if (c.rev !== APP_REV) { localStorage.removeItem(CACHE_KEY); return false; }
     allData   = c.a;
     auditData = c.b || [];
     if (c.sa) stageAggregate = c.sa;
@@ -2828,12 +2831,12 @@ function cacheLoad() {
 
 function cacheSave() {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), a:allData, b:auditData, dtf:docTypeFlat, sa:stageAggregate}));
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), rev:APP_REV, a:allData, b:auditData, dtf:docTypeFlat, sa:stageAggregate}));
     updateCacheAge(Date.now());
   } catch {
     try {
       const slim = allData.map(r=>({...r,wf_stages:[]}));
-      localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), a:slim, b:auditData, sa:stageAggregate}));
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), rev:APP_REV, a:slim, b:auditData, sa:stageAggregate}));
       updateCacheAge(Date.now());
     } catch { /* quota exceeded */ }
   }
