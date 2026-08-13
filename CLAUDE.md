@@ -136,6 +136,9 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
   - Pure bug fix → keep `rNN`, bump issue suffix (`r107-i1`, `r107-i2`)
   - Log fixes as "Issue 1/2/3" under that rev. Next feature resets issue counter.
   - **One `APP_REV` bump per combined spec** — never merge unrelated specs into one rev.
+    A same-rev fix of the rev you just shipped is `-iM`, not a new major. **Enforce via the
+    `cap-nhat-revision` skill checklist** — see its "vết r129–r130" anti-pattern (bundled 3
+    concerns / fixed r129 as a major instead of `r129-i1`). If a task bundles concerns → stop and ask (§"When to stop and ask" #5).
 - **Target date priority**: `stage_task_target` takes precedence over the user-entered
   custom field (`sd.td || f['Target date']`) — stale custom entries used to override
   authoritative workflow data.

@@ -29,6 +29,29 @@ commit message để dựng nhật ký cho báo cáo tuần.
 Nếu không chắc thay đổi là feature hay bugfix, hỏi người dùng trước khi bump — ranh
 giới này quyết định số tăng thế nào.
 
+## ✅ Checklist BẮT BUỘC trước khi đổi APP_REV (sai 1 câu → dừng)
+
+1. **1 rev = 1 mối quan tâm?** Nếu thay đổi gồm ≥2 việc độc lập (vd "thêm cột" + "sửa
+   filter" + "đổi loader") → **tách thành nhiều rev/commit**, KHÔNG gộp. Gộp = vi phạm.
+2. **Feature hay bugfix thuần?** Bugfix thuần (không đổi tính năng/layout) → `-iM` trên
+   rev cũ, KHÔNG bump major. Không chắc → **hỏi user**.
+3. **Đây có phải sửa lỗi của rev vừa ship?** → `-iM` của **chính rev đó**, không phải
+   rev major mới. (Đừng "chữa" bằng cách bump lên số mới.)
+4. **Đã đi qua skill này chưa?** Bump tay rất dễ trượt luật — luôn dùng `/cap-nhat-revision`.
+
+> Đồng bộ với repo `CLAUDE.md`: §Versioning ("One APP_REV bump per combined spec") +
+> "When to stop and ask" #5 ("task bundles multiple independent concerns into one revision").
+
+## ⚠️ Anti-pattern có thật — vết r129–r130 (2026-08-13, ĐỪNG LẶP LẠI)
+
+- **r129 gộp 3 mối quan tâm** (RFI→Task monitor + cột Owner + filter Section) vào 1 rev →
+  sai câu 1. Đáng lẽ tách ≥2 rev (RFI/Task là 1 việc; Owner+filter là việc khác).
+- **r130 thực chất là sửa lỗi filter của r129** (lọc nhầm trường Department thay vì Owner)
+  → theo câu 3 đáng lẽ là `r129-i1`, nhưng lại bump major + trộn thêm feature (resolve
+  User Group). Trộn fix + feature làm nhòe ranh giới.
+- **Nguyên nhân gốc:** bump tay, bỏ qua skill + bỏ qua "stop and ask". Luật đã có sẵn —
+  lỗi là ở khâu thực thi. → Từ nay chạy checklist trên trước mọi lần bump.
+
 ## Quy trình
 
 1. **Tìm dòng khai báo** trong `index.html`:
