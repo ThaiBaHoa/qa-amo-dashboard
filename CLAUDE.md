@@ -62,7 +62,7 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
   html2canvas 1.4.1, xlsx 0.18.5, DOMPurify.
 - **This repo is the canonical source for `index.html`.** A `post-commit` hook
   (`.git/hooks/post-commit`) auto-copies `index.html` to a backup at
-  `F:\Onedrive - personal\OneDrive\build app cho cong ty\MQA dashboard website\index.html` after every commit.
+  `F:\Onedrive - Bussiness\OneDrive - VietJet Aviation Joint Stock Company\Vault-CongViec\03-Du-An\build app cho cong ty\MQA dashboard website\index.html` after every commit.
   Never edit that OneDrive copy — it is overwritten on the next commit. Delete the hook
   to disable syncing.
 - **Doc↔code drift guard.** The auto-sync above covers ONLY `index.html` — the `.md`
@@ -269,7 +269,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.08.11-r128
+Rev current: 2026.08.13-r129
 
 ORG_UNIT = 'QA AMO'   ← main pages (never change without cross-page intent)
                          CMR-CAR and ECAR use org_unit = 'TQA' — fetched separately

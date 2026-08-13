@@ -1,9 +1,11 @@
-# Tech Spec — PAVOI RFI Monitor (cột RFI + Detail modal)
+# Tech Spec — PAVOI RFI/Task Monitor (cột RFI/Task + Detail modal)
 
 **Target file:** `index.html` (single-file SPA, repo `ThaiBaHoa/qa-amo-dashboard`)
-**Trạng thái:** ĐÃ TRIỂN KHAI — version hiện tại `2026.08.11-r127`
-**Lịch sử:** r82 (khởi tạo) → r83 (ưu tiên overdue) → r84 (fetch theo report_id) → r85 (retry + per-report) → r86 (load theo PAVOI Open + modal fetch tươi) → **r127 (popup con: Instructions + Response mỗi RFI)**
-**Phạm vi:** trang `page-pavoi`, `renderPavoi()`, loader + modal RFI. KHÔNG chạm phần khác.
+**Trạng thái:** ĐÃ TRIỂN KHAI — version hiện tại `2026.08.13-r129`
+**Lịch sử:** r82 (khởi tạo) → r83 (ưu tiên overdue) → r84 (fetch theo report_id) → r85 (retry + per-report) → r86 (load theo PAVOI Open + modal fetch tươi) → r127 (popup con: Instructions + Response mỗi RFI) → **r129 (theo dõi CẢ Task, không chỉ RFI)**
+**Phạm vi:** trang `page-pavoi`, `renderPavoi()`, loader + modal. KHÔNG chạm phần khác.
+
+> **r129 — vì sao mở rộng sang Task:** Trong workflow PAVOI, auditor bấm nút `+` chọn **1 trong**: *Add task* / *Transfer Report Ownership* / *Request For Information*. Nhiều PAVOI (vd **PAVOI-397**) auditor chọn **Add task** → không có dòng `Request For Information` → cột/popup cũ (chỉ lọc RFI) hiện `—`/`0` dù report vẫn có việc đang mở. Từ r129: theo dõi **mọi task** (RFI + Task), phân loại bằng `isPavoiItem`/`isPavoiRfi` (đầu `<script>`). *Transfer Report Ownership* KHÔNG tạo row trong `dwreporting_report_task` nên không phải loại trừ. Đã probe toàn bộ PAVOI: **1258 RFI · 155 Task (92 title) · 626 row title=null (stage placeholder → loại)**.
 
 ---
 
@@ -45,11 +47,16 @@ RFI nằm ở đây (KHÔNG phải `dwreporting_report_workflow`). Quan hệ: 1 
 
 | Khái niệm | Quy tắc |
 |---|---|
-| **RFI hợp lệ** | `task_title === 'Request For Information'` **và** `task_status !== 'Deleted'` |
-| **RFI open** | `task_status !== 'Completed'` **và** `!task_completed_date` |
-| **RFI overdue** | open **và** (`ageCalc(task_target_date) < 0` **HOẶC** `task_delivery_status === 'overdue'`) |
+| **Item hợp lệ** (r129) | `isPavoiItem` = `task_title` non-empty **và** `task_status !== 'Deleted'` → gồm CẢ RFI lẫn Task. Row `task_title` null/'' = stage placeholder → loại. |
+| **Là RFI** | `isPavoiRfi` = `task_title === 'Request For Information'`. Còn lại (title tùy biến) = **Task** (Add task). |
+| **Item open** | `task_status !== 'Completed'` **và** `!task_completed_date` |
+| **Item overdue** | open **và** (`ageCalc(task_target_date) < 0` **HOẶC** `task_delivery_status === 'overdue'`) |
 | **Owner** | `task_owner` |
-| **Worst (đại diện cột)** | RFI overdue có `ageing` âm nhất; nếu thiếu target → `ageing = 0` để vẫn vào diện worst |
+| **Worst (đại diện cột)** | item overdue có `ageing` âm nhất; nếu thiếu target → `ageing = 0` để vẫn vào diện worst |
+
+> **r129 UI (RFI/Task):** cột đổi tên `RFI` → **`RFI / Task`**; modal thêm cột **Type** (badge RFI/Task), KPI `Total RFI`→`Total`, header `RFI & Task Monitor`; Task hiện title dưới owner; popup con đổi label theo loại (`RFI Detail` / `Task Detail`). `pavoiRfiMap` giờ chứa RFI+Task → `ovrFetchPavoiOwners` (Overdue Report export) cũng gồm owner của Task đang mở (blast-radius đã cập nhật đồng bộ, hợp mục tiêu: người đang nợ việc).
+>
+> **r129 thêm (Owner + Section filter):** bảng PAVOI thêm cột **Owner** (`r.owner_name` = `userMap[owner_id].full_name`, đã có sẵn từ `loadData`) đặt **ngay sau Report No**, sortable qua `pavSort('owner_name')`. Thêm dropdown **Section** (`#pavoiSectF`, class `.sel`) lọc theo trường **Department** (`r.dept`) — 4 nhóm QA AMO: `Licensing and Authorization` · `Quality Control` · `AMO Safety` · `Standard and Compliance` (nhãn hiển thị "MQA/AMO - … Section"). Predicate trong `renderPavoi`: `if(sect && r.dept!==sect) return false;`. `owner_name` cũng thêm vào haystack search. Data verify: 4 giá trị này tồn tại trong trường Department (probe `dwanalytics_report_form_section_field`, field_name='Department').
 
 > **Lý do dùng `!== 'Completed'` thay vì `=== 'InProgress'`:** RFI đang mở thực tế có nhiều status (`Available`, `InProgress`, `NotStarted`, `PendingSignOff`). Hardcode `InProgress` sẽ bỏ sót.
 >

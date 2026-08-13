@@ -863,6 +863,13 @@ tr:last-child td{border-bottom:none}
               <button class="pill" onclick="setPAV('On-time Closed',this)">On-time</button>
               <button class="pill" onclick="setPAV('Lately Closed',this)">Lately</button>
               <div class="ymulti" id="pavoiYearF"></div>
+              <select class="sel" id="pavoiSectF" onchange="TS.pavoi.page=1;renderPavoi()" title="Lọc theo Section (trường Department)">
+                <option value="">All Sections</option>
+                <option value="Licensing and Authorization">MQA - Licensing and Authorization Section</option>
+                <option value="Quality Control">MQA - Quality Control Section</option>
+                <option value="AMO Safety">AMO - Safety Section</option>
+                <option value="Standard and Compliance">MQA - Standard and Compliance Section</option>
+              </select>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
                 <input class="srch" id="pavoiSrch" placeholder="Search..." oninput="dRenderPavoi()">
               </div>
@@ -871,6 +878,7 @@ tr:last-child td{border-bottom:none}
               <table>
                 <thead><tr>
                   <th onclick="pavSort('report_number')">Report No ↕</th>
+                  <th onclick="pavSort('owner_name')">Owner ↕</th>
                   <th onclick="pavSort('semantic_status')">Status ↕</th>
                   <th onclick="pavSort('raised_date')">Raised Date ↕</th>
                   <th onclick="pavSort('Target_date')">Target Date ↕</th>
@@ -879,7 +887,7 @@ tr:last-child td{border-bottom:none}
                   <th>Request For Verification</th>
                   <th>Verification Result</th>
                   <th>Department</th>
-                  <th>RFI</th>
+                  <th>RFI / Task</th>
                   <th>Audit Ref (MNT)</th>
                   <th>Audit Title</th>
                 </tr></thead>
@@ -2188,14 +2196,14 @@ tr:last-child td{border-bottom:none}
   <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:95%;max-width:820px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
     <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0">
       <div>
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">PAVOI Detail · RFI Monitor</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">PAVOI Detail · RFI &amp; Task Monitor</div>
         <div style="font-size:15px;font-weight:700;color:var(--text);margin-top:2px" id="pavoiMTitle">—</div>
         <div style="font-size:11px;color:var(--muted);margin-top:3px" id="pavoiMSub">—</div>
       </div>
       <button onclick="closePavoiModal()" style="background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);font-size:16px;cursor:pointer;padding:3px 10px;border-radius:6px;flex-shrink:0;margin-left:12px">✕</button>
     </div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:12px 18px;border-bottom:1px solid var(--border);flex-shrink:0">
-      <div class="chart-card" style="text-align:center;padding:8px"><div class="kpi-lbl">Total RFI</div><div class="kpi-val" id="pvk-total" style="color:var(--blue)">—</div></div>
+      <div class="chart-card" style="text-align:center;padding:8px"><div class="kpi-lbl">Total</div><div class="kpi-val" id="pvk-total" style="color:var(--blue)">—</div></div>
       <div class="chart-card" style="text-align:center;padding:8px"><div class="kpi-lbl">Open</div><div class="kpi-val" id="pvk-open" style="color:var(--blue)">—</div></div>
       <div class="chart-card" style="text-align:center;padding:8px"><div class="kpi-lbl">Overdue</div><div class="kpi-val" id="pvk-over" style="color:#ff6b6b">—</div></div>
       <div class="chart-card" style="text-align:center;padding:8px"><div class="kpi-lbl">Completed</div><div class="kpi-val" id="pvk-done" style="color:var(--green)">—</div></div>
@@ -2203,6 +2211,7 @@ tr:last-child td{border-bottom:none}
     <div style="overflow:auto;flex:1;min-height:0;padding:0 18px 18px">
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead style="position:sticky;top:0;background:var(--card);z-index:1"><tr>
+          <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Type</th>
           <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Owner</th>
           <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Status</th>
           <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Target</th>
@@ -2220,7 +2229,7 @@ tr:last-child td{border-bottom:none}
   <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:95%;max-width:680px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
     <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0">
       <div>
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">RFI Detail · Request For Information</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em" id="rfiMKind">RFI Detail · Request For Information</div>
         <div style="font-size:15px;font-weight:700;color:var(--text);margin-top:2px" id="rfiMOwner">—</div>
         <div style="font-size:11px;color:var(--muted);margin-top:3px" id="rfiMSub">—</div>
       </div>
@@ -2280,7 +2289,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.11-r128';
+const APP_REV = '2026.08.13-r129';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2505,8 +2514,14 @@ let _docTasks = [], _docTaskSort = { col:'status', asc:true };   // copyholder l
 let docTypeTree=[], docTypeFlat=[], docTypeIndex={}, docTypeByTitle={}, selectedTypeId=null, docWorkflowCache={}, expandedTreeNodes=new Set(), currentDocRevId=null;
 let cmrLoaded = false, ecarLoaded = false;
 let pavoiRfiLoaded = false;
-let pavoiRfiMap = {};            // report_id -> [rfi,...]
+let pavoiRfiMap = {};            // report_id -> [item,...]  (RFI + Task; xem isPavoiItem)
 let pavoiRfiDone = new Set();    // report_id đã fetch xong (để cell hiện data đã có dù còn chunk lỗi)
+// Trong workflow PAVOI, auditor có thể chọn "Request For Information" HOẶC "Add task".
+// Cả hai đều là dwreporting_report_task cần theo dõi. Item hợp lệ = có task_title (non-empty)
+// và chưa bị xóa. Row task_title=null là stage placeholder (vd "Approve to close PAVOI") → loại.
+const PAVOI_RFI_TITLE = 'Request For Information';
+const isPavoiItem = t => !!(t && t.task_title && String(t.task_title).trim() && t.task_status !== 'Deleted');
+const isPavoiRfi  = t => !!(t && t.task_title === PAVOI_RFI_TITLE);
 const PS = 25; // page size
 
 // Table states — mỗi table có state riêng
@@ -4694,15 +4709,17 @@ function pavSort(col){TS.pavoi.asc=TS.pavoi.sort===col?!TS.pavoi.asc:true;TS.pav
 
 function renderPavoi() {
   const srch=(g('pavoiSrch')?.value||'').toLowerCase();
+  const sect=g('pavoiSectF')?.value||'';               // '' = All Sections; else lọc theo trường Department (r.dept)
   const ts=TS.pavoi;
 
   let data=allData.filter(r=>{
     if(r.report_title!=='PAVOI') return false;
     if(ts.sf!=='all' && r.semantic_status!==ts.sf) return false;
+    if(sect && r.dept!==sect) return false;
     if(!ymHas('pavoiYearF', r.raised_year)) return false;
     if(srch){
       const t=[r.report_number,r.semantic_status,r.audit_title,
-               r.audit_number,r.rfv,r.report_ref,r.verif_result,r.dept].join(' ').toLowerCase();
+               r.audit_number,r.rfv,r.report_ref,r.verif_result,r.dept,r.owner_name].join(' ').toLowerCase();
       if(!t.includes(srch))return false;
     }
     return true;
@@ -4712,6 +4729,7 @@ function renderPavoi() {
   renderPaged('pavoiBody','pavoiInfo','pavoiPg','pavoiCnt',data,ts,r=>`
     <tr style="cursor:pointer" onclick="showPavoiDetail('${r.report_id}')">
       <td><b>${esc(r.report_number)||'—'}</b></td>
+      <td style="font-size:11px;color:var(--muted)">${esc(r.owner_name)||'—'}</td>
       <td>${sBadge(r.semantic_status)}</td>
       <td style="font-size:11px;color:var(--muted)">${fd(r.raised_date)}</td>
       <td>${fd(r.Target_date)}</td>
@@ -4752,14 +4770,14 @@ async function loadPavoiRfi(force=false){
     const url = G_URL + 'dwreporting_report_task' +
       '?$select=report_id,task_id,task_title,task_owner,task_status,task_delivery_status,' +
       'task_target_date,task_completed_date,task_instructions,task_response,task_related_section_name' +
-      '&$filter=' + encodeURIComponent('('+orClause+") and task_title eq 'Request For Information'");
-    setOv(true,'Loading PAVOI RFI...',`${Math.min(i+CHUNK,todo.length)}/${todo.length} reports`);
+      '&$filter=' + encodeURIComponent('('+orClause+')');   // lấy MỌI task (RFI + Task), lọc trong JS
+    setOv(true,'Loading PAVOI RFI/Task...',`${Math.min(i+CHUNK,todo.length)}/${todo.length} reports`);
     let ok = false;
     for(let attempt=1; attempt<=MAX_TRY && !ok; attempt++){
       try{
         const raw = await fetchAll(url, true);
         raw.forEach(t=>{
-          if(t.task_status === 'Deleted') return;          // loại RFI đã xóa
+          if(!isPavoiItem(t)) return;                        // loại Deleted + stage placeholder (title rỗng)
           (pavoiRfiMap[t.report_id] ||= []).push(t);
         });
         ids.forEach(id => pavoiRfiDone.add(id));            // đánh dấu các report trong chunk đã xong
@@ -4773,7 +4791,7 @@ async function loadPavoiRfi(force=false){
   }
   if(failed){
     pavoiRfiLoaded = false;   // còn chunk lỗi → mở lại trang sẽ thử lại đúng các report còn thiếu
-    toast(`PAVOI RFI: ${failed} nhóm tải lỗi — mở lại trang để thử lại`,'err');
+    toast(`PAVOI RFI/Task: ${failed} nhóm tải lỗi — mở lại trang để thử lại`,'err');
   }else{
     pavoiRfiLoaded = true;
   }
@@ -4787,9 +4805,9 @@ async function fetchPavoiRfiOne(report_id){
   const url = G_URL + 'dwreporting_report_task' +
     '?$select=report_id,task_id,task_title,task_owner,task_status,task_delivery_status,' +
     'task_target_date,task_completed_date,task_instructions,task_response,task_related_section_name' +
-    '&$filter=' + encodeURIComponent('report_id eq '+report_id+" and task_title eq 'Request For Information'");
+    '&$filter=' + encodeURIComponent('report_id eq '+report_id);   // GUID không bọc nháy; lấy mọi task
   const raw = await fetchAll(url, true);
-  pavoiRfiMap[report_id] = raw.filter(t => t.task_status !== 'Deleted');   // GUID không bọc nháy
+  pavoiRfiMap[report_id] = raw.filter(isPavoiItem);   // RFI + Task, bỏ Deleted + stage placeholder
   pavoiRfiDone.add(report_id);
 }
 
@@ -4820,7 +4838,7 @@ function pavoiRfiCell(report_id){
   if(sm.worst){
     const d = Math.abs(sm.worst.ageing);
     const more = sm.overdueCount > 1 ? ` <span style="color:var(--muted)">+${sm.overdueCount-1}</span>` : '';
-    return `<span class="badge b-over" title="${esc(sm.worst.owner)} · target ${fd(sm.worst.target)} · ${sm.overdueCount} RFI overdue">Overdue ${d}d</span>${more}`
+    return `<span class="badge b-over" title="${esc(sm.worst.owner)} · target ${fd(sm.worst.target)} · ${sm.overdueCount} item overdue">Overdue ${d}d</span>${more}`
          + `<div style="font-size:10px;color:var(--muted);margin-top:2px">${esc(sm.worst.owner)||'—'}</div>`;
   }
   // 2) Còn RFI open nhưng chưa quá hạn
@@ -4836,7 +4854,7 @@ async function showPavoiDetail(report_id){
   s('pavoiMSub', [r.report_ref?('Ref: '+r.report_ref):null, r.dept, fd(r.raised_date)].filter(Boolean).join(' · '));
   g('pavoiModal').style.display='flex';
   s('pvk-total','…'); s('pvk-open','…'); s('pvk-over','…'); s('pvk-done','…');
-  g('pavoiRfiBody').innerHTML='<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Loading RFI…</td></tr>';
+  g('pavoiRfiBody').innerHTML='<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">Loading RFI / Task…</td></tr>';
   // Luôn fetch tươi report này → modal + cell phản ánh đúng hiện trạng Galileo (tránh số liệu stale).
   try{ await fetchPavoiRfiOne(report_id); renderPavoi(); }   // renderPavoi: cập nhật cell ngoài bảng cho khớp
   catch(e){ console.warn('[PAVOI RFI one] '+report_id, e.message); }   // lỗi → dùng cache đã có nếu có
@@ -4859,7 +4877,7 @@ function renderPavoiModal(report_id){
   });
   const body = g('pavoiRfiBody');
   body.innerHTML = list.length===0
-    ? '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">No RFI</td></tr>'
+    ? '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">No RFI or Task</td></tr>'
     : list.map(t=>{
       const isOpen = t.task_status!=='Completed' && !t.task_completed_date;
       const ag = ageCalc(t.task_target_date);
@@ -4872,8 +4890,17 @@ function renderPavoiModal(report_id){
         statusBadge = late ? '<span class="badge b-late">Late</span>' : '<span class="badge b-on">Completed</span>';
         daysCell = '<span style="color:var(--muted)">—</span>';
       }
+      // Type: RFI (task_title cố định) vs Task (add task — title là nội dung việc). Task hiện title dưới owner.
+      const rfi = isPavoiRfi(t);
+      const typeBadge = rfi
+        ? '<span class="badge b-open" style="background:rgba(59,130,246,.15);color:var(--blue)">RFI</span>'
+        : '<span class="badge" style="background:rgba(148,163,184,.15);color:var(--muted)">Task</span>';
+      const subLine = rfi
+        ? (t.task_related_section_name ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">${esc(t.task_related_section_name)}</div>` : '')
+        : `<div style="font-size:10px;color:var(--muted);margin-top:2px" title="${esc(t.task_title)}">${esc(String(t.task_title).slice(0,60))}${String(t.task_title).length>60?'…':''}</div>`;
       return `<tr style="cursor:pointer" title="Xem Instructions + Response" onclick="showRfiDetail('${report_id}','${t.task_id}')">
-        <td style="font-size:12px;font-weight:500">${esc(t.task_owner)||'—'} <span style="color:var(--muted);font-size:10px">›</span></td>
+        <td>${typeBadge}</td>
+        <td style="font-size:12px;font-weight:500">${esc(t.task_owner)||'—'} <span style="color:var(--muted);font-size:10px">›</span>${subLine}</td>
         <td>${statusBadge}</td>
         <td style="font-size:11px;color:var(--muted)">${fd(t.task_target_date)}</td>
         <td style="font-size:11px;color:var(--muted)">${fd(t.task_completed_date)}</td>
@@ -4887,6 +4914,7 @@ function closePavoiModal(e){ if(e&&e.target!==g('pavoiModal'))return; g('pavoiMo
 function showRfiDetail(report_id, task_id){
   const t = (pavoiRfiMap[report_id]||[]).find(x=>x.task_id===task_id);
   if(!t) return;
+  s('rfiMKind', isPavoiRfi(t) ? 'RFI Detail · Request For Information' : 'Task Detail · '+String(t.task_title||'').slice(0,50));
   s('rfiMOwner', t.task_owner || '—');
   const done = t.task_status==='Completed' || t.task_completed_date;
   s('rfiMSub', [
@@ -7139,7 +7167,7 @@ async function ovrFetchPavoiOwners(reportIds){
   // "Chưa trả lời" = owner của RFI đang MỞ (chưa Completed & chưa có completed_date; bỏ Deleted).
   // Bỏ qua các RFI đã hoàn thành (kể cả của QC Inspector) để cột chỉ còn người đang nợ trả lời.
   const distinct=list=>[...new Set((list||[])
-    .filter(t=>t.task_status!=='Deleted'&&t.task_status!=='Completed'&&!t.task_completed_date)
+    .filter(t=>isPavoiItem(t)&&t.task_status!=='Completed'&&!t.task_completed_date)   // RFI + Task đang mở, bỏ placeholder/Deleted
     .map(t=>t.task_owner).filter(Boolean))];
   reportIds.forEach(id=>{ if(pavoiRfiMap[id]) map[id]=distinct(pavoiRfiMap[id]); else todo.push(id); });
   const CHUNK=15;
@@ -7147,7 +7175,7 @@ async function ovrFetchPavoiOwners(reportIds){
     const ids=todo.slice(i,i+CHUNK);
     const orClause=ids.map(id=>'report_id eq '+id).join(' or ');            // GUID không bọc nháy
     const url=G_URL+'dwreporting_report_task?$select=report_id,task_owner,task_status,task_completed_date,task_title&$filter='+
-      encodeURIComponent('('+orClause+") and task_title eq 'Request For Information'");
+      encodeURIComponent('('+orClause+')');   // mọi task (RFI + Task); distinct() lọc bằng isPavoiItem
     try{
       const raw=await fetchAll(url,true);
       const byId={}; raw.forEach(t=>{ (byId[t.report_id] ||= []).push(t); });
