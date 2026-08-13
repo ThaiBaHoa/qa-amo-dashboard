@@ -863,12 +863,12 @@ tr:last-child td{border-bottom:none}
               <button class="pill" onclick="setPAV('On-time Closed',this)">On-time</button>
               <button class="pill" onclick="setPAV('Lately Closed',this)">Lately</button>
               <div class="ymulti" id="pavoiYearF"></div>
-              <select class="sel" id="pavoiSectF" onchange="TS.pavoi.page=1;renderPavoi()" title="Lọc theo Section (trường Department)">
-                <option value="">All Sections</option>
-                <option value="Licensing and Authorization">MQA - Licensing and Authorization Section</option>
-                <option value="Quality Control">MQA - Quality Control Section</option>
-                <option value="AMO Safety">AMO - Safety Section</option>
-                <option value="Standard and Compliance">MQA - Standard and Compliance Section</option>
+              <select class="sel" id="pavoiSectF" onchange="TS.pavoi.page=1;renderPavoi()" title="Lọc theo Owner = nhóm Section (Galileo đang chuyển owner PAVOI về 4 nhóm này)">
+                <option value="">All owners</option>
+                <option value="MQA - Licensing and Authorization Section">MQA - Licensing and Authorization Section</option>
+                <option value="MQA - Quality Control Section">MQA - Quality Control Section</option>
+                <option value="AMO - Safety Section">AMO - Safety Section</option>
+                <option value="MQA - Standard and Compliance Section">MQA - Standard and Compliance Section</option>
               </select>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
                 <input class="srch" id="pavoiSrch" placeholder="Search..." oninput="dRenderPavoi()">
@@ -2289,7 +2289,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.13-r129';
+const APP_REV = '2026.08.13-r130';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2905,13 +2905,20 @@ async function loadData(forceRefresh=false) {
       throw e;
     }
 
-    // 2. USERS
+    // 2. USERS (+ USER GROUPS)
     setOv(true,'[3/6] Loading users...','',35);
     let userMap = {};
     try {
       const usersRaw = await fetchAll(G_URL + 'dwreporting_users?$select=user_id,full_name');
       usersRaw.forEach(u => { if (u.user_id) userMap[u.user_id] = u.full_name || null; });
     } catch(e) { console.warn('Users load error:',e); }
+    // Owner của report có thể là 1 USER (cá nhân) HOẶC 1 USER GROUP (nhóm) — Galileo đang chuyển owner
+    // PAVOI từ cá nhân sang 4 nhóm "… Section" (owner_id = group_id). Nạp groupMap để owner_name hiện
+    // đúng tên nhóm khi owner là group. Merge vào userMap (user_id/group_id đều UUID, không đụng nhau).
+    try {
+      const grpRaw = await fetchAll(G_URL + 'dwanalytics_user_group?$select=group_id,name');
+      grpRaw.forEach(gr => { if (gr.group_id && !userMap[gr.group_id]) userMap[gr.group_id] = gr.name || null; });
+    } catch(e) { console.warn('User groups load error:',e); }
 
     // 3. WORKFLOW
     setOv(true,`[4/6] Loading workflow (${summary.length} reports)...`,'',50);
@@ -4709,13 +4716,13 @@ function pavSort(col){TS.pavoi.asc=TS.pavoi.sort===col?!TS.pavoi.asc:true;TS.pav
 
 function renderPavoi() {
   const srch=(g('pavoiSrch')?.value||'').toLowerCase();
-  const sect=g('pavoiSectF')?.value||'';               // '' = All Sections; else lọc theo trường Department (r.dept)
+  const sect=g('pavoiSectF')?.value||'';               // '' = All; else lọc theo OWNER = nhóm Section (owner_name)
   const ts=TS.pavoi;
 
   let data=allData.filter(r=>{
     if(r.report_title!=='PAVOI') return false;
     if(ts.sf!=='all' && r.semantic_status!==ts.sf) return false;
-    if(sect && r.dept!==sect) return false;
+    if(sect && r.owner_name!==sect) return false;      // owner của PAVOI trùng đúng tên nhóm Section
     if(!ymHas('pavoiYearF', r.raised_year)) return false;
     if(srch){
       const t=[r.report_number,r.semantic_status,r.audit_title,
