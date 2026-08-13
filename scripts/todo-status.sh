@@ -4,7 +4,8 @@
 # đều là ĐIỀU KIỆN DATA đếm được → script query proxy, so với baseline, HÚ khi gate đổi.
 #   Gate 1: Backfill cờ QC cho CMR-CAR  → đếm CMR-CAR gán category "QC MQA Physical Finding".
 #   Gate 2: SCR có category_id (gate "Bộ lọc Category QC Spot Check") → đếm SCR có category_id.
-# Nguồn sự thật TODO: §8 QA_AMO_CONTEXT.md. Khi gate đổi → cập nhật §8 + baseline dưới đây.
+# Nguồn sự thật backlog: VIEC_TUONG_LAI.md (nhóm 4) trong vault; §8 QA_AMO_CONTEXT.md tóm tắt.
+# Khi gate đổi → cập nhật VIEC_TUONG_LAI.md + rollup §8 + baseline BASE_* dưới đây.
 #
 # KHÔNG đặt trong git hook (có network, chậm/offline sẽ chặn commit oan). Chạy tay hoặc
 # trong flow báo cáo tuần (skill bao-cao-tuan gọi nó). Đếm là raw (report_summary append-only,
