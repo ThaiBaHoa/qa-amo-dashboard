@@ -1,2 +1,6 @@
 # Shell scripts phải giữ LF — CRLF làm `sh` lỗi `\r` (hook + check-doc-sync).
 *.sh text eol=lf
+
+# Hook trong scripts/hooks/ không có đuôi .sh nên luật trên không phủ tới.
+# Checkout ra CRLF là `sh` chết với `bad interpreter` — im lặng mất cả hai guard.
+scripts/hooks/* text eol=lf
