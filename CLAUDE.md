@@ -287,4 +287,34 @@ Open `http://localhost:8000`. Login hits live Supabase. Galileo proxy is also re
 
 ---
 
+## Where design decisions live
+
+Design rationale for this project is recorded outside this repo, in the personal
+vault reachable through the `om` MCP server. Use `search` first; `expand` for a known
+note's neighbourhood. See `~/.claude/CLAUDE.md` for the full tool contract.
+
+**Consult the record before changing any of these:**
+
+- `APP_REV` / the `rNN` revision scheme and what counts as a major bump
+- `AF_SCHEMAS` and the declaration order of `*_TITLE` / `AF_*_COLS` consts
+- `loadData()` and `ORG_UNIT` — anything cross-page
+- The `fetchAll(url, skipOv)` overlay contract
+- The Supabase-auth / Galileo-data split, and `public.users` as profile-only
+- Session storage location (`sessionStorage`, never `localStorage`)
+- The `post-commit` / `pre-commit` hooks and the doc↔code sync guard
+- Deploy surface: `CNAME`, GitHub Pages, the Cloudflare Worker proxy
+
+If the record and this repo disagree, the record holds the *why*. Reconcile before
+changing behaviour.
+
+**Say what came back**, in whatever you write before implementing — a spec, a plan, a
+commit message. Name the recorded decisions the work rests on, anything you found that
+argues *against* the approach, and an explicit "nothing recorded on this" when the
+record is empty. An empty record is a finding, not a blank to skip.
+
+This pairs with the `probe-spec` skill: probe Galileo for data shape, consult the vault
+for *why the last decision went the way it did*. Neither substitutes for the other.
+
+---
+
 *Combines [Karpathy-Inspired Claude Code Guidelines](https://github.com/multica-ai/andrej-karpathy-skills) with QA AMO Dashboard project-specific rules. Update alongside each significant revision spec.*
