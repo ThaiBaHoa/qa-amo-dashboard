@@ -13,8 +13,10 @@
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
 cd "$ROOT" || exit 0
 
-# Đường dẫn vault (giữ khớp với .git/hooks/post-commit — WORKSPACE)
-WORKSPACE="F:/Onedrive - Bussiness/OneDrive - VietJet Aviation Joint Stock Company/Vault-CongViec/03-Du-An/build app cho cong ty/MQA dashboard website"
+# Đường dẫn vault — giải theo từng máy (OneDrive mount ở ổ khác nhau: F: trên
+# laptop, G: trên PC nhà). Trước đây dòng này hardcode F:, nên trên PC nhà phần
+# kiểm tra QA_AMO_CONTEXT.md im lặng bỏ qua. Nguồn sự thật: scripts/resolve-workspace.sh
+WORKSPACE="$(sh "$ROOT/scripts/resolve-workspace.sh" 2>/dev/null)"
 
 REV_FULL="$(grep -oE "APP_REV[^;]*" index.html | head -1 | grep -oE "r[0-9]+(-i[0-9]+)?")"
 REV_MAJOR="$(printf '%s' "$REV_FULL" | grep -oE 'r[0-9]+')"

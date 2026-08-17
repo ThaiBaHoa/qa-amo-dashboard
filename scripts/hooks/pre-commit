@@ -1,0 +1,21 @@
+#!/bin/sh
+# Guard doc<->code: chan commit khi tai lieu tut rev so voi APP_REV trong index.html.
+# Chi chay khi commit co dung toi index.html.
+#
+# Hook KHONG duoc version hoa. Cai lai sau moi lan clone:
+#   sh scripts/install-hooks.sh
+#
+# Bo qua mot lan:  git commit --no-verify
+
+if git diff --cached --name-only | grep -qx 'index.html'; then
+  ROOT="$(git rev-parse --show-toplevel)"
+  if [ -f "$ROOT/scripts/check-doc-sync.sh" ]; then
+    sh "$ROOT/scripts/check-doc-sync.sh" || {
+      echo "[pre-commit] Chan commit: tai lieu tut rev. Sua xong roi commit lai," >&2
+      echo "             hoac bo qua mot lan bang: git commit --no-verify" >&2
+      exit 1
+    }
+  fi
+fi
+
+exit 0

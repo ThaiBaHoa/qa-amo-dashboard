@@ -1,0 +1,30 @@
+#!/bin/sh
+# Sau moi commit:
+#   1. Sao luu index.html sang workspace tren OneDrive (repo van la nguon su that)
+#   2. Sinh lai NHAT_KY_CAP_NHAT_APP.md tu git log
+#
+# Workspace giai theo tung may qua scripts/resolve-workspace.sh (OneDrive mount
+# o F: tren laptop, G: tren PC nha). Khong tim thay -> bo qua im lang, vi mot
+# clone tren may khong co vault van phai commit duoc binh thuong.
+#
+# Hook KHONG duoc version hoa. Cai lai sau moi lan clone:
+#   sh scripts/install-hooks.sh
+
+ROOT="$(git rev-parse --show-toplevel)"
+WORKSPACE="$(sh "$ROOT/scripts/resolve-workspace.sh" 2>/dev/null)"
+
+if [ -z "$WORKSPACE" ]; then
+  echo "[post-commit] Khong thay workspace OneDrive tren may nay - bo qua backup."
+  exit 0
+fi
+
+if [ -f "$ROOT/index.html" ]; then
+  cp "$ROOT/index.html" "$WORKSPACE/index.html" && \
+    echo "[post-commit] Da backup index.html -> $WORKSPACE"
+fi
+
+if [ -f "$ROOT/scripts/gen-changelog.sh" ]; then
+  ( cd "$ROOT" && sh scripts/gen-changelog.sh "$WORKSPACE/NHAT_KY_CAP_NHAT_APP.md" )
+fi
+
+exit 0

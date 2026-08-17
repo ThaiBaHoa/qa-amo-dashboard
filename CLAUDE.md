@@ -61,19 +61,26 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
 - Libraries load from CDN (in `<head>`): Chart.js 4.4.1, supabase-js 2, jsPDF 2.5.1,
   html2canvas 1.4.1, xlsx 0.18.5, DOMPurify.
 - **This repo is the canonical source for `index.html`.** A `post-commit` hook
-  (`.git/hooks/post-commit`) auto-copies `index.html` to a backup at
-  `F:\Onedrive - Bussiness\OneDrive - VietJet Aviation Joint Stock Company\Vault-CongViec\03-Du-An\build app cho cong ty\MQA dashboard website\index.html` after every commit.
+  auto-copies `index.html` into the OneDrive workspace folder after every commit.
   Never edit that OneDrive copy — it is overwritten on the next commit. Delete the hook
   to disable syncing.
+  **The workspace path differs per machine** (OneDrive mounts at `F:` on the work
+  laptop, `G:` on the home PC), so it is resolved at runtime by
+  `scripts/resolve-workspace.sh` — the single source of truth, used by the hook and by
+  `check-doc-sync.sh` alike. Override with `QA_AMO_WORKSPACE`. No match → skipped
+  silently, so a clone on a machine without the vault still commits normally.
 - **Doc↔code drift guard.** The auto-sync above covers ONLY `index.html` — the `.md`
   spec docs are hand-maintained and once drifted to r107/r112 while code was r118. A
   `pre-commit` hook (`.git/hooks/pre-commit`) now runs `scripts/check-doc-sync.sh` when a
   commit touches `index.html`: it blocks if the code's major `rNN` isn't reflected in
   `CLAUDE.md` (Rev current) + `PROJECT_TECH_SPEC.md` (Version + §14). `TECHNICAL_REFERENCE.md`
   content (fields/flows) still needs a manual read — see `SO_DO_CAU_TRUC.html`.
-  **Hooks aren't versioned** — on a fresh clone reinstall both (`post-commit`, `pre-commit`)
-  from the snippets here; the check *script* IS versioned in `scripts/`. Bypass once with
+  **`.git/hooks/` isn't tracked by git**, so a fresh clone starts with no hooks and both
+  guards vanish silently. The hook bodies now live in `scripts/hooks/` (tracked); install
+  them with **`sh scripts/install-hooks.sh`** after every clone. Bypass once with
   `git commit --no-verify`.
+  > Known gap: `check-doc-sync.sh` also checks `QA_AMO_CONTEXT.md` in the workspace, but
+  > that file does not exist on any machine yet — that branch of the guard is dormant.
 
 ### Two backends — do not confuse them
 
