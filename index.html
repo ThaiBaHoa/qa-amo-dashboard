@@ -2318,7 +2318,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.18-r131-i4';
+const APP_REV = '2026.08.18-r131-i5';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -7547,6 +7547,14 @@ const RS_VOI = 'Verification of implementation (VOI)';
 // Form revision cũ / EIS không có radio này → không có cổng miễn trừ, vẫn tính bắt buộc.
 const RS_MEDA_GATE = 'MEDA Checklist';
 const RS_MEDA_FIELD = 'Contributing Factors Checklist MEDA';
+// "Other (explain here)" chỉ phải điền khi checklist TYPE OF EVENT chọn "Other".
+// GIỚI HẠN đã biết: mỗi report có NHIỀU ô cùng tên "Other (explain here)" (ô con của
+// TYPE OF EVENT, Consequence, Initial Source…) và không phân biệt nổi ô nào của ai —
+// giống hệt vấn đề 2 ô "Detailed Description" bên EIS. Nên chỉ gate được theo
+// TYPE OF EVENT (Eric chốt 18/08/2026); Consequence/Initial Source chọn Other mà
+// không giải thích thì dashboard KHÔNG bắt được. Luật nhập liệu vẫn yêu cầu giải thích.
+const RS_OTHER_GATE = 'TYPE OF EVENT';
+const RS_OTHER_FIELD = 'Other (explain here)';
 // Tiêu đề report nằm ở field khác nhau tuỳ form và tuỳ revision — rank nhỏ hơn thắng.
 // F-088 = SUBJECT · EIS 015+ = Investigation · EIS cũ = BRIEF DETAILS.
 // KHÔNG dùng 'Detailed Description' làm fallback: form EIS có ĐÚNG HAI row cùng tên đó (một ở
@@ -7594,11 +7602,12 @@ async function loadRptStatus(){
     const eavRaw=res[0], taskRaw=res[1], linkRaw=res[2], attRaw=res[3];
 
     // ── cột E: field đã điền / bỏ trống. Row VẪN tồn tại khi field trống (text_value rỗng) ──
-    const fld={}, subj={}, meda={};
+    const fld={}, subj={}, meda={}, toe={};
     eavRaw.forEach(f=>{
       if(!idSet.has(f.report_id)) return;
       const n=f.field_name, v=(f.text_value||'').trim();
       if(n===RS_MEDA_GATE && v) meda[f.report_id]=v;
+      if(n===RS_OTHER_GATE && v) (toe[f.report_id]||(toe[f.report_id]=[])).push(v);
       const rank = RS_SUBJ_RANK[n];
       if(v && rank!==undefined){
         const cur=subj[f.report_id];
@@ -7646,9 +7655,11 @@ async function loadRptStatus(){
         const isOpen = r.report_status!=='Closed';
         const m = fld[r.report_id]||{};
         const medaOff = meda[r.report_id]==='No';
+        const noOther = !(toe[r.report_id]||[]).some(v=>/other/i.test(v));
         const names = Object.keys(m).filter(n=>
-          !(isOpen && n===RS_VOI) &&            // report còn Open thì chưa cần VOI
-          !(medaOff && n===RS_MEDA_FIELD));     // tick No thì không dùng Contributing Factors
+          !(isOpen && n===RS_VOI) &&              // report còn Open thì chưa cần VOI
+          !(medaOff && n===RS_MEDA_FIELD) &&      // tick No thì không dùng Contributing Factors
+          !(noOther && n===RS_OTHER_FIELD));      // TYPE OF EVENT không chọn Other thì không cần giải thích
         const miss = names.filter(n=>!m[n]).sort();
         const w = wf[r.report_id]||{rfi:0,task:0,stage:null};
         const links=Array.from(perRep[r.report_id]||[]).map(k=>keyMap[k]).filter(n=>n && n!==r.report_number);
