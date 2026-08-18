@@ -52,6 +52,26 @@ giới này quyết định số tăng thế nào.
 - **Nguyên nhân gốc:** bump tay, bỏ qua skill + bỏ qua "stop and ask". Luật đã có sẵn —
   lỗi là ở khâu thực thi. → Từ nay chạy checklist trên trước mọi lần bump.
 
+## ⚠️ Anti-pattern có thật — vết r131→r132 (2026-08-18, ĐỪNG LẶP LẠI)
+
+- **Bối cảnh:** r131 = spec "thêm trang Report Status". Ngay sau đó user yêu cầu đổi
+  cách tính cột D **của chính trang đó**. Đã bump thành **r132** — SAI.
+- **Lập luận sai:** "đổi ngữ nghĩa một cột = đổi tính năng → theo luật phải tăng rNN".
+- **Đúng phải là `r131-i1`.** Đơn vị của một rev là **một spec**, không phải mỗi lần
+  hành vi thay đổi. Còn đang gọt chính cái spec vừa làm → `-iM`, bất kể lần gọt đó là
+  sửa lỗi hay tinh chỉnh yêu cầu mới.
+
+### Câu hỏi phân định (hỏi TRƯỚC khi chọn số)
+
+> **Đây là spec MỚI ĐỘC LẬP, hay vẫn đang làm tiếp spec của rev hiện tại?**
+
+- Vẫn là spec đó (thêm/sửa/bỏ chi tiết bên trong tính năng vừa giao) → **`rNN-iM`**.
+- Spec khác hẳn, đứng một mình được, mô tả trong 1 câu không cần nhắc tính năng cũ
+  → **`r(NN+1)`**.
+
+Đừng dùng "feature hay bugfix" làm câu hỏi đầu tiên — nó dẫn tới bump nhầm như trên.
+Hỏi "cùng spec hay khác spec" trước, rồi mới tới feature/bugfix.
+
 ## Quy trình
 
 1. **Tìm dòng khai báo** trong `index.html`:
