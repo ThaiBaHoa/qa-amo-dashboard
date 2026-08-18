@@ -342,7 +342,7 @@ Trợ lý chat nổi (FAB `#aiFab` góc phải-dưới, panel `#aiPanel`, badge 
 
 Thay bảng Excel *"Thống kê tình trạng report EIS & F-088 trên Coruson"* trước đây phòng MQA
 làm tay hàng tháng để trình chiếu. Luật chấm gốc: `F088 GUIDEDANCE.docx` (Eric, 18/08/2026);
-hướng dẫn nhập liệu đầy đủ (nguyên liệu SOP): `F088_HUONG_DAN_NHAP_LIEU.md` (workspace).
+hướng dẫn nhập liệu đầy đủ (nguyên liệu SOP): `01-Quy-Trinh/QT-002-Nhap-lieu-report-F-088-EIS-tren-Coruson.md` (vault).
 **Chi tiết luật + 10 bẫy dữ liệu đã xác minh nằm ở `TECHNICAL_REFERENCE.md` §8 — đọc trước khi sửa.**
 
 Base lấy từ `allData` (2 `report_title`); lazy-load 5 nguồn phụ khi mở trang, tất cả `skipOv=true`.
