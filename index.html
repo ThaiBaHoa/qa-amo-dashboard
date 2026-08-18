@@ -658,7 +658,10 @@ tr:last-child td{border-bottom:none}
                 <tbody id="rsBody"></tbody>
               </table>
             </div>
-            <div class="tbl-foot"><span id="rsInfo">&mdash;</span></div>
+            <div class="tbl-foot" style="flex-wrap:wrap;gap:6px">
+              <span id="rsInfo">&mdash;</span>
+              <span style="font-size:11px;color:var(--muted)">&#9888; Evidence in tab WORKFLOW is not exposed by Coruson reporting &mdash; check it manually (SOP QT-002 &sect;9).</span>
+            </div>
           </div>
         </div>
 
@@ -2318,7 +2321,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.18-r131-i5';
+const APP_REV = '2026.08.18-r131-i6';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -7697,7 +7700,7 @@ function rsGaps(r){
     out.push({k:'Fill Information', d:r.miss.length+' missing: '+names, full:r.miss.join(' · ')});
   }
   if(!rsOkF(r)) out.push({k:'Workflow', d:'no RFI/Task · stage '+(r.stage||'none'), full:''});
-  if(!rsOkH(r)) out.push({k:'Attachment', d:'no file uploaded', full:''});
+  if(!rsOkH(r)) out.push({k:'Final report', d:'no file in tab REPORT', full:''});
   return out;
 }
 
@@ -7733,13 +7736,13 @@ function rsExport(){
   const f=RS_FORMS[rsTab], rows=rsVisible();
   const head=['Report No.','Report Title','Incharge person','Tình trạng hoàn thiện report trên Coruson',
     'Report Section/Fill Information','Workflow Section/Add task','Evaluation/Link initial Report',
-    'Attachment/Final report, Evidence','Status of report on Coruson'].concat(f.pavoi?['PAVOI']:[]);
+    'Final report (tab REPORT)','Status of report on Coruson'].concat(f.pavoi?['PAVOI']:[]);
   const body=rows.map(r=>[r.num, r.subject, r.owner,
     rsDone(r)?'Completed':'Not Completed — '+rsGaps(r).map(x=>x.k+': '+(x.full||x.d)).join(' | '),
     rsOkE(r)?'Satis':'Unsatis — missing: '+r.miss.join('; '),
     rsOkF(r)?'Satis':'Unsatis',
     r.links.join(', ')||'—',
-    r.files.length?'Uploaded ('+r.files.length+')':'Not uploaded',
+    r.files.length?'Uploaded ('+r.files.length+')':'Miss final report',
     r.status].concat(f.pavoi?[r.links.filter(x=>/^PAVOI/i.test(x)).join(', ')||'—']:[]));
   const ws=XLSX.utils.aoa_to_sheet([head].concat(body));
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,f.label);
@@ -7756,7 +7759,7 @@ function renderRptStatus(){
   }
   const cols=['Report No.','Report Title','Incharge Person','Completion on Coruson',
     'Report Section / Fill Information','Workflow / Add Task','Evaluation / Linked Report',
-    'Attachment / Final Report, Evidence','Status on Coruson'].concat(f.pavoi?['PAVOI']:[]);
+    'Final Report (tab REPORT)','Status on Coruson'].concat(f.pavoi?['PAVOI']:[]);
   head.innerHTML='<tr>'+cols.map(c=>'<th>'+c+'</th>').join('')+'</tr>';
   if(!rsRows){ body.innerHTML='<tr><td colspan="'+cols.length+'" style="text-align:center;padding:24px;color:var(--muted)">No data</td></tr>'; return; }
 
@@ -7775,9 +7778,13 @@ function renderRptStatus(){
     const gCell = r.links.length
       ? r.links.map(x=>'<span style="font-size:11px;color:var(--blue)">'+esc(x)+'</span>').join('<br>')
       : '<span style="color:var(--muted)">—</span>';
+    // Coruson KHÔNG xuất ra tệp đính trong task của report (đo: 0/68.831 attachment
+    // context_type='Report' có task/stage/workflow_instance_id, trong khi Audit có 3.423)
+    // → chỉ khẳng định được chuyện final report ở tab REPORT. Evidence ở tab WORKFLOW
+    // phải kiểm tay; ĐỪNG hiển thị 'đủ evidence' vì không có dữ liệu để nói thế.
     const hCell = r.files.length
       ? okB('Uploaded')+mut(r.files.length+' file'+(r.files.length>1?'s':''), r.files.slice(0,12).join(' · '))
-      : badB('Not uploaded');
+      : badB('Miss final report');
     const pav = r.links.filter(x=>/^PAVOI/i.test(x));
     return '<tr>'+
       '<td><b style="color:var(--blue)">'+esc(r.num)+'</b></td>'+
@@ -7806,7 +7813,7 @@ function renderRptStatus(){
               ' · Fill Information '+all.filter(rsOkE).length+'/'+all.length+
               ' · Workflow '+all.filter(rsOkF).length+'/'+all.length+
               ' · Linked '+all.filter(r=>r.links.length).length+'/'+all.length+
-              ' · Attachment '+all.filter(r=>r.files.length).length+'/'+all.length+
+              ' · Final report '+all.filter(rsOkH).length+'/'+all.length+
               ' · Open '+all.filter(r=>r.open).length);
 }
 
