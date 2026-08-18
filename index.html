@@ -2317,7 +2317,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.18-r131';
+const APP_REV = '2026.08.18-r131-i1';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -7658,6 +7658,23 @@ async function loadRptStatus(){
 // E đạt khi không thiếu field nào; F đạt khi có RFI/Task HOẶC stage đã Completed
 function rsOkE(r){ return r.nreq>0 && r.miss.length===0; }
 function rsOkF(r){ return (r.rfi+r.task)>0 || r.stage==='Completed'; }
+function rsOkH(r){ return r.files.length>0; }
+// Cột D KHÔNG còn là report_status. Report chỉ Completed khi CẢ E, F, H đều đạt
+// (cột G — linked report — không tính, vì nhiều report không cần link).
+// Do đó D và I có thể lệch nhau: report đã Closed trên Coruson nhưng hồ sơ còn
+// thiếu thì D = Not Completed. Đó chính là chỗ cần bổ sung, đánh giá lại.
+function rsDone(r){ return rsOkE(r) && rsOkF(r) && rsOkH(r); }
+const RS_GAP_CAP = 6;   // số tên field in thẳng ra ô, phần dư gộp thành "+N more"
+function rsGaps(r){
+  const out=[];
+  if(!rsOkE(r)){
+    const names=r.miss.slice(0,RS_GAP_CAP).join(', ')+(r.miss.length>RS_GAP_CAP?', +'+(r.miss.length-RS_GAP_CAP)+' more':'');
+    out.push({k:'Fill Information', d:r.miss.length+' missing: '+names, full:r.miss.join(' · ')});
+  }
+  if(!rsOkF(r)) out.push({k:'Workflow', d:'no RFI/Task · stage '+(r.stage||'none'), full:''});
+  if(!rsOkH(r)) out.push({k:'Attachment', d:'no file uploaded', full:''});
+  return out;
+}
 
 function setRsTab(tab,btn){
   rsTab=tab;
@@ -7688,7 +7705,8 @@ function rsExport(){
   const head=['Report No.','Report Title','Incharge person','Tình trạng hoàn thiện report trên Coruson',
     'Report Section/Fill Information','Workflow Section/Add task','Evaluation/Link initial Report',
     'Attachment/Final report, Evidence','Status of report on Coruson'].concat(f.pavoi?['PAVOI']:[]);
-  const body=rows.map(r=>[r.num, r.subject, r.owner, r.open?'Not Completed':'Completed',
+  const body=rows.map(r=>[r.num, r.subject, r.owner,
+    rsDone(r)?'Completed':'Not Completed — '+rsGaps(r).map(x=>x.k+': '+(x.full||x.d)).join(' | '),
     rsOkE(r)?'Satis':'Unsatis — missing: '+r.miss.join('; '),
     rsOkF(r)?'Satis':'Unsatis',
     r.links.join(', ')||'—',
@@ -7731,7 +7749,13 @@ function renderRptStatus(){
       '<td><b style="color:var(--blue)">'+esc(r.num)+'</b></td>'+
       '<td style="max-width:340px;font-size:11px;color:var(--muted)" title="'+esc(r.subject)+'">'+esc(r.subject.slice(0,150))+(r.subject.length>150?'…':'')+'</td>'+
       '<td style="font-size:11px;color:var(--muted);white-space:nowrap">'+esc(r.owner)+'</td>'+
-      '<td>'+(r.open?badB('Not Completed'):okB('Completed'))+'</td>'+
+      '<td style="max-width:300px">'+(rsDone(r)
+          ? okB('Completed')
+          : badB('Not Completed')+rsGaps(r).map(x=>
+              '<div style="font-size:10px;color:var(--muted);margin-top:3px;line-height:1.35"'+
+              (x.full?' title="'+esc(x.full)+'"':'')+
+              '><b style="color:var(--text-2)">'+x.k+'</b> — '+esc(x.d)+'</div>').join('')
+        )+'</td>'+
       '<td style="white-space:nowrap">'+eCell+'</td>'+
       '<td style="white-space:nowrap">'+fCell+'</td>'+
       '<td>'+gCell+'</td>'+
@@ -7743,7 +7767,8 @@ function renderRptStatus(){
 
   const all=rsRows[rsTab]||[];
   s('rsCnt', rows.length+' of '+all.length+' · '+f.label);
-  s('rsInfo', 'Satis — Fill Information '+all.filter(rsOkE).length+'/'+all.length+
+  s('rsInfo', 'Completed (E+F+H) '+all.filter(rsDone).length+'/'+all.length+
+              ' · Fill Information '+all.filter(rsOkE).length+'/'+all.length+
               ' · Workflow '+all.filter(rsOkF).length+'/'+all.length+
               ' · Linked '+all.filter(r=>r.links.length).length+'/'+all.length+
               ' · Attachment '+all.filter(r=>r.files.length).length+'/'+all.length+
