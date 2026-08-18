@@ -645,6 +645,7 @@ tr:last-child td{border-bottom:none}
               <button class="pill rs-sf on" onclick="setRsSF('all',this)">All</button>
               <button class="pill rs-sf" onclick="setRsSF('Open',this)">Open</button>
               <button class="pill rs-sf" onclick="setRsSF('Closed',this)">Closed</button>
+              <div class="ymulti" id="rsYearF"></div>
               <div class="srch-wrap"><span class="srch-icon">&#128269;</span>
                 <input class="srch" id="rsSrch" placeholder="Search..." oninput="dRenderRptStatus()">
               </div>
@@ -2317,7 +2318,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.18-r131-i2';
+const APP_REV = '2026.08.18-r131-i3';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -7642,7 +7643,7 @@ async function loadRptStatus(){
         const w = wf[r.report_id]||{rfi:0,task:0,stage:null};
         const links=Array.from(perRep[r.report_id]||[]).map(k=>keyMap[k]).filter(n=>n && n!==r.report_number);
         return {
-          num:r.report_number||'—', owner:r.owner_name||'—',
+          num:r.report_number||'—', owner:r.owner_name||'—', year:r.raised_year||null,
           subject:(subj[r.report_id]||{}).v||'—', status:r.report_status||'—', open:isOpen,
           nreq:names.length, miss:miss, rfi:w.rfi, task:w.task, stage:w.stage,
           links:Array.from(new Set(links)).sort(), files:att[r.report_id]||[],
@@ -7691,9 +7692,13 @@ function setRsSF(sf,btn){
   if(btn)btn.classList.add('on');
   renderRptStatus();
 }
+// rsScope = tab hiện tại đã lọc theo NĂM. Dòng tổng kết dưới bảng đếm trên tập này,
+// KHÔNG tính filter Open/Closed và ô search — hai cái đó là thao tác soi tạm thời,
+// còn con số tổng kết phải theo đúng kỳ (năm) đang trình bày.
+function rsScope(){ return ((rsRows||{})[rsTab]||[]).filter(r=>ymHas('rsYearF', r.year)); }
 function rsVisible(){
   const q=((g('rsSrch')||{}).value||'').trim().toLowerCase();
-  return ((rsRows||{})[rsTab]||[]).filter(r=>{
+  return rsScope().filter(r=>{
     if(rsSF==='Open' && !r.open) return false;
     if(rsSF==='Closed' && r.open) return false;
     if(q && [r.num,r.subject,r.owner,r.links.join(' ')].join(' ').toLowerCase().indexOf(q)<0) return false;
@@ -7717,12 +7722,17 @@ function rsExport(){
     r.status].concat(f.pavoi?[r.links.filter(x=>/^PAVOI/i.test(x)).join(', ')||'—']:[]));
   const ws=XLSX.utils.aoa_to_sheet([head].concat(body));
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,f.label);
-  XLSX.writeFile(wb,'Coruson report status - '+f.label+' - '+new Date().toISOString().slice(0,10)+'.xlsx');
+  XLSX.writeFile(wb,'Coruson report status - '+f.label+' - '+ymText('rsYearF').replace(/[^\w,-]+/g,'_')+' - '+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
 function renderRptStatus(){
   const head=g('rsHead'), body=g('rsBody'); if(!head||!body) return;
   const f=RS_FORMS[rsTab];
+  // Danh sách năm lấy hợp của CẢ HAI tab → đổi tab không làm mất lựa chọn đang có.
+  if(rsRows){
+    const years=[...new Set([].concat.apply([],Object.values(rsRows)).map(r=>r.year).filter(Boolean))].sort((a,b)=>b-a);
+    initYearMulti('rsYearF', years, {onChange:renderRptStatus});
+  }
   const cols=['Report No.','Report Title','Incharge Person','Completion on Coruson',
     'Report Section / Fill Information','Workflow / Add Task','Evaluation / Linked Report',
     'Attachment / Final Report, Evidence','Status on Coruson'].concat(f.pavoi?['PAVOI']:[]);
@@ -7769,8 +7779,8 @@ function renderRptStatus(){
     '</tr>';
   }).join('') || '<tr><td colspan="'+cols.length+'" style="text-align:center;padding:24px;color:var(--muted)">No data</td></tr>';
 
-  const all=rsRows[rsTab]||[];
-  s('rsCnt', rows.length+' of '+all.length+' · '+f.label);
+  const all=rsScope();
+  s('rsCnt', rows.length+' of '+all.length+' · '+f.label+' · '+ymText('rsYearF'));
   s('rsInfo', 'Completed (E+F+H) '+all.filter(rsDone).length+'/'+all.length+
               ' · Fill Information '+all.filter(rsOkE).length+'/'+all.length+
               ' · Workflow '+all.filter(rsOkF).length+'/'+all.length+
