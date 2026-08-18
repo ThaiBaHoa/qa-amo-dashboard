@@ -2317,7 +2317,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.18-r131-i1';
+const APP_REV = '2026.08.18-r131-i2';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -7665,6 +7665,9 @@ function rsOkH(r){ return r.files.length>0; }
 // thiếu thì D = Not Completed. Đó chính là chỗ cần bổ sung, đánh giá lại.
 function rsDone(r){ return rsOkE(r) && rsOkF(r) && rsOkH(r); }
 const RS_GAP_CAP = 6;   // số tên field in thẳng ra ô, phần dư gộp thành "+N more"
+// CSS global `td{white-space:nowrap}` khiến max-width trên <td> vô hiệu và chữ dài tràn
+// đè sang cột bên (vết r131-i2). Ô nào cho phép nhiều dòng thì phải mở lại white-space.
+const RS_WRAP = 'white-space:normal;word-break:break-word;line-height:1.4;';
 function rsGaps(r){
   const out=[];
   if(!rsOkE(r)){
@@ -7747,9 +7750,10 @@ function renderRptStatus(){
     const pav = r.links.filter(x=>/^PAVOI/i.test(x));
     return '<tr>'+
       '<td><b style="color:var(--blue)">'+esc(r.num)+'</b></td>'+
-      '<td style="max-width:340px;font-size:11px;color:var(--muted)" title="'+esc(r.subject)+'">'+esc(r.subject.slice(0,150))+(r.subject.length>150?'…':'')+'</td>'+
+      '<td style="'+RS_WRAP+'max-width:380px;min-width:260px;font-size:11px;color:var(--muted)" title="'+esc(r.subject)+'">'+
+        '<div style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">'+esc(r.subject)+'</div></td>'+
       '<td style="font-size:11px;color:var(--muted);white-space:nowrap">'+esc(r.owner)+'</td>'+
-      '<td style="max-width:300px">'+(rsDone(r)
+      '<td style="'+RS_WRAP+'max-width:320px;min-width:200px">'+(rsDone(r)
           ? okB('Completed')
           : badB('Not Completed')+rsGaps(r).map(x=>
               '<div style="font-size:10px;color:var(--muted);margin-top:3px;line-height:1.35"'+
