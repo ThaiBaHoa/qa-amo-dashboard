@@ -214,8 +214,8 @@ Chỉ áp cho MCAR. Tính hạn kỳ vọng theo quy trình rồi cảnh báo kh
 ## 7. Trang & điều hướng
 
 ### 7.1 `showPage(name, btn)` (L6405) + `PT` map (L6404)
-20 trang. Trang admin-only: `reports, admin, querybuilder, mydashboard` (+ kpi2 thực tế admin). Trigger load:
-`overview`→resize charts · `openrfi`→renderOpen · `overdue`→renderOv · `kpi`→filterKpiYear · `kpi2`→loadKpi2/renderKpi2 · `allforms`→renderAF · `pavoi`→`loadPavoiRfi()` nếu chưa, else renderPavoi · `cmrcar`→loadCmr/renderCmr · `ecar`→loadEcar/renderEcar · `amoecar`→renderAmoEcar · `mcar`→renderMcar · `auditplan`→renderAudit · `docs`→tree+renderDocPage · `reports`→generateReport · `admin`→loadUsers · `querybuilder`→qbInit · `mydashboard`→dbInit.
+21 trang. Trang admin-only: `reports, admin, querybuilder, mydashboard` (+ kpi2 thực tế admin). Trigger load:
+`overview`→resize charts · `openrfi`→renderOpen · `overdue`→renderOv · `kpi`→filterKpiYear · `kpi2`→loadKpi2/renderKpi2 · `allforms`→renderAF · `pavoi`→`loadPavoiRfi()` nếu chưa, else renderPavoi · `cmrcar`→loadCmr/renderCmr · `ecar`→loadEcar/renderEcar · `amoecar`→renderAmoEcar · `mcar`→renderMcar · `auditplan`→renderAudit · `docs`→tree+renderDocPage · `reports`→generateReport · `admin`→loadUsers · `querybuilder`→qbInit · `mydashboard`→dbInit · `rptstatus`→`loadRptStatus()` nếu chưa, else `renderRptStatus`.
 
 ### 7.2 Bảng dữ liệu (cột chính)
 - **Open Reports** `renderOpen` (chỉ Open+Overdue): No, Form, Status, Owner, Raised, Target, Days, CAT, Finding Level, **Repetitive**, Audit Title.
@@ -230,6 +230,7 @@ Chỉ áp cho MCAR. Tính hạn kỳ vọng theo quy trình rồi cảnh báo kh
 - **AMO-ECAR / MCAR** `renderAmoEcar/renderMcar` (dùng `renderFormView`): No, Status, Raised, Target, Days, CAT, Finding Level, Audit Title. **MCAR riêng:** (r101) cột **⚠ Deadline** + dropdown lọc `mcarWarnF` (All/Mismatch/OK), gate `ids.warn`/`ids.warnFilter`, tính hạn kỳ vọng theo rule (xem §6.5b) cảnh báo khi `Target_date` lệch; (r103) thêm cột **Raised by** (`owner_name`, gate `ids.raisedBy`) + **bỏ Finding Description** (gate `ids.hideFindingDesc`). MCAR = 9 cột, AMO-ECAR giữ 8 cột.
 - **Audit Plan** `renderAudit`: No, Title, Type, Status, Scheduled, Lead Auditor, Location, Findings, Open, Overdue, Pipeline, Workflow (+ bottleneck panel).
 - **Documents** `renderDocPage`: cây doc_type (15 root) + bảng Doc No, Title, Type, Rev, Status, Owner, Review date, Distributed, Actions.
+- **Report Status** `renderRptStatus` (r131, xem §8.10): 2 tab F-088 / EIS. Cột Report No, Report Title, Incharge Person, **Completion on Coruson** (suy ra từ E+F+H, thiếu thì liệt kê chi tiết ngay trong ô), Report Section/Fill Information, Workflow/Add Task, Evaluation/Linked Report, Attachment, Status on Coruson (+ **PAVOI** chỉ ở tab EIS). Toolbar: tab form · filter Open/Closed · **multi-year `rsYearF`** · search · xuất Excel · Refresh.
 
 ### 7.3 Filtering & sort
 - Pills status (`TS[page].sf`), form select (`ff`), **year (multi-year widget — xem §7.5)**, search (debounce 300ms). Mỗi trang có search fields riêng.
@@ -337,6 +338,46 @@ Trợ lý chat nổi (FAB `#aiFab` góc phải-dưới, panel `#aiPanel`, badge 
 
 ## 9. Design system (CSS)
 
+### 8.10 Report Status on Coruson — EIS & F-088 (r131, `loadRptStatus`/`renderRptStatus`)
+
+Thay bảng Excel *"Thống kê tình trạng report EIS & F-088 trên Coruson"* trước đây phòng MQA
+làm tay hàng tháng để trình chiếu. Luật chấm gốc: `F088 GUIDEDANCE.docx` (Eric, 18/08/2026);
+hướng dẫn nhập liệu đầy đủ (nguyên liệu SOP): `F088_HUONG_DAN_NHAP_LIEU.md` (workspace).
+**Chi tiết luật + 10 bẫy dữ liệu đã xác minh nằm ở `TECHNICAL_REFERENCE.md` §8 — đọc trước khi sửa.**
+
+Base lấy từ `allData` (2 `report_title`); lazy-load 5 nguồn phụ khi mở trang, tất cả `skipOv=true`.
+
+| Cột | Nguồn | Đạt khi |
+|---|---|---|
+| **D** Completion on Coruson | suy ra | **E ∧ F ∧ H** (G không tính). Thiếu → liệt kê từng chỗ ngay trong ô |
+| **E** Fill Information | `dwanalytics_report_form_section_field` | mọi field có giá trị, trừ 3 cổng miễn trừ dưới |
+| **F** Workflow / Add Task | `dwreporting_report_task` | stage quản lý có RFI/Task **HOẶC** `stage_status='Completed'` |
+| **G** Evaluation / Linked Report | `dwanalytics_report_fact_other_reports` → `dwanalytics_report` | có link thật (hiện mã, không phải badge đạt/không đạt) |
+| **H** Attachment | `dwanalytics_attachment` | `context_type eq 'Report'`, ≥1 file |
+| **I** Status on Coruson | `report_status` | nguyên trạng — **D và I cố ý lệch nhau** |
+| **J** PAVOI (chỉ tab EIS) | lọc cột G theo tiền tố `PAVOI` | — |
+
+**Ba cổng miễn trừ của cột E** (bỏ trống hợp lệ): `Verification of implementation (VOI)` khi report
+`Open` · `Contributing Factors Checklist MEDA` khi radio `MEDA Checklist='No'` · `Other (explain here)`
+khi `TYPE OF EVENT` không chọn `Other`. **KHÔNG nới `AIRCRAFT TYPE & SERIES`** — checklist có sẵn
+lựa chọn `N/A`, bỏ trống là nhập thiếu thật (Eric xác nhận 18/08/2026).
+
+**Hằng/hàm chính:** `RS_FORMS` (title + stage quản lý mỗi form) · `RS_NON_FIELDS` (4 row cấu trúc
+không bao giờ điền được) · `RS_SUBJ_RANK` (tiêu đề: `SUBJECT` → `Investigation` → `BRIEF DETAILS`) ·
+`RS_MEDA_GATE/FIELD` + `RS_OTHER_GATE/FIELD` (cổng điều kiện) · `RS_WRAP` (mở lại `white-space` vì CSS
+global `td{nowrap}` làm `max-width` vô hiệu) · `rsIn()` (build `$filter … in (…)`) · `rsScope()`
+(tab + năm — dòng tổng kết đếm trên tập này) vs `rsVisible()` (thêm Open/Closed + search) ·
+`rsOkE/rsOkF/rsOkH/rsDone/rsGaps` · `rsExport()`.
+
+**Hiệu năng:** dùng toán tử OData **`in (…)`** thay chuỗi `or` → cả trang chỉ ~8 request thay vì ~40
+(xem §12 I13).
+
+**Số liệu 18/08/2026:** F-088 68 report (E 23 · F 67 · G 46 · H 65 · **Completed 22**), EIS 16 report
+(E 9 · F 14 · G 16 · H 11 · **Completed 8**). Cột E khắt khe hơn bản chấm tay (Excel ghi Satis 67/68) —
+**có chủ ý**, không phải bug.
+
+---
+
 ### 9.1 Tokens (`:root` + theme)
 - Spacing: `--gap:14px --pad:18px --r:14px --sb-w:248px`. Accent: `--accent:#e8453c` (VietJet red).
 - **Dark** (`html[data-theme="dark"]`): `--bg:#0d1014 --surface:#15191f --surface-2:#1b2027 --border:#252b34 --text:#e9edf3 --text-2:#a4afbd`.
@@ -405,6 +446,7 @@ Trợ lý chat nổi (FAB `#aiFab` góc phải-dưới, panel `#aiPanel`, badge 
 | I8 | Galileo có **replica lag** (read trả bản cũ vài phút) → số liệu RFI/finding có thể stale; fetch tươi on-demand cho chi tiết. |
 | I9 | `dwreporting_report_task.id` KHÔNG unique — dedup bằng `task_id` nếu cần. |
 | I10 | Stage `Task` thường trùng lặp trong workflow → lấy giá trị muộn nhất (deriveStageDates). |
+| I13 | **`in (…)` vượt được `MaxNodeCount=100`, chuỗi `or` thì KHÔNG** (r131). Đo trên chính proxy này: `or` hỏng từ **25 giá trị** (đúng lỗi "node count limit of '100'"), còn `report_key in (…448 số)` và `context_id in (…84 UUID)` lọt gọn trong **1 request**. UUID trong `in()` viết **trần** (không nháy), chuỗi vẫn phải có nháy đơn. Nhờ đó `loadRptStatus` chỉ tốn ~8 request thay vì ~40. **KHÔNG** cứu được hạn chế `report_id` trên view EAV (I2) — đó là chuyện khác, vẫn phải post-filter bằng `Set`. |
 | I12 | **Ghép field của repeater (nhiều finding/CA trong 1 report) PHẢI theo `section_id`, KHÔNG theo `created_date`/thời gian.** Galileo ghi các field xen kẽ giữa các instance → ghép theo thứ tự thời gian sẽ trộn nhầm (vd sai Department/finding). Group `report_id → section_id → {field_name: value}` (header section_id có thể dùng chung giữa các report cùng form → group `report_id` TRƯỚC). Áp dụng cho EIS CA (§8.7), QCS findings (§8.8), CMR/ECAR (`applySecIdOverlay`). |
 
 ---
