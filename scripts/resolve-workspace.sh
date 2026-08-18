@@ -1,6 +1,6 @@
 #!/bin/sh
 # Nguon su that DUY NHAT cho duong dan "workspace" (thu muc vault chua ban sao
-# index.html + QA_AMO_CONTEXT.md). In ra duong dan, hoac in rong neu khong tim thay.
+# index.html + QA_AMO_Dashboard.md). In ra duong dan, hoac in rong neu khong tim thay.
 #
 # Vi sao can: OneDrive mount o o dia KHAC NHAU tren tung may.
 #   - laptop cong ty : F:/Onedrive - Bussiness/OneDrive - VietJet .../

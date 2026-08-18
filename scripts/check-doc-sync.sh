@@ -3,7 +3,7 @@
 # So MAJOR rev (rNN, bỏ -iM) trong index.html với các tài liệu mang version.
 #   - CLAUDE.md            → phải chứa rNN (dòng "Rev current")
 #   - PROJECT_TECH_SPEC.md → phải chứa rNN (header "Version hiện tại" + §14 lịch sử)
-#   - QA_AMO_CONTEXT.md    → file home VAULT-NATIVE (ngoài repo). Check RIÊNG dòng header
+#   - QA_AMO_Dashboard.md    → file home VAULT-NATIVE (ngoài repo). Check RIÊNG dòng header
 #       "Rev hiện tại:" (không grep cả file — §8 chứa rev cũ sẽ lọt). Vết r129/r130:
 #       header kẹt r128 vì file này không nằm trong repo nên hook cũ không bắt.
 #   - TECHNICAL_REFERENCE.md → KHÔNG grep được nội dung (field/flow) → chỉ nhắc rà tay.
@@ -15,7 +15,7 @@ cd "$ROOT" || exit 0
 
 # Đường dẫn vault — giải theo từng máy (OneDrive mount ở ổ khác nhau: F: trên
 # laptop, G: trên PC nhà). Trước đây dòng này hardcode F:, nên trên PC nhà phần
-# kiểm tra QA_AMO_CONTEXT.md im lặng bỏ qua. Nguồn sự thật: scripts/resolve-workspace.sh
+# kiểm tra QA_AMO_Dashboard.md im lặng bỏ qua. Nguồn sự thật: scripts/resolve-workspace.sh
 WORKSPACE="$(sh "$ROOT/scripts/resolve-workspace.sh" 2>/dev/null)"
 
 REV_FULL="$(grep -oE "APP_REV[^;]*" index.html | head -1 | grep -oE "r[0-9]+(-i[0-9]+)?")"
@@ -35,14 +35,20 @@ for DOC in CLAUDE.md PROJECT_TECH_SPEC.md; do
   fi
 done
 
-# 2) QA_AMO_CONTEXT.md (vault): check ĐÚNG dòng header, không phải cả file.
+# 2) QA_AMO_Dashboard.md (vault): check ĐÚNG dòng header, không phải cả file.
 #    Vắng file (clone máy không có vault) → bỏ qua, không chặn.
-CTX="$WORKSPACE/QA_AMO_CONTEXT.md"
+CTX="$WORKSPACE/QA_AMO_Dashboard.md"
+CTX_CHECKED=""
 if [ -f "$CTX" ]; then
+  CTX_CHECKED=1
   CTX_REV="$(grep -m1 'Rev hi' "$CTX" | grep -oE 'r[0-9]+' | head -1)"
   if [ "$CTX_REV" != "$REV_MAJOR" ]; then
-    STALE="$STALE QA_AMO_CONTEXT.md(header=${CTX_REV:-none})"
+    STALE="$STALE QA_AMO_Dashboard.md(header=${CTX_REV:-none})"
   fi
+elif [ -z "$WORKSPACE" ]; then
+  echo "[doc-sync] BỎ QUA QA_AMO_Dashboard.md — không giải được workspace trên máy này." >&2
+else
+  echo "[doc-sync] BỎ QUA QA_AMO_Dashboard.md — không thấy trong $WORKSPACE" >&2
 fi
 
 if [ -n "$STALE" ]; then
@@ -51,12 +57,16 @@ if [ -n "$STALE" ]; then
   for D in $STALE; do echo "      · $D" >&2; done
   echo "" >&2
   echo "  → Cập nhật: CLAUDE.md 'Rev current' + PROJECT_TECH_SPEC 'Version hiện tại' & §14," >&2
-  echo "    QA_AMO_CONTEXT.md header 'Rev hiện tại:' + 'Cập nhật context:' + 1 dòng §8 'Gần đây'," >&2
+  echo "    QA_AMO_Dashboard.md header 'Rev hiện tại:' + 'Cập nhật context:' + 1 dòng §8 'Gần đây'," >&2
   echo "    và RÀ TECHNICAL_REFERENCE.md nếu luồng/field dữ liệu đổi (grep không bắt được)." >&2
   echo "" >&2
   exit 1
 fi
 
-echo "[doc-sync] OK — CLAUDE.md, PROJECT_TECH_SPEC.md & QA_AMO_CONTEXT.md (header) đã nhắc $REV_MAJOR." >&2
+if [ -n "$CTX_CHECKED" ]; then
+  echo "[doc-sync] OK — CLAUDE.md, PROJECT_TECH_SPEC.md & QA_AMO_Dashboard.md (header) đã nhắc $REV_MAJOR." >&2
+else
+  echo "[doc-sync] OK — CLAUDE.md & PROJECT_TECH_SPEC.md đã nhắc $REV_MAJOR (QA_AMO_Dashboard.md: bỏ qua, xem trên)." >&2
+fi
 echo "[doc-sync] Nhắc: rà TECHNICAL_REFERENCE.md nếu nguồn/field/công thức có đổi (không auto-check được)." >&2
 exit 0

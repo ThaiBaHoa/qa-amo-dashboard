@@ -4,7 +4,7 @@
 # đều là ĐIỀU KIỆN DATA đếm được → script query proxy, so với baseline, HÚ khi gate đổi.
 #   Gate 1: Backfill cờ QC cho CMR-CAR  → đếm CMR-CAR gán category "QC MQA Physical Finding".
 #   Gate 2: SCR có category_id (gate "Bộ lọc Category QC Spot Check") → đếm SCR có category_id.
-# Nguồn sự thật backlog: VIEC_TUONG_LAI.md (nhóm 4) trong vault; §8 QA_AMO_CONTEXT.md tóm tắt.
+# Nguồn sự thật backlog: VIEC_TUONG_LAI.md (nhóm 4) trong vault; §8 QA_AMO_Dashboard.md tóm tắt.
 # Khi gate đổi → cập nhật VIEC_TUONG_LAI.md + rollup §8 + baseline BASE_* dưới đây.
 #
 # KHÔNG đặt trong git hook (có network, chậm/offline sẽ chặn commit oan). Chạy tay hoặc
@@ -59,7 +59,7 @@ echo ""
 if [ "$CMR_QC" = "?" ] || [ "$SCR_POP" = "?" ]; then
   echo ">> Có query lỗi (network/proxy?). Chạy lại; script không chặn gì."
 elif [ "$FLAG" = 1 ]; then
-  echo ">> CÓ GATE ĐỔI → cập nhật §8 QA_AMO_CONTEXT.md + baseline trong script này."
+  echo ">> CÓ GATE ĐỔI → cập nhật §8 QA_AMO_Dashboard.md + baseline trong script này."
 else
   echo ">> Tất cả gate giữ nguyên — TODO §8 còn đúng."
 fi

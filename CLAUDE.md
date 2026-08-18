@@ -79,8 +79,11 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
   guards vanish silently. The hook bodies now live in `scripts/hooks/` (tracked); install
   them with **`sh scripts/install-hooks.sh`** after every clone. Bypass once with
   `git commit --no-verify`.
-  > Known gap: `check-doc-sync.sh` also checks `QA_AMO_CONTEXT.md` in the workspace, but
-  > that file does not exist on any machine yet — that branch of the guard is dormant.
+  > `check-doc-sync.sh` also checks the header rev of `QA_AMO_Dashboard.md` in the
+  > workspace (it lives in the vault, not the repo). It was named `QA_AMO_CONTEXT.md`
+  > until 2026-08-13; the guard kept the old name and so skipped silently until
+  > 2026-08-18. If the workspace or the file is missing the guard now says so on
+  > stderr instead of passing quietly.
 
 ### Two backends — do not confuse them
 

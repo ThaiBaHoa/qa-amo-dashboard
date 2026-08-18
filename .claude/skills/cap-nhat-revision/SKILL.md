@@ -66,10 +66,12 @@ giới này quyết định số tăng thế nào.
    - `TECHNICAL_REFERENCE.md`: rà lại **nếu nguồn/field/công thức đổi** (vd thêm `field_name`
      ở bước [5/6] `loadData`, đổi org_unit, đổi cách tính). Grep không bắt được nội dung này
      → phải đọc tay. Xem `SO_DO_CAU_TRUC.html` (sơ đồ luồng) để đối chiếu.
-   - ⚠️ **`QA_AMO_CONTEXT.md`** (file home vault, KHÔNG nằm trong repo → `check-doc-sync.sh`
-     & pre-commit hook **không** bắt được, dễ trôi lặng lẽ — phải sửa TAY): cập nhật
-     **header `Rev hiện tại:`** + **`Cập nhật context:`** + thêm 1 gạch đầu dòng ở
-     **§8 "Gần đây"**. (Vết r129–r130: đã quên bước này → header kẹt ở r128.)
+   - ⚠️ **`QA_AMO_Dashboard.md`** (file home vault, KHÔNG nằm trong repo — phải sửa TAY):
+     cập nhật **header `Rev hiện tại:`** + **`Cập nhật context:`** + thêm 1 gạch đầu dòng ở
+     **§8 "Gần đây"**. `check-doc-sync.sh` CÓ bắt dòng header này (qua
+     `scripts/resolve-workspace.sh`), nhưng KHÔNG bắt được §8 — phần đó vẫn trôi lặng lẽ.
+     (Vết r129–r130: đã quên bước này → header kẹt ở r128. File tên cũ là
+     `QA_AMO_CONTEXT.md`, đổi tên 13/08; guard giữ tên cũ nên bỏ qua im lặng tới 18/08.)
    - Bump `-iM` thuần bugfix: doc thường không cần đổi (rNN đã có sẵn trong doc).
 4. **Chốt trước commit — chạy check tự động:**
    ```
