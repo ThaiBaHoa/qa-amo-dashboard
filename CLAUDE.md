@@ -112,6 +112,9 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
 - `fetchAll(url, skipOv=false)` — paginated OData fetch with 30s AbortController timeout.
   **Pass `skipOv=true` on every secondary / modal / lazy call** — otherwise the shared
   global overlay hijacks with stale text ("vết r41" bug).
+- `loadRptStatus` / `renderRptStatus` — **Report Status on Coruson** (r131): bảng tình trạng hoàn thiện
+  report EIS & F-088, thay file Excel làm tay hàng tháng. Chấm Satis/Unsatis 4 cột từ Galileo. Luật chấm
+  + 7 cái bẫy đã xác minh nằm ở `TECHNICAL_REFERENCE.md` §8 — **đọc trước khi sửa**, đừng suy lại từ đầu.
 - `renderAF` — All Forms table, schema-driven via `AF_SCHEMAS{report_title → {cols[], rowClick?}}`
   (`_default` = 14-col fallback). Form-specific views: EIS (`loadEisDetail`/`enrichEis`/
   `showEisDetail`) and QC Spot Check (`loadQcsDetail`/`enrichQcs`/`showQcsDetail`, r107) —
@@ -282,7 +285,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.08.13-r130
+Rev current: 2026.08.18-r131
 
 ORG_UNIT = 'QA AMO'   ← main pages (never change without cross-page intent)
                          CMR-CAR and ECAR use org_unit = 'TQA' — fetched separately

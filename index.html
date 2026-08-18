@@ -523,6 +523,7 @@ tr:last-child td{border-bottom:none}
         <button class="nav-item" onclick="showPage('kpi',this)"><span class="nav-ic" data-ic="chart"></span>KPI Charts</button>
         <button class="nav-item" onclick="showSPIPage(this)"><span class="nav-icon">📈</span>SPI</button>
         <button class="nav-item" onclick="showPage('safety',this)"><span class="nav-ic" data-ic="shield"></span>Safety</button>
+        <button class="nav-item" onclick="showPage('rptstatus',this)"><span class="nav-ic" data-ic="list"></span>Report Status</button>
         <button class="nav-item" onclick="showAuditPlanPage(this)"><span class="nav-ic" data-ic="calendar"></span>Audit Plan</button>
         <div class="nav-sec" style="margin-top:6px">Detail</div>
         <button class="nav-item" onclick="showPage('allforms',this)"><span class="nav-ic" data-ic="list"></span>All Forms</button>
@@ -631,6 +632,33 @@ tr:last-child td{border-bottom:none}
         <!-- SAFETY — MSAG Report Status -->
         <div class="page" id="page-safety">
           <div id="safetyHost" style="overflow-x:auto;padding:6px 2px"></div>
+        </div>
+
+        <!-- CORUSON REPORT STATUS — EIS & F-088 -->
+        <div class="page" id="page-rptstatus">
+          <div class="tbl-card">
+            <div class="tbl-bar">
+              <div><div class="tbl-title">Report Status on Coruson</div><div class="tbl-count" id="rsCnt">&mdash;</div></div>
+              <button class="pill rs-tab on" onclick="setRsTab('f088',this)">F-088</button>
+              <button class="pill rs-tab" onclick="setRsTab('eis',this)">EIS</button>
+              <span style="width:1px;height:20px;background:var(--border)"></span>
+              <button class="pill rs-sf on" onclick="setRsSF('all',this)">All</button>
+              <button class="pill rs-sf" onclick="setRsSF('Open',this)">Open</button>
+              <button class="pill rs-sf" onclick="setRsSF('Closed',this)">Closed</button>
+              <div class="srch-wrap"><span class="srch-icon">&#128269;</span>
+                <input class="srch" id="rsSrch" placeholder="Search..." oninput="dRenderRptStatus()">
+              </div>
+              <button class="btn-sm" onclick="rsExport()" style="white-space:nowrap">&#11015; Excel</button>
+              <button class="btn-sm" onclick="rsLoaded=false;loadRptStatus()" style="white-space:nowrap">&#8635; Refresh</button>
+            </div>
+            <div class="tbl-wrap">
+              <table>
+                <thead id="rsHead"></thead>
+                <tbody id="rsBody"></tbody>
+              </table>
+            </div>
+            <div class="tbl-foot"><span id="rsInfo">&mdash;</span></div>
+          </div>
         </div>
 
         <!-- OPEN RFI -->
@@ -2289,7 +2317,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.13-r130';
+const APP_REV = '2026.08.18-r131';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -7397,7 +7425,7 @@ async function deleteUser(id,email,role){
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────
-const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',spi:'SPI — Safety Performance Indicators',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',ecar:'ECAR Detail',amoecar:'AMO-ECAR',mcar:'MCAR',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management',querybuilder:'Query Builder',mydashboard:'My Dashboard',kpi2:'KPI 2 — Early Detection',safety:'Safety — MSAG Report Status (OSR / MOSR)'};
+const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',spi:'SPI — Safety Performance Indicators',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',ecar:'ECAR Detail',amoecar:'AMO-ECAR',mcar:'MCAR',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management',querybuilder:'Query Builder',mydashboard:'My Dashboard',kpi2:'KPI 2 — Early Detection',safety:'Safety — MSAG Report Status (OSR / MOSR)',rptstatus:'Report Status on Coruson — EIS & F-088'};
 // ── SAFETY — MSAG Report Status (OSR / MOSR) ─────────────────
 // Owner ∈ nhóm MSAG = report thuộc ban MQA (MOSR mặc nhiên thuộc MQA;
 // OSR là báo cáo chung nên phải lọc theo owner). Mỗi report 1 status →
@@ -7494,6 +7522,234 @@ function buildSafetyTable(d){
   </div>`;
 }
 
+// ── CORUSON REPORT STATUS — EIS & F-088 (r131) ───────────────
+// Thay bảng Excel "Thống kê tình trạng report EIS & F-088 trên Coruson" làm tay hàng tháng.
+// Luật chấm lấy từ "F088 GUIDEDANCE.docx" (Eric, 18/08/2026), đã đối chiếu bản Excel JUL-2026:
+//   E  = mọi field trong form đã điền (report Open thì miễn trừ VOI)  — luật chữ nghĩa, Eric chốt
+//   F  = stage quản lý có RFI/Task, HOẶC stage đã Completed          — 68/68 khớp Excel
+//   G  = report được link tới (quan hệ thật, không phải field gõ tay) — banner "linked to" của Coruson
+//   H  = có file đính kèm ở context Report                            — 66/68 khớp Excel
+//   D/I= report_status (Closed → Completed/Closed)                    — 68/68 khớp Excel
+const RS_F088_TITLE = 'MQA Event Report F-088';
+const RS_FORMS = {
+  f088: { title: RS_F088_TITLE, stage: 'Event Report F-088 Management', label: 'F-088', pavoi: false },
+  eis:  { title: EIS_TITLE,     stage: 'EIS Management',                label: 'EIS',   pavoi: true  },
+};
+// Row EAV KHÔNG phải field nhập liệu (0% fill trên toàn bộ dataset) → không tính vào cột E.
+// Row có repeater_section_name = header của repeater, cũng loại.
+const RS_NON_FIELDS = new Set(['VietJet_Air_logo.svg','Add number of involved persons','Team',
+  'Add info of person performing read&sign/error briefing (as many as required)']);
+const RS_VOI = 'Verification of implementation (VOI)';
+// Tiêu đề report nằm ở field khác nhau tuỳ form và tuỳ revision — rank nhỏ hơn thắng.
+// F-088 = SUBJECT · EIS 015+ = Investigation · EIS cũ = BRIEF DETAILS.
+// KHÔNG dùng 'Detailed Description' làm fallback: form EIS có ĐÚNG HAI row cùng tên đó (một ở
+// DESCRIPTION OF THE EVENT, một ở ANALYSIS) và không có gì phân biệt được — field_id khác nhau
+// theo từng report, repeater_section_name đều null, thứ tự row không ổn định. Đã kiểm: EIS-2025/014
+// row đầu là mô tả sự kiện, còn EIS-2025/012 row đầu lại là phần phân tích → lấy bừa sẽ in nhầm
+// đoạn MEDA lên bảng trình chiếu. Hệ quả: EIS 012/013/014/015/018 để trống cột Report Title.
+const RS_SUBJ_RANK = {'SUBJECT':0,'Investigation':1,'BRIEF DETAILS':2};
+
+let rsLoaded=false, rsRows=null, rsTab='f088', rsSF='all';
+
+// OData `in (…)` KHÔNG bị tính theo MaxNodeCount như chuỗi `or` → nhồi được hàng trăm giá trị
+// trong 1 request (đã đo: 448 report_key, 84 UUID). Nhờ đó trang này chỉ tốn ~8 request.
+const rsIn = (col,vals,quote) => col+' in ('+vals.map(v=>quote?"'"+String(v).replace(/'/g,"''")+"'":v).join(',')+')';
+
+async function loadRptStatus(){
+  setOv(true,'Loading Coruson report status...','');
+  try{
+    const forms = Object.entries(RS_FORMS);
+    const titles = forms.map(x=>x[1].title);
+    const base = {};
+    forms.forEach(x=>{ base[x[0]]=allData.filter(r=>r.report_title===x[1].title); });
+    const ids = [].concat.apply([],Object.values(base)).map(r=>r.report_id).filter(Boolean);
+    if(!ids.length) throw new Error('Không tìm thấy report EIS / F-088 trong allData');
+    const idSet = new Set(ids);
+    const stages = forms.map(x=>x[1].stage);
+
+    // 4 fetch song song. Tất cả truyền skipOv=true (Invariant I11 — không cướp overlay chung).
+    // EAV/task/link lọc theo report_title rồi post-filter bằng Set (Invariant I1 — view EAV không
+    // filter được theo report_id: query có `report_id eq <uuid>` trả về RỖNG chứ không báo lỗi).
+    const res = await Promise.all([
+      fetchAll(G_URL+'dwanalytics_report_form_section_field'+
+        '?$select=report_id,field_name,text_value,repeater_section_name'+
+        '&$filter='+encodeURIComponent(rsIn('report_title',titles,true)), true),
+      fetchAll(G_URL+'dwreporting_report_task'+
+        '?$select=report_id,task_title,task_status,stage_title,stage_status'+
+        '&$filter='+encodeURIComponent(rsIn('report_title',titles,true)), true),
+      fetchAll(G_URL+'dwanalytics_report_fact_other_reports'+
+        '?$select=report_id,linked_to_key,linked_from_report_key'+
+        '&$filter='+encodeURIComponent(rsIn('title',titles,true)), true),
+      fetchAll(G_URL+'dwanalytics_attachment'+
+        '?$select=context_id,file_name'+
+        '&$filter='+encodeURIComponent("context_type eq 'Report' and "+rsIn('context_id',ids,false)), true),
+    ]);
+    const eavRaw=res[0], taskRaw=res[1], linkRaw=res[2], attRaw=res[3];
+
+    // ── cột E: field đã điền / bỏ trống. Row VẪN tồn tại khi field trống (text_value rỗng) ──
+    const fld={}, subj={};
+    eavRaw.forEach(f=>{
+      if(!idSet.has(f.report_id)) return;
+      const n=f.field_name, v=(f.text_value||'').trim();
+      const rank = RS_SUBJ_RANK[n];
+      if(v && rank!==undefined){
+        const cur=subj[f.report_id];
+        if(!cur || rank<cur.rank) subj[f.report_id]={rank:rank,v:v};
+      }
+      if(RS_NON_FIELDS.has(n) || f.repeater_section_name || n.indexOf('CORRECTIVE ACTIONS')===0) return;
+      const m=fld[f.report_id]||(fld[f.report_id]={});
+      m[n] = m[n] || !!v;
+    });
+
+    // ── cột F: RFI / Task trên stage quản lý; task_title rỗng = stage placeholder → loại ──
+    const wf={};
+    taskRaw.forEach(t=>{
+      if(!idSet.has(t.report_id) || stages.indexOf(t.stage_title)<0) return;
+      const w=wf[t.report_id]||(wf[t.report_id]={rfi:0,task:0,stage:null});
+      w.stage = t.stage_status;
+      const ti=(t.task_title||'').trim();
+      if(ti && t.task_status!=='Deleted'){ if(ti==='Request For Information') w.rfi++; else w.task++; }
+    });
+
+    // ── cột G: resolve report_key → report_number, chỉ giữ bản hiện hành (valid_to null) ──
+    const perRep={}, keys=new Set();
+    linkRaw.forEach(l=>{
+      if(!idSet.has(l.report_id)) return;
+      const set = perRep[l.report_id]||(perRep[l.report_id]=new Set());
+      [l.linked_to_key,l.linked_from_report_key].forEach(k=>{ if(k>0){ set.add(k); keys.add(k); } });
+    });
+    const keyMap={};
+    if(keys.size){
+      const kRaw=await fetchAll(G_URL+'dwanalytics_report'+
+        '?$select=report_key,number,valid_to'+
+        '&$filter='+encodeURIComponent(rsIn('report_key',Array.from(keys),false)), true)
+        .catch(e=>{console.warn('[rptstatus] link resolve failed:',e.message);return[];});
+      kRaw.forEach(x=>{ if(x.valid_to===null && x.number) keyMap[x.report_key]=x.number; });
+    }
+
+    // ── cột H ──
+    const att={};
+    attRaw.forEach(a=>{ if(idSet.has(a.context_id)) (att[a.context_id]||(att[a.context_id]=[])).push(a.file_name||''); });
+
+    rsRows={};
+    forms.forEach(x=>{
+      const key=x[0];
+      rsRows[key]=base[key].map(r=>{
+        const isOpen = r.report_status!=='Closed';
+        const m = fld[r.report_id]||{};
+        const names = Object.keys(m).filter(n=>!(isOpen && n===RS_VOI));
+        const miss = names.filter(n=>!m[n]).sort();
+        const w = wf[r.report_id]||{rfi:0,task:0,stage:null};
+        const links=Array.from(perRep[r.report_id]||[]).map(k=>keyMap[k]).filter(n=>n && n!==r.report_number);
+        return {
+          num:r.report_number||'—', owner:r.owner_name||'—',
+          subject:(subj[r.report_id]||{}).v||'—', status:r.report_status||'—', open:isOpen,
+          nreq:names.length, miss:miss, rfi:w.rfi, task:w.task, stage:w.stage,
+          links:Array.from(new Set(links)).sort(), files:att[r.report_id]||[],
+        };
+      }).sort((a,b)=>String(a.num).localeCompare(String(b.num),undefined,{numeric:true}));
+    });
+    rsLoaded=true;
+  }catch(e){ console.error('Report status load error:',e); toast('Error loading report status: '+e.message,'err'); }
+  setOv(false);
+  renderRptStatus();
+}
+
+// E đạt khi không thiếu field nào; F đạt khi có RFI/Task HOẶC stage đã Completed
+function rsOkE(r){ return r.nreq>0 && r.miss.length===0; }
+function rsOkF(r){ return (r.rfi+r.task)>0 || r.stage==='Completed'; }
+
+function setRsTab(tab,btn){
+  rsTab=tab;
+  document.querySelectorAll('#page-rptstatus .rs-tab').forEach(p=>p.classList.remove('on'));
+  if(btn)btn.classList.add('on');
+  renderRptStatus();
+}
+function setRsSF(sf,btn){
+  rsSF=sf;
+  document.querySelectorAll('#page-rptstatus .rs-sf').forEach(p=>p.classList.remove('on'));
+  if(btn)btn.classList.add('on');
+  renderRptStatus();
+}
+function rsVisible(){
+  const q=((g('rsSrch')||{}).value||'').trim().toLowerCase();
+  return ((rsRows||{})[rsTab]||[]).filter(r=>{
+    if(rsSF==='Open' && !r.open) return false;
+    if(rsSF==='Closed' && r.open) return false;
+    if(q && [r.num,r.subject,r.owner,r.links.join(' ')].join(' ').toLowerCase().indexOf(q)<0) return false;
+    return true;
+  });
+}
+const dRenderRptStatus=debounce(renderRptStatus,200);
+
+// Xuất đúng bố cục file Excel gốc (cột D..J), để gửi kèm sau buổi họp
+function rsExport(){
+  const f=RS_FORMS[rsTab], rows=rsVisible();
+  const head=['Report No.','Report Title','Incharge person','Tình trạng hoàn thiện report trên Coruson',
+    'Report Section/Fill Information','Workflow Section/Add task','Evaluation/Link initial Report',
+    'Attachment/Final report, Evidence','Status of report on Coruson'].concat(f.pavoi?['PAVOI']:[]);
+  const body=rows.map(r=>[r.num, r.subject, r.owner, r.open?'Not Completed':'Completed',
+    rsOkE(r)?'Satis':'Unsatis — missing: '+r.miss.join('; '),
+    rsOkF(r)?'Satis':'Unsatis',
+    r.links.join(', ')||'—',
+    r.files.length?'Uploaded ('+r.files.length+')':'Not uploaded',
+    r.status].concat(f.pavoi?[r.links.filter(x=>/^PAVOI/i.test(x)).join(', ')||'—']:[]));
+  const ws=XLSX.utils.aoa_to_sheet([head].concat(body));
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,f.label);
+  XLSX.writeFile(wb,'Coruson report status - '+f.label+' - '+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+
+function renderRptStatus(){
+  const head=g('rsHead'), body=g('rsBody'); if(!head||!body) return;
+  const f=RS_FORMS[rsTab];
+  const cols=['Report No.','Report Title','Incharge Person','Completion on Coruson',
+    'Report Section / Fill Information','Workflow / Add Task','Evaluation / Linked Report',
+    'Attachment / Final Report, Evidence','Status on Coruson'].concat(f.pavoi?['PAVOI']:[]);
+  head.innerHTML='<tr>'+cols.map(c=>'<th>'+c+'</th>').join('')+'</tr>';
+  if(!rsRows){ body.innerHTML='<tr><td colspan="'+cols.length+'" style="text-align:center;padding:24px;color:var(--muted)">No data</td></tr>'; return; }
+
+  const rows=rsVisible();
+  const okB  = t=>'<span class="badge b-on">'+t+'</span>';
+  const badB = t=>'<span class="badge b-over">'+t+'</span>';
+  const mut  = (t,tip)=>'<span style="font-size:10px;color:var(--muted);margin-left:5px"'+(tip?' title="'+esc(tip)+'"':'')+'>'+t+'</span>';
+  body.innerHTML = rows.map(r=>{
+    const eCell = rsOkE(r)
+      ? okB('Satis')+mut(r.nreq+'/'+r.nreq)
+      : badB('Unsatis')+mut((r.nreq-r.miss.length)+'/'+r.nreq+' · '+r.miss.length+' missing', 'Missing: '+r.miss.join(' · '));
+    const fDet = (r.rfi+r.task)>0
+      ? [r.rfi?r.rfi+' RFI':'', r.task?r.task+' Task':''].filter(Boolean).join(' · ')
+      : (r.stage||'no stage');
+    const fCell = (rsOkF(r)?okB('Satis'):badB('Unsatis'))+mut(esc(fDet));
+    const gCell = r.links.length
+      ? r.links.map(x=>'<span style="font-size:11px;color:var(--blue)">'+esc(x)+'</span>').join('<br>')
+      : '<span style="color:var(--muted)">—</span>';
+    const hCell = r.files.length
+      ? okB('Uploaded')+mut(r.files.length+' file'+(r.files.length>1?'s':''), r.files.slice(0,12).join(' · '))
+      : badB('Not uploaded');
+    const pav = r.links.filter(x=>/^PAVOI/i.test(x));
+    return '<tr>'+
+      '<td><b style="color:var(--blue)">'+esc(r.num)+'</b></td>'+
+      '<td style="max-width:340px;font-size:11px;color:var(--muted)" title="'+esc(r.subject)+'">'+esc(r.subject.slice(0,150))+(r.subject.length>150?'…':'')+'</td>'+
+      '<td style="font-size:11px;color:var(--muted);white-space:nowrap">'+esc(r.owner)+'</td>'+
+      '<td>'+(r.open?badB('Not Completed'):okB('Completed'))+'</td>'+
+      '<td style="white-space:nowrap">'+eCell+'</td>'+
+      '<td style="white-space:nowrap">'+fCell+'</td>'+
+      '<td>'+gCell+'</td>'+
+      '<td style="white-space:nowrap">'+hCell+'</td>'+
+      '<td>'+sBadge(r.status)+'</td>'+
+      (f.pavoi?'<td style="font-size:11px;color:var(--blue)">'+(pav.length?esc(pav.join(', ')):'<span style="color:var(--muted)">—</span>')+'</td>':'')+
+    '</tr>';
+  }).join('') || '<tr><td colspan="'+cols.length+'" style="text-align:center;padding:24px;color:var(--muted)">No data</td></tr>';
+
+  const all=rsRows[rsTab]||[];
+  s('rsCnt', rows.length+' of '+all.length+' · '+f.label);
+  s('rsInfo', 'Satis — Fill Information '+all.filter(rsOkE).length+'/'+all.length+
+              ' · Workflow '+all.filter(rsOkF).length+'/'+all.length+
+              ' · Linked '+all.filter(r=>r.links.length).length+'/'+all.length+
+              ' · Attachment '+all.filter(r=>r.files.length).length+'/'+all.length+
+              ' · Open '+all.filter(r=>r.open).length);
+}
+
 function showPage(name,btn){
   if((name==='reports'||name==='admin'||name==='querybuilder'||name==='mydashboard')&&(!curUser||curUser.role!=='admin')){
     toast('You do not have permission to access this page','err');return;
@@ -7518,6 +7774,7 @@ function showPage(name,btn){
   if(name==='overdue'){ renderOv(); }
   if(name==='pavoi'){ if(!pavoiRfiLoaded) loadPavoiRfi(); else renderPavoi(); }
   if(name==='safety'){ if(!safetyLoaded) loadSafety(); else renderSafety(); }
+  if(name==='rptstatus'){ if(!rsLoaded) loadRptStatus(); else renderRptStatus(); }
   if(name==='overview'){
     setTimeout(()=>{
       Object.values(charts).forEach(c=>{ try{c.resize()}catch(e){} });

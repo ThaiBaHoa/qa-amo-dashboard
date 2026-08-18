@@ -75,6 +75,7 @@ const ORG_UNIT  = 'QA AMO';   // Dùng cho loadData() chính
 | CMR-CAR | `loadCmr()` | `dwreporting_report_summary` | **`'TQA'`** | `report_title eq 'CMR CAR'` |
 | ECAR | `loadEcar()` | `dwreporting_report_summary` | **`'TQA'`** | `report_title eq 'ECAR'` |
 | Documents | `loadDocuments()` | `dwreporting_document_summary` | không filter | filter `Active` client-side |
+| Report Status (r131) | `loadRptStatus()` | base từ `allData`; phụ: `dwanalytics_report_form_section_field`, `dwreporting_report_task`, `dwanalytics_report_fact_other_reports`, `dwanalytics_report`, `dwanalytics_attachment` | `'QA AMO'` (qua `allData`) | `report_title in ('MQA Event Report F-088','MQA Event Investigation Summary')` |
 | Documents (detail) | on-demand | `dwreporting_document_task` | — | `document_revision_id eq '{id}'` |
 
 > ⚠️ **QUAN TRỌNG:** CMR-CAR và ECAR dùng `org_unit_name = 'TQA'` — KHÔNG phải `ORG_UNIT`. Đây là đặc thù của hệ thống Galileo, không phải bug. Không được đổi sang `ORG_UNIT`.
@@ -315,6 +316,33 @@ sớm" nếu tồn tại ≥1 MCAR thỏa **cả hai**:
 
 ---
 
+### 8. `loadRptStatus()` — Report Status on Coruson (EIS & F-088, r131)
+
+Thay bảng Excel "Thống kê tình trạng report EIS & F-088 trên Coruson" trước đây làm tay hàng tháng.
+Luật chấm lấy từ `F088 GUIDEDANCE.docx` (Eric, 18/08/2026), đã đối chiếu **từng ô** với bản Excel JUL-2026.
+
+| Cột (theo Excel gốc) | Nguồn Galileo | Luật | Khớp Excel |
+|---|---|---|---|
+| D · Tình trạng hoàn thiện | `report_status` | `Closed` → Completed | 68/68 |
+| E · Report Section / Fill Information | `dwanalytics_report_form_section_field` | mọi field có giá trị; report `Open` miễn trừ `Verification of implementation (VOI)` | 13/68 |
+| F · Workflow / Add task | `dwreporting_report_task` | stage quản lý có RFI/Task **HOẶC** `stage_status='Completed'` | **68/68** |
+| G · Evaluation / Link initial Report | `dwanalytics_report_fact_other_reports` → `dwanalytics_report` | mã report được link (bản `valid_to eq null`) | đúng mã ở mọi dòng Excel có ghi mã |
+| H · Attachment / Final report | `dwanalytics_attachment` | `context_type eq 'Report'` và có ≥1 file | 66/68 |
+| I · Status on Coruson | `report_status` | nguyên trạng | 68/68 |
+| J · PAVOI (chỉ tab EIS) | lọc cột G theo tiền tố `PAVOI` | — | 3/3 dòng Excel có ghi |
+
+**Bẫy đã xác minh — đọc trước khi sửa:**
+
+1. **Row EAV VẪN tồn tại khi field bỏ trống** (`text_value` rỗng, `field_type` null). Nhờ đó đếm được field *thiếu*, không chỉ field đã điền. Nhưng phải loại 4 row **không bao giờ điền được** (0% fill trên toàn bộ dataset — chúng là cấu trúc, không phải ô nhập): `VietJet_Air_logo.svg`, `Add number of involved persons`, `Team`, `Add info of person performing read&sign/error briefing (as many as required)`; cộng mọi row có `repeater_section_name` khác null (header repeater, vd `CORRECTIVE ACTIONS`). Quên loại → mọi report đều Unsatis.
+2. **Luật cột F chữ nghĩa là chưa đủ.** "Có RFI hoặc Task = Satis" chỉ khớp 53/68. MQA-RP-055-2025 và MQA-RP-069-2026 không có RFI/Task nào nhưng stage đã `Completed` (bản Excel chấm Satis); MQA-RP-072-2026 cũng không có nhưng stage còn `PendingSignOff` (chấm "Chưa có thông tin"). Thêm vế `stage_status='Completed'` → khớp 68/68.
+3. **Cột G KHÔNG lấy từ field gõ tay** (`Detail of Initial Source` / `Reference of Related Event`). Lấy quan hệ thật rồi resolve `report_key` → `number`, chỉ giữ bản hiện hành `valid_to eq null` — 1 report được link có nhiều version key (vd MQA-RP-065-2026 có 7 key, tất cả đều là `VJC-ECAR-830`).
+4. **Không tách được "evidence đính ở Add task" khỏi "final report đính ở tab Report".** `dwanalytics_attachment.context_type` chỉ có 5 giá trị (Report / Audit / AuditChecklistItem / Document / Change Request) — không có 'Task' — và `task_instance_id` rỗng trên toàn bộ dataset QA AMO. Đừng hứa tách 2 loại này.
+5. **Tiêu đề report nằm ở field khác nhau tuỳ revision** — rank: `SUBJECT` (F-088) → `Investigation` (EIS 015 trở đi) → `BRIEF DETAILS` (EIS cũ). Lấy sai thì cột Report Title rỗng ở đúng các report mới nhất. **KHÔNG thêm `Detailed Description` làm fallback:** form EIS có ĐÚNG HAI row mang tên đó (một ở section DESCRIPTION OF THE EVENT, một ở ANALYSIS) và không có gì phân biệt nổi — `field_id` khác nhau theo từng report (không dùng chung), `repeater_section_name` đều null, thứ tự row không ổn định (EIS-2025/014 row đầu là mô tả sự kiện, EIS-2025/012 row đầu lại là phần phân tích). Lấy bừa = in nhầm đoạn MEDA lên bảng trình chiếu. `dwanalytics_report.summary` cũng không cứu được (rỗng ở 73/84 report). Hệ quả chấp nhận: EIS 012/013/014/015/018 để trống Report Title. Muốn lấp thì phải join `dwanalytics_report_section_field` qua `report_field_key` để đọc `section_template_id` — chưa làm vì chỉ được thêm 2 dòng.
+6. **Số liệu cột E khắt khe hơn bản làm tay rất nhiều** (12/68 đạt, so với 67/68 trong Excel). Đây là lựa chọn có chủ ý của Eric (18/08/2026), KHÔNG phải bug. Field bị bỏ trống nhiều nhất: `Contributing Factors Checklist MEDA` 32/68 (chỉ điền khi MEDA = Yes), `AIRCRAFT TYPE & SERIES` 23/68 (nhiều F-088 không gắn tàu bay), `Other (explain here)` 14/68, `Consequence` 13/68. Nếu sau này muốn nới, loại nhóm điều kiện + nhóm gắn tàu bay khỏi mẫu số → 54/68 đạt.
+7. **Galileo là nguồn đủ hơn Excel.** Excel JUL-2026 thiếu MQA-EIS-013/015/018; ngược lại Galileo không có MQA-EIS-001/002 (số cũ, trước khi lên Coruson). MQA-EIS-015 rỗng hoàn toàn, stage `Withdrawn`.
+
+---
+
 ## Giới hạn OData (KHÔNG được vượt qua)
 
 | Giới hạn | Giá trị | Lý do |
@@ -324,6 +352,7 @@ sớm" nếu tồn tại ≥1 MCAR thỏa **cả hai**:
 | Pattern an toàn | Chỉ filter `field_name` (≤15 terms = 29 nodes) | Fetch hết rồi post-filter JS |
 | ⚠ Timeout (r107) | `field_name`-only mà tên field generic (vd `'Finding description'` ~14k row) | Quá 30s → rỗng âm thầm. Thêm `report_raised_date ge <ISO>` để thu hẹp + chunk ~8 field/query. |
 | ⚠ `report_id` 400 | `report_id eq '<uuid>'` trên `report_field`/`report_form_section_field` | Trả **HTTP 400** (cột không filter được) — bắt buộc post-filter JS. |
+| ✅ **Lối thoát: `in (…)`** (r131) | `report_key in (k1,…,k448)` · `context_id in (uuid1,…,uuid84)` | **KHÔNG bị tính như chuỗi `or`.** Đã đo trên chính proxy này: `or` hỏng ở 25 giá trị (đúng lỗi "node count limit of '100'"), còn `in()` nuốt gọn **448 số** và **84 UUID** trong 1 request. UUID trong `in()` viết trần, KHÔNG bọc nháy; chuỗi thì vẫn phải có nháy đơn. Nhờ đó `loadRptStatus()` chỉ tốn ~8 request thay vì ~40. **Lưu ý:** `in()` KHÔNG cứu được giới hạn `report_id` ở dòng trên — đó là hạn chế của view EAV, không phải node count. |
 
 ---
 
