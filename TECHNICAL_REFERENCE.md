@@ -319,9 +319,15 @@ sớm" nếu tồn tại ≥1 MCAR thỏa **cả hai**:
 ### 8. `loadRptStatus()` — Report Status on Coruson (EIS & F-088, r131)
 
 Thay bảng Excel "Thống kê tình trạng report EIS & F-088 trên Coruson" trước đây làm tay hàng tháng.
-Luật chấm lấy từ `F088 GUIDEDANCE.docx` (Eric, 18/08/2026), đã đối chiếu **từng ô** với bản Excel JUL-2026.
+Luật chấm lấy từ `F088 GUIDEDANCE.docx` (Eric, 18/08/2026).
 
-| Cột (theo Excel gốc) | Nguồn Galileo | Luật | Khớp Excel |
+> ⚠️ **NGUYÊN TẮC: chuẩn là giá trị đọc từ Coruson, KHÔNG phải bảng Excel làm tay.** Bản Excel
+> JUL-2026 chỉ dùng **một lần** lúc dựng luật, để kiểm xem luật có bắt đúng thực tế không — các
+> con số "khớp X/68" dưới đây là **bằng chứng lúc phát triển**, không phải tiêu chí nghiệm thu.
+> Khi dashboard và bảng tay lệch nhau thì **dashboard đúng**; đừng sửa code cho khớp bảng tay.
+> (Eric chốt 18/08/2026.)
+
+| Cột (theo Excel gốc) | Nguồn Galileo | Luật | Khớp Excel (lúc dựng luật) |
 |---|---|---|---|
 | D · Tình trạng hoàn thiện | suy ra từ E + F + H | `Completed` chỉ khi **cả E, F, H đều đạt** (G không tính). Thiếu → liệt kê chi tiết từng chỗ trong ô. | cố ý KHÔNG khớp — xem bẫy 8 |
 | E · Report Section / Fill Information | `dwanalytics_report_form_section_field` | mọi field có giá trị; miễn trừ 3 trường hợp: `Verification of implementation (VOI)` khi report `Open`; `Contributing Factors Checklist MEDA` khi radio `MEDA Checklist`=`No`; `Other (explain here)` khi `TYPE OF EVENT` không chọn `Other` | 23/68 đạt |
