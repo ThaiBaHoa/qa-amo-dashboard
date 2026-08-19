@@ -2321,7 +2321,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.18-r131-i6';
+const APP_REV = '2026.08.19-r132';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2905,82 +2905,91 @@ async function loadData(forceRefresh=false) {
   pavoiRfiLoaded = false; pavoiRfiMap = {}; pavoiRfiDone = new Set();   // reset RFI để Refresh kéo lại bản mới
   eisLoaded=false; eisCAMap={}; eisDescMap={};   // reset EIS per-CA cache để Refresh kéo lại
   qcsLoaded=false; qcsMap={};                     // reset QC Spot Check cache để Refresh kéo lại
-  setOv(true,'[1/6] Connecting to Galileo...','',5);
+  setOv(true,'Connecting to Galileo...','',5);
   try {
 
-    // 1. SUMMARY — lấy toàn bộ QA AMO, không filter year
-    setOv(true,'[1/6] Loading report summary...','',15);
-    const sumRaw = await fetchAll(
-      G_URL + 'dwreporting_report_summary' +
-      '?$select=report_id,report_title,report_number,report_status,' +
-      'org_unit_name,raised_date,audit_title,audit_id,modified_date,valid_from,valid_to,owner_id' +
-      '&$filter=org_unit_name eq \'' + ORG_UNIT + '\''
-    );
-    setOv(true,`[2/6] ${sumRaw.length} rows — deduplicating...`,'',25);
+    // ── NẠP SONG SONG ───────────────────────────────────
+    // 6 request dưới đây ĐỘC LẬP — không cái nào dùng kết quả cái kia làm $filter.
+    // Chạy nối tiếp tốn ~22s vì TTFB của Galileo là 2–4s mỗi request trong khi
+    // truyền chỉ 0,07–0,18s: gần như toàn bộ thời gian là xếp hàng. Promise.all
+    // đưa về ~5s (= request chậm nhất).
+    // skipOv=true cho TẤT CẢ (invariant I11): fetchAll ghi overlay qua
+    // g('ovText').textContent — chạy song song sẽ giẫm chữ lên nhau. Overlay do
+    // chính loadData lái bằng bộ đếm parDone bên dưới.
+    const PAR_N = 6;
+    let parDone = 0;
+    const parStep = label => {
+      parDone++;
+      setOv(true, `[${parDone}/${PAR_N}] ${label}`, `${parDone}/${PAR_N} requests done`,
+            5 + Math.round(parDone / PAR_N * 75));
+    };
+    // par() dựng map NGAY trong onRows để nhả mảng thô cho GC (workflow 22 MB,
+    // custom fields 10,7 MB) — giữ cả 6 mảng tới khi Promise.all xong sẽ đội đỉnh heap.
+    // critical=true → lỗi làm hỏng cả lượt load (đúng như summary trước đây).
+    // critical=false → nuốt lỗi + log, giữ nguyên hành vi try/catch tuần tự cũ.
+    const par = (label, url, onRows, critical) => {
+      const p = fetchAll(url, true).then(rows => { onRows(rows); parStep(label); });
+      return critical ? p : p.catch(e => { console.warn(label + ' load error:', e); parStep(label); });
+    };
 
-    let summary;
-    try {
-      // DEDUP: giữ 1 record/report_id có modified_date mới nhất, bỏ record không có report_number
-      const sumMap = {};
-      sumRaw.forEach(r => {
-        if (!r.report_number || !r.report_number.trim()) return;
-        const ex = sumMap[r.report_id];
-        if (!ex) { sumMap[r.report_id]=r; return; }
-        if (new Date(r.modified_date) > new Date(ex.modified_date)) {
-          sumMap[r.report_id] = r;
-        }
-      });
-      summary = Object.values(sumMap);
-      console.log('[loadData] summary dedup OK:', summary.length, 'reports');
-    } catch(e) {
-      console.error('[loadData] CRASH in dedup:', e);
-      throw e;
-    }
+    let summary = [], usersRaw = [], grpRaw = [], auRaw = [];
+    let userMap = {}, wfMap = {}, wfAllMap = {}, fMap = {};
 
-    // 2. USERS (+ USER GROUPS)
-    setOv(true,'[3/6] Loading users...','',35);
-    let userMap = {};
-    try {
-      const usersRaw = await fetchAll(G_URL + 'dwreporting_users?$select=user_id,full_name');
-      usersRaw.forEach(u => { if (u.user_id) userMap[u.user_id] = u.full_name || null; });
-    } catch(e) { console.warn('Users load error:',e); }
-    // Owner của report có thể là 1 USER (cá nhân) HOẶC 1 USER GROUP (nhóm) — Galileo đang chuyển owner
-    // PAVOI từ cá nhân sang 4 nhóm "… Section" (owner_id = group_id). Nạp groupMap để owner_name hiện
-    // đúng tên nhóm khi owner là group. Merge vào userMap (user_id/group_id đều UUID, không đụng nhau).
-    try {
-      const grpRaw = await fetchAll(G_URL + 'dwanalytics_user_group?$select=group_id,name');
-      grpRaw.forEach(gr => { if (gr.group_id && !userMap[gr.group_id]) userMap[gr.group_id] = gr.name || null; });
-    } catch(e) { console.warn('User groups load error:',e); }
+    await Promise.all([
 
-    // 3. WORKFLOW
-    setOv(true,`[4/6] Loading workflow (${summary.length} reports)...`,'',50);
-    let wfMap = {}, wfAllMap = {};
-    try {
-      const wfRaw = await fetchAll(
+      // 1. SUMMARY — lấy toàn bộ QA AMO, không filter year
+      par('Report summary',
+        G_URL + 'dwreporting_report_summary' +
+        '?$select=report_id,report_title,report_number,report_status,' +
+        'org_unit_name,raised_date,audit_title,audit_id,modified_date,valid_from,valid_to,owner_id' +
+        '&$filter=org_unit_name eq \'' + ORG_UNIT + '\'',
+        rows => {
+          try {
+            // DEDUP: giữ 1 record/report_id có modified_date mới nhất, bỏ record không có report_number
+            const sumMap = {};
+            rows.forEach(r => {
+              if (!r.report_number || !r.report_number.trim()) return;
+              const ex = sumMap[r.report_id];
+              if (!ex) { sumMap[r.report_id]=r; return; }
+              if (new Date(r.modified_date) > new Date(ex.modified_date)) {
+                sumMap[r.report_id] = r;
+              }
+            });
+            summary = Object.values(sumMap);
+            console.log('[loadData] summary dedup OK:', summary.length, 'reports');
+          } catch(e) {
+            console.error('[loadData] CRASH in dedup:', e);
+            throw e;
+          }
+        }, true),
+
+      // 2. USERS + USER GROUPS — gộp sau Promise.all để giữ đúng thứ tự áp dụng
+      par('Users',       G_URL + 'dwreporting_users?$select=user_id,full_name',   rows => { usersRaw = rows; }),
+      par('User groups', G_URL + 'dwanalytics_user_group?$select=group_id,name',  rows => { grpRaw   = rows; }),
+
+      // 3. WORKFLOW
+      par('Workflow',
         G_URL + 'dwreporting_report_workflow' +
-        '?$select=report_id,stage_type,stage_status,stage_completed_date,stage_target_date'
-      );
-      wfRaw.forEach(w => {
-        if (!wfAllMap[w.report_id]) wfAllMap[w.report_id] = [];
-        wfAllMap[w.report_id].push(w);
-        if (w.stage_type !== 'ReportAcceptReject') return;
-        if (w.stage_status !== 'Completed' && w.stage_status !== 'InProgress') return;
-        const ex = wfMap[w.report_id];
-        if (!ex) { wfMap[w.report_id]=w; return; }
-        const wDone  = w.stage_status === "Completed";
-        const exDone = ex.stage_status === "Completed";
-        if (wDone && !exDone) { wfMap[w.report_id]=w; return; }
-        if (!wDone && exDone) { return; }
-        if (new Date(w.stage_completed_date||0) > new Date(ex.stage_completed_date||0))
-          wfMap[w.report_id]=w;
-      });
-    } catch(e) { console.warn('Workflow load error:',e); }
+        '?$select=report_id,stage_type,stage_status,stage_completed_date,stage_target_date',
+        rows => {
+          rows.forEach(w => {
+            if (!wfAllMap[w.report_id]) wfAllMap[w.report_id] = [];
+            wfAllMap[w.report_id].push(w);
+            if (w.stage_type !== 'ReportAcceptReject') return;
+            if (w.stage_status !== 'Completed' && w.stage_status !== 'InProgress') return;
+            const ex = wfMap[w.report_id];
+            if (!ex) { wfMap[w.report_id]=w; return; }
+            const wDone  = w.stage_status === "Completed";
+            const exDone = ex.stage_status === "Completed";
+            if (wDone && !exDone) { wfMap[w.report_id]=w; return; }
+            if (!wDone && exDone) { return; }
+            if (new Date(w.stage_completed_date||0) > new Date(ex.stage_completed_date||0))
+              wfMap[w.report_id]=w;
+          });
+        }),
 
-    // 4. CUSTOM FIELDS
-    setOv(true,'[5/6] Loading custom fields...','',68);
-    let fMap = {};
-    try {
-      const fRaw = await fetchAll(
+      // 4. CUSTOM FIELDS
+      par('Custom fields',
         G_URL + 'dwanalytics_report_form_section_field' +
         '?$select=report_id,field_name,text_value' +
         '&$filter=' + encodeURIComponent(
@@ -2993,14 +3002,30 @@ async function loadData(forceRefresh=false) {
           "field_name eq 'Finding description' or field_name eq 'Nature of finding' or " +
           "field_name eq 'Issued to (person)' or " +
           "field_name eq 'First extension approved?' or field_name eq 'Second extension agreed?'"
-        )
-      );
-      fRaw.forEach(f => {
-        if (!fMap[f.report_id]) fMap[f.report_id]={};
-        if (!fMap[f.report_id][f.field_name])
-          fMap[f.report_id][f.field_name] = f.text_value;
-      });
-    } catch(e) { console.warn('Fields load error:',e); }
+        ),
+        rows => {
+          rows.forEach(f => {
+            if (!fMap[f.report_id]) fMap[f.report_id]={};
+            if (!fMap[f.report_id][f.field_name])
+              fMap[f.report_id][f.field_name] = f.text_value;
+          });
+        }),
+
+      // 5. AUDIT SUMMARY — dùng ở khối "4. AUDIT PLAN" phía dưới
+      par('Audit plan',
+        G_URL + 'dwreporting_audit_summary' +
+        '?$select=audit_id,number,title,audit_type,status,scheduled_start_date,' +
+        'actual_start_date,closed_date,lead_auditor_name,primary_scope_item_name,location_name',
+        rows => { auRaw = rows; }),
+    ]);
+
+    // USERS trước, GROUPS chỉ lấp chỗ trống — áp đúng thứ tự này bất kể request nào
+    // về trước, để kết quả không phụ thuộc độ trễ mạng.
+    usersRaw.forEach(u => { if (u.user_id) userMap[u.user_id] = u.full_name || null; });
+    // Owner của report có thể là 1 USER (cá nhân) HOẶC 1 USER GROUP (nhóm) — Galileo đang chuyển owner
+    // PAVOI từ cá nhân sang 4 nhóm "… Section" (owner_id = group_id). Nạp groupMap để owner_name hiện
+    // đúng tên nhóm khi owner là group. Merge vào userMap (user_id/group_id đều UUID, không đụng nhau).
+    grpRaw.forEach(gr => { if (gr.group_id && !userMap[gr.group_id]) userMap[gr.group_id] = gr.name || null; });
 
     // BUILD FINAL DATASET
     setOv(true,'Processing data...','',80);
@@ -3054,18 +3079,11 @@ async function loadData(forceRefresh=false) {
       };
     });
 
-    // 4. LOAD AUDIT SUMMARY — lấy audit_id từ allData rồi fetch audit info
-    setOv(true,'[6/6] Loading audit plan...','',90);
+    // 4. AUDIT PLAN — auRaw đã nạp song song ở khối trên, đây chỉ còn xử lý
+    setOv(true,'Processing audit plan...','',90);
     try {
       // Lấy danh sách audit_id có trong QA AMO reports
       const auditIdSet = new Set(allData.map(r=>r.audit_id).filter(Boolean));
-
-      // Load TẤT CẢ audit — không filter, chỉ 86 records
-      const auRaw = await fetchAll(
-        G_URL + 'dwreporting_audit_summary' +
-        '?$select=audit_id,number,title,audit_type,status,scheduled_start_date,' +
-        'actual_start_date,closed_date,lead_auditor_name,primary_scope_item_name,location_name'
-      );
 
       // Dedup audit by audit_id — giữ bản đầu tiên (audit không có versioning)
       const auMap = {};

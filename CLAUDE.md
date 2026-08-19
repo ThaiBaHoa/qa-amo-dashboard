@@ -103,7 +103,15 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
 
 - `doLogin` / `doRegister` / `doLogout` — auth flow against Supabase.
 - `initApp` — runs after login, builds UI shell, calls `loadData`.
-- `loadData` — fetches reports from Galileo in stages, builds `allData` / `auditData`.
+- `loadData` — fetches reports from Galileo, builds `allData` / `auditData`.
+  **The six top-level fetches run in `Promise.all` (r132), not in sequence** — they are
+  independent (none uses another’s result as a `$filter`) and Galileo’s TTFB is 2–4s per
+  request while transfer is ~0.1s, so serialising them wasted ~17s of pure queueing.
+  Each job builds its map inside `onRows` so the raw arrays (workflow 22 MB, custom
+  fields 10.7 MB) are freed early instead of all six being held at once. Only the
+  summary job is `critical` — the rest swallow errors and return `[]`, matching the old
+  per-stage `try/catch`. Users are applied before user-groups **after** the barrier so
+  the merge order cannot depend on network latency.
   **Never mutate `allData` directly** — use enriched clones only.
   **Never touch `loadData()` or `ORG_UNIT` unless the change is intentionally cross-page.**
 - `startAutoRefresh` — kiosk/LED auto-refresh: wall-clock heartbeat every 5 min that
@@ -285,7 +293,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.08.18-r131-i6
+Rev current: 2026.08.19-r132
 
 ORG_UNIT = 'QA AMO'   ← main pages (never change without cross-page intent)
                          CMR-CAR and ECAR use org_unit = 'TQA' — fetched separately
