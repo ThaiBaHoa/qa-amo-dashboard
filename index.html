@@ -2910,9 +2910,12 @@ async function loadData(forceRefresh=false) {
 
     // ── NẠP SONG SONG ───────────────────────────────────
     // 6 request dưới đây ĐỘC LẬP — không cái nào dùng kết quả cái kia làm $filter.
-    // Chạy nối tiếp tốn ~22s vì TTFB của Galileo là 2–4s mỗi request trong khi
-    // truyền chỉ 0,07–0,18s: gần như toàn bộ thời gian là xếp hàng. Promise.all
-    // đưa về ~5s (= request chậm nhất).
+    // Đo A/B thật trên trình duyệt (3 vòng xen kẽ, chỉ phần network, 19/08/2026):
+    // tuần tự 14,59/14,63/14,65s — song song 7,49/7,21/6,67s → 14,6s còn 7,1s (2,05×).
+    // Cả loadData end-to-end (kèm dựng map + renderAll + cacheSave) ~8,8s khi proxy
+    // đã ấm; lần mở đầu tiên còn ~25s vì first-touch, cả hai chế độ đều dính.
+    // Lưu ý: lợi ích đến từ CHỒNG LẤN phần truyền/giải nén chứ không thuần TTFB —
+    // riêng report_workflow đã mất 10,4s tuần tự.
     // skipOv=true cho TẤT CẢ (invariant I11): fetchAll ghi overlay qua
     // g('ovText').textContent — chạy song song sẽ giẫm chữ lên nhau. Overlay do
     // chính loadData lái bằng bộ đếm parDone bên dưới.

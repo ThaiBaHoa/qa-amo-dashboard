@@ -105,8 +105,11 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
 - `initApp` — runs after login, builds UI shell, calls `loadData`.
 - `loadData` — fetches reports from Galileo, builds `allData` / `auditData`.
   **The six top-level fetches run in `Promise.all` (r132), not in sequence** — they are
-  independent (none uses another’s result as a `$filter`) and Galileo’s TTFB is 2–4s per
-  request while transfer is ~0.1s, so serialising them wasted ~17s of pure queueing.
+  independent (none uses another’s result as a `$filter`). Measured A/B in-browser, 3
+  alternating rounds, network phase only: sequential 14.6s → parallel 7.1s (2.05×). Full
+  `loadData` end-to-end is ~8.8s warm; the first load after opening the app is ~25s in
+  either mode (proxy/origin first-touch). The win comes from overlapping *transfer*, not
+  just latency — `report_workflow` alone is 10.4s sequential.
   Each job builds its map inside `onRows` so the raw arrays (workflow 22 MB, custom
   fields 10.7 MB) are freed early instead of all six being held at once. Only the
   summary job is `critical` — the rest swallow errors and return `[]`, matching the old

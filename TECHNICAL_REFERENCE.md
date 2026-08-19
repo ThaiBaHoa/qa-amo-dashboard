@@ -91,8 +91,9 @@ Gọi khi: login, refresh, hết cache (TTL 4h).
 > **Sáu bước dưới đây chạy SONG SONG, không nối tiếp (r132).** Chúng độc lập — không bước nào
 > dùng kết quả bước khác làm `$filter` — nên cả sáu đi trong một `Promise.all`. Đánh số 1–6 ở đây
 > chỉ để đọc cho có thứ tự, KHÔNG phải thứ tự thực thi; đừng viết code dựa vào giả định bước 2 xong
-> trước bước 3. Lý do: TTFB của Galileo là 2,0–4,1s mỗi request còn truyền chỉ 0,07–0,18s (đo
-> 19/08/2026), nối tiếp mất ~22s trong đó ~17s là xếp hàng. Hai ngoại lệ vẫn tuần tự vì thật sự phụ
+> trước bước 3. Đo A/B trên trình duyệt (3 vòng xen kẽ, chỉ phần network, 19/08/2026): tuần tự
+> **14,6s** → song song **7,1s** (2,05×); cả `loadData` end-to-end ~8,8s khi proxy đã ấm, lần mở đầu
+> tiên ~25s ở cả hai chế độ. Hai ngoại lệ vẫn tuần tự vì thật sự phụ
 > thuộc: **bước 6 (Audit Workflow)** cần danh sách audit từ bước 5, và merge `userMap` áp bước 2
 > (users) trước rồi mới bước 2b (user groups) — làm SAU barrier để không phụ thuộc độ trễ mạng.
 
