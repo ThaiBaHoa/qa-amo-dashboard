@@ -156,6 +156,8 @@ GET dwreporting_audit_summary
            lead_auditor_name, primary_scope_item_name, location_name
   (không filter — lấy hết, dedup theo audit_id)
 ```
+→ **Chặn trước (r133): bỏ mọi audit `status = 'Deleted'`** — audit đã xoá trên Galileo không được vào bất kỳ thống kê nào. Trước r133 chúng lọt qua và bị `isActive` đếm thành *đang tiến hành*, làm ô Overview "Audit vs Inspection" (1.061) lệch ô "By status" (1.046) đúng 15 audit MNT. Probe 20/08/2026: 135 audit `Deleted` toàn hệ thống, 15 là MNT, **0 report QA AMO trỏ tới** nên loại bỏ vô hại. Cùng chỗ đó vẫn loại prefix `MPS`.
+
 → Filter client-side (3 nhánh OR): giữ audit khi **(1)** `audit_id` có trong QA AMO reports, **HOẶC (2)** số hiệu có prefix QA AMO (`QA_AMO_PREFIXES`=`MNT`) — bất kể `audit_type`/lead, **HOẶC (3)** là `Internal Audit`/`Inspection` do `QA_AMO_AUDITORS` dẫn. Nhánh (2) thêm ở **r126** để bắt trọn audit **kế hoạch tương lai** (chưa có report) có type khác (`MQA Internal Cross Audit`, `VJC AMO`…) hoặc lead còn `"Assign Lead Auditor"` — trước đó bị whitelist type + danh sách lead làm rớt (vd Q4/2026 mất MNT-1045..1048).
 
 **Bước 6 — Audit Workflow**

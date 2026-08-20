@@ -2321,7 +2321,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.19-r132';
+const APP_REV = '2026.08.20-r133';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3189,7 +3189,18 @@ async function loadData(forceRefresh=false) {
           sched_month: a.scheduled_start_date ? String(Number(String(a.scheduled_start_date).slice(5,7))) : null,
           workflow_category: deriveWorkflowCategory(a),
         };
-      }).filter(a => a.prefix !== 'MPS');
+      }).filter(a => a.prefix !== 'MPS' && a.status !== 'Deleted');
+      // ↑ status 'Deleted' = audit đã bị xoá trên Galileo, KHÔNG được vào bất kỳ thống kê nào (r133).
+      // Trước đây lọt vào auditData và bị đếm SAI thành "đang tiến hành": ô "Audit vs Inspection"
+      // dùng isActive = (không Closed && không Cancelled) nên vơ luôn 'Deleted', trong khi ô
+      // "By status" chỉ vẽ 5 status có trong CFG.AUDIT_STATUS nên bỏ qua → hai ô cạnh nhau lệch
+      // 15 audit (1.046 vs 1.061), đúng số audit MNT bị xoá. runSelfChecks (r125) đã cảnh báo
+      // đúng chỗ này từ trước nhưng chỉ hiện trong Console.
+      // Probe 20/08/2026: 135 audit 'Deleted' toàn hệ thống, 15 trong đó là MNT (MNT-0001..0032,
+      // toàn kế hoạch 2020 bị huỷ) và **0 report QA AMO nào trỏ tới chúng** → loại bỏ không làm
+      // mất audit_number của report nào. Quyết định nghiệp vụ của Eric 20/08/2026: xoá là loại hẳn,
+      // không hiện thành cột riêng.
+      // KHÔNG cần thêm 'Deleted' vào CFG.AUDIT_STATUS: đã lọc từ đây nên không bao giờ tới donut.
 
       // Also update allData with audit number
       const auNumMap = {};
