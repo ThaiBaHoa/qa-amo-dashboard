@@ -2342,7 +2342,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.20-r138';
+const APP_REV = '2026.08.20-r139';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -7772,6 +7772,37 @@ const RS_SUBJ_RANK = {'SUBJECT':0,'Investigation':1,'BRIEF DETAILS':2};
 
 let rsLoaded=false, rsRows=null, rsTab='f088', rsSF='all';
 
+// Cột của bảng Report Status + khoá sắp xếp. [r139]
+// Khoá là HÀM chứ không phải tên trường: phần lớn cột ở đây là kết luận suy ra
+// (Satis/Unsatis, Completed/Not Completed) chứ không có sẵn trong row, nên sortD()
+// — vốn chỉ nhận tên trường — không dùng lại được.
+// Cột boolean trả 1/0 để Unsatis dồn về một đầu, tiện soi chỗ còn thiếu.
+// Định danh bằng `id` chứ không bằng chỉ số: tab EIS có thêm cột PAVOI còn tab F-088
+// thì không, nên chỉ số cột lệch nhau giữa hai tab; dùng id thì đổi tab vẫn giữ đúng
+// cột đang sắp, và tự bỏ sort nếu cột đó không tồn tại ở tab kia.
+const RS_COLS = [
+  { id:'num',    label:'Report No.',                        key:r=>r.num||'' },
+  { id:'subj',   label:'Report Title',                      key:r=>r.subject||'' },
+  { id:'owner',  label:'Incharge Person',                   key:r=>r.owner||'' },
+  { id:'done',   label:'Completion on Coruson',             key:r=>rsDone(r)?1:0 },
+  { id:'fill',   label:'Report Section / Fill Information',  key:r=>rsOkE(r)?1:0 },
+  { id:'wf',     label:'Workflow / Add Task',               key:r=>rsOkF(r)?1:0 },
+  { id:'links',  label:'Evaluation / Linked Report',        key:r=>r.links.length },
+  { id:'files',  label:'Final Report (tab REPORT)',         key:r=>rsOkH(r)?1:0 },
+  { id:'status', label:'Status on Coruson',                 key:r=>r.status||'' },
+];
+const RS_COL_PAVOI = { id:'pavoi', label:'PAVOI',
+  key:r=>r.links.filter(x=>/^PAVOI/i.test(x)).join(', ') };
+
+// null = giữ nguyên thứ tự gốc như trước r139; chỉ sắp khi người dùng bấm.
+let rsSortId = null, rsSortAsc = true;
+
+function rsSetSort(id){
+  if(rsSortId===id) rsSortAsc = !rsSortAsc;
+  else { rsSortId = id; rsSortAsc = true; }
+  renderRptStatus();
+}
+
 // OData `in (…)` KHÔNG bị tính theo MaxNodeCount như chuỗi `or` → nhồi được hàng trăm giá trị
 // trong 1 request (đã đo: 448 report_key, 84 UUID). Nhờ đó trang này chỉ tốn ~8 request.
 const rsIn = (col,vals,quote) => col+' in ('+vals.map(v=>quote?"'"+String(v).replace(/'/g,"''")+"'":v).join(',')+')';
@@ -7960,13 +7991,29 @@ function renderRptStatus(){
     const years=[...new Set([].concat.apply([],Object.values(rsRows)).map(r=>r.year).filter(Boolean))].sort((a,b)=>b-a);
     initYearMulti('rsYearF', years, {onChange:renderRptStatus});
   }
-  const cols=['Report No.','Report Title','Incharge Person','Completion on Coruson',
-    'Report Section / Fill Information','Workflow / Add Task','Evaluation / Linked Report',
-    'Final Report (tab REPORT)','Status on Coruson'].concat(f.pavoi?['PAVOI']:[]);
-  head.innerHTML='<tr>'+cols.map(c=>'<th>'+c+'</th>').join('')+'</tr>';
+  const cols = RS_COLS.concat(f.pavoi?[RS_COL_PAVOI]:[]);
+  // th đã có sẵn cursor:pointer + user-select:none trong CSS chung.
+  // Mũi tên: ↕ = sắp được, ↑/↓ = cột đang sắp. Bảng này 9-10 cột nên phải chỉ rõ
+  // cột nào đang sắp, khác các bảng khác trong app vốn chỉ hiện ↕ tĩnh.
+  head.innerHTML='<tr>'+cols.map(c=>{
+    const on = rsSortId===c.id;
+    return '<th onclick="rsSetSort(\''+c.id+'\')">'+c.label+
+      '<span style="margin-left:5px;opacity:'+(on?'1':'.4')+'">'+(on?(rsSortAsc?'↑':'↓'):'↕')+'</span></th>';
+  }).join('')+'</tr>';
   if(!rsRows){ body.innerHTML='<tr><td colspan="'+cols.length+'" style="text-align:center;padding:24px;color:var(--muted)">No data</td></tr>'; return; }
 
-  const rows=rsVisible();
+  let rows=rsVisible();
+  // find() trả undefined khi cột đang sắp không có ở tab hiện tại (vd PAVOI ở tab F-088)
+  // → bỏ qua sort thay vì lỗi.
+  const sc = rsSortId ? cols.find(c=>c.id===rsSortId) : null;
+  if(sc){
+    rows=[...rows].sort((a,b)=>{
+      const va=sc.key(a), vb=sc.key(b);
+      if(typeof va==='string' || typeof vb==='string')
+        return rsSortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+      return rsSortAsc ? va-vb : vb-va;
+    });
+  }
   const okB  = t=>'<span class="badge b-on">'+t+'</span>';
   const badB = t=>'<span class="badge b-over">'+t+'</span>';
   const mut  = (t,tip)=>'<span style="font-size:10px;color:var(--muted);margin-left:5px"'+(tip?' title="'+esc(tip)+'"':'')+'>'+t+'</span>';
