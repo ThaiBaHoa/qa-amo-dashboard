@@ -545,7 +545,7 @@ body.kiosk .mob-menu{display:none!important}
         <div id="adminNav" style="display:none">
           <div class="nav-sec" style="margin-top:6px">Admin</div>
           <button class="nav-item" onclick="showPage('admin',this)"><span class="nav-ic" data-ic="users"></span>User Management</button>
-          <button class="nav-item admin-only" id="reportsNav" onclick="showPage('reports',this)"><span class="nav-ic" data-ic="download"></span>Export Reports</button>
+          <button class="nav-item admin-only" id="reportsNav" style="display:none" onclick="showPage('reports',this)"><span class="nav-ic" data-ic="download"></span>Export Reports</button>
           <button class="nav-item" onclick="showPage('kpi2',this)"><span class="nav-ic" data-ic="chart"></span>Early Detection</button>
           <button class="nav-item" onclick="showPage('querybuilder',this)"><span class="nav-ic" data-ic="search"></span>Query Builder</button>
           <button class="nav-item" onclick="showPage('mydashboard',this)"><span class="nav-ic" data-ic="star"></span>My Dashboard</button>
@@ -821,7 +821,7 @@ body.kiosk .mob-menu{display:none!important}
                 </select>
                 <select class="sel" id="ataYear" onchange="renderATACompare()" style="font-size:11px"></select>
                 <select class="sel" id="ataMonth" onchange="renderATACompare()" style="font-size:11px"></select>
-                <button class="btn-sm admin-only" onclick="exportATAComparePDF()" style="white-space:nowrap;flex-shrink:0">⬇ PDF</button>
+                <button class="btn-sm admin-only" onclick="exportATAComparePDF()" style="white-space:nowrap;flex-shrink:0;display:none">⬇ PDF</button>
               </div>
             </div>
             <!-- Legend -->
@@ -1829,7 +1829,7 @@ body.kiosk .mob-menu{display:none!important}
               <div style="display:flex;gap:8px">
                 <button class="btn-sm" onclick="qbShowTemplates()" style="gap:5px">📋 Templates</button>
                 <button class="btn-sm" onclick="qbSaveTemplate()" style="gap:5px">💾 Save template</button>
-                <button class="btn-sm admin-only" onclick="qbExportExcel()" style="background:#1D6F42;border-color:#1D6F42;color:#fff">📥 Excel</button>
+                <button class="btn-sm admin-only" onclick="qbExportExcel()" style="background:#1D6F42;border-color:#1D6F42;color:#fff;display:none">📥 Excel</button>
               </div>
             </div>
           </div>
@@ -2342,7 +2342,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.20-r137';
+const APP_REV = '2026.08.20-r138';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -4251,8 +4251,8 @@ function renderOpen() {
 }
 
 async function exportATAComparePDF() {
-  if(!curUser||curUser.role!=='admin'){toast('Chi admin moi co quyen xuat bao cao','err');return;}
-  toast('Dang tao PDF...','info');
+  if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
+  toast('Generating PDF...','info');
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
   const W=doc.internal.pageSize.getWidth(), M=10;
@@ -4331,7 +4331,7 @@ async function exportATAComparePDF() {
 
   const fname=`ATA_Compare_${lvlLabel}_${yr.replace(/, /g,'-')}_${new Date().toISOString().slice(0,10)}.pdf`;
   doc.save(fname);
-  toast('Da xuat '+fname,'ok');
+  toast('Exported '+fname,'ok');
 }
 
 // ── TABLE: OVERDUE ────────────────────────────────────────────
@@ -5033,7 +5033,7 @@ async function loadPavoiRfi(force=false){
   }
   if(failed){
     pavoiRfiLoaded = false;   // còn chunk lỗi → mở lại trang sẽ thử lại đúng các report còn thiếu
-    toast(`PAVOI RFI/Task: ${failed} nhóm tải lỗi — mở lại trang để thử lại`,'err');
+    toast(`PAVOI RFI/Task: ${failed} group(s) failed to load — reopen the page to retry`,'err');
   }else{
     pavoiRfiLoaded = true;
   }
@@ -7649,7 +7649,7 @@ async function loadSafety(){
     const groups=gr.filter(x=>!x.is_archived && !SAFETY_ROLE_RE.test(x.name||''));
     const id2name={}; groups.forEach(x=>id2name[x.group_id]=(x.name||'').trim());
     const ids=groups.map(x=>x.group_id);
-    if(!ids.length) throw new Error('Không tìm thấy nhóm MSAG');
+    if(!ids.length) throw new Error('No MSAG group found');
     // 2) report owned bởi các nhóm MSAG (bản hiện hành valid_to null)
     const flt='('+ids.map(i=>'owner_id eq '+i).join(' or ')+') and valid_to eq null';
     const raw=await fetchAll(G_URL+'dwreporting_report_summary?$select=report_id,report_status,owner_id,form_name,report_number&$filter='+encodeURIComponent(flt));
@@ -7784,7 +7784,7 @@ async function loadRptStatus(){
     const base = {};
     forms.forEach(x=>{ base[x[0]]=allData.filter(r=>r.report_title===x[1].title); });
     const ids = [].concat.apply([],Object.values(base)).map(r=>r.report_id).filter(Boolean);
-    if(!ids.length) throw new Error('Không tìm thấy report EIS / F-088 trong allData');
+    if(!ids.length) throw new Error('No EIS / F-088 report found in the loaded data');
     const idSet = new Set(ids);
     const stages = forms.map(x=>x[1].stage);
 

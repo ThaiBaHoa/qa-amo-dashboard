@@ -172,6 +172,13 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
 - **Admin-only tools**: Export Reports, Query Builder, My Dashboard, Early Detection,
   User Management live under sidebar `#adminNav`. Every export button carries `.admin-only`
   (hidden for viewers) AND its handler re-checks `curUser.role==='admin'`.
+  ⚠️ **`.admin-only` alone hides nothing.** `initApp` only *shows* those elements for admins
+  (`el.style.display=''`); it never hides them for viewers. The markup must therefore carry
+  **`display:none` itself**. r138 found 3 of 13 missing it — the KPI Charts `⬇ PDF` button was
+  genuinely visible to viewers (the other two sat inside an already-hidden parent or on a
+  `showPage`-blocked page). No data leaked, because all 9 export handlers re-check the role,
+  but the button was clickable and answered with an error. When you add an `.admin-only`
+  element, write `style="display:none"` and verify as a viewer, not as an admin.
 - **Versioning** (`APP_REV = YYYY.MM.DD-rNN[-iM]`):
   - New feature / layout change / removed functionality → bump `rNN → r(NN+1)`
   - Pure bug fix → keep `rNN`, bump issue suffix (`r107-i1`, `r107-i2`)
@@ -314,7 +321,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.08.20-r137
+Rev current: 2026.08.20-r138
 
 ORG_UNIT = 'QA AMO'   ← main pages (never change without cross-page intent)
                          CMR-CAR and ECAR use org_unit = 'TQA' — fetched separately
