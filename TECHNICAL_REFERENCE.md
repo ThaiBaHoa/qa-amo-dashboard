@@ -121,7 +121,13 @@ GET dwreporting_report_workflow
            stage_completed_date, stage_target_date
 ```
 → Build `wfMap[report_id]`: chỉ lấy stage `ReportAcceptReject` (Completed/InProgress) để lấy `close_date`.
-→ Build `wfAllMap[report_id]`: tất cả stages để render workflow steps.
+→ Build `wfAllMap[report_id]`: tất cả stages để render workflow steps — **có lọc trùng bằng `Set` (r134)**.
+   Bảng này **trải phẳng theo (stage × task)**: một stage có N task thì ra N dòng giống hệt nhau ở đúng 5 cột
+   trên. Không lọc thì `wf_stages` phình **36,1%** (12.808 → 8.181 trên phạm vi QA AMO) và cột Workflow vẽ lặp
+   cùng một bước (PAVOI-403: 63 chip cho 2 bước thật). Khoá lọc là **5 cột đang `$select`**, cố ý KHÔNG dùng
+   `stage_id` vì thêm cột đó làm payload tăng 2,22 → 4,20 MB (+90%) để giữ thêm 19/8.200 stage (0,23%) mà 5 cột
+   của chúng vốn giống hệt nhau. `wfMap` KHÔNG bị ảnh hưởng; `deriveStageDates` đã kiểm 3.441/3.441 report
+   không lệch (hàm dùng `later()` nên idempotent với dòng trùng).
 
 **Bước 4 — Custom Fields**
 ```

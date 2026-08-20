@@ -2321,7 +2321,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.20-r133';
+const APP_REV = '2026.08.20-r134';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2975,9 +2975,27 @@ async function loadData(forceRefresh=false) {
         G_URL + 'dwreporting_report_workflow' +
         '?$select=report_id,stage_type,stage_status,stage_completed_date,stage_target_date',
         rows => {
+          // dwreporting_report_workflow là bảng ĐÃ TRẢI PHẲNG theo (stage × task): một stage có
+          // N task thì hiện ra N dòng giống hệt nhau ở 5 cột ta $select. Không lọc thì wf_stages
+          // phình ra và cột Workflow vẽ lặp cùng một bước — PAVOI-403 có 63 mục cho đúng 2 bước
+          // thật, ra chuỗi "● Task › ● Task › …" 63 lần. Đo 20/08/2026 trên phạm vi QA AMO:
+          // 12.808 mục → 8.181 sau lọc, tức 36,1% là bản trùng.
+          // Khoá lọc dùng ĐÚNG 5 cột đang có, CỐ Ý KHÔNG kéo thêm stage_id: thêm cột đó làm
+          // payload của request nặng nhất tăng 2,22 → 4,20 MB (+90%) mà chỉ giữ thêm 19/8.200
+          // stage (0,23%) — và 19 stage đó có cả 5 cột giống hệt nhau nên chip vẽ ra trùng khít,
+          // người dùng không phân biệt được. Nếu sau này cần đúng từng stage instance (vd đếm số
+          // lần lặp của một stage) thì mới đổi khoá sang stage_id và chịu thêm payload.
+          // KHÔNG đụng wfMap phía dưới — nó vẫn chạy trên MỌI dòng như trước, và vốn đã bất biến
+          // với dòng trùng vì luật chọn thắng là tất định.
+          const wfSeen = new Set();
           rows.forEach(w => {
-            if (!wfAllMap[w.report_id]) wfAllMap[w.report_id] = [];
-            wfAllMap[w.report_id].push(w);
+            const wfKey = w.report_id+'|'+w.stage_type+'|'+w.stage_status+'|'+
+                          w.stage_completed_date+'|'+w.stage_target_date;
+            if (!wfSeen.has(wfKey)) {
+              wfSeen.add(wfKey);
+              if (!wfAllMap[w.report_id]) wfAllMap[w.report_id] = [];
+              wfAllMap[w.report_id].push(w);
+            }
             if (w.stage_type !== 'ReportAcceptReject') return;
             if (w.stage_status !== 'Completed' && w.stage_status !== 'InProgress') return;
             const ex = wfMap[w.report_id];

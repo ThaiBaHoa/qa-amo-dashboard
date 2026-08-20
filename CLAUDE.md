@@ -198,6 +198,7 @@ Known Galileo data quirks — **do not "fix" them in Galileo data**, keep these 
 
 | Quirk | Workaround |
 |-------|-----------|
+| `dwreporting_report_workflow` is flattened by (stage × task) — one stage with N tasks appears as N identical rows across the 5 columns we `$select` | Dedup with a `Set` while building `wfAllMap` (r134). Without it `wf_stages` inflates 36% and the Workflow column repeats the same step (PAVOI-403 rendered 63 chips for 2 real stages). Key on the 5 selected columns, **not** `stage_id` — adding that column nearly doubles the request (2.22 → 4.20 MB) to keep 19 of 8,200 stages whose five columns are identical anyway. `deriveStageDates` was already dedup-safe (`later()` is idempotent), verified across all 3,441 reports. |
 | Trailing space in `document_type` | `.trim()` before every string comparison |
 | Double space: `"Foreign Air  Transport…"` (FAOC) | Match both variants + `sw('FAOC')` prefix |
 | Typo: `"MQA - Qualilty Notice"` | Hardcode misspelled string in mapping |
@@ -296,7 +297,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.08.20-r133
+Rev current: 2026.08.20-r134
 
 ORG_UNIT = 'QA AMO'   ← main pages (never change without cross-page intent)
                          CMR-CAR and ECAR use org_unit = 'TQA' — fetched separately
