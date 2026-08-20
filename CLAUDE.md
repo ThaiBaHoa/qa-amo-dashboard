@@ -79,11 +79,22 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
   guards vanish silently. The hook bodies now live in `scripts/hooks/` (tracked); install
   them with **`sh scripts/install-hooks.sh`** after every clone. Bypass once with
   `git commit --no-verify`.
-  > `check-doc-sync.sh` also checks the header rev of `QA_AMO_Dashboard.md` in the
-  > workspace (it lives in the vault, not the repo). It was named `QA_AMO_CONTEXT.md`
-  > until 2026-08-13; the guard kept the old name and so skipped silently until
-  > 2026-08-18. If the workspace or the file is missing the guard now says so on
-  > stderr instead of passing quietly.
+  > `check-doc-sync.sh` also checks the header rev of `QA_AMO_Dashboard.md`, which lives
+  > in the **`obsidian-mind` vault** at `reference/qa-amo-dashboard/` — not in the repo and
+  > no longer in Vault-CongViec. Resolved per machine by `scripts/resolve-vault-note.sh`
+  > (deliberately separate from `resolve-workspace.sh`, which still points at Vault-CongViec
+  > for the `index.html` mirror — merging the two would break that mirror). Override with
+  > `QA_AMO_VAULT_NOTE`. Missing file → says so on stderr instead of passing quietly.
+  > **Writing that note must happen from a session opened inside `obsidian-mind`** (global
+  > CLAUDE.md rule); a session in this repo prepares the content but does not write it.
+  >
+  > This guard has now been aimed at the wrong target twice, and both times failed silently.
+  > (1) The file was renamed from `QA_AMO_CONTEXT.md` on 2026-08-13; the guard kept the old
+  > name and skipped until 2026-08-18. (2) Until 2026-08-20 it watched the Vault-CongViec
+  > copy while the copy the `om` MCP server actually serves to **every** Claude session lives
+  > in `obsidian-mind` — that one sat at r130 for 10 revs, 65 lines behind, and the guard
+  > reported OK the whole time. When a "single source of truth" file exists in two places,
+  > assume the guard is watching the wrong one until proven otherwise.
 
 ### Two backends — do not confuse them
 

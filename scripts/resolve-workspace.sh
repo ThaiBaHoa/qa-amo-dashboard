@@ -1,6 +1,9 @@
 #!/bin/sh
-# Nguon su that DUY NHAT cho duong dan "workspace" (thu muc vault chua ban sao
-# index.html + QA_AMO_Dashboard.md). In ra duong dan, hoac in rong neu khong tim thay.
+# Nguon su that DUY NHAT cho duong dan "workspace" — thu muc chua ban sao
+# index.html + NHAT_KY_CAP_NHAT_APP.md. In ra duong dan, hoac in rong neu khong thay.
+#
+# LUU Y: file home QA_AMO_Dashboard.md KHONG con o day. Tu 20/08/2026 no song
+# trong vault obsidian-mind — dung scripts/resolve-vault-note.sh cho file do.
 #
 # Vi sao can: OneDrive mount o o dia KHAC NHAU tren tung may.
 #   - laptop cong ty : F:/Onedrive - Bussiness/OneDrive - VietJet .../

@@ -6,6 +6,10 @@
 #   - QA_AMO_Dashboard.md    → file home VAULT-NATIVE (ngoài repo). Check RIÊNG dòng header
 #       "Rev hiện tại:" (không grep cả file — §8 chứa rev cũ sẽ lọt). Vết r129/r130:
 #       header kẹt r128 vì file này không nằm trong repo nên hook cũ không bắt.
+#       Từ 20/08/2026 file ở obsidian-mind/reference/qa-amo-dashboard/ — xem
+#       scripts/resolve-vault-note.sh. Trước đó guard canh bản ở Vault-CongViec nên
+#       bản trong vault (bản mà om server phục vụ cho MỌI phiên Claude) kẹt ở r130
+#       suốt 10 rev mà không ai hay.
 #   - TECHNICAL_REFERENCE.md → KHÔNG grep được nội dung (field/flow) → chỉ nhắc rà tay.
 # Exit 0 = khớp; exit 1 = có doc tụt rev (in ra danh sách).
 # Dùng: sh scripts/check-doc-sync.sh   (chạy tại gốc repo)
@@ -13,10 +17,10 @@
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
 cd "$ROOT" || exit 0
 
-# Đường dẫn vault — giải theo từng máy (OneDrive mount ở ổ khác nhau: F: trên
-# laptop, G: trên PC nhà). Trước đây dòng này hardcode F:, nên trên PC nhà phần
-# kiểm tra QA_AMO_Dashboard.md im lặng bỏ qua. Nguồn sự thật: scripts/resolve-workspace.sh
-WORKSPACE="$(sh "$ROOT/scripts/resolve-workspace.sh" 2>/dev/null)"
+# Đường dẫn file home trong vault — giải theo từng máy (OneDrive mount ở ổ khác
+# nhau: F: laptop công ty, G: PC nhà). Nguồn sự thật: scripts/resolve-vault-note.sh
+# (KHÁC resolve-workspace.sh — cái đó lo việc mirror index.html, không đổi).
+CTX="$(sh "$ROOT/scripts/resolve-vault-note.sh" 2>/dev/null)"
 
 REV_FULL="$(grep -oE "APP_REV[^;]*" index.html | head -1 | grep -oE "r[0-9]+(-i[0-9]+)?")"
 REV_MAJOR="$(printf '%s' "$REV_FULL" | grep -oE 'r[0-9]+')"
@@ -37,18 +41,16 @@ done
 
 # 2) QA_AMO_Dashboard.md (vault): check ĐÚNG dòng header, không phải cả file.
 #    Vắng file (clone máy không có vault) → bỏ qua, không chặn.
-CTX="$WORKSPACE/QA_AMO_Dashboard.md"
 CTX_CHECKED=""
-if [ -f "$CTX" ]; then
+if [ -n "$CTX" ] && [ -f "$CTX" ]; then
   CTX_CHECKED=1
   CTX_REV="$(grep -m1 'Rev hi' "$CTX" | grep -oE 'r[0-9]+' | head -1)"
   if [ "$CTX_REV" != "$REV_MAJOR" ]; then
     STALE="$STALE QA_AMO_Dashboard.md(header=${CTX_REV:-none})"
   fi
-elif [ -z "$WORKSPACE" ]; then
-  echo "[doc-sync] BỎ QUA QA_AMO_Dashboard.md — không giải được workspace trên máy này." >&2
 else
-  echo "[doc-sync] BỎ QUA QA_AMO_Dashboard.md — không thấy trong $WORKSPACE" >&2
+  echo "[doc-sync] BỎ QUA QA_AMO_Dashboard.md — không thấy trong vault obsidian-mind" >&2
+  echo "           (obsidian-mind/reference/qa-amo-dashboard/QA_AMO_Dashboard.md)" >&2
 fi
 
 if [ -n "$STALE" ]; then

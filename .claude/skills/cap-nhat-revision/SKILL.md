@@ -86,12 +86,17 @@ Hỏi "cùng spec hay khác spec" trước, rồi mới tới feature/bugfix.
    - `TECHNICAL_REFERENCE.md`: rà lại **nếu nguồn/field/công thức đổi** (vd thêm `field_name`
      ở bước [5/6] `loadData`, đổi org_unit, đổi cách tính). Grep không bắt được nội dung này
      → phải đọc tay. Xem `SO_DO_CAU_TRUC.html` (sơ đồ luồng) để đối chiếu.
-   - ⚠️ **`QA_AMO_Dashboard.md`** (file home vault, KHÔNG nằm trong repo — phải sửa TAY):
-     cập nhật **header `Rev hiện tại:`** + **`Cập nhật context:`** + thêm 1 gạch đầu dòng ở
-     **§8 "Gần đây"**. `check-doc-sync.sh` CÓ bắt dòng header này (qua
-     `scripts/resolve-workspace.sh`), nhưng KHÔNG bắt được §8 — phần đó vẫn trôi lặng lẽ.
-     (Vết r129–r130: đã quên bước này → header kẹt ở r128. File tên cũ là
-     `QA_AMO_CONTEXT.md`, đổi tên 13/08; guard giữ tên cũ nên bỏ qua im lặng tới 18/08.)
+   - ⚠️ **`QA_AMO_Dashboard.md`** — file home, sống trong **vault `obsidian-mind`** tại
+     `reference/qa-amo-dashboard/`, KHÔNG nằm trong repo và KHÔNG còn ở Vault-CongViec.
+     Cập nhật **header `Rev hiện tại:`** + **`Cập nhật context:`** + thêm 1 gạch đầu dòng ở
+     **§8 "Gần đây"**. `check-doc-sync.sh` CÓ bắt dòng header (qua
+     `scripts/resolve-vault-note.sh`), nhưng KHÔNG bắt được §8 — phần đó vẫn trôi lặng lẽ.
+     ⚠️ **Ghi vào vault phải làm từ phiên mở NGAY TRONG `obsidian-mind`** — luật ở CLAUDE.md
+     toàn cục. Phiên mở trong repo/workspace thì chỉ chuẩn bị nội dung, không ghi thẳng.
+     (Hai vết cùng họ, đều là "guard canh nhầm chỗ": r129–r130 header kẹt r128 vì file đổi
+     tên từ `QA_AMO_CONTEXT.md` 13/08 mà guard giữ tên cũ, im lặng tới 18/08. Rồi 20/08 phát
+     hiện guard đang canh bản ở Vault-CongViec trong khi bản `om` server phục vụ cho MỌI
+     phiên Claude nằm ở `obsidian-mind` và đã kẹt ở r130 suốt 10 rev.)
    - Bump `-iM` thuần bugfix: doc thường không cần đổi (rNN đã có sẵn trong doc).
 4. **Chốt trước commit — chạy check tự động:**
    ```
