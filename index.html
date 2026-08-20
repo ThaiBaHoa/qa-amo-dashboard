@@ -2342,7 +2342,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.20-r139';
+const APP_REV = '2026.08.20-r140';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2897,11 +2897,19 @@ function startAutoRefresh() {
 // Bật bằng URL:  ?kiosk=1   → 30 giây/trang (mặc định)
 //                ?kiosk=45  → 45 giây/trang (nhận 5–600)
 // Thoát: bấm Esc trên bàn phím cắm vào máy LED (phòng khi mở nhầm trên máy cá nhân).
+// Mỗi bước tự gọi hàm mở trang của nó, KHÔNG dùng chung showPage(name) cho tất cả:
+// trang SPI có đường vào riêng `showSPIPage()` (nó gọi showPage('spi') rồi mới nạp dữ
+// liệu). Gọi showPage('spi') thẳng thì trang mở ra nhưng dữ liệu không bao giờ được nạp.
 const KIOSK_STEPS = [
-  { page:'overview',  tab:null,   label:'Overview' },
-  { page:'rptstatus', tab:'eis',  label:'Report Status · EIS' },
-  { page:'rptstatus', tab:'f088', label:'Report Status · F-088' },
+  { label:'Overview',              show:()=>showPage('overview') },
+  { label:'Report Status · EIS',   show:()=>{ showPage('rptstatus'); kioskRsTab('eis');  } },
+  { label:'Report Status · F-088', show:()=>{ showPage('rptstatus'); kioskRsTab('f088'); } },
+  { label:'SPI',                   show:()=>showSPIPage() },
+  { label:'Safety · MSAG',         show:()=>showPage('safety') },
 ];
+function kioskRsTab(tab){
+  setRsTab(tab, document.querySelector('#page-rptstatus .rs-tab[data-tab="'+tab+'"]'));
+}
 const KIOSK_DEFAULT_SEC = 30;
 let kioskSec = 0, kioskTimer = null, kioskIdx = 0;
 
@@ -2925,9 +2933,18 @@ async function startKiosk(){
   for(let i=0; i<180 && (isLoading || !allData.length); i++) {
     await new Promise(r => setTimeout(r, 1000));
   }
-  // Nạp trước để vòng xoay không khựng lại chờ tải khi lần đầu tới Report Status.
+  // Nạp trước MỌI trang lazy-load trong vòng xoay, để không khựng lại chờ tải khi lần
+  // đầu tới từng trang. Mỗi nguồn bọc try riêng: một nguồn hỏng không được làm chết
+  // cả chế độ kiosk — trang đó sẽ tự lazy-load khi tới lượt, cùng lắm là chậm một nhịp.
   try { if(!rsLoaded) await loadRptStatus(); }
   catch(e){ console.warn('[kiosk] prewarm Report Status thất bại:', e.message); }
+  try { if(!safetyLoaded) await loadSafety(); }
+  catch(e){ console.warn('[kiosk] prewarm Safety thất bại:', e.message); }
+  // SPI nạp thẳng loadSPI() thay vì showSPIPage(): showSPIPage sẽ CHUYỂN TRANG, mà lúc
+  // này vòng xoay chưa bắt đầu nên màn hình sẽ nhảy sang SPI rồi mới quay về Overview.
+  // Gán _spiData + populateSpiYear() để khi tới lượt, showSPIPage() đi nhánh nhanh.
+  try { if(!_spiData){ _spiData = await loadSPI(); populateSpiYear(); } }
+  catch(e){ console.warn('[kiosk] prewarm SPI thất bại:', e.message); }
 
   kioskShow(0);
   if(kioskTimer) clearInterval(kioskTimer);
@@ -2954,10 +2971,8 @@ function stopKiosk(){
 function kioskShow(i){
   kioskIdx = i;
   const st = KIOSK_STEPS[i];
-  showPage(st.page);
-  if(st.tab){
-    setRsTab(st.tab, document.querySelector('#page-rptstatus .rs-tab[data-tab="' + st.tab + '"]'));
-  }
+  try { st.show(); }
+  catch(e){ console.warn('[kiosk] không mở được trang', st.label, '—', e.message); }
   const el = g('kioskChip');
   if(el){
     el.style.display = 'flex';

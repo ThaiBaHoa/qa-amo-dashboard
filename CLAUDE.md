@@ -120,7 +120,10 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
 - `startKiosk` / `kioskShow` / `stopKiosk` — **LED wall mode (r137)**, off unless the URL has
   `?kiosk=` (`1` = 30s/page, or `5`–`600` for a custom interval; anything else falls back to 30s).
   Adds `body.kiosk` (hides sidebar + `#aiFab`, `.main` margin 0), then cycles `KIOSK_STEPS`:
-  Overview → Report Status/EIS → Report Status/F-088. Esc exits. **Never reloads** — the session
+  Overview → Report Status/EIS → Report Status/F-088 → SPI → Safety/MSAG (r140). Esc exits.
+  **Each step carries its own `show()` closure, not a page name** — SPI has a separate entry
+  point `showSPIPage()` that calls `showPage('spi')` *and then* loads its data, so calling
+  `showPage('spi')` directly opens the page but never fetches anything. **Never reloads** — the session
   lives in `sessionStorage`. It waits for `loadData` to finish, then pre-warms `loadRptStatus()`
   so the first cycle does not stall, and skips a tick while `isLoading`. Charts are `resize()`d
   after every switch because hiding the sidebar changes the width.
@@ -321,7 +324,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.08.20-r139
+Rev current: 2026.08.20-r140
 
 ORG_UNIT = 'QA AMO'   ← main pages (never change without cross-page intent)
                          CMR-CAR and ECAR use org_unit = 'TQA' — fetched separately
