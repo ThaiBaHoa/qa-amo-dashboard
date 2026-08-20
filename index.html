@@ -568,6 +568,12 @@ tr:last-child td{border-bottom:none}
         <div class="topbar-right">
           <div class="live" id="liveBadge" style="display:none"><span class="live-dot"></span><span id="recCount">0</span> reports</div>
           <span id="cacheAge" style="font-size:11px;color:var(--text-3);white-space:nowrap;font-family:'IBM Plex Mono',monospace"></span>
+          <!-- Cảnh báo tự kiểm dữ liệu (r136). Ẩn mặc định; chỉ hiện cho admin KHI có cảnh báo.
+               KHÔNG gắn class .admin-only: initApp bung display cho mọi phần tử mang class đó
+               nên chip sẽ hiện cả khi không có cảnh báo. Điều kiện hiện nằm ở updateDqBadge(). -->
+          <button class="icon-btn" id="dqBadge" style="display:none;width:auto;gap:6px;padding:0 10px;color:var(--yellow);border-color:var(--yellow)" onclick="showSelfCheckWarnings()">
+            <span style="font-size:13px;line-height:1">&#9888;</span><span id="dqCount" style="font-size:12px;font-weight:600">0</span>
+          </button>
           <button class="icon-btn" id="btnTheme" title="Toggle theme" onclick="toggleTheme()"><span class="nav-ic" data-ic="sun"></span></button>
           <button class="icon-btn" title="Notifications"><span class="nav-ic" data-ic="bell"></span></button>
           <button class="icon-btn" id="btnRefresh" title="Refresh" onclick="loadData(true)"><span class="nav-ic" data-ic="refresh"></span></button>
@@ -2321,7 +2327,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.20-r135';
+const APP_REV = '2026.08.20-r136';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3426,28 +3432,62 @@ function renderAll() {
 }
 
 // Tự kiểm bất biến dữ liệu (dev safety net) — cảnh báo console khi số liệu LỆCH. [r125]
-// KHÔNG throw, KHÔNG chặn render. Mở DevTools Console để thấy. Xem TECHNICAL_REFERENCE §D.
+// KHÔNG throw, KHÔNG chặn render. Từ r136 cảnh báo hiện cả trên chip ⚠ ở topbar (admin).
+// (Con trỏ "TECHNICAL_REFERENCE §D" ở đây trước kia trỏ nhầm mục — §D là "Công cụ tìm liên
+//  kết trong 1 file". Luật self-check nằm ở PROJECT_TECH_SPEC §14, rev r125/r136.)
 function runSelfChecks(){
   try{
     const warn=[];
     const AU = (typeof auditData!=='undefined' && Array.isArray(auditData)) ? auditData : [];
     const AL = (typeof allData!=='undefined'   && Array.isArray(allData))   ? allData   : [];
+    // Chuỗi cảnh báo viết TIẾNG ANH từ r136 — chúng không còn chỉ nằm trong Console mà
+    // hiện thẳng trên UI cho admin, nên rơi vào luật "mọi chữ người dùng thấy là tiếng Anh".
     // 1) status audit lạ → donut "By status" bỏ sót (chỉ vẽ status trong CFG.AUDIT_STATUS)
     const badAu = [...new Set(AU.filter(a=>a.status && !AUDIT_STATUS[a.status]).map(a=>a.status))];
-    if(badAu.length) warn.push('Audit status lạ (thêm vào CFG.AUDIT_STATUS): '+badAu.join(', '));
+    if(badAu.length) warn.push('Unknown audit status (add it to CFG.AUDIT_STATUS): '+badAu.join(', '));
     // 2) semantic_status lạ → donut/bảng report bỏ sót (không có trong CFG.SEM)
     const badSem = [...new Set(AL.filter(r=>r.semantic_status && !SEM[r.semantic_status]).map(r=>r.semantic_status))];
-    if(badSem.length) warn.push('semantic_status lạ (thêm vào CFG.SEM): '+badSem.join(', '));
+    if(badSem.length) warn.push('Unknown report semantic_status (add it to CFG.SEM): '+badSem.join(', '));
     // 3) Overview tie-out: ô "By status" phải KHỚP ô "Audit vs Inspection" (mọi năm)
     const mnt = AU.filter(a=>a.prefix==='MNT');
     const donutSum = AUDIT_STATUS_ORDER.reduce((s,st)=>s+mnt.filter(a=>a.status===st).length,0);
     const barSum   = mnt.filter(isClosed).length + mnt.filter(isActive).length + mnt.filter(isCancelled).length;
-    if(donutSum!==barSum) warn.push(`Overview lệch: By-status(${donutSum}) ≠ Audit-vs-Inspection(${barSum}) — do status audit lạ, thêm vào CFG.AUDIT_STATUS`);
+    if(donutSum!==barSum) warn.push(`Overview mismatch: By status (${donutSum}) does not equal Audit vs Inspection (${barSum}) — an audit status is missing from CFG.AUDIT_STATUS or AUDIT_ACTIVE`);
     // Kết quả
-    if(warn.length){ console.warn('%c[self-check] '+warn.length+' cảnh báo:','color:#D29922;font-weight:700'); warn.forEach(w=>console.warn('  • '+w)); }
-    else console.log('%c[self-check] OK — By-status=Audit-vs-Inspection='+donutSum+' · status/semantic hợp lệ','color:#3FB950');
+    if(warn.length){ console.warn('%c[self-check] '+warn.length+' warning(s):','color:#D29922;font-weight:700'); warn.forEach(w=>console.warn('  • '+w)); }
+    else console.log('%c[self-check] OK — By-status=Audit-vs-Inspection='+donutSum+' · status/semantic valid','color:#3FB950');
+    selfCheckWarnings = warn;   // [r136] giữ lại để UI đọc
+    updateDqBadge();
     return warn;
-  }catch(e){ console.warn('[self-check] lỗi khi chạy:', e); return null; }
+  }catch(e){
+    console.warn('[self-check] lỗi khi chạy:', e);
+    selfCheckWarnings = []; updateDqBadge();
+    return null;
+  }
+}
+
+// ── Cảnh báo tự kiểm — hiện trên UI [r136] ────────────────────────
+// Vì sao cần: runSelfChecks có từ r125 và đã bắt ĐÚNG lỗi audit 'Deleted' bị đếm nhầm
+// (r133) từ nhiều tháng trước, nhưng cảnh báo chỉ nằm trong Console nên không ai thấy —
+// lỗi sống sót tới khi tình cờ có người mở DevTools. Tự kiểm mà không ai đọc thì coi như
+// không có. Nay có chip ⚠ trên topbar, chỉ hiện cho admin và chỉ khi thật sự có cảnh báo.
+let selfCheckWarnings = [];
+
+function updateDqBadge(){
+  const b = g('dqBadge');
+  if(!b) return;
+  const show = selfCheckWarnings.length > 0 && curUser && curUser.role === 'admin';
+  b.style.display = show ? 'flex' : 'none';
+  if(!show) return;
+  g('dqCount').textContent = selfCheckWarnings.length;
+  b.title = `Data self-check: ${selfCheckWarnings.length} warning(s) — click for details\n\n· `
+          + selfCheckWarnings.join('\n· ');
+}
+
+function showSelfCheckWarnings(){
+  if(!selfCheckWarnings.length){ toast('Data self-check: no warnings','ok'); return; }
+  toast(`Data self-check found ${selfCheckWarnings.length} warning(s)`,'err');
+  selfCheckWarnings.forEach(w => toast(w,'err'));
 }
 
 // ── REUSABLE MULTI-YEAR FILTER ───────────────────────────────

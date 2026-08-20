@@ -136,6 +136,14 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
 - `renderAll` — renders every page from `allData`.
 - `showPage` — sidebar nav / page switching. Blocks non-admins from admin pages.
 - `setOv` / `showLoadError` — loading overlay + error/retry state.
+- `runSelfChecks` / `updateDqBadge` / `showSelfCheckWarnings` — data self-check (r125) plus the
+  **⚠ chip in the topbar (r136)**. The chip appears only when there are warnings AND
+  `curUser.role==="admin"`; hover shows the full list, click toasts them. **Do not give it
+  `.admin-only`** — `initApp` force-shows every element with that class, so the chip would
+  appear even with zero warnings. Warning strings are **English**: they are user-facing now,
+  not Console-only. Reason this exists: the self-check caught the `Deleted`-audit miscount
+  months before r133 fixed it, but nobody reads the Console — a self-check nobody reads is
+  not a self-check.
 - `loadUsers` / `approveUser` / `rejectUser` / `makeAdmin` — admin user management.
 
 ---
@@ -297,7 +305,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.08.20-r135
+Rev current: 2026.08.20-r136
 
 ORG_UNIT = 'QA AMO'   ← main pages (never change without cross-page intent)
                          CMR-CAR and ECAR use org_unit = 'TQA' — fetched separately
