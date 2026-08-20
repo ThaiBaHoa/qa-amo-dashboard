@@ -2321,7 +2321,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.20-r134';
+const APP_REV = '2026.08.20-r135';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2361,7 +2361,19 @@ const semColorMap = () => Object.fromEntries(SEM_ORDER.map(k => [k, SEM[k].color
 // 3) Định nghĩa ĐÓNG / MỞ cho record AUDIT (.status) — dùng chung, đừng so 'Closed' tay
 const isClosed    = a => !!a && a.status === 'Closed';
 const isCancelled = a => !!a && a.status === 'Cancelled';
-const isActive    = a => !!a && a.status !== 'Closed' && a.status !== 'Cancelled'; // đang mở/tiến hành
+// 'Đang tiến hành' LIỆT KÊ THẲNG các status hợp lệ, không định nghĩa bằng loại trừ. [r135]
+// Định nghĩa cũ — isActive = (không Closed && không Cancelled) — là danh sách ĐEN: mọi status
+// Galileo thêm về sau đều tự động rơi vào "đang tiến hành" mà không ai hay. Đó đúng là cách 15
+// audit 'Deleted' bị đếm nhầm suốt tới r133, làm ô "Audit vs Inspection" (1.061) lệch ô
+// "By status" (1.046). r133 chỉ bịt riêng 'Deleted' — cái bẫy vẫn còn nguyên cho status kế tiếp.
+// Đánh đổi có chủ ý: status lạ nay BỊ BỎ khỏi biểu đồ thay vì bị đếm nhầm vào một cột sai. Bỏ
+// sót không im lặng: runSelfChecks kêu ở CẢ HAI kiểm — "status audit lạ" và tie-out
+// By-status ≠ Audit-vs-Inspection — và từ r136 cảnh báo đó hiện thẳng trên UI cho admin.
+// CỐ Ý viết tay danh sách này thay vì suy từ AUDIT_STATUS_ORDER: nếu ai thêm status mới vào
+// CFG.AUDIT_STATUS mà quên thêm ở đây thì tie-out lệch → self-check kêu. Suy tự động sẽ luôn
+// khớp và không ai phát hiện ra là đã âm thầm xếp status mới vào "đang tiến hành".
+const AUDIT_ACTIVE = new Set(['Scheduled','InProgress','Performed']);
+const isActive    = a => !!a && AUDIT_ACTIVE.has(a.status);
 
 // 4) Mốc thời gian theo quy trình, tính từ ngày Raise (ngày) — 1 nơi khai báo
 const DEADLINE_DAYS = { rfi: 14, target: 45, ext1: 30 };
