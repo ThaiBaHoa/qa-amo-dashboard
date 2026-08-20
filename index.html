@@ -232,6 +232,13 @@ tr:last-child td{border-bottom:none}
 /* ── RESPONSIVE SCALING ─────────────────────────────────── */
 
 /* Hamburger button (mobile only) */
+/* Chế độ Kiosk/LED [r137]: giấu điều hướng, dành hết bề ngang cho dữ liệu.
+   Giữ .topbar vì nó là thứ DUY NHẤT trên màn LED cho biết đang chiếu trang nào và
+   dữ liệu tươi tới đâu (chấm live + cacheAge) — người đứng xa cần biết số có cũ không. */
+body.kiosk .sidebar{display:none}
+body.kiosk .main{margin-left:0}
+body.kiosk #aiFab{display:none!important}
+body.kiosk .mob-menu{display:none!important}
 .mob-menu{display:none;align-items:center;justify-content:center;width:36px;height:36px;border:none;background:rgba(255,255,255,.04);color:var(--text);cursor:pointer;font-size:20px;border-radius:8px;flex-shrink:0;transition:background .2s;line-height:1}
 .mob-menu:hover{background:rgba(255,255,255,.1)}
 
@@ -568,6 +575,10 @@ tr:last-child td{border-bottom:none}
         <div class="topbar-right">
           <div class="live" id="liveBadge" style="display:none"><span class="live-dot"></span><span id="recCount">0</span> reports</div>
           <span id="cacheAge" style="font-size:11px;color:var(--text-3);white-space:nowrap;font-family:'IBM Plex Mono',monospace"></span>
+          <!-- Trạng thái kiosk (r137): chỉ hiện khi đang ở chế độ LED. -->
+          <div id="kioskChip" style="display:none;align-items:center;gap:6px;font-size:11px;color:var(--text-3);white-space:nowrap;font-family:'IBM Plex Mono',monospace;border:1px solid var(--border);border-radius:10px;height:36px;padding:0 10px">
+            <span style="font-size:12px;line-height:1">&#128250;</span><span id="kioskStep">1/3</span>
+          </div>
           <!-- Cảnh báo tự kiểm dữ liệu (r136). Ẩn mặc định; chỉ hiện cho admin KHI có cảnh báo.
                KHÔNG gắn class .admin-only: initApp bung display cho mọi phần tử mang class đó
                nên chip sẽ hiện cả khi không có cảnh báo. Điều kiện hiện nằm ở updateDqBadge(). -->
@@ -645,8 +656,8 @@ tr:last-child td{border-bottom:none}
           <div class="tbl-card">
             <div class="tbl-bar">
               <div><div class="tbl-title">Report Status on Coruson</div><div class="tbl-count" id="rsCnt">&mdash;</div></div>
-              <button class="pill rs-tab on" onclick="setRsTab('f088',this)">F-088</button>
-              <button class="pill rs-tab" onclick="setRsTab('eis',this)">EIS</button>
+              <button class="pill rs-tab on" data-tab="f088" onclick="setRsTab('f088',this)">F-088</button>
+              <button class="pill rs-tab" data-tab="eis" onclick="setRsTab('eis',this)">EIS</button>
               <span style="width:1px;height:20px;background:var(--border)"></span>
               <button class="pill rs-sf on" onclick="setRsSF('all',this)">All</button>
               <button class="pill rs-sf" onclick="setRsSF('Open',this)">Open</button>
@@ -1719,6 +1730,10 @@ tr:last-child td{border-bottom:none}
                   <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">Click the "↻ Refresh" button on the topbar to reload the latest data from Galileo at any time. The dashboard also auto-refreshes its data every 12 hours (for LED / kiosk screens) without reloading the page or logging you out. Loading takes approximately 30–60 seconds.</div>
                 </div>
                 <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
+                  <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">📺 How do I put the dashboard on the LED wall?</div>
+                  <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">Open <b>https://vjc-qa-amo.com/?kiosk=1</b> and sign in once. The dashboard hides the sidebar and cycles through <b>Overview → Report Status (EIS) → Report Status (F-088)</b>, 30 seconds each, forever. Use <b>?kiosk=45</b> to change the interval (5–600 seconds). Press <b>Esc</b> to stop cycling.<br><br>In the LED controller, use <b>one single WebView</b> pointing at that URL — do not create one WebView per page. Each WebView is a separate browser session, so every playlist loop would land back on the login screen and reload all data. With one WebView you sign in once and the data refreshes itself every 12 hours in place.<br><br><b>Note:</b> the session is lost if the WebView or the machine restarts, so someone has to sign in again at the screen.</div>
+                </div>
+                <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
                   <div style="padding:10px 14px;background:rgba(255,255,255,0.03);font-size:12px;font-weight:600;color:var(--text)">❓ Why does Audit Plan show 963 records?</div>
                   <div style="padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6">The dashboard loads all audits for QA AMO auditors (Vo Vinh Hien, Le Hong Chuong, Thai Ba Hoa…) from past to present, including future Scheduled audits. Use the Year filter to view a specific year's plan.</div>
                 </div>
@@ -2327,7 +2342,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.20-r136';
+const APP_REV = '2026.08.20-r137';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2765,6 +2780,7 @@ function initApp() {
   }
   if(!cacheLoad()) loadData();
   startAutoRefresh();
+  startKiosk();          // [r137] no-op khi URL không có ?kiosk=
 }
 
 const dRenderOpen  = debounce(renderOpen,  300);
@@ -2865,6 +2881,91 @@ function startAutoRefresh() {
     nextAutoRefresh = Date.now() + AUTO_REFRESH_MS;
     loadData(true);                        // fetch lại từ Galileo, KHÔNG reload, KHÔNG chạm auth
   }, AUTO_REFRESH_CHECK_MS);
+}
+
+// ── KIOSK / LED [r137] ───────────────────────────────────────
+// Màn LED phòng MQA chiếu qua Commander TO. Trên đó, dashboard phải là **một** WebView
+// duy nhất và tự xoay trang bên trong — KHÔNG tạo 3 WebView cho 3 trang: mỗi WebView là
+// một phiên trình duyệt riêng, nên mỗi vòng lặp playlist phải đăng nhập lại và tải lại
+// toàn bộ dữ liệu (~25s lần đầu), màn hình sẽ đứng ở login/Loading phần lớn thời gian.
+// Một WebView + app tự xoay: đăng nhập 1 lần, tải 1 lần, sau đó chỉ đổi trang trong DOM.
+//
+// TUYỆT ĐỐI không `location.reload()` khi xoay — phiên nằm trong sessionStorage, reload là
+// mất phiên và rơi về màn hình đăng nhập. Dữ liệu vẫn tự tươi nhờ startAutoRefresh (12h,
+// gọi loadData(true) tại chỗ, không reload).
+//
+// Bật bằng URL:  ?kiosk=1   → 30 giây/trang (mặc định)
+//                ?kiosk=45  → 45 giây/trang (nhận 5–600)
+// Thoát: bấm Esc trên bàn phím cắm vào máy LED (phòng khi mở nhầm trên máy cá nhân).
+const KIOSK_STEPS = [
+  { page:'overview',  tab:null,   label:'Overview' },
+  { page:'rptstatus', tab:'eis',  label:'Report Status · EIS' },
+  { page:'rptstatus', tab:'f088', label:'Report Status · F-088' },
+];
+const KIOSK_DEFAULT_SEC = 30;
+let kioskSec = 0, kioskTimer = null, kioskIdx = 0;
+
+function kioskParam(){
+  const v = new URLSearchParams(location.search).get('kiosk');
+  if(v === null) return 0;
+  if(v === '' || v === '1' || v === 'true' || v === 'yes') return KIOSK_DEFAULT_SEC;
+  const n = parseInt(v, 10);
+  return (Number.isFinite(n) && n >= 5 && n <= 600) ? n : KIOSK_DEFAULT_SEC;
+}
+
+async function startKiosk(){
+  kioskSec = kioskParam();
+  if(!kioskSec) return;
+  document.body.classList.add('kiosk');
+
+  // Đợi loadData xong rồi mới nạp trước Report Status — loadRptStatus lọc từ allData,
+  // gọi sớm là ném 'Không tìm thấy report EIS / F-088 trong allData'. initApp không await
+  // loadData nên phải tự chờ ở đây. Trần 180 nhịp = 3 phút, quá thì cứ xoay (trang
+  // Report Status sẽ tự lazy-load khi tới lượt).
+  for(let i=0; i<180 && (isLoading || !allData.length); i++) {
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  // Nạp trước để vòng xoay không khựng lại chờ tải khi lần đầu tới Report Status.
+  try { if(!rsLoaded) await loadRptStatus(); }
+  catch(e){ console.warn('[kiosk] prewarm Report Status thất bại:', e.message); }
+
+  kioskShow(0);
+  if(kioskTimer) clearInterval(kioskTimer);
+  kioskTimer = setInterval(() => {
+    if(!curUser) { stopKiosk(); return; }     // đã logout
+    if(isLoading) return;                     // đang làm mới 12h → đứng yên, sang nhịp sau
+    kioskShow((kioskIdx + 1) % KIOSK_STEPS.length);
+  }, kioskSec * 1000);
+
+  document.addEventListener('keydown', kioskEsc);
+  console.log('[kiosk] ON —', KIOSK_STEPS.length, 'trang ·', kioskSec, 'giây/trang');
+}
+
+function kioskEsc(e){ if(e.key === 'Escape') { stopKiosk(); toast('Kiosk mode off','info'); } }
+
+function stopKiosk(){
+  if(kioskTimer) { clearInterval(kioskTimer); kioskTimer = null; }
+  document.removeEventListener('keydown', kioskEsc);
+  document.body.classList.remove('kiosk');
+  const el = g('kioskChip'); if(el) el.style.display = 'none';
+  console.log('[kiosk] OFF');
+}
+
+function kioskShow(i){
+  kioskIdx = i;
+  const st = KIOSK_STEPS[i];
+  showPage(st.page);
+  if(st.tab){
+    setRsTab(st.tab, document.querySelector('#page-rptstatus .rs-tab[data-tab="' + st.tab + '"]'));
+  }
+  const el = g('kioskChip');
+  if(el){
+    el.style.display = 'flex';
+    s('kioskStep', (i+1) + '/' + KIOSK_STEPS.length);
+    el.title = 'Kiosk mode · ' + st.label + ' · ' + kioskSec + 's per page · press Esc to exit';
+  }
+  // Giấu sidebar đổi bề ngang → Chart.js phải tính lại, nếu không biểu đồ bị méo/tràn.
+  setTimeout(() => { Object.values(charts).forEach(c => { try{ c.resize(); }catch(e){} }); }, 60);
 }
 
 function cacheLoad() {

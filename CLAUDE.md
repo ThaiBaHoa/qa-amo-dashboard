@@ -117,6 +117,15 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
   the merge order cannot depend on network latency.
   **Never mutate `allData` directly** — use enriched clones only.
   **Never touch `loadData()` or `ORG_UNIT` unless the change is intentionally cross-page.**
+- `startKiosk` / `kioskShow` / `stopKiosk` — **LED wall mode (r137)**, off unless the URL has
+  `?kiosk=` (`1` = 30s/page, or `5`–`600` for a custom interval; anything else falls back to 30s).
+  Adds `body.kiosk` (hides sidebar + `#aiFab`, `.main` margin 0), then cycles `KIOSK_STEPS`:
+  Overview → Report Status/EIS → Report Status/F-088. Esc exits. **Never reloads** — the session
+  lives in `sessionStorage`. It waits for `loadData` to finish, then pre-warms `loadRptStatus()`
+  so the first cycle does not stall, and skips a tick while `isLoading`. Charts are `resize()`d
+  after every switch because hiding the sidebar changes the width.
+  **On the LED controller use ONE WebView** pointing at `?kiosk=1` — one WebView per page means one
+  browser session per page, so every playlist loop returns to the login screen and refetches ~38 MB.
 - `startAutoRefresh` — kiosk/LED auto-refresh: wall-clock heartbeat every 5 min that
   calls `loadData(true)` in place every 12h. No page reload — sessionStorage safe.
   Started at the end of `initApp`; no-ops after logout via `if(!curUser)` guard.
@@ -305,7 +314,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.08.20-r136
+Rev current: 2026.08.20-r137
 
 ORG_UNIT = 'QA AMO'   ← main pages (never change without cross-page intent)
                          CMR-CAR and ECAR use org_unit = 'TQA' — fetched separately
