@@ -28,4 +28,6 @@ done
 echo ""
 echo "Xong. Kiem tra:"
 echo "  workspace  -> $(sh "$ROOT/scripts/resolve-workspace.sh" 2>/dev/null || echo '(khong thay - backup se bi bo qua)')"
+echo "  vault note -> $(sh "$ROOT/scripts/resolve-vault-note.sh" 2>/dev/null || echo '(khong thay - repo-docs se bi bo qua)')"
 echo "  doc-sync   -> chay 'sh scripts/check-doc-sync.sh' de thu"
+echo "  repo-docs  -> chay 'sh scripts/sync-repo-docs.sh --check' de thu"

@@ -1,16 +1,27 @@
 #!/bin/sh
 # Sau moi commit:
-#   1. Sao luu index.html sang workspace tren OneDrive (repo van la nguon su that)
-#   2. Sinh lai NHAT_KY_CAP_NHAT_APP.md tu git log
+#   1. Guong doc ky thuat cua repo vao vault obsidian-mind (repo-docs/)
+#   2. Sao luu index.html sang workspace tren OneDrive (repo van la nguon su that)
+#   3. Sinh lai NHAT_KY_CAP_NHAT_APP.md tu git log
 #
-# Workspace giai theo tung may qua scripts/resolve-workspace.sh (OneDrive mount
-# o F: tren laptop, G: tren PC nha). Khong tim thay -> bo qua im lang, vi mot
-# clone tren may khong co vault van phai commit duoc binh thuong.
+# Buoc 1 dung resolve-vault-note.sh, buoc 2-3 dung resolve-workspace.sh — HAI dich
+# KHAC NHAU va giai bang HAI script khac nhau. Vi the buoc 1 phai chay TRUOC cho
+# thoat som "khong thay workspace" ben duoi: mot may co vault nhung khong co
+# Vault-CongViec van phai dong bo duoc repo-docs.
+#
+# Khong tim thay dich -> bo qua im lang, vi mot clone tren may khong co vault van
+# phai commit duoc binh thuong.
 #
 # Hook KHONG duoc version hoa. Cai lai sau moi lan clone:
 #   sh scripts/install-hooks.sh
 
 ROOT="$(git rev-parse --show-toplevel)"
+
+# 1) Guong doc sang vault (doc lap voi workspace ben duoi)
+if [ -f "$ROOT/scripts/sync-repo-docs.sh" ]; then
+  sh "$ROOT/scripts/sync-repo-docs.sh"
+fi
+
 WORKSPACE="$(sh "$ROOT/scripts/resolve-workspace.sh" 2>/dev/null)"
 
 if [ -z "$WORKSPACE" ]; then
