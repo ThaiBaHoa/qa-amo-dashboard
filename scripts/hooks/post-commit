@@ -3,6 +3,7 @@
 #   1. Guong doc ky thuat cua repo vao vault obsidian-mind (repo-docs/)
 #   2. Sao luu index.html sang workspace tren OneDrive (repo van la nguon su that)
 #   3. Sinh lai NHAT_KY_CAP_NHAT_APP.md tu git log
+#   4. Guong tai lieu workspace sang vault (sau buoc 3, xem ghi chu tai cho)
 #
 # Buoc 1 dung resolve-vault-note.sh, buoc 2-3 dung resolve-workspace.sh — HAI dich
 # KHAC NHAU va giai bang HAI script khac nhau. Vi the buoc 1 phai chay TRUOC cho
@@ -36,6 +37,13 @@ fi
 
 if [ -f "$ROOT/scripts/gen-changelog.sh" ]; then
   ( cd "$ROOT" && sh scripts/gen-changelog.sh "$WORKSPACE/NHAT_KY_CAP_NHAT_APP.md" )
+fi
+
+# 4) Guong tai lieu workspace sang vault. PHAI chay SAU gen-changelog: buoc tren
+# vua ghi lai NHAT_KY_CAP_NHAT_APP.md, chay truoc thi ban trong vault se tut mot
+# commit. Sync co bien doi (giu frontmatter + wikilink cua vault), khong phai cp.
+if [ -f "$ROOT/scripts/sync-workspace-docs.sh" ]; then
+  sh "$ROOT/scripts/sync-workspace-docs.sh"
 fi
 
 exit 0
