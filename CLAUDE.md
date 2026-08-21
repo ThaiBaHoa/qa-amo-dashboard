@@ -143,7 +143,10 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
 - `startAutoRefresh` — kiosk/LED auto-refresh: wall-clock heartbeat every 5 min that
   calls `loadData(true)` in place every 12h. No page reload — sessionStorage safe.
   Started at the end of `initApp`; no-ops after logout via `if(!curUser)` guard.
-- `fetchAll(url, skipOv=false)` — paginated OData fetch with 30s AbortController timeout.
+- `fetchAll(url, skipOv=false)` — paginated OData fetch, **90s** AbortController timeout
+  (`FETCH_TIMEOUT_MS`) plus **2 retries** with 2s/5s backoff on timeout/5xx/429/network
+  errors (`fetchWithRetry`). Keep `FETCH_TIMEOUT_MS` equal to the `galileo-proxy`
+  Worker timeout (`worker.js` L52) — see Known issues. [r141]
   **Pass `skipOv=true` on every secondary / modal / lazy call** — otherwise the shared
   global overlay hijacks with stale text ("vết r41" bug).
 - `loadRptStatus` / `renderRptStatus` — **Report Status on Coruson** (r131): bảng tình trạng hoàn thiện
@@ -294,9 +297,19 @@ Do not ask when:
 
 ## Known issues / gotchas
 
-- **Galileo HTTP 524**: the report-summary query is slow; the Cloudflare Worker
-  times out (~100s) intermittently. `fetchAll` caps each request at 30s and
-  `loadData` shows a retry overlay on failure. Root cause is Galileo backend.
+- **Galileo latency is random, not size-proportional (r141)**: measured 21/08/2026 on
+  `dwreporting_audit_summary` (4,317 rows, 1.76 MB), 7 consecutive calls: 17.7s / 7.7s /
+  19.7s / 7.5s / 16.0s / fail / fail — roughly **30% failures** at a 30s ceiling. Chunking
+  with `$top=1000` does **not** help (5 chunks × 6–18s each — worse overall); the cost is
+  per-request latency, not bytes. Fix = raise both ceilings to 90s (`galileo-proxy`
+  `worker.js` L52 **and** `FETCH_TIMEOUT_MS`) **and retry**. Both numbers must stay equal.
+- **The proxy owns the real ceiling**: `galileo-proxy` aborts the upstream fetch itself and
+  returns `504 Gateway Timeout` (`text/plain`, 15 bytes) with CORS headers attached. Raising
+  only the client timeout does nothing. Tell the two apart by `Content-Type`: the Worker's
+  own 504 is `text/plain`, a pass-through response is forced to `application/json`.
+- **A failed non-critical fetch is now visible (r141)**: `par()` records into `loadFailures`,
+  which (a) raises error toasts, (b) **blocks `cacheSave()`** so a single network blip cannot
+  freeze a half-empty dashboard for the full 4h `CACHE_TTL`, (c) feeds `runSelfChecks`.
 - **QC MQA Physical Finding category (r107+)**: New Galileo Category added by Sơn (~2026-06-19).
   Confirmed on CMR-1039 (org TQA). Many QC CMRs not yet backfilled. Do not build QC
   filter/KPI until backfill is confirmed complete — verify `category_id` is non-null on
@@ -335,7 +348,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.08.20-r140
+Rev current: 2026.08.21-r141
 
 ORG_UNIT = 'QA AMO'   ← main pages (never change without cross-page intent)
                          CMR-CAR and ECAR use org_unit = 'TQA' — fetched separately

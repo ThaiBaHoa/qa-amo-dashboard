@@ -2342,7 +2342,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.20-r140';
+const APP_REV = '2026.08.21-r141';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2574,6 +2574,9 @@ function enterRecoveryUI() {
 }
 
 // ── STATE ────────────────────────────────────────────────────
+// [r141] Nguồn dữ liệu thất bại trong lượt loadData hiện tại. Đọc bởi runSelfChecks (để hiện
+// lên chip cảnh báo) và bởi khối cuối loadData (để chặn cacheSave). Reset đầu mỗi loadData.
+let loadFailures = [];
 let curUser = null, allData = [], auditData = [], docData = [], cmrData = [], ecarData = [], docTaskCache = {}, charts = {}, userFilter = 'all', isLoading = false;
 let _docTasks = [], _docTaskSort = { col:'status', asc:true };   // copyholder list + sort (modal Document)
 let docTypeTree=[], docTypeFlat=[], docTypeIndex={}, docTypeByTitle={}, selectedTypeId=null, docWorkflowCache={}, expandedTreeNodes=new Set(), currentDocRevId=null;
@@ -3036,6 +3039,7 @@ function updateCacheAge(ts) {
 async function loadData(forceRefresh=false) {
   if(isLoading){toast('Loading data, please wait...','info');return;}
   isLoading=true;
+  loadFailures = [];                              // [r141] reset mỗi lượt load
   pavoiRfiLoaded = false; pavoiRfiMap = {}; pavoiRfiDone = new Set();   // reset RFI để Refresh kéo lại bản mới
   eisLoaded=false; eisCAMap={}; eisDescMap={};   // reset EIS per-CA cache để Refresh kéo lại
   qcsLoaded=false; qcsMap={};                     // reset QC Spot Check cache để Refresh kéo lại
@@ -3066,7 +3070,15 @@ async function loadData(forceRefresh=false) {
     // critical=false → nuốt lỗi + log, giữ nguyên hành vi try/catch tuần tự cũ.
     const par = (label, url, onRows, critical) => {
       const p = fetchAll(url, true).then(rows => { onRows(rows); parStep(label); });
-      return critical ? p : p.catch(e => { console.warn(label + ' load error:', e); parStep(label); });
+      return critical ? p : p.catch(e => {
+        console.warn(label + ' load error:', e);
+        // [r141] Trước đây lỗi CHỈ nằm ở dòng console.warn trên. Hậu quả 21/08/2026:
+        // 'Audit plan' hết giờ → auditData rỗng → Overview mất hẳn phần MNT mà KHÔNG có
+        // một dấu hiệu nào trên UI, self-check còn báo "OK" vì 0 === 0. Nay ghi lại để
+        // (a) hiện lên UI, (b) chặn cacheSave đóng băng trạng thái khuyết suốt 4 giờ.
+        loadFailures.push(label + ': ' + ((e && e.message) ? e.message : String(e)));
+        parStep(label);
+      });
     };
 
     let summary = [], usersRaw = [], grpRaw = [], auRaw = [];
@@ -3367,8 +3379,17 @@ async function loadData(forceRefresh=false) {
     renderAll();
     g('liveBadge').style.display='';
     g('recCount').textContent=allData.length;
-    toast(`Loaded ${allData.length} reports, ${auditData.length} audits`,'ok');
-    cacheSave();
+    if (loadFailures.length) {
+      // Chuỗi hiện cho người dùng → TIẾNG ANH (luật r136).
+      toast(`Incomplete load — ${loadFailures.length} data source(s) failed. Press ↻ Refresh.`,'err');
+      loadFailures.forEach(f => toast(f,'err'));
+      // KHÔNG ghi cache khi thiếu dữ liệu: CACHE_TTL = 4 giờ, một lần rớt mạng sẽ giam
+      // dashboard ở trạng thái khuyết suốt 4 giờ kể cả khi mạng đã tốt lại. [r141]
+      console.warn('[loadData] cache NOT saved —', loadFailures.length, 'source(s) failed:', loadFailures);
+    } else {
+      toast(`Loaded ${allData.length} reports, ${auditData.length} audits`,'ok');
+      cacheSave();
+    }
     setOv(false);
 
   } catch(e) {
@@ -3378,19 +3399,58 @@ async function loadData(forceRefresh=false) {
   } finally { isLoading=false; }
 }
 
+// Thời gian chờ MỘT request. Trần THẬT nằm ở Worker galileo-proxy (worker.js L52) — proxy
+// tự abort rồi trả 504 "Gateway Timeout". Trước r141 CẢ HAI đều 30s, và đó là gốc sự cố
+// 21/08/2026: Galileo trả bảng lớn mất 7–20s tuỳ lúc, ~30% số lần vượt 30s → request
+// 'Audit plan' chết âm thầm → Overview mất sạch phần MNT. Nay Worker = 90s, client = 90s.
+// GIỮ HAI SỐ NÀY BẰNG NHAU: client ngắn hơn thì proxy chưa kịp trả lỗi tử tế; client dài
+// hơn thì chỉ ngồi chờ vô ích sau khi proxy đã bỏ cuộc.
+const FETCH_TIMEOUT_MS = 90000;
+const FETCH_RETRIES    = 2;              // 2 lần thử lại = tối đa 3 lần gọi
+const RETRY_DELAY_MS   = [2000, 5000];   // backoff giữa các lần
+
+// Lỗi ĐÁNG thử lại: hết giờ, 5xx, 429, đứt mạng. KHÔNG thử lại 4xx khác — HTTP 400 nghĩa là
+// query sai (vd MaxNodeCount), gọi lại 3 lần vẫn sai mà mất thêm 2 lượt chờ.
+const RETRIABLE_RE = /timed out|HTTP 5\d\d|HTTP 429|Failed to fetch|NetworkError|Load failed|network error/i;
+
+const _sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function fetchOnce(url) {
+  const ctl = new AbortController();
+  const tid = setTimeout(()=>ctl.abort(), FETCH_TIMEOUT_MS);
+  let r;
+  try { r = await fetch(url, {signal:ctl.signal}); }
+  catch(e){ throw new Error(e.name==='AbortError'
+      ? `Request timed out (${FETCH_TIMEOUT_MS/1000}s) — server responded slowly`
+      : e.message); }
+  finally { clearTimeout(tid); }
+  if(!r.ok) throw new Error('HTTP '+r.status+' '+r.statusText);
+  return r.json();
+}
+
+// Vì sao phải RETRY chứ không chỉ nâng timeout: đo 21/08/2026 trên dwreporting_audit_summary
+// (4.317 dòng, 1,76 MB) — 7 lần gọi liên tiếp ra 17,7s / 7,7s / 19,7s / 7,5s / 16,0s / hỏng /
+// hỏng. Độ trễ Galileo dao động NGẪU NHIÊN chứ không tỉ lệ với số byte, nên chia trang
+// $top=1000 KHÔNG cứu được (đo thật: 5 chunk × 6–18s, tổng còn tệ hơn gọi một phát).
+// Với ~30% hỏng mỗi lần, 3 lần thử kéo xác suất trắng tay từ 30% xuống ~2,7%.
+async function fetchWithRetry(url) {
+  for (let attempt = 0; ; attempt++) {
+    try { return await fetchOnce(url); }
+    catch(e) {
+      if (attempt >= FETCH_RETRIES || !RETRIABLE_RE.test(e.message)) throw e;
+      const wait = RETRY_DELAY_MS[attempt];
+      console.warn(`[fetchAll] retry ${attempt+1}/${FETCH_RETRIES} in ${wait}ms — ${e.message} — ${url.slice(0,140)}`);
+      await _sleep(wait);
+    }
+  }
+}
+
 async function fetchAll(url, skipOv=false) {
   let res=[],next=url,p=0;
   while(next) {
     p++;
     if(!skipOv) setOv(true,g('ovText').textContent,`Trang ${p} · ${res.length} records`);
-    const ctl=new AbortController();
-    const tid=setTimeout(()=>ctl.abort(),30000);
-    let r;
-    try { r=await fetch(next,{signal:ctl.signal}); }
-    catch(e){ throw new Error(e.name==='AbortError'?'Request timed out (30s) — server responded slowly':e.message); }
-    finally { clearTimeout(tid); }
-    if(!r.ok) throw new Error('HTTP '+r.status+' '+r.statusText);
-    const j=await r.json();
+    const j=await fetchWithRetry(next);
     res=res.concat(j.value||[]);
     // Route nextLink qua proxy — lấy phần sau /odata/ ghép vào G_URL
     const rawNext = j['@odata.nextLink'] || null;
@@ -3569,6 +3629,13 @@ function runSelfChecks(){
     const donutSum = AUDIT_STATUS_ORDER.reduce((s,st)=>s+mnt.filter(a=>a.status===st).length,0);
     const barSum   = mnt.filter(isClosed).length + mnt.filter(isActive).length + mnt.filter(isCancelled).length;
     if(donutSum!==barSum) warn.push(`Overview mismatch: By status (${donutSum}) does not equal Audit vs Inspection (${barSum}) — an audit status is missing from CFG.AUDIT_STATUS or AUDIT_ACTIVE`);
+    // 4) [r141] Nguồn dữ liệu nào rớt trong lượt load này
+    if(loadFailures.length) warn.push('Incomplete load — failed source(s): '+loadFailures.join(' | '));
+    // 5) [r141] auditData rỗng trong khi allData có dữ liệu = request 'Audit plan' đã chết.
+    //    Kiểm (3) ở trên MÙ với ca này vì 0 === 0 vẫn "khớp" — đúng cái bẫy ngày 21/08/2026:
+    //    console in ra "[self-check] OK — By-status=Audit-vs-Inspection=0" trong khi Overview
+    //    đang trắng trơn. "Bằng 0" và "không có dữ liệu" LÀ HAI CHUYỆN KHÁC NHAU.
+    if(AL.length && !AU.length) warn.push('auditData is empty while allData has '+AL.length+' reports — the Audit plan request failed; Overview and Audit Plan are BLANK, not zero');
     // Kết quả
     if(warn.length){ console.warn('%c[self-check] '+warn.length+' warning(s):','color:#D29922;font-weight:700'); warn.forEach(w=>console.warn('  • '+w)); }
     else console.log('%c[self-check] OK — By-status=Audit-vs-Inspection='+donutSum+' · status/semantic valid','color:#3FB950');

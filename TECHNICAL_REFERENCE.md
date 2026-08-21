@@ -439,7 +439,9 @@ const ALLOWED_ORIGINS = [
 // Block nếu không có Origin hoặc Origin không trong whitelist → 403
 // Chỉ cho phép GET, không POST/PUT/DELETE
 // API Key Galileo lưu trong Worker secret GALILEO_KEY
-// Timeout: 30s
+// Timeout: 90s (r141 — trước là 30s; Galileo trả bảng lớn 7–20s tuỳ lúc nên 30s hỏng ~30%)
+// Hết giờ → Worker TỰ trả 504 'Gateway Timeout' (text/plain, 15 byte) kèm CORS header.
+// PHẢI bằng FETCH_TIMEOUT_MS trong index.html — nâng một bên là vô ích.
 ```
 
 ### 2. `galileo-ai` (AI Assistant — `AI_URL`, r112)
