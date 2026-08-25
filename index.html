@@ -844,6 +844,37 @@ body.kiosk .mob-menu{display:none!important}
               </table>
             </div>
           </div>
+
+          <!-- Row 4: KPI 7 — PAVOI KPI (tỷ lệ PAVOI chưa được đánh giá)  [r142] -->
+          <div class="chart-card" style="flex-shrink:0;margin-top:8px">
+            <div class="chart-head" style="margin-bottom:10px">
+              <div>
+                <div class="chart-title">KPI 7 — PAVOI KPI (not-assessed rate)</div>
+                <div class="chart-sub" id="kpi7Sub">Not assessed ÷ Total × 100% · assessed = has ≥1 RFI or Task</div>
+              </div>
+              <div style="display:flex;gap:6px;align-items:center">
+                <div class="ymulti" id="kpi7Year"></div>
+                <button class="btn-sm" onclick="loadKpi7Tasks(true)" title="Re-fetch RFI / Task for every PAVOI" style="white-space:nowrap;flex-shrink:0">↻</button>
+                <div style="text-align:right;min-width:108px">
+                  <div class="kpi-val" id="kpi7-val" style="font-size:20px">—</div>
+                  <div class="kpi-lbl" id="kpi7-frac">—</div>
+                </div>
+              </div>
+            </div>
+            <div id="kpi7Warn" style="display:none;font-size:11px;color:var(--yellow);margin-bottom:8px"></div>
+            <div style="overflow-x:auto">
+              <table class="stat-tbl" id="kpi7Table">
+                <thead><tr>
+                  <th>Section (PAVOI owner)</th>
+                  <th style="text-align:center;color:var(--green)">Assessed</th>
+                  <th style="text-align:center;color:#ff6b6b">Not assessed</th>
+                  <th style="text-align:center">Total PAVOI</th>
+                  <th style="text-align:center">KPI %</th>
+                </tr></thead>
+                <tbody id="kpi7Body"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
         <!-- ALL FORMS -->
@@ -2297,6 +2328,33 @@ body.kiosk .mob-menu{display:none!important}
   </div>
 </div>
 
+<!-- KPI 7 — danh sách PAVOI chưa được đánh giá của 1 ban  [r142] -->
+<!-- z-index 210 < pavoiModal (215) để click 1 dòng mở được PAVOI Detail chồng lên trên. -->
+<div class="overlay" id="kpi7Modal" onclick="closeKpi7Modal(event)" style="z-index:210;display:none">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:95%;max-width:860px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0">
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">KPI 7 · PAVOI not assessed (no RFI, no Task)</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text);margin-top:2px" id="kpi7MTitle">—</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px" id="kpi7MSub">—</div>
+      </div>
+      <button onclick="closeKpi7Modal()" style="background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);font-size:16px;cursor:pointer;padding:3px 10px;border-radius:6px;flex-shrink:0;margin-left:12px">✕</button>
+    </div>
+    <div style="overflow:auto;flex:1;min-height:0;padding:0 18px 18px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead style="position:sticky;top:0;background:var(--card);z-index:1"><tr>
+          <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Report #</th>
+          <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Raised</th>
+          <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Owner</th>
+          <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Status</th>
+          <th style="padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);border-bottom:1px solid var(--border)">Dept</th>
+        </tr></thead>
+        <tbody id="kpi7ModalBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="overlay">
   <div class="ov-box">
     <div class="spinner" id="ovSpinner"></div>
@@ -2342,7 +2400,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.21-r141';
+const APP_REV = '2026.08.25-r142';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2590,6 +2648,20 @@ let pavoiRfiDone = new Set();    // report_id đã fetch xong (để cell hiện
 const PAVOI_RFI_TITLE = 'Request For Information';
 const isPavoiItem = t => !!(t && t.task_title && String(t.task_title).trim() && t.task_status !== 'Deleted');
 const isPavoiRfi  = t => !!(t && t.task_title === PAVOI_RFI_TITLE);
+// [r142] KPI 7 — PAVOI KPI. Kho đếm RIÊNG, KHÔNG dùng chung pavoiRfiMap: loadPavoiRfi()
+// chỉ fetch task cho PAVOI đang Open, nên đọc map đó sẽ đếm nhầm mọi PAVOI đã đóng thành
+// "chưa đánh giá". Chi tiết ở khối "KPI 7" phía dưới (cạnh renderKpi7).
+const KPI7_SECTIONS = [                      // phải khớp TUYỆT ĐỐI owner_name (= 4 option của #pavoiSectF)
+  'MQA - Licensing and Authorization Section',
+  'MQA - Quality Control Section',
+  'AMO - Safety Section',
+  'MQA - Standard and Compliance Section'
+];
+const KPI7_UNASSIGNED = '__unassigned__';    // bucket owner cá nhân / rỗng (Galileo đang chuyển owner sang User Group)
+const KPI7_CACHE_KEY  = 'qaAmoKpi7V1';
+let kpi7Loaded = false;
+let kpi7Cnt  = {};          // report_id -> số item hợp lệ (RFI + Task). 0 = thật sự chưa đánh giá.
+let kpi7Done = new Set();   // report_id đã fetch xong — CHỈ id trong này mới được đưa vào mẫu số.
 const PS = 25; // page size
 
 // Table states — mỗi table có state riêng
@@ -3041,6 +3113,8 @@ async function loadData(forceRefresh=false) {
   isLoading=true;
   loadFailures = [];                              // [r141] reset mỗi lượt load
   pavoiRfiLoaded = false; pavoiRfiMap = {}; pavoiRfiDone = new Set();   // reset RFI để Refresh kéo lại bản mới
+  kpi7Loaded = false; kpi7Cnt = {}; kpi7Done = new Set();                // [r142] reset kho đếm KPI 7 (data mới → đếm lại)
+  try{ localStorage.removeItem(KPI7_CACHE_KEY); }catch{}
   eisLoaded=false; eisCAMap={}; eisDescMap={};   // reset EIS per-CA cache để Refresh kéo lại
   qcsLoaded=false; qcsMap={};                     // reset QC Spot Check cache để Refresh kéo lại
   setOv(true,'Connecting to Galileo...','',5);
@@ -3636,6 +3710,20 @@ function runSelfChecks(){
     //    console in ra "[self-check] OK — By-status=Audit-vs-Inspection=0" trong khi Overview
     //    đang trắng trơn. "Bằng 0" và "không có dữ liệu" LÀ HAI CHUYỆN KHÁC NHAU.
     if(AL.length && !AU.length) warn.push('auditData is empty while allData has '+AL.length+' reports — the Audit plan request failed; Overview and Audit Plan are BLANK, not zero');
+    // 6) [r142] KPI 7 — hai bất biến của bảng PAVOI KPI. Chỉ chạy khi đã fetch được ít nhất
+    //    1 report (trước đó mọi số đều 0 → kiểm sẽ "đúng" một cách vô nghĩa).
+    if(kpi7Done.size){
+      const k7 = kpi7Stats();
+      let sumRows = 0;
+      k7.order.forEach(k=>{
+        const r = k7.rows[k];
+        if(r.assessed + r.notAssessed !== r.total)
+          warn.push(`KPI 7 row mismatch (${k===KPI7_UNASSIGNED?'Unassigned owner':k}): assessed ${r.assessed} + not assessed ${r.notAssessed} does not equal total ${r.total}`);
+        sumRows += r.total;
+      });
+      if(sumRows !== k7.tot.total)
+        warn.push(`KPI 7 total mismatch: sum of the 5 section rows (${sumRows}) does not equal the MQA total (${k7.tot.total})`);
+    }
     // Kết quả
     if(warn.length){ console.warn('%c[self-check] '+warn.length+' warning(s):','color:#D29922;font-weight:700'); warn.forEach(w=>console.warn('  • '+w)); }
     else console.log('%c[self-check] OK — By-status=Audit-vs-Inspection='+donutSum+' · status/semantic valid','color:#3FB950');
@@ -3770,6 +3858,7 @@ function populateFilters() {
   initYearMulti('ovYearF',      years, {onChange:renderOv});
   initYearMulti('ovYearFilter', years, {onChange:filterOverviewYear, default:'current'});
   initYearMulti('kpiYear',      years, {onChange:filterKpiYear,      default:'current'});
+  initYearMulti('kpi7Year',     years, {onChange:renderKpi7,          default:'current'});
 
   // Audit year filter
   populateAuditYearFilter();
@@ -5254,6 +5343,200 @@ function showRfiDetail(report_id, task_id){
   g('rfiModal').style.display='flex';
 }
 function closeRfiModal(e){ if(e&&e.target!==g('rfiModal'))return; g('rfiModal').style.display='none'; }
+
+// ── KPI 7 — PAVOI KPI (tỷ lệ PAVOI chưa được đánh giá) ────────────────────────  [r142]
+// Nghiệp vụ (Eric chốt 25/08/2026):
+//   · "Đã đánh giá"  = report có ÍT NHẤT 1 item hợp lệ trong dwreporting_report_task
+//     (RFI hoặc Add task — xem isPavoiItem). KHÔNG phụ thuộc task_status: task đã
+//     Completed vẫn tính là đã đánh giá ("đã từng mở" = đã đánh giá).
+//   · "Chưa đánh giá" = không có item hợp lệ nào.
+//   · Đếm theo REPORT, không theo task: 1 PAVOI có 12 RFI vẫn chỉ là 1.
+//   · KPI = Chưa đánh giá ÷ Tổng × 100 — CÀNG THẤP CÀNG TỐT, 0% = đã đánh giá hết.
+//
+// ⚠ Vì sao KPI 7 KHÔNG đọc thẳng pavoiRfiMap: loadPavoiRfi() cố tình CHỈ fetch task cho
+// PAVOI đang Open, và đánh dấu pavoiRfiDone rỗng cho report đã đóng để cell hiện '—'.
+// Đọc map đó thì MỌI PAVOI đã đóng sẽ bị đếm nhầm thành "chưa đánh giá" → KPI vọt lên
+// ~100%. KPI 7 vì thế có kho đếm RIÊNG (kpi7Cnt/kpi7Done), fetch cho TOÀN BỘ PAVOI mọi
+// trạng thái, và KHÔNG ghi ngược vào pavoiRfiMap (giữ nguyên hành vi cột RFI ở bảng
+// PAVOI Detail). Chỉ MƯỢN chiều ngược lại: report nào pavoiRfiMap đã có ≥1 item thì
+// chắc chắn "đã đánh giá", khỏi fetch lại.
+//
+// Bucket "Unassigned owner": Galileo đang chuyển owner PAVOI từ cá nhân → User Group
+// ("… Section"). Report chưa chuyển rơi vào bucket này — hiện công khai kèm cảnh báo
+// (PA1), bảng tự đúng dần khi Galileo backfill xong; KHÔNG hardcode bảng ánh xạ tên người.
+
+function kpi7CacheLoad(){
+  try{
+    const raw = localStorage.getItem(KPI7_CACHE_KEY); if(!raw) return false;
+    const c = JSON.parse(raw);
+    // Vứt cache khi lên rev mới hoặc quá TTL — cùng luật với cacheLoad() r128.
+    if(!c.ts || c.rev !== APP_REV || Date.now()-c.ts > CACHE_TTL){ localStorage.removeItem(KPI7_CACHE_KEY); return false; }
+    kpi7Cnt = c.cnt || {};
+    kpi7Done = new Set(Object.keys(kpi7Cnt));
+    return kpi7Done.size > 0;
+  }catch{ return false; }
+}
+function kpi7CacheSave(){
+  try{ localStorage.setItem(KPI7_CACHE_KEY, JSON.stringify({ts:Date.now(), rev:APP_REV, cnt:kpi7Cnt})); }catch{ /* quota */ }
+}
+
+// Lazy-load số item (RFI + Task) của TỪNG PAVOI, mọi trạng thái. Chỉ lưu SỐ ĐẾM, không
+// lưu nội dung task → cache nhỏ, và không đụng tới dữ liệu của bảng PAVOI Detail.
+// Chunk 15 GUID (MaxNodeCount=100, mỗi 'or' = 2 node); GUID trong $filter KHÔNG bọc nháy.
+// Retry 3 lần/chunk, backoff 400ms × attempt; 1 chunk lỗi KHÔNG phá chunk khác.
+async function loadKpi7Tasks(force=false){
+  if(force){
+    kpi7Loaded=false; kpi7Cnt={}; kpi7Done=new Set();
+    try{ localStorage.removeItem(KPI7_CACHE_KEY); }catch{}
+  }
+  if(kpi7Loaded && !force){ renderKpi7(); return; }
+  const ids = [...new Set(allData.filter(r=>r.report_title==='PAVOI' && r.report_id).map(r=>r.report_id))];
+  if(!ids.length){ kpi7Loaded=true; renderKpi7(); return; }
+  if(!force && !kpi7Done.size) kpi7CacheLoad();
+  // Mượn kết quả loadPavoiRfi đã fetch (nếu user vào trang PAVOI trước). CHỈ mượn key có
+  // trong pavoiRfiMap (đã có ≥1 item) — pavoiRfiDone chứa cả report đã đóng KHÔNG hề
+  // được fetch, mượn nó sẽ tạo ra số 0 giả = "chưa đánh giá" sai.
+  Object.keys(pavoiRfiMap).forEach(id=>{
+    const n = (pavoiRfiMap[id]||[]).length;
+    if(n && !kpi7Done.has(id)){ kpi7Cnt[id]=n; kpi7Done.add(id); }
+  });
+  const todo = ids.filter(id=>!kpi7Done.has(id));
+  if(!todo.length){ kpi7Loaded=true; kpi7CacheSave(); renderKpi7(); runSelfChecks(); return; }
+
+  setOv(true,'Loading PAVOI assessment (KPI 7)...','',0);
+  const CHUNK = 15, MAX_TRY = 3;
+  let failed = 0;
+  for(let i=0;i<todo.length;i+=CHUNK){
+    const chunk = todo.slice(i,i+CHUNK);
+    const orClause = chunk.map(id=>'report_id eq '+id).join(' or ');   // GUID không bọc nháy
+    const url = G_URL + 'dwreporting_report_task' +
+      '?$select=report_id,task_id,task_title,task_status' +
+      '&$filter=' + encodeURIComponent('('+orClause+')');
+    const doneN = Math.min(i+CHUNK, todo.length);
+    setOv(true,'Loading PAVOI assessment (KPI 7)...',`${doneN}/${todo.length} PAVOI`,Math.round(doneN/todo.length*100));
+    let ok = false;
+    for(let attempt=1; attempt<=MAX_TRY && !ok; attempt++){
+      try{
+        const raw = await fetchAll(url, true);          // skipOv=true — overlay dùng chung (vết r41)
+        const tally = {};
+        raw.forEach(t=>{ if(isPavoiItem(t)) tally[t.report_id] = (tally[t.report_id]||0)+1; });
+        // Chỉ ghi 0 cho report thuộc chunk ĐÃ fetch thành công → 0 nghĩa là "thật sự không
+        // có RFI/Task", không phải "chưa fetch".
+        chunk.forEach(id=>{ kpi7Cnt[id] = tally[id]||0; kpi7Done.add(id); });
+        ok = true;
+      }catch(e){
+        console.warn(`[KPI7] chunk@${i} try ${attempt}/${MAX_TRY} failed:`, e.message);
+        if(attempt<MAX_TRY) await new Promise(res=>setTimeout(res, 400*attempt));   // backoff
+      }
+    }
+    if(!ok) failed++;
+  }
+  kpi7Loaded = !failed;   // còn chunk lỗi → mở lại trang KPI sẽ thử lại đúng phần còn thiếu
+  kpi7CacheSave();
+  setOv(false);
+  if(failed) toast(`KPI 7: ${failed} group(s) failed to load — reopen the KPI page to retry`,'err');
+  renderKpi7();
+  runSelfChecks();
+}
+
+// Gom số liệu KPI 7 theo ban. Nguồn DUY NHẤT cho render, modal và self-check.
+// Report chưa fetch xong (kpi7Done chưa có) rơi vào `pending` và KHÔNG được đếm vào
+// assessed/notAssessed/total ở BẤT KỲ dòng nào → bất biến Σ dòng con = TOTAL luôn giữ.
+function kpi7Stats(){
+  const order = [...KPI7_SECTIONS, KPI7_UNASSIGNED];
+  const rows = {};
+  order.forEach(k=>{ rows[k] = {key:k, assessed:0, notAssessed:0, total:0, pending:0, notList:[]}; });
+  const tot = {assessed:0, notAssessed:0, total:0, pending:0, inGroup:0, all:0};
+  allData.forEach(r=>{
+    if(r.report_title!=='PAVOI' || !r.report_id) return;
+    if(!ymHas('kpi7Year', r.raised_year)) return;
+    tot.all++;
+    const inGroup = KPI7_SECTIONS.includes(r.owner_name);
+    if(inGroup) tot.inGroup++;
+    const row = rows[inGroup ? r.owner_name : KPI7_UNASSIGNED];
+    if(!kpi7Done.has(r.report_id)){ row.pending++; tot.pending++; return; }
+    row.total++; tot.total++;
+    if((kpi7Cnt[r.report_id]||0) > 0){ row.assessed++; tot.assessed++; }
+    else { row.notAssessed++; tot.notAssessed++; row.notList.push(r); }
+  });
+  return { order, rows, tot };
+}
+
+function kpi7Rate(n,d){ return d ? n/d*100 : null; }
+function kpi7Fmt(v){ return v===null ? '—' : (Math.round(v*10)/10).toFixed(1)+'%'; }
+// Chiều KPI: càng thấp càng tốt. 0% = đã đánh giá hết.
+function kpi7Color(v){ return v===null ? 'var(--muted)' : v===0 ? 'var(--green)' : v<=25 ? 'var(--yellow)' : '#ff6b6b'; }
+
+function renderKpi7(){
+  const body = g('kpi7Body'); if(!body) return;
+  const st = kpi7Stats();
+  const label = k => k===KPI7_UNASSIGNED ? 'Unassigned owner' : k;
+
+  const subRows = st.order.map((k,i)=>{
+    const r = st.rows[k], p = kpi7Rate(r.notAssessed, r.total), un = (k===KPI7_UNASSIGNED);
+    const nameStyle = un ? ' style="color:var(--muted);font-style:italic"' : '';
+    const pend = r.pending ? ` <span style="font-size:10px;color:var(--muted)">(${r.pending} loading…)</span>` : '';
+    const naCell = r.notAssessed
+      ? `<span style="cursor:pointer;text-decoration:underline dotted;color:#ff6b6b" onclick="showKpi7NotAssessed(${i})" title="List the ${r.notAssessed} PAVOI with no RFI or Task">${r.notAssessed}</span>`
+      : '<span style="color:var(--muted)">0</span>';
+    return `<tr>
+      <td${nameStyle}>${esc(label(k))}${pend}</td>
+      <td style="text-align:center;color:var(--green)">${r.assessed}</td>
+      <td style="text-align:center">${naCell}</td>
+      <td style="text-align:center">${r.total || '—'}</td>
+      <td style="text-align:center;font-weight:600;color:${kpi7Color(p)}">${kpi7Fmt(p)}</td>
+    </tr>`;
+  }).join('');
+
+  const pT = kpi7Rate(st.tot.notAssessed, st.tot.total);
+  body.innerHTML = subRows + `<tr style="font-weight:700;background:rgba(255,255,255,.04)">
+      <td>TOTAL — MQA</td>
+      <td style="text-align:center;color:var(--green)">${st.tot.assessed}</td>
+      <td style="text-align:center;color:#ff6b6b">${st.tot.notAssessed}</td>
+      <td style="text-align:center">${st.tot.total || '—'}</td>
+      <td style="text-align:center;color:${kpi7Color(pT)}">${kpi7Fmt(pT)}</td>
+    </tr>`;
+
+  const v = g('kpi7-val');
+  if(v){ v.textContent = kpi7Fmt(pT); v.style.color = kpi7Color(pT); }
+  s('kpi7-frac', st.tot.total ? `${st.tot.notAssessed} / ${st.tot.total} not assessed` : 'no PAVOI');
+  s('kpi7Sub', `Not assessed ÷ Total × 100% · assessed = has ≥1 RFI or Task · all PAVOI statuses · year ${ymText('kpi7Year')} · lower is better`);
+
+  // Cảnh báo hiện trạng (PA1): owner đang được Galileo chuyển từ cá nhân sang User Group.
+  const w = g('kpi7Warn');
+  if(w){
+    const msgs = [];
+    if(st.tot.all && st.tot.inGroup < st.tot.all)
+      msgs.push(`Owner migration in progress — ${st.tot.inGroup}/${st.tot.all} PAVOI already owned by a Section group; the rest are counted under "Unassigned owner".`);
+    if(st.tot.pending)
+      msgs.push(`${st.tot.pending} PAVOI not loaded yet — excluded from every figure above.`);
+    w.innerHTML = msgs.length ? '⚠ ' + msgs.map(esc).join('  ·  ') : '';
+    w.style.display = msgs.length ? '' : 'none';
+  }
+}
+
+// Click ô "Not assessed" → liệt kê đúng các PAVOI không có RFI/Task của ban đó.
+// Click 1 dòng → mở PAVOI Detail (pavoiModal z-index 215 nằm trên kpi7Modal z-index 210).
+function showKpi7NotAssessed(idx){
+  const st = kpi7Stats();
+  const k = st.order[idx]; if(!k) return;
+  const r = st.rows[k];
+  s('kpi7MTitle', k===KPI7_UNASSIGNED ? 'Unassigned owner' : k);
+  s('kpi7MSub', `${r.notAssessed} PAVOI with no RFI and no Task · all statuses · year ${ymText('kpi7Year')}`);
+  const td = 'padding:8px 10px;border-bottom:1px solid var(--border)';
+  const list = r.notList.slice().sort((a,b)=>String(b.raised_date||'').localeCompare(String(a.raised_date||'')));
+  g('kpi7ModalBody').innerHTML = list.length
+    ? list.map(x=>`<tr style="cursor:pointer" title="Open PAVOI Detail" onclick="showPavoiDetail('${x.report_id}')">
+        <td style="${td}"><b>${esc(x.report_number)||'—'}</b></td>
+        <td style="${td};font-size:11px;color:var(--muted)">${fd(x.raised_date)}</td>
+        <td style="${td};font-size:11px">${esc(x.owner_name)||'—'}</td>
+        <td style="${td}">${sBadge(x.semantic_status)}</td>
+        <td style="${td};font-size:11px;color:var(--muted)">${esc(x.dept)||'—'}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Nothing to show</td></tr>';
+  g('kpi7Modal').style.display='flex';
+}
+function closeKpi7Modal(e){ if(e&&e.target!==g('kpi7Modal'))return; g('kpi7Modal').style.display='none'; }
 
 // ── CMR-CAR ───────────────────────────────────────────────────
 function parseAircraftFromTitle(title){
@@ -8168,7 +8451,7 @@ function showPage(name,btn){
   if(name==='ecar'){ if(!ecarLoaded) loadEcar(); else renderEcar(); }
   if(name==='amoecar'){ renderAmoEcar(); }
   if(name==='mcar'){ renderMcar(); }
-  if(name==='kpi'){ filterKpiYear(); }
+  if(name==='kpi'){ filterKpiYear(); if(!kpi7Loaded) loadKpi7Tasks(); else renderKpi7(); }   // [r142] KPI 7 lazy-load
   if(name==='kpi2'){ if(!kpi2Loaded) loadKpi2(); else renderKpi2(); }
   if(name==='overdue'){ renderOv(); }
   if(name==='pavoi'){ if(!pavoiRfiLoaded) loadPavoiRfi(); else renderPavoi(); }

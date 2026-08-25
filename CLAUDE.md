@@ -297,6 +297,23 @@ Do not ask when:
 
 ## Known issues / gotchas
 
+- **`pavoiRfiMap` is Open-only — never use it as a denominator (r142)**: `loadPavoiRfi()`
+  deliberately fetches tasks **only** for PAVOI with `report_status === 'Open'` and marks
+  closed reports `pavoiRfiDone` with an **empty** entry so the RFI cell renders `—`. Any KPI
+  that reads the map directly counts **every closed PAVOI as "no task"**. KPI 7 therefore
+  keeps its own store (`kpi7Cnt` / `kpi7Done`, loader `loadKpi7Tasks()`) covering all PAVOI
+  statuses, and does **not** write back into `pavoiRfiMap`. Same trap applies to any future
+  metric over report tasks.
+- **`0` and "not fetched yet" are different (r142)**: `kpi7Cnt[id] = 0` is only written for a
+  chunk that actually succeeded. Reports outside `kpi7Done` are `pending` and stay out of both
+  numerator and denominator — otherwise a failed chunk silently reads as "not assessed".
+  Same lesson as r141's `auditData` empty-vs-zero check.
+- **PAVOI owner is mid-migration from person to User Group (r130, still true r142)**: Galileo
+  is moving PAVOI `owner_name` from individuals onto the four `'… Section'` groups (probe
+  r130: 28/461 done). Do **not** hardcode a person→section mapping; bucket the remainder as
+  "Unassigned owner" and show the migration progress, so the table corrects itself as the
+  backfill lands.
+
 - **Galileo latency is random, not size-proportional (r141)**: measured 21/08/2026 on
   `dwreporting_audit_summary` (4,317 rows, 1.76 MB), 7 consecutive calls: 17.7s / 7.7s /
   19.7s / 7.5s / 16.0s / fail / fail — roughly **30% failures** at a 30s ceiling. Chunking
@@ -348,7 +365,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.08.21-r141
+Rev current: 2026.08.25-r142
 
 ORG_UNIT = 'QA AMO'   ← main pages (never change without cross-page intent)
                          CMR-CAR and ECAR use org_unit = 'TQA' — fetched separately
