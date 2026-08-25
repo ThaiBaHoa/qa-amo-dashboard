@@ -297,6 +297,18 @@ Do not ask when:
 
 ## Known issues / gotchas
 
+- **KPI 7 numerator and denominator live on DIFFERENT sets (r144)** — deliberate, not a bug:
+  `TOTAL = OPEN + CLOSED` is the denominator (every PAVOI ever raised), while the numerator
+  counts **only OPEN PAVOI with no RFI/Task**. A closed PAVOI never enters the numerator but
+  always sits in the denominator. r142 got this wrong by counting every task-less PAVOI —
+  measured on live 2026 data that read **15.9%** instead of the correct **7.9%** (5 closed
+  PAVOI without tasks). If you touch `kpi7Stats()`, re-read the block comment above it first.
+- **A denominator that needs no fetch must not be gated on fetch state (r144)**: KPI 7's
+  denominator comes straight from `allData`, so Total/Closed stay correct even while task
+  chunks are still loading; only the numerator waits. The KPI **%** is withheld (`—`) while
+  any open PAVOI is unfetched — a partial numerator would understate the rate, i.e. lie in
+  the reassuring direction.
+
 - **Org unit filtering must include sub-units (r143)**: the tree is
   `VietjetAir | QA AMO` with four active children — `Quality Control`,
   `Licensing and Authorization`, `Standard and Compliance`, `AMO Safety` (created
@@ -381,7 +393,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.08.25-r143
+Rev current: 2026.08.25-r144
 
 ORG_UNIT_IDS          ← main pages: 'QA AMO' + ALL its sub-units, resolved at load
                          from dwreporting_organisational_unit_hierarchy (r143).

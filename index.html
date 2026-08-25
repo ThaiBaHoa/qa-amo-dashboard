@@ -866,8 +866,9 @@ body.kiosk .mob-menu{display:none!important}
               <table class="stat-tbl" id="kpi7Table">
                 <thead><tr>
                   <th>Section (PAVOI owner)</th>
-                  <th style="text-align:center;color:var(--green)">Assessed</th>
-                  <th style="text-align:center;color:#ff6b6b">Not assessed</th>
+                  <th style="text-align:center;color:var(--green)">Open · assessed</th>
+                  <th style="text-align:center;color:#ff6b6b">Open · not assessed</th>
+                  <th style="text-align:center;color:var(--muted)">Closed</th>
                   <th style="text-align:center">Total PAVOI</th>
                   <th style="text-align:center">KPI %</th>
                 </tr></thead>
@@ -2415,7 +2416,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.25-r143';
+const APP_REV = '2026.08.25-r144';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2676,7 +2677,8 @@ const KPI7_UNASSIGNED = '__unassigned__';    // bucket owner cá nhân / rỗng 
 const KPI7_CACHE_KEY  = 'qaAmoKpi7V1';
 let kpi7Loaded = false;
 let kpi7Cnt  = {};          // report_id -> số item hợp lệ (RFI + Task). 0 = thật sự chưa đánh giá.
-let kpi7Done = new Set();   // report_id đã fetch xong — CHỈ id trong này mới được đưa vào mẫu số.
+let kpi7Done = new Set();   // report_id ĐANG OPEN đã fetch xong. [r144] KHÔNG liên quan mẫu số:
+                            // mẫu số là mọi PAVOI lấy thẳng từ allData, không cần dữ liệu task.
 const PS = 25; // page size
 
 // Table states — mỗi table có state riêng
@@ -3763,17 +3765,23 @@ function runSelfChecks(){
     if(AL.length && !AU.length) warn.push('auditData is empty while allData has '+AL.length+' reports — the Audit plan request failed; Overview and Audit Plan are BLANK, not zero');
     // 6) [r142] KPI 7 — hai bất biến của bảng PAVOI KPI. Chỉ chạy khi đã fetch được ít nhất
     //    1 report (trước đó mọi số đều 0 → kiểm sẽ "đúng" một cách vô nghĩa).
-    if(kpi7Done.size){
+    {
       const k7 = kpi7Stats();
-      let sumRows = 0;
-      k7.order.forEach(k=>{
-        const r = k7.rows[k];
-        if(r.assessed + r.notAssessed !== r.total)
-          warn.push(`KPI 7 row mismatch (${k===KPI7_UNASSIGNED?'Unassigned owner':k}): assessed ${r.assessed} + not assessed ${r.notAssessed} does not equal total ${r.total}`);
-        sumRows += r.total;
-      });
-      if(sumRows !== k7.tot.total)
-        warn.push(`KPI 7 total mismatch: sum of the 5 section rows (${sumRows}) does not equal the MQA total (${k7.tot.total})`);
+      if(k7.tot.all){
+        let sumRows = 0;
+        k7.order.forEach(k=>{
+          const r = k7.rows[k], nm = (k===KPI7_UNASSIGNED?'Unassigned owner':k);
+          if(r.openAssessed + r.openNotAssessed + r.openPending + r.closed !== r.total)
+            warn.push(`KPI 7 row mismatch (${nm}): open assessed ${r.openAssessed} + open not assessed ${r.openNotAssessed} + open not loaded ${r.openPending} + closed ${r.closed} does not equal total ${r.total}`);
+          if(r.notList.length !== r.openNotAssessed)
+            warn.push(`KPI 7 drill-down mismatch (${nm}): the modal would list ${r.notList.length} PAVOI but the cell says ${r.openNotAssessed}`);
+          if(r.notList.some(x=>x.report_status!=='Open'))
+            warn.push(`KPI 7 numerator contamination (${nm}): a CLOSED PAVOI reached the numerator — closed reports must only ever count in the denominator`);
+          sumRows += r.total;
+        });
+        if(sumRows !== k7.tot.total)
+          warn.push(`KPI 7 total mismatch: sum of the 5 section rows (${sumRows}) does not equal the MQA total (${k7.tot.total})`);
+      }
     }
     // 7) [r143] Cây org unit — hai ca im lặng nguy hiểm.
     if(ORG_UNIT_IDS.length === 1)
@@ -5400,22 +5408,32 @@ function showRfiDetail(report_id, task_id){
 }
 function closeRfiModal(e){ if(e&&e.target!==g('rfiModal'))return; g('rfiModal').style.display='none'; }
 
-// ── KPI 7 — PAVOI KPI (tỷ lệ PAVOI chưa được đánh giá) ────────────────────────  [r142]
-// Nghiệp vụ (Eric chốt 25/08/2026):
+// ── KPI 7 — PAVOI KPI (tỷ lệ PAVOI đang mở chưa được đánh giá) ────────────  [r142 · r144]
+// Nghiệp vụ (Eric chốt 25/08/2026, bản sửa cùng ngày ở r144):
 //   · "Đã đánh giá"  = report có ÍT NHẤT 1 item hợp lệ trong dwreporting_report_task
 //     (RFI hoặc Add task — xem isPavoiItem). KHÔNG phụ thuộc task_status: task đã
 //     Completed vẫn tính là đã đánh giá ("đã từng mở" = đã đánh giá).
 //   · "Chưa đánh giá" = không có item hợp lệ nào.
 //   · Đếm theo REPORT, không theo task: 1 PAVOI có 12 RFI vẫn chỉ là 1.
-//   · KPI = Chưa đánh giá ÷ Tổng × 100 — CÀNG THẤP CÀNG TỐT, 0% = đã đánh giá hết.
 //
-// ⚠ Vì sao KPI 7 KHÔNG đọc thẳng pavoiRfiMap: loadPavoiRfi() cố tình CHỈ fetch task cho
-// PAVOI đang Open, và đánh dấu pavoiRfiDone rỗng cho report đã đóng để cell hiện '—'.
-// Đọc map đó thì MỌI PAVOI đã đóng sẽ bị đếm nhầm thành "chưa đánh giá" → KPI vọt lên
-// ~100%. KPI 7 vì thế có kho đếm RIÊNG (kpi7Cnt/kpi7Done), fetch cho TOÀN BỘ PAVOI mọi
-// trạng thái, và KHÔNG ghi ngược vào pavoiRfiMap (giữ nguyên hành vi cột RFI ở bảng
-// PAVOI Detail). Chỉ MƯỢN chiều ngược lại: report nào pavoiRfiMap đã có ≥1 item thì
-// chắc chắn "đã đánh giá", khỏi fetch lại.
+//   ⭐ TỬ SỐ VÀ MẪU SỐ NẰM TRÊN HAI TẬP KHÁC NHAU — CHỦ Ý, KHÔNG PHẢI NHẦM LẪN:
+//        TONG  = OPEN + CLOSED                            ← mẫu số: MỌI PAVOI đã phát hành
+//        OPEN  = OPEN_DA_DANH_GIA + OPEN_CHUA_DANH_GIA    ← chỉ trong tập Open
+//        KPI%  = OPEN_CHUA_DANH_GIA ÷ TONG × 100
+//     PAVOI đã Closed KHÔNG BAO GIỜ vào tử số, nhưng LUÔN nằm trong mẫu số.
+//     CÀNG THẤP CÀNG TỐT, 0% = không còn việc đang mở nào chưa đánh giá.
+//
+//   ⚠ r142 làm sai chỗ này: đếm mọi PAVOI không có task vào tử số, kể cả đã đóng. Đo trên
+//     data thật 25/08/2026 (2026): sai cho ra 15.9%, đúng phải là 7.9% — 5 PAVOI đã đóng
+//     không có task bị tính nhầm. Khi sửa vùng này, ĐỌC LẠI khối trên trước.
+//
+// ⚠ Vì sao KPI 7 vẫn có kho đếm RIÊNG (kpi7Cnt/kpi7Done) thay vì đọc thẳng pavoiRfiMap:
+// pavoiRfiMap chỉ được nạp KHI người dùng mở trang PAVOI Detail, và có thể còn thiếu chunk
+// lỗi — một KPI không được phụ thuộc vào việc người dùng đã ghé trang nào. Ngoài ra
+// pavoiRfiDone bị đánh dấu RỖNG cho report đã đóng (để cell RFI hiện '—'), nên "có mặt
+// trong pavoiRfiDone" KHÔNG đồng nghĩa "đã fetch". KPI 7 vì thế tự fetch và KHÔNG ghi
+// ngược vào pavoiRfiMap (giữ nguyên hành vi cột RFI của bảng PAVOI Detail). Chỉ MƯỢN
+// chiều ngược lại: report nào pavoiRfiMap đã có ≥1 item thì chắc chắn "đã đánh giá".
 //
 // Bucket "Unassigned owner": Galileo đang chuyển owner PAVOI từ cá nhân → User Group
 // ("… Section"). Report chưa chuyển rơi vào bucket này — hiện công khai kèm cảnh báo
@@ -5446,7 +5464,11 @@ async function loadKpi7Tasks(force=false){
     try{ localStorage.removeItem(KPI7_CACHE_KEY); }catch{}
   }
   if(kpi7Loaded && !force){ renderKpi7(); return; }
-  const ids = [...new Set(allData.filter(r=>r.report_title==='PAVOI' && r.report_id).map(r=>r.report_id))];
+  // [r144] CHỈ cần task của PAVOI ĐANG OPEN. Mẫu số là toàn bộ PAVOI (Open + Closed) nhưng
+  // lấy thẳng từ allData, không cần task; còn tử số theo định nghĩa chỉ gồm PAVOI đang Open
+  // chưa được đánh giá — PAVOI đã Closed KHÔNG BAO GIỜ vào tử số. Nhờ vậy số request tụt
+  // từ ~17 (246 report) xuống ~3 (39 report đang Open).
+  const ids = [...new Set(allData.filter(r=>r.report_title==='PAVOI' && r.report_id && r.report_status==='Open').map(r=>r.report_id))];
   if(!ids.length){ kpi7Loaded=true; renderKpi7(); return; }
   if(!force && !kpi7Done.size) kpi7CacheLoad();
   // Mượn kết quả loadPavoiRfi đã fetch (nếu user vào trang PAVOI trước). CHỈ mượn key có
@@ -5495,14 +5517,24 @@ async function loadKpi7Tasks(force=false){
   runSelfChecks();
 }
 
-// Gom số liệu KPI 7 theo ban. Nguồn DUY NHẤT cho render, modal và self-check.
-// Report chưa fetch xong (kpi7Done chưa có) rơi vào `pending` và KHÔNG được đếm vào
-// assessed/notAssessed/total ở BẤT KỲ dòng nào → bất biến Σ dòng con = TOTAL luôn giữ.
+// [r144] Gom số liệu KPI 7 theo ban. Nguồn DUY NHẤT cho render, modal và self-check.
+//
+// PHÂN HOẠCH (Eric chốt 25/08/2026 — điểm dễ làm sai nhất, tử số và mẫu số nằm trên HAI
+// tập khác nhau, đây là CHỦ Ý chứ không phải nhầm lẫn):
+//     TONG  = OPEN + CLOSED                              ← mẫu số: MỌI PAVOI đã phát hành
+//     OPEN  = OPEN_DA_DANH_GIA + OPEN_CHUA_DANH_GIA      ← chỉ trong tập Open
+//     KPI%  = OPEN_CHUA_DANH_GIA ÷ TONG × 100
+// PAVOI đã Closed KHÔNG BAO GIỜ vào tử số, nhưng LUÔN nằm trong mẫu số.
+//
+// Mẫu số KHÔNG cần dữ liệu task → `total` và `closed` luôn chính xác kể cả khi chưa fetch
+// xong. Chỉ tử số mới cần task, và chỉ cho PAVOI đang Open: report Open chưa fetch rơi vào
+// `openPending`, không được xếp bừa vào đã/chưa đánh giá.
+// Bất biến từng dòng: openAssessed + openNotAssessed + openPending + closed === total.
 function kpi7Stats(){
   const order = [...KPI7_SECTIONS, KPI7_UNASSIGNED];
   const rows = {};
-  order.forEach(k=>{ rows[k] = {key:k, assessed:0, notAssessed:0, total:0, pending:0, notList:[]}; });
-  const tot = {assessed:0, notAssessed:0, total:0, pending:0, inGroup:0, all:0};
+  order.forEach(k=>{ rows[k] = {key:k, openAssessed:0, openNotAssessed:0, openPending:0, closed:0, total:0, notList:[]}; });
+  const tot = {openAssessed:0, openNotAssessed:0, openPending:0, closed:0, total:0, inGroup:0, all:0};
   allData.forEach(r=>{
     if(r.report_title!=='PAVOI' || !r.report_id) return;
     if(!ymHas('kpi7Year', r.raised_year)) return;
@@ -5510,10 +5542,11 @@ function kpi7Stats(){
     const inGroup = KPI7_SECTIONS.includes(r.owner_name);
     if(inGroup) tot.inGroup++;
     const row = rows[inGroup ? r.owner_name : KPI7_UNASSIGNED];
-    if(!kpi7Done.has(r.report_id)){ row.pending++; tot.pending++; return; }
-    row.total++; tot.total++;
-    if((kpi7Cnt[r.report_id]||0) > 0){ row.assessed++; tot.assessed++; }
-    else { row.notAssessed++; tot.notAssessed++; row.notList.push(r); }
+    row.total++; tot.total++;                                   // mẫu số: mọi PAVOI, không cần task
+    if(r.report_status !== 'Open'){ row.closed++; tot.closed++; return; }   // Closed: chỉ ở mẫu số
+    if(!kpi7Done.has(r.report_id)){ row.openPending++; tot.openPending++; return; }
+    if((kpi7Cnt[r.report_id]||0) > 0){ row.openAssessed++; tot.openAssessed++; }
+    else { row.openNotAssessed++; tot.openNotAssessed++; row.notList.push(r); }
   });
   return { order, rows, tot };
 }
@@ -5528,47 +5561,51 @@ function renderKpi7(){
   const st = kpi7Stats();
   const label = k => k===KPI7_UNASSIGNED ? 'Unassigned owner' : k;
 
-  // [r142-i1] "Chưa nạp được" KHÁC "bằng 0" — cùng bài học r141. Dòng không có report nào
-  // ĐÃ FETCH XONG (`total === 0`, dù vì fetch hỏng hay vì ban đó không có PAVOI trong năm
-  // đang lọc) phải hiện '—' ở CẢ BỐN ô số. In `0` ở Assessed/Not assessed trong khi Total
-  // và KPI% là '—' vừa nói dối ("đã kiểm, không thiếu cái nào") vừa lẫn hai ký hiệu trong
-  // cùng một dòng. `0` chỉ được in khi đã có mẫu số thật (`total > 0`).
+  // [r142-i1 · giữ ở r144] "Chưa nạp được" KHÁC "bằng 0". Dòng không có PAVOI nào
+  // (`total === 0`) hiện '—' ở MỌI ô số — in `0` khi chưa có mẫu số vừa nói dối vừa lẫn
+  // hai ký hiệu trong một dòng. `0` chỉ in khi đã có mẫu số thật.
+  // [r144] Mẫu số KHÔNG phụ thuộc fetch, nên Total/Closed luôn hiện số thật. Chỉ hai cột
+  // Open mới cần task: còn report Open chưa fetch (`openPending`) thì KPI% hiện '—' vì tử
+  // số lúc đó chắc chắn ĐANG THIẾU — hiển thị một % thấp giả là nói dối theo chiều "ổn cả".
   const dash = '<span style="color:var(--muted)">—</span>';
+  const rowRate = r => (r.total && !r.openPending) ? kpi7Rate(r.openNotAssessed, r.total) : null;
   const subRows = st.order.map((k,i)=>{
-    const r = st.rows[k], p = kpi7Rate(r.notAssessed, r.total), un = (k===KPI7_UNASSIGNED);
-    const noData = r.total === 0;
+    const r = st.rows[k], p = rowRate(r), un = (k===KPI7_UNASSIGNED);
+    const noData   = r.total === 0;
+    const openBlind = (r.openAssessed + r.openNotAssessed) === 0 && r.openPending > 0;
     const nameStyle = un ? ' style="color:var(--muted);font-style:italic"' : '';
-    const pend = r.pending ? ` <span style="font-size:10px;color:var(--muted)">(${r.pending} not loaded)</span>` : '';
-    const naCell = noData ? dash : (r.notAssessed
-      ? `<span style="cursor:pointer;text-decoration:underline dotted;color:#ff6b6b" onclick="showKpi7NotAssessed(${i})" title="List the ${r.notAssessed} PAVOI with no RFI or Task">${r.notAssessed}</span>`
+    const pend = r.openPending ? ` <span style="font-size:10px;color:var(--muted)">(${r.openPending} open not loaded)</span>` : '';
+    const naCell = (noData || openBlind) ? dash : (r.openNotAssessed
+      ? `<span style="cursor:pointer;text-decoration:underline dotted;color:#ff6b6b" onclick="showKpi7NotAssessed(${i})" title="List the ${r.openNotAssessed} open PAVOI with no RFI or Task">${r.openNotAssessed}</span>`
       : '<span style="color:var(--muted)">0</span>');
     return `<tr>
       <td${nameStyle}>${esc(label(k))}${pend}</td>
-      <td style="text-align:center;color:var(--green)">${noData ? dash : r.assessed}</td>
+      <td style="text-align:center;color:var(--green)">${(noData||openBlind) ? dash : r.openAssessed}</td>
       <td style="text-align:center">${naCell}</td>
+      <td style="text-align:center;color:var(--muted)">${noData ? dash : r.closed}</td>
       <td style="text-align:center">${r.total || '—'}</td>
       <td style="text-align:center;font-weight:600;color:${kpi7Color(p)}">${kpi7Fmt(p)}</td>
     </tr>`;
   }).join('');
 
-  const pT = kpi7Rate(st.tot.notAssessed, st.tot.total);
-  const noDataT   = st.tot.total === 0;
-  // total=0 VÌ fetch hỏng (còn pending) — KHÁC total=0 vì thật sự không có PAVOI nào.
-  const allPending = noDataT && st.tot.pending > 0;
+  const pT = rowRate(st.tot);
+  const noDataT    = st.tot.total === 0;
+  const openBlindT = (st.tot.openAssessed + st.tot.openNotAssessed) === 0 && st.tot.openPending > 0;
   body.innerHTML = subRows + `<tr style="font-weight:700;background:rgba(255,255,255,.04)">
       <td>TOTAL — MQA</td>
-      <td style="text-align:center;color:var(--green)">${noDataT ? dash : st.tot.assessed}</td>
-      <td style="text-align:center;color:#ff6b6b">${noDataT ? dash : st.tot.notAssessed}</td>
+      <td style="text-align:center;color:var(--green)">${(noDataT||openBlindT) ? dash : st.tot.openAssessed}</td>
+      <td style="text-align:center;color:#ff6b6b">${(noDataT||openBlindT) ? dash : st.tot.openNotAssessed}</td>
+      <td style="text-align:center;color:var(--muted)">${noDataT ? dash : st.tot.closed}</td>
       <td style="text-align:center">${st.tot.total || '—'}</td>
       <td style="text-align:center;color:${kpi7Color(pT)}">${kpi7Fmt(pT)}</td>
     </tr>`;
 
   const v = g('kpi7-val');
   if(v){ v.textContent = kpi7Fmt(pT); v.style.color = kpi7Color(pT); }
-  // "no PAVOI" chỉ được nói khi THẬT SỰ không có PAVOI nào — không phải khi fetch hỏng.
-  s('kpi7-frac', st.tot.total ? `${st.tot.notAssessed} / ${st.tot.total} not assessed`
-                              : (allPending ? 'not loaded' : 'no PAVOI'));
-  s('kpi7Sub', `Not assessed ÷ Total × 100% · assessed = has ≥1 RFI or Task · all PAVOI statuses · year ${ymText('kpi7Year')} · lower is better`);
+  s('kpi7-frac', !st.tot.total ? 'no PAVOI'
+               : st.tot.openPending ? `${st.tot.openPending} open not loaded`
+               : `${st.tot.openNotAssessed} / ${st.tot.total} open & not assessed`);
+  s('kpi7Sub', `Open &amp; not assessed ÷ Total PAVOI (Open + Closed) × 100% · assessed = has ≥1 RFI or Task · closed PAVOI count in the denominator only, never in the numerator · year ${ymText('kpi7Year')} · lower is better`);
 
   // Cảnh báo hiện trạng (PA1): owner đang được Galileo chuyển từ cá nhân sang User Group.
   const w = g('kpi7Warn');
@@ -5576,24 +5613,24 @@ function renderKpi7(){
     const msgs = [];
     if(st.tot.all && st.tot.inGroup < st.tot.all)
       msgs.push(`Owner migration in progress — ${st.tot.inGroup}/${st.tot.all} PAVOI already owned by a Section group; the rest are counted under "Unassigned owner".`);
-    if(st.tot.pending)
-      msgs.push(allPending
-        ? `Could not load RFI / Task for any of the ${st.tot.pending} PAVOI — the figures above are NOT zero, they are unknown. Press ↻ to retry.`
-        : `${st.tot.pending} PAVOI not loaded yet — excluded from every figure above.`);
+    if(st.tot.openPending)
+      msgs.push(openBlindT
+        ? `Could not load RFI / Task for any of the ${st.tot.openPending} open PAVOI — the KPI is NOT low, it is unknown. Press ↻ to retry.`
+        : `${st.tot.openPending} open PAVOI not loaded yet — the KPI %% is withheld until they are, because the numerator would be understated.`);
     w.innerHTML = msgs.length ? '⚠ ' + msgs.map(esc).join('  ·  ') : '';
     w.style.display = msgs.length ? '' : 'none';
-    w.style.color = allPending ? '#ff6b6b' : 'var(--yellow)';   // [r142-i1] hỏng hoàn toàn → đỏ, đừng để lẫn với cảnh báo thường
+    w.style.color = openBlindT ? '#ff6b6b' : 'var(--yellow)';   // [r142-i1] hỏng hoàn toàn → đỏ, đừng để lẫn với cảnh báo thường
   }
 }
 
-// Click ô "Not assessed" → liệt kê đúng các PAVOI không có RFI/Task của ban đó.
+// Click ô "Open · not assessed" → liệt kê đúng các PAVOI ĐANG OPEN không có RFI/Task.
 // Click 1 dòng → mở PAVOI Detail (pavoiModal z-index 215 nằm trên kpi7Modal z-index 210).
 function showKpi7NotAssessed(idx){
   const st = kpi7Stats();
   const k = st.order[idx]; if(!k) return;
   const r = st.rows[k];
   s('kpi7MTitle', k===KPI7_UNASSIGNED ? 'Unassigned owner' : k);
-  s('kpi7MSub', `${r.notAssessed} PAVOI with no RFI and no Task · all statuses · year ${ymText('kpi7Year')}`);
+  s('kpi7MSub', `${r.openNotAssessed} OPEN PAVOI with no RFI and no Task · closed PAVOI are never counted here · year ${ymText('kpi7Year')}`);
   const td = 'padding:8px 10px;border-bottom:1px solid var(--border)';
   const list = r.notList.slice().sort((a,b)=>String(b.raised_date||'').localeCompare(String(a.raised_date||'')));
   g('kpi7ModalBody').innerHTML = list.length
@@ -5604,7 +5641,7 @@ function showKpi7NotAssessed(idx){
         <td style="${td}">${sBadge(x.semantic_status)}</td>
         <td style="${td};font-size:11px;color:var(--muted)">${esc(x.dept)||'—'}</td>
       </tr>`).join('')
-    : '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Nothing to show</td></tr>';
+    : '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">No open PAVOI without RFI or Task</td></tr>';
   g('kpi7Modal').style.display='flex';
 }
 function closeKpi7Modal(e){ if(e&&e.target!==g('kpi7Modal'))return; g('kpi7Modal').style.display='none'; }
