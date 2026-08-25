@@ -297,6 +297,22 @@ Do not ask when:
 
 ## Known issues / gotchas
 
+- **Org unit filtering must include sub-units (r143)**: the tree is
+  `VietjetAir | QA AMO` with four active children — `Quality Control`,
+  `Licensing and Authorization`, `Standard and Compliance`, `AMO Safety` (created
+  2025-07-09) — matching the four MQA sections exactly. `TQA` and `OQA` sit under
+  `VietjetAir | SQA | Quality Assurance`, a **different** department, and stay excluded.
+  The old filter `org_unit_name eq 'QA AMO'` matched the **parent row only**, silently
+  dropping every report filed against a child: measured 2026-08-25, **69 reports missing**
+  (20 PAVOI, 26 AMO-HAZARD LOG, 22 AMO-HIRA, 1 Aircraft Inspection). Open PAVOI read 35 in
+  the app while Coruson showed 39. Resolve the descendants at load time from
+  `dwreporting_organisational_unit_hierarchy` — do **not** hardcode the section names.
+- **Filter org units by `org_unit_id`, not `org_unit_name` (r143)**: Galileo does not
+  guarantee unique unit names across the tree, so a same-named unit in another department
+  would silently pull foreign data in. `dwreporting_report_summary` exposes `org_unit_id`,
+  `org_unit_name`, `org_unit_code`, `org_unit_is_archived` — use the UUID (unquoted, as with
+  every GUID in a `$filter`).
+
 - **`pavoiRfiMap` is Open-only — never use it as a denominator (r142)**: `loadPavoiRfi()`
   deliberately fetches tasks **only** for PAVOI with `report_status === 'Open'` and marks
   closed reports `pavoiRfiDone` with an **empty** entry so the RFI cell renders `—`. Any KPI
@@ -365,9 +381,11 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.08.25-r142-i1
+Rev current: 2026.08.25-r143
 
-ORG_UNIT = 'QA AMO'   ← main pages (never change without cross-page intent)
+ORG_UNIT_IDS          ← main pages: 'QA AMO' + ALL its sub-units, resolved at load
+                         from dwreporting_organisational_unit_hierarchy (r143).
+                         Filter by org_unit_id (UUID), never by org_unit_name.
                          CMR-CAR and ECAR use org_unit = 'TQA' — fetched separately
 ```
 

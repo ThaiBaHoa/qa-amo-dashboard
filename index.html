@@ -2375,6 +2375,21 @@ const SUPA_KEY  = 'sb_publishable_eGdEXBCSD_19tu4sOV8NWQ_8mZmUqqq';
 const G_URL     = 'https://galileo-proxy.thaibahoa2308.workers.dev/proxy/';
 // G_KEY removed — stored securely in Cloudflare Worker environment
 const ORG_UNIT  = 'QA AMO';
+// [r143] Lọc report theo org unit phải bao cả BAN CON. Cây thật trên Galileo:
+//   VietjetAir | QA AMO ─┬─ Quality Control
+//                        ├─ Licensing and Authorization
+//                        ├─ Standard and Compliance
+//                        └─ AMO Safety            (lập 09/07/2025)
+// (TQA và OQA nằm ở nhánh 'VietjetAir | SQA | Quality Assurance' — KHÁC phòng, vẫn loại.)
+// Filter cũ `org_unit_name eq 'QA AMO'` chỉ khớp ĐÚNG cấp cha nên rụng sạch report gắn
+// vào ban con: đo 25/08/2026 thiếu 69 report (20 PAVOI, 26 AMO-HAZARD LOG, 22 AMO-HIRA,
+// 1 Aircraft Inspection) → PAVOI đang Open hiện 35 trong khi Coruson là 39.
+// Lọc theo org_unit_id (UUID) chứ KHÔNG theo tên: tên ban không được Galileo bảo đảm
+// duy nhất toàn cây, một ban trùng tên ở phòng khác sẽ kéo nhầm dữ liệu vào.
+const ORG_UNIT_ID = '25eb6426-1bcf-49b7-947e-4b39ac82859e';   // org unit 'QA AMO' (code MQA)
+let   ORG_UNIT_IDS = [ORG_UNIT_ID];   // QA AMO + hậu duệ chưa archive — dựng trong loadOrgUnitIds()
+// GUID trong $filter KHÔNG bọc nháy. n phần tử = 2n−1 node, trần OData là 100 → an toàn tới 50 ban.
+const orgUnitFilter = () => '(' + ORG_UNIT_IDS.map(i => 'org_unit_id eq ' + i).join(' or ') + ')';
 const QC_CAT_UUID = '7e5ccacc-563d-4fde-bef7-905870d68aca';  // Category "QC MQA Physical Finding" (cấp report)
 // Danh sách auditor QA AMO — dùng để filter audit plan
 // Thêm tên mới vào đây khi có auditor mới
@@ -2400,7 +2415,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.25-r142-i1';
+const APP_REV = '2026.08.25-r143';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3069,6 +3084,7 @@ function cacheLoad() {
     if (c.rev !== APP_REV) { localStorage.removeItem(CACHE_KEY); return false; }
     allData   = c.a;
     auditData = c.b || [];
+    if (Array.isArray(c.ou) && c.ou.length) ORG_UNIT_IDS = c.ou;   // [r143] phiên mở từ cache không chạy loadData
     if (c.sa) stageAggregate = c.sa;
     if (c.dtf) {
       docTypeFlat = c.dtf;
@@ -3087,7 +3103,7 @@ function cacheLoad() {
 
 function cacheSave() {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), rev:APP_REV, a:allData, b:auditData, dtf:docTypeFlat, sa:stageAggregate}));
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), rev:APP_REV, a:allData, b:auditData, dtf:docTypeFlat, sa:stageAggregate, ou:ORG_UNIT_IDS}));
     updateCacheAge(Date.now());
   } catch {
     try {
@@ -3105,6 +3121,37 @@ function updateCacheAge(ts) {
   const nextH = Math.ceil((CACHE_TTL - (Date.now()-ts)) / 3600000);
   el.textContent = age < 2 ? 'Just loaded' : age < 60 ? `${age}m ago` : `${Math.floor(age/60)}h${age%60?age%60+'m':''} ago`;
   el.title = `Cache expires in ~${nextH}h — click ↻ Refresh to reload now`;
+}
+
+// ── ORG UNIT ─────────────────────────────────────────────────
+// [r143] Dựng danh sách org unit của MQA = 'QA AMO' + MỌI hậu duệ chưa archive, đọc từ
+// dwreporting_organisational_unit_hierarchy (209 dòng, nhẹ). KHÔNG hardcode tên 4 ban:
+// ban con lập thêm sau này tự vào, khỏi phải sửa code (AMO Safety mới lập 07/2025 là ví dụ).
+// Hỏng → lùi về CHỈ 'QA AMO' (đúng hành vi trước r143: thiếu data nhưng không trắng trang)
+// và ghi vào loadFailures để cảnh báo nổi lên UI thay vì âm thầm thiếu.
+async function loadOrgUnitIds(){
+  try{
+    setOv(true,'Loading org unit tree...','',8);
+    const h = await fetchAll(G_URL + 'dwreporting_organisational_unit_hierarchy' +
+      '?$select=organisational_unit_id,name,parent_id,is_archived', true);
+    const byParent = {};
+    h.forEach(r => (byParent[r.parent_id] ||= []).push(r));
+    const ids = [ORG_UNIT_ID], seen = new Set(ids);
+    const walk = id => (byParent[id]||[]).forEach(c => {
+      const cid = c.organisational_unit_id;
+      if(c.is_archived || !cid || seen.has(cid)) return;   // seen: chặn vòng lặp nếu cây có chu trình
+      seen.add(cid); ids.push(cid); walk(cid);
+    });
+    walk(ORG_UNIT_ID);
+    ORG_UNIT_IDS = ids;
+    console.log('[org-unit] QA AMO + ' + (ids.length-1) + ' ban con');
+    return ids.length;
+  }catch(e){
+    console.warn('[org-unit] không dựng được cây org unit, lùi về chỉ QA AMO:', e.message);
+    ORG_UNIT_IDS = [ORG_UNIT_ID];
+    loadFailures.push('Org unit tree (falling back to QA AMO only — sub-section reports are MISSING)');
+    return 1;
+  }
 }
 
 // ── DATA LOADING ─────────────────────────────────────────────
@@ -3155,6 +3202,10 @@ async function loadData(forceRefresh=false) {
       });
     };
 
+    // [r143] PHẢI chạy TRƯỚC Promise.all: request 'Report summary' dùng kết quả này làm $filter.
+    // Đây là ngoại lệ duy nhất của ghi chú "6 request độc lập" ở trên.
+    await loadOrgUnitIds();
+
     let summary = [], usersRaw = [], grpRaw = [], auRaw = [];
     let userMap = {}, wfMap = {}, wfAllMap = {}, fMap = {};
 
@@ -3165,7 +3216,7 @@ async function loadData(forceRefresh=false) {
         G_URL + 'dwreporting_report_summary' +
         '?$select=report_id,report_title,report_number,report_status,' +
         'org_unit_name,raised_date,audit_title,audit_id,modified_date,valid_from,valid_to,owner_id' +
-        '&$filter=org_unit_name eq \'' + ORG_UNIT + '\'',
+        '&$filter=' + encodeURIComponent(orgUnitFilter()),   // [r143] QA AMO + ban con, lọc theo UUID
         rows => {
           try {
             // DEDUP: giữ 1 record/report_id có modified_date mới nhất, bỏ record không có report_number
@@ -3724,6 +3775,11 @@ function runSelfChecks(){
       if(sumRows !== k7.tot.total)
         warn.push(`KPI 7 total mismatch: sum of the 5 section rows (${sumRows}) does not equal the MQA total (${k7.tot.total})`);
     }
+    // 7) [r143] Cây org unit — hai ca im lặng nguy hiểm.
+    if(ORG_UNIT_IDS.length === 1)
+      warn.push('Org unit tree not loaded — only the parent "QA AMO" is queried, so reports filed under a sub-section (Quality Control, Licensing, Standard & Compliance, AMO Safety) are MISSING from every page');
+    if(ORG_UNIT_IDS.length > 45)
+      warn.push('Org unit list has '+ORG_UNIT_IDS.length+' entries — the $filter is near the OData MaxNodeCount limit of 100 ('+(ORG_UNIT_IDS.length*2-1)+' nodes); the Report summary request will start failing');
     // Kết quả
     if(warn.length){ console.warn('%c[self-check] '+warn.length+' warning(s):','color:#D29922;font-weight:700'); warn.forEach(w=>console.warn('  • '+w)); }
     else console.log('%c[self-check] OK — By-status=Audit-vs-Inspection='+donutSum+' · status/semantic valid','color:#3FB950');
@@ -10338,7 +10394,9 @@ function spiMonthIndex(...candidates){
 async function loadSPI(){
   const sumUrl = G_URL + 'dwreporting_report_summary'
     + '?$select=report_id,report_number,report_title,report_status,org_unit_name,modified_date,raised_date'
-    + `&$filter=org_unit_name eq '${SPI_CONFIG.orgUnit}' and report_title eq '${SPI_CONFIG.reportTitle}'`;
+    + '&$filter=' + encodeURIComponent(orgUnitFilter() + " and report_title eq '" + SPI_CONFIG.reportTitle + "'");
+  // [r143] Dùng chung orgUnitFilter() cho nhất quán. Đo 25/08/2026: ban con có 0 report
+  // 'AMO - SPI' nên KHÔNG đổi con số nào hôm nay — chỉ để SPI không hụt khi ban con dùng form này.
   const sumRaw = await fetchAll(sumUrl, true);
 
   const sumMap = {};
