@@ -2400,7 +2400,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.25-r142';
+const APP_REV = '2026.08.25-r142-i1';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -5472,16 +5472,23 @@ function renderKpi7(){
   const st = kpi7Stats();
   const label = k => k===KPI7_UNASSIGNED ? 'Unassigned owner' : k;
 
+  // [r142-i1] "Chưa nạp được" KHÁC "bằng 0" — cùng bài học r141. Dòng không có report nào
+  // ĐÃ FETCH XONG (`total === 0`, dù vì fetch hỏng hay vì ban đó không có PAVOI trong năm
+  // đang lọc) phải hiện '—' ở CẢ BỐN ô số. In `0` ở Assessed/Not assessed trong khi Total
+  // và KPI% là '—' vừa nói dối ("đã kiểm, không thiếu cái nào") vừa lẫn hai ký hiệu trong
+  // cùng một dòng. `0` chỉ được in khi đã có mẫu số thật (`total > 0`).
+  const dash = '<span style="color:var(--muted)">—</span>';
   const subRows = st.order.map((k,i)=>{
     const r = st.rows[k], p = kpi7Rate(r.notAssessed, r.total), un = (k===KPI7_UNASSIGNED);
+    const noData = r.total === 0;
     const nameStyle = un ? ' style="color:var(--muted);font-style:italic"' : '';
-    const pend = r.pending ? ` <span style="font-size:10px;color:var(--muted)">(${r.pending} loading…)</span>` : '';
-    const naCell = r.notAssessed
+    const pend = r.pending ? ` <span style="font-size:10px;color:var(--muted)">(${r.pending} not loaded)</span>` : '';
+    const naCell = noData ? dash : (r.notAssessed
       ? `<span style="cursor:pointer;text-decoration:underline dotted;color:#ff6b6b" onclick="showKpi7NotAssessed(${i})" title="List the ${r.notAssessed} PAVOI with no RFI or Task">${r.notAssessed}</span>`
-      : '<span style="color:var(--muted)">0</span>';
+      : '<span style="color:var(--muted)">0</span>');
     return `<tr>
       <td${nameStyle}>${esc(label(k))}${pend}</td>
-      <td style="text-align:center;color:var(--green)">${r.assessed}</td>
+      <td style="text-align:center;color:var(--green)">${noData ? dash : r.assessed}</td>
       <td style="text-align:center">${naCell}</td>
       <td style="text-align:center">${r.total || '—'}</td>
       <td style="text-align:center;font-weight:600;color:${kpi7Color(p)}">${kpi7Fmt(p)}</td>
@@ -5489,17 +5496,22 @@ function renderKpi7(){
   }).join('');
 
   const pT = kpi7Rate(st.tot.notAssessed, st.tot.total);
+  const noDataT   = st.tot.total === 0;
+  // total=0 VÌ fetch hỏng (còn pending) — KHÁC total=0 vì thật sự không có PAVOI nào.
+  const allPending = noDataT && st.tot.pending > 0;
   body.innerHTML = subRows + `<tr style="font-weight:700;background:rgba(255,255,255,.04)">
       <td>TOTAL — MQA</td>
-      <td style="text-align:center;color:var(--green)">${st.tot.assessed}</td>
-      <td style="text-align:center;color:#ff6b6b">${st.tot.notAssessed}</td>
+      <td style="text-align:center;color:var(--green)">${noDataT ? dash : st.tot.assessed}</td>
+      <td style="text-align:center;color:#ff6b6b">${noDataT ? dash : st.tot.notAssessed}</td>
       <td style="text-align:center">${st.tot.total || '—'}</td>
       <td style="text-align:center;color:${kpi7Color(pT)}">${kpi7Fmt(pT)}</td>
     </tr>`;
 
   const v = g('kpi7-val');
   if(v){ v.textContent = kpi7Fmt(pT); v.style.color = kpi7Color(pT); }
-  s('kpi7-frac', st.tot.total ? `${st.tot.notAssessed} / ${st.tot.total} not assessed` : 'no PAVOI');
+  // "no PAVOI" chỉ được nói khi THẬT SỰ không có PAVOI nào — không phải khi fetch hỏng.
+  s('kpi7-frac', st.tot.total ? `${st.tot.notAssessed} / ${st.tot.total} not assessed`
+                              : (allPending ? 'not loaded' : 'no PAVOI'));
   s('kpi7Sub', `Not assessed ÷ Total × 100% · assessed = has ≥1 RFI or Task · all PAVOI statuses · year ${ymText('kpi7Year')} · lower is better`);
 
   // Cảnh báo hiện trạng (PA1): owner đang được Galileo chuyển từ cá nhân sang User Group.
@@ -5509,9 +5521,12 @@ function renderKpi7(){
     if(st.tot.all && st.tot.inGroup < st.tot.all)
       msgs.push(`Owner migration in progress — ${st.tot.inGroup}/${st.tot.all} PAVOI already owned by a Section group; the rest are counted under "Unassigned owner".`);
     if(st.tot.pending)
-      msgs.push(`${st.tot.pending} PAVOI not loaded yet — excluded from every figure above.`);
+      msgs.push(allPending
+        ? `Could not load RFI / Task for any of the ${st.tot.pending} PAVOI — the figures above are NOT zero, they are unknown. Press ↻ to retry.`
+        : `${st.tot.pending} PAVOI not loaded yet — excluded from every figure above.`);
     w.innerHTML = msgs.length ? '⚠ ' + msgs.map(esc).join('  ·  ') : '';
     w.style.display = msgs.length ? '' : 'none';
+    w.style.color = allPending ? '#ff6b6b' : 'var(--yellow)';   // [r142-i1] hỏng hoàn toàn → đỏ, đừng để lẫn với cảnh báo thường
   }
 }
 
