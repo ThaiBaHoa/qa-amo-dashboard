@@ -2416,7 +2416,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.25-r144';
+const APP_REV = '2026.08.28-r145';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2845,7 +2845,8 @@ async function doChangePass() {
 async function doLogout() {
   await sb.auth.signOut();
   sessionStorage.clear();
-  localStorage.removeItem(CACHE_KEY); // Clear report data cache so next user starts fresh
+  idbDel(CACHE_KEY).catch(e => console.warn('[cache] không xoá được cache khi logout:', e && e.message));
+  // ↑ [r145] Cache nằm ở IndexedDB từ r145. Xoá để người đăng nhập kế tiếp bắt đầu sạch.
   curUser=null; allData=[];
   g('authWrap').style.display='flex'; g('app').style.display='none';
   g('loginForm').style.display=''; g('registerForm').style.display='none';
@@ -2870,7 +2871,10 @@ function initApp() {
     g('adminNav').style.display='';
     document.querySelectorAll('.admin-only').forEach(el=>el.style.display='');
   }
-  if(!cacheLoad()) loadData();
+  // [r145] cacheLoad() là async (IndexedDB). Dùng .then() chứ KHÔNG await: giữ initApp()
+  // đồng bộ như cũ để startAutoRefresh()/startKiosk() chạy ngay, không chờ đĩa.
+  cacheLoad().then(ok => { if(!ok) loadData(); })
+             .catch(() => loadData());
   startAutoRefresh();
   startKiosk();          // [r137] no-op khi URL không có ?kiosk=
 }
@@ -2951,8 +2955,73 @@ window.addEventListener('DOMContentLoaded', async ()=>{
 });
 
 // ── CACHE (4 giờ) ────────────────────────────────────────────
-const CACHE_KEY = 'qaAmoV5';
-const CACHE_TTL = 4 * 60 * 60 * 1000; // 4 hours
+// [r145] Cache CHUYỂN TỪ localStorage SANG IndexedDB. Vì sao, đo 28/08/2026 trên máy thật:
+// localStorage cấp cho origin này vỏn vẹn ~4,8 MB, trong khi payload cacheSave() định ghi
+// đã là 6,13 MB (nhánh full) / 4,58 MB (nhánh slim). Cả hai đều ném QuotaExceededError và
+// bị `catch { /* quota */ }` NUỐT IM LẶNG → cache 4 giờ chưa từng ghi được một lần nào,
+// nên MỌI lượt mở dashboard đều là một lượt nạp nguội đầy đủ (~24s đo ngày 28/08).
+// Triệu chứng đánh lừa: loadFailures rỗng, dữ liệu đúng, app "chạy tốt" — chỉ chậm mãi mãi.
+// IndexedDB không dính trần ~5 MB (hạn mức theo dung lượng đĩa trống), và structured clone
+// bỏ luôn được bước JSON.stringify 6 MB mỗi lần ghi.
+const CACHE_KEY   = 'qaAmoV5';
+const CACHE_TTL   = 4 * 60 * 60 * 1000; // 4 hours
+const CACHE_DB    = 'qaAmoCache';
+const CACHE_STORE = 'blobs';
+
+// [r145] Lỗi ghi cache gần nhất, để runSelfChecks (kiểm 8) đẩy lên UI cho admin.
+// KHÔNG để null nghĩa là "cache đang không hoạt động" — xem luật "phải kêu" ở cacheSave().
+let cacheSaveError = null;
+
+// ── IndexedDB: 4 hàm tối thiểu, mỗi hàm tự mở/đóng ───────────
+// Cố tình KHÔNG giữ một handle db dài hạn: kết nối treo khi có tab khác đang
+// onupgradeneeded sẽ làm mọi lượt ghi sau đó im lặng không bao giờ resolve.
+function idbOpen(){
+  return new Promise((res, rej) => {
+    if(!self.indexedDB) return rej(new Error('IndexedDB unavailable'));
+    const rq = indexedDB.open(CACHE_DB, 1);
+    rq.onupgradeneeded = () => {
+      const db = rq.result;
+      if(!db.objectStoreNames.contains(CACHE_STORE)) db.createObjectStore(CACHE_STORE);
+    };
+    rq.onsuccess = () => res(rq.result);
+    rq.onerror   = () => rej(rq.error || new Error('indexedDB.open failed'));
+    rq.onblocked = () => rej(new Error('indexedDB.open blocked by another tab'));
+  });
+}
+function idbTx(mode, fn){
+  return idbOpen().then(db => new Promise((res, rej) => {
+    const tx = db.transaction(CACHE_STORE, mode);
+    const rq = fn(tx.objectStore(CACHE_STORE));
+    tx.oncomplete = () => { db.close(); res(rq ? rq.result : undefined); };
+    tx.onerror    = () => { db.close(); rej(tx.error || new Error('idb transaction failed')); };
+    tx.onabort    = () => { db.close(); rej(tx.error || new Error('idb transaction aborted')); };
+  }));
+}
+const idbGet = k      => idbTx('readonly',  st => st.get(k));
+const idbSet = (k, v) => idbTx('readwrite', st => st.put(v, k));
+const idbDel = k      => idbTx('readwrite', st => st.delete(k));
+
+// ── [r145] Dọn khoá cache mồ côi trong localStorage ──────────
+// Bump CACHE_KEY (vd V4 → V5) làm code mới thôi ĐỌC khoá cũ, nhưng trình duyệt vẫn GIỮ
+// nguyên nó — blob cũ thành rác bất tử, không ai đọc mà vẫn chiếm quota. Ca thật đo được
+// 28/08/2026: 'qaAmoV4' ghi ngày 19/05/2026 (101 ngày trước) chiếm 4,04 MB trên tổng ~4,8 MB,
+// để lại đúng 0,75 MB trống — chính nó bóp chết mọi lượt ghi cache kể từ đó.
+// Giữ lại KPI7_CACHE_KEY: nó chỉ lưu SỐ ĐẾM nên rất nhỏ, vẫn nằm ở localStorage.
+// CACHE_KEY cũng bị xoá khỏi localStorage: từ r145 nó sống trong IndexedDB, bản localStorage
+// (nếu còn sót từ build cũ) chỉ là rác.
+function purgeLegacyCacheKeys(){
+  try{
+    let freed = 0; const gone = [];
+    for(const k of Object.keys(localStorage)){
+      if(!k.startsWith('qaAmo') || k === KPI7_CACHE_KEY) continue;
+      freed += k.length + (localStorage.getItem(k) || '').length;
+      localStorage.removeItem(k); gone.push(k);
+    }
+    if(gone.length) console.log('%c[cache] đã dọn ' + gone.length + ' khoá localStorage mồ côi (' +
+      (freed/1048576).toFixed(2) + ' MB): ' + gone.join(', '), 'color:#3FB950');
+  }catch(e){ console.warn('[cache] purgeLegacyCacheKeys lỗi:', e && e.message); }
+}
+purgeLegacyCacheKeys();
 
 // ── AUTO-REFRESH (màn hình LED / kiosk) ──────────────────────
 // Làm mới dữ liệu Galileo mỗi 12h NGAY TẠI CHỖ (loadData(true)),
@@ -3075,15 +3144,16 @@ function kioskShow(i){
   setTimeout(() => { Object.values(charts).forEach(c => { try{ c.resize(); }catch(e){} }); }, 60);
 }
 
-function cacheLoad() {
+// [r145] ASYNC kể từ r145 (IndexedDB). Người gọi: initApp() dùng .then(), KHÔNG await,
+// để startAutoRefresh()/startKiosk() vẫn chạy ngay như trước.
+async function cacheLoad() {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    if (!raw) return false;
-    const c = JSON.parse(raw);
+    const c = await idbGet(CACHE_KEY);
+    if (!c) return false;
     if (!c.ts || !c.a || Date.now() - c.ts > CACHE_TTL) return false;
     // Vứt cache khi lên rev mới (deploy đổi logic/field) → tránh phục vụ data cũ
     // tính theo code cũ. Vd r126 nới filter Audit Plan nhưng cache r125 vẫn thiếu audit.
-    if (c.rev !== APP_REV) { localStorage.removeItem(CACHE_KEY); return false; }
+    if (c.rev !== APP_REV) { idbDel(CACHE_KEY).catch(()=>{}); return false; }
     allData   = c.a;
     auditData = c.b || [];
     if (Array.isArray(c.ou) && c.ou.length) ORG_UNIT_IDS = c.ou;   // [r143] phiên mở từ cache không chạy loadData
@@ -3100,19 +3170,42 @@ function cacheLoad() {
     const age = Math.round((Date.now()-c.ts)/60000);
     toast(`Cache (${age < 60 ? age+'m' : Math.floor(age/60)+'h'} ago) — ${allData.length} reports, ${auditData.length} audits · Press ↻ to refresh`,'ok');
     return true;
-  } catch { return false; }
+  } catch(e) {
+    // [r145] ĐỌC hỏng thì im lặng là chấp nhận được — hậu quả chỉ là nạp lại từ Galileo,
+    // đúng thứ sẽ xảy ra tiếp theo. GHI hỏng mới là thứ phải kêu (xem cacheSave).
+    console.warn('[cache] cacheLoad lỗi, sẽ nạp lại từ Galileo:', e && e.message);
+    return false;
+  }
 }
 
-function cacheSave() {
+// [r145] LUẬT: một lượt ghi cache hỏng phải ỒN ÀO BẰNG một request hỏng.
+// Bản trước nuốt QuotaExceededError bằng `catch { /* quota exceeded */ }` — app vẫn đúng
+// chức năng nên không ai nghi ngờ, trong khi cache chết suốt 3 tháng và mọi lượt mở trang
+// đều nạp nguội. Nay: ghi vào cacheSaveError → runSelfChecks kiểm 8 đẩy lên chip cảnh báo
+// của admin, kèm console.warn có SỐ (byte định ghi, quota còn lại) để chẩn đoán được ngay.
+// Không await ở người gọi: hàm tự nuốt mọi lỗi, không bao giờ ném ra ngoài.
+async function cacheSave() {
+  const payload = {ts:Date.now(), rev:APP_REV, a:allData, b:auditData,
+                   dtf:docTypeFlat, sa:stageAggregate, ou:ORG_UNIT_IDS};
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), rev:APP_REV, a:allData, b:auditData, dtf:docTypeFlat, sa:stageAggregate, ou:ORG_UNIT_IDS}));
-    updateCacheAge(Date.now());
-  } catch {
+    // structured clone — KHÔNG JSON.stringify: bỏ được bước dựng chuỗi ~6 MB mỗi lượt ghi.
+    await idbSet(CACHE_KEY, payload);
+    cacheSaveError = null;
+    updateCacheAge(payload.ts);
+  } catch(e) {
+    const msg = (e && (e.name || e.message)) ? ((e.name||'') + ' ' + (e.message||'')).trim() : String(e);
+    cacheSaveError = msg;
+    let est = '';
     try {
-      const slim = allData.map(r=>({...r,wf_stages:[]}));
-      localStorage.setItem(CACHE_KEY, JSON.stringify({ts:Date.now(), rev:APP_REV, a:slim, b:auditData, sa:stageAggregate}));
-      updateCacheAge(Date.now());
-    } catch { /* quota exceeded */ }
+      if (navigator.storage && navigator.storage.estimate) {
+        const q = await navigator.storage.estimate();
+        est = ' · đang dùng ' + (q.usage/1048576).toFixed(1) + ' MB / hạn mức ' +
+              (q.quota/1048576).toFixed(1) + ' MB';
+      }
+    } catch {}
+    console.warn('%c[cache] GHI CACHE HỎNG — mọi lượt mở dashboard sẽ nạp nguội lại từ ' +
+      'Galileo cho tới khi sửa: ' + msg + est, 'color:#F85149;font-weight:700');
+    if (typeof updateDqBadge === 'function') { try { updateDqBadge(); } catch {} }
   }
 }
 
@@ -3788,6 +3881,11 @@ function runSelfChecks(){
       warn.push('Org unit tree not loaded — only the parent "QA AMO" is queried, so reports filed under a sub-section (Quality Control, Licensing, Standard & Compliance, AMO Safety) are MISSING from every page');
     if(ORG_UNIT_IDS.length > 45)
       warn.push('Org unit list has '+ORG_UNIT_IDS.length+' entries — the $filter is near the OData MaxNodeCount limit of 100 ('+(ORG_UNIT_IDS.length*2-1)+' nodes); the Report summary request will start failing');
+    // 8) [r145] Cache không ghi được → mọi lượt mở dashboard nạp nguội lại từ Galileo (~24s).
+    //    Ca 28/08/2026: localStorage hết chỗ vì blob 'qaAmoV4' mồ côi 4 MB, cả hai nhánh ghi
+    //    ném QuotaExceededError và bị catch{} nuốt → không một dấu hiệu nào, suốt 3 tháng.
+    if(cacheSaveError)
+      warn.push('Cache write is failing (' + cacheSaveError + ') — every page open reloads all data from Galileo (~24s) instead of using the 4-hour cache');
     // Kết quả
     if(warn.length){ console.warn('%c[self-check] '+warn.length+' warning(s):','color:#D29922;font-weight:700'); warn.forEach(w=>console.warn('  • '+w)); }
     else console.log('%c[self-check] OK — By-status=Audit-vs-Inspection='+donutSum+' · status/semantic valid','color:#3FB950');
@@ -5451,7 +5549,12 @@ function kpi7CacheLoad(){
   }catch{ return false; }
 }
 function kpi7CacheSave(){
-  try{ localStorage.setItem(KPI7_CACHE_KEY, JSON.stringify({ts:Date.now(), rev:APP_REV, cnt:kpi7Cnt})); }catch{ /* quota */ }
+  // [r145] Cache này CHỦ Ý ở lại localStorage: nó chỉ lưu SỐ ĐẾM nên vài chục KB, không
+  // đáng dựng thêm một store IndexedDB. Nhưng không được nuốt lỗi im lặng nữa — cùng lý do
+  // đã làm cache chính chết 3 tháng mà không ai biết.
+  try{ localStorage.setItem(KPI7_CACHE_KEY, JSON.stringify({ts:Date.now(), rev:APP_REV, cnt:kpi7Cnt})); }
+  catch(e){ console.warn('[cache] không ghi được cache KPI 7 (' + (e && e.name) +
+    ') — trang KPI sẽ fetch lại mỗi lần mở:', e && e.message); }
 }
 
 // Lazy-load số item (RFI + Task) của TỪNG PAVOI, mọi trạng thái. Chỉ lưu SỐ ĐẾM, không

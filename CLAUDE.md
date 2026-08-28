@@ -200,6 +200,11 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
   - New feature / layout change / removed functionality → bump `rNN → r(NN+1)`
   - Pure bug fix → keep `rNN`, bump issue suffix (`r107-i1`, `r107-i2`)
   - Log fixes as "Issue 1/2/3" under that rev. Next feature resets issue counter.
+  - **Never reserve rev numbers ahead of time.** A rev number is assigned **when the change
+    ships**, in ship order. Planning docs must use neutral labels ("Việc 1/2/3/4"), never
+    `rNN` headings — see the `cap-nhat-revision` skill's "đặt chỗ số rev" anti-pattern
+    (28/08/2026: a handover plan reserved r145–r148, an unrelated cache fix shipped first,
+    and the reservation forced a nonsensical jump to r149 before Eric corrected it).
   - **One `APP_REV` bump per combined spec** — never merge unrelated specs into one rev.
     A same-rev fix of the rev you just shipped is `-iM`, not a new major. **Enforce via the
     `cap-nhat-revision` skill checklist** — see its "vết r129–r130" anti-pattern (bundled 3
@@ -394,7 +399,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.08.25-r144
+Rev current: 2026.08.28-r145
 
 ORG_UNIT_IDS          ← main pages: 'QA AMO' + ALL its sub-units, resolved at load
                          from dwreporting_organisational_unit_hierarchy (r143).

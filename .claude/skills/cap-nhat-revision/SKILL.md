@@ -118,6 +118,20 @@ Hỏi "cùng spec hay khác spec" trước, rồi mới tới feature/bugfix.
 7. **Push khi người dùng muốn deploy** — `git push` (deploy = GitHub Pages trên `main`).
    Đừng tự push nếu người dùng chưa yêu cầu.
 
+## ⚠️ Anti-pattern có thật — đặt chỗ số rev (28-08-2026, ĐỪNG LẶP LẠI)
+
+- **Bối cảnh:** `KE_HOACH_SUA_r145_r148.md` (kế hoạch bàn giao 27/08) gán sẵn **r145–r148**
+  cho bốn việc chưa ai bắt tay làm. Hôm sau một việc KHÁC (sửa tầng cache) xong trước.
+- **Lập luận sai:** "r145–r148 đã có chủ, việc mới lấy r149 cho khỏi đụng."
+- **Eric bác:** *"cái nào sửa trước thì up rev trước chứ đặt chỗ như vậy rồi sau này sửa lại
+  sẽ lẫn lộn chồng lấn các phiên bản."* Việc cache ship trước → nó là **r145**.
+- **Luật:** **số rev gán KHI SHIP, theo thứ tự ship — KHÔNG đặt chỗ trước.** Rev là nhãn của
+  một thay đổi *đã ra*, không phải ô trống giữ sẵn cho dự định. Đặt chỗ đẻ ra hai hỏng hóc:
+  số nhảy cóc (r144 → r149) không ai giải thích được, và khi kế hoạch đổi thứ tự thì rev
+  trong tài liệu không còn khớp rev trong code.
+- **Kế hoạch thì đánh số thế nào?** Dùng nhãn trung tính — "Việc 1/2/3/4" — kèm thứ tự ưu tiên.
+  Số rev điền vào lúc commit. File kế hoạch đã đổi thành `KE_HOACH_SUA_4_VIEC_TON.md` theo đúng cách này.
+
 ## Ví dụ message
 
 **Feature mới:**
