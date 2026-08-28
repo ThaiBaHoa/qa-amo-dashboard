@@ -2417,7 +2417,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.28-r149';
+const APP_REV = '2026.08.28-r149-i1';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -5873,7 +5873,11 @@ function kpi7Stats(){
 function kpi7Rate(r){ return r && r.total ? (r.openAssessed + r.closed)/r.total*100 : null; }
 function kpi7Fmt(v){ return v===null ? '—' : (Math.round(v*10)/10).toFixed(1)+'%'; }
 // [r149] Chiều KPI ĐẢO so với r142–r148: càng CAO càng tốt. 100% = đã đánh giá hết phần đang mở.
-function kpi7Color(v){ return v===null ? 'var(--muted)' : v>=100 ? 'var(--green)' : v>=75 ? 'var(--yellow)' : '#ff6b6b'; }
+// [r149-i1] Ngưỡng Eric chốt 28/08/2026: ≥75% xanh · 50–<75% vàng · <50% đỏ. r149 ship với
+// ngưỡng mirror ngược của bản cũ (chỉ 100% mới xanh) — quá gắt: dải thực tế của công thức
+// mới nằm khoảng 85–100%, nên 92.1% hiện VÀNG dù đã là mức tốt. Ngưỡng do NGHIỆP VỤ đặt,
+// không suy ra được từ công thức — đừng tự mirror lần sau, hỏi.
+function kpi7Color(v){ return v===null ? 'var(--muted)' : v>=75 ? 'var(--green)' : v>=50 ? 'var(--yellow)' : '#ff6b6b'; }
 
 function renderKpi7(){
   const body = g('kpi7Body'); if(!body) return;
