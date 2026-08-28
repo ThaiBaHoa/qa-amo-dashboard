@@ -2416,7 +2416,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.28-r147';
+const APP_REV = '2026.08.28-r148';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3329,8 +3329,12 @@ async function loadData(forceRefresh=false) {
     // custom fields 10,7 MB) — giữ cả 6 mảng tới khi Promise.all xong sẽ đội đỉnh heap.
     // critical=true → lỗi làm hỏng cả lượt load (đúng như summary trước đây).
     // critical=false → nuốt lỗi + log, giữ nguyên hành vi try/catch tuần tự cũ.
+    // [r148] url có thể là CHUỖI (fetchAll như cũ) hoặc PROMISE trả về mảng dòng —
+    // dùng cho 'Workflow' vốn tự lo lấy dòng bằng delta. Callback onRows KHÔNG đổi, nên
+    // dòng lấy kiểu nào cũng đi qua đúng một khối xử lý.
     const par = (label, url, onRows, critical) => {
-      const p = fetchAll(url, true).then(rows => { onRows(rows); parStep(label); });
+      const src = (typeof url === 'string') ? fetchAll(url, true) : url;
+      const p = src.then(rows => { onRows(rows); parStep(label); });
       return critical ? p : p.catch(e => {
         console.warn(label + ' load error:', e);
         // [r141] Trước đây lỗi CHỈ nằm ở dòng console.warn trên. Hậu quả 21/08/2026:
@@ -3383,8 +3387,7 @@ async function loadData(forceRefresh=false) {
 
       // 3. WORKFLOW
       par('Workflow',
-        G_URL + 'dwreporting_report_workflow' +
-        '?$select=report_id,stage_type,stage_status,stage_completed_date,stage_target_date',
+        fetchWorkflowRows(forceRefresh),   // [r148] delta; ↻ Refresh (forceRefresh) → nạp đầy
         rows => {
           // dwreporting_report_workflow là bảng ĐÃ TRẢI PHẲNG theo (stage × task): một stage có
           // N task thì hiện ra N dòng giống hệt nhau ở 5 cột ta $select. Không lọc thì wf_stages
@@ -3734,6 +3737,105 @@ async function fetchAll(url, skipOv=false) {
     if(p>200) break; // safety cap
   }
   return res;
+}
+
+// ── [r148] WORKFLOW: ĐỒNG BỘ THEO THAY ĐỔI (delta) ───────────
+// dwreporting_report_workflow là request NẶNG NHẤT và không cắt được server-side:
+//   · KHÔNG có cột org_unit_id  → không lọc theo cây org unit như report_summary (đã kiểm
+//     bằng ?$top=1: bảng có 30 cột, không cột nào mang phạm vi phòng ban).
+//   · 37 report_title của QA AMO → vượt trần $filter, Galileo trả HTTP 400 (kèm thân JSON
+//     hợp lệ, nên đừng đọc .value rồi tưởng "không có dữ liệu").
+//   · 3.541 report_id → trần ~16 GUID/$filter, cần 222 request. Vô nghĩa.
+//   · Lọc theo ngày: mốc AN TOÀN (≥2021, report QA AMO cũ nhất 01/10/2021) chỉ cắt 4%
+//     (119.805 → 115.083). Cắt sâu hơn là mất dữ liệu QA AMO.
+// Nhưng bảng này BIẾN ĐỔI RẤT CHẬM. Đo 28/08/2026 trên tổng 119.805 dòng:
+//     4 giờ →   109 dòng /  42 report      24 giờ →  373 dòng /  85 report
+//     7 ngày → 1.506 dòng / 542 report      30 ngày → 4.969 dòng
+// Nên: nạp đầy MỘT lần, sau đó chỉ kéo phần đổi. 42 report = 3 request chunk thay vì
+// 120k dòng. Bản thô lưu riêng trong IndexedDB và **không gắn APP_REV** — nó là dữ liệu
+// Galileo nguyên bản, không có logic app nào nướng vào, nên bump rev không cần vứt nó.
+//
+// AN TOÀN — vì sao cách này không đẻ ra hai đường tính toán: delta chỉ đổi CÁCH LẤY DÒNG.
+// Mảng dòng trả về đi qua ĐÚNG khối dedup/dựng wfMap+wfAllMap cũ, không sao chép logic.
+//
+// Đơn vị merge là CẢ REPORT, không phải từng dòng: cột `id` KHÔNG duy nhất (đo được
+// 100.000 dòng chỉ có 36.821 `id` — bảng đã trải phẳng theo stage × task), nên không có
+// khoá dòng để thay tại chỗ. Report nào có bất kỳ dòng nào đổi thì bỏ hết dòng cũ của nó
+// rồi kéo lại đủ.
+//
+// GIỚI HẠN ĐÃ BIẾT: delta không thấy được dòng BỊ XOÁ. Hai lớp chắn:
+//   (a) report bị xoá hẳn → dòng thừa nằm lại vô hại, vì wfMap/wfAllMap chỉ được ĐỌC cho
+//       report có trong summary;
+//   (b) một stage bị xoá khỏi report còn sống → chip Workflow thừa cho tới lần nạp đầy.
+//       Nạp đầy xảy ra khi: quá WF_MAX_AGE, quá WF_MAX_CHUNKS, hoặc người dùng bấm ↻.
+const WF_RAW_KEY    = 'wfRaw';
+const WF_MAX_AGE    = 7 * 24 * 60 * 60 * 1000;  // quá 7 ngày → nạp đầy, để bắt cả phần bị xoá
+const WF_CHUNK      = 15;                        // GUID/$filter (MaxNodeCount=100, mỗi 'or' = 2 node)
+const WF_MAX_CHUNKS = 10;                        // >150 report đổi thì nạp đầy còn rẻ hơn
+const WF_SELECT     = '?$select=report_id,stage_type,stage_status,stage_completed_date,stage_target_date';
+
+// Mốc nước: LẤY TRƯỚC khi kéo dữ liệu. Dòng nào đổi trong lúc đang kéo sẽ có
+// modified_date ≥ mốc này nên lượt sau kéo lại — thừa thì vô hại, thiếu mới chết.
+async function wfWatermark(){
+  const j = await fetchWithRetry(G_URL + 'dwreporting_report_workflow' +
+    '?$select=modified_date&$orderby=modified_date desc&$top=1');
+  const v = (j && j.value && j.value[0]) ? j.value[0].modified_date : null;
+  if(!v) throw new Error('không đọc được mốc modified_date');
+  return v;
+}
+
+async function fetchWorkflowRows(forceFull){
+  const t0 = Date.now();
+  const wm = await wfWatermark();                       // trước mọi thứ — xem ghi chú trên
+  let cached = null;
+  if(!forceFull){
+    try{ cached = await idbGet(WF_RAW_KEY); }catch(e){ console.warn('[wf] đọc cache thô lỗi:', e && e.message); }
+  }
+
+  const fullLoad = async (why) => {
+    const rows = await fetchAll(G_URL + 'dwreporting_report_workflow' + WF_SELECT, true);
+    try{ await idbSet(WF_RAW_KEY, {syncedAt: wm, fetchedAt: Date.now(), rows}); }
+    catch(e){ console.warn('[wf] không lưu được bản thô (' + (e && e.name) + ') — lượt sau lại phải nạp đầy:', e && e.message); }
+    console.log('%c[wf] NẠP ĐẦY (' + why + ') — ' + rows.length + ' dòng trong ' +
+      ((Date.now()-t0)/1000).toFixed(1) + 's', 'color:#D29922');
+    return rows;
+  };
+
+  if(!cached || !Array.isArray(cached.rows) || !cached.syncedAt) return fullLoad('chưa có bản thô');
+  if(Date.now() - (cached.fetchedAt || 0) > WF_MAX_AGE)          return fullLoad('bản thô quá 7 ngày');
+
+  // Dòng nào đổi kể từ mốc lần trước → lấy tập report_id (payload rất nhẹ)
+  let changed;
+  try{
+    changed = await fetchAll(G_URL + 'dwreporting_report_workflow' +
+      '?$select=report_id&$filter=' + encodeURIComponent('modified_date gt ' + cached.syncedAt), true);
+  }catch(e){
+    console.warn('[wf] hỏi phần thay đổi lỗi, lùi về nạp đầy:', e && e.message);
+    return fullLoad('hỏi delta lỗi');
+  }
+
+  const ids = [...new Set(changed.map(r => r.report_id).filter(Boolean))];
+  if(ids.length > WF_MAX_CHUNKS * WF_CHUNK) return fullLoad(ids.length + ' report đổi, nạp đầy rẻ hơn');
+
+  let fresh = [];
+  if(ids.length){
+    const chunks = [];
+    for(let i = 0; i < ids.length; i += WF_CHUNK) chunks.push(ids.slice(i, i + WF_CHUNK));
+    // GUID trong $filter KHÔNG bọc nháy (invariant Galileo).
+    const parts = await Promise.all(chunks.map(c => fetchAll(
+      G_URL + 'dwreporting_report_workflow' + WF_SELECT + '&$filter=' +
+      encodeURIComponent('(' + c.map(id => 'report_id eq ' + id).join(' or ') + ')'), true)));
+    fresh = parts.flat();
+  }
+
+  const dropIds = new Set(ids);
+  const rows = cached.rows.filter(r => !dropIds.has(r.report_id)).concat(fresh);
+  try{ await idbSet(WF_RAW_KEY, {syncedAt: wm, fetchedAt: cached.fetchedAt || Date.now(), rows}); }
+  catch(e){ console.warn('[wf] không lưu được bản thô sau delta:', e && e.message); }
+  console.log('%c[wf] DELTA — ' + ids.length + ' report đổi (' + changed.length + ' dòng), ' +
+    Math.ceil(ids.length / WF_CHUNK) + ' request, tổng ' + rows.length + ' dòng trong ' +
+    ((Date.now()-t0)/1000).toFixed(1) + 's', 'color:#3FB950;font-weight:700');
+  return rows;
 }
 
 // ── CALCULATIONS ─────────────────────────────────────────────
