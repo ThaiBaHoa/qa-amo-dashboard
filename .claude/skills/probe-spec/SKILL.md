@@ -20,6 +20,58 @@ hành vi query — luôn dò dữ liệu sống trước, rồi mới viết spe
 (1) PROBE  →  (2) SPEC  →  (3) IMPLEMENT
 ```
 
+## 0. TRIỆU CHỨNG LÀ "CHẬM"? — kiểm tầng MÌNH SỞ HỮU trước khi đo Galileo
+
+> Mục này chặn ĐÚNG cái bẫy đã làm mất một buổi sáng ngày 28/08/2026. Nó chỉ áp dụng
+> khi ai đó báo **chậm**, không áp dụng khi báo **sai số liệu** (cái đó xuống §1).
+
+Galileo là thủ phạm **có sẵn**: nó thật sự chậm và thất thường (đo 10 mẫu trên
+`dwreporting_report_workflow`: TTFB gọn 3,4–6,3s nhưng total trải 3,7–22,7s), lại có
+tiền án ghi trong code từ 21/08 và có sẵn số liệu để dẫn. Vì vậy nó **hút hết sự nghi
+ngờ** — và lần chẩn đoán đầu tiên đã đổ cho nó, cho ra một kết luận đầy số đo nhưng
+**sai trọng tâm**.
+
+Sự thật là cache 4 giờ **chưa từng ghi được một lần nào suốt ~3 tháng**: `qaAmoV4` mồ
+côi 4,04 MB chiếm gần hết quota localStorage ~4,8 MB, `cacheSave()` ném
+`QuotaExceededError` và bị `catch{}` nuốt. Galileo chỉ quyết định một lượt nguội tốn
+15s hay 40s — nó **không** giải thích vì sao lượt nào cũng nguội.
+
+Thứ phá vỡ vụ án là MỘT dòng, chạy sau một lượt load **thành công**:
+
+```js
+localStorage.getItem(CACHE_KEY)   // → null  ⇒ cache không hề được ghi
+```
+
+**Luật: kiểm cục bộ trước, đo mạng sau.** Kiểm cục bộ rẻ và tất định; đo mạng đắt và
+nhiễu. Chạy hết bốn dòng này trên Console trước khi mở tab Network:
+
+```js
+// 1. Cache có thật sự được dùng không, và tỉ lệ bao nhiêu?  (r146)
+await idbGet(CACHE_STATS_KEY)        // {opens, hits, misses, recent:'MMMMMH', lastReason}
+// 2. Lượt mở này miss vì lý do gì?
+cacheMissReason                      // 'quá hạn 4 giờ' | 'lên rev mới (…)' | …
+// 3. Ghi cache có đang hỏng không?
+cacheSaveError                       // null = ổn
+// 4. Máy móc/ dữ liệu có cảnh báo nào không? (kiểm 8 và 9 nằm trong đây)
+runSelfChecks()
+```
+
+Nếu `hits` là 0 trên nhiều `opens`, hoặc `cacheSaveError` khác `null` → **dừng, sửa
+cache**, đừng đo Galileo. Chỉ khi bốn cái trên đều sạch thì độ chậm mới thật sự nằm ở
+đường truyền, lúc đó mới đáng bỏ công đo.
+
+**Khi đo Galileo thì nhớ hai bẫy đo lường:**
+- `curl` **không tự gửi `Accept-Encoding`** → phải thêm `--compressed`, nếu không sẽ đo
+  nhánh 18,5 MB mà trình duyệt không bao giờ đi vào (chậm gấp 8 lần) rồi kết luận sai
+  là "server chết".
+- Đừng chẩn đoán bằng **TTFB**; phải đọc `time_total`. Galileo trả header nhanh rồi
+  **nhỏ giọt body**.
+- Đo baseline mạng ĐỘC LẬP trước khi đổ cho đường truyền công ty
+  (`speed.cloudflare.com/__down?bytes=10000000` — hôm đó máy đạt 14–16 MB/s, mạng hoàn
+  toàn không có lỗi).
+
+---
+
 ## 1. PROBE — dò dữ liệu sống trước
 
 - Xác minh shape dữ liệu thật qua **DevTools Console** (OData query trực tiếp) trước
