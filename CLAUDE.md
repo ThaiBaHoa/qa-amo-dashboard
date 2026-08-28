@@ -176,6 +176,22 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
 
 ## Conventions
 
+- **Silent `catch` is banned on STATE paths, allowed on BEST-EFFORT paths.** The distinction,
+  not a blanket ban — 95 catches exist and most swallow harmlessly:
+  - **Best-effort** (failure only looks worse): `chart.resize()`, `chart.destroy()`,
+    `localStorage.removeItem`, reading an optional preference. Swallow freely.
+  - **State** (failure changes what is stored, exported, or shown): any `setItem`/`idbSet`,
+    any `renderAll()`, anything that puts content into a PDF/XLSX/DOCX the user will send.
+    These MUST log with enough numbers to diagnose, and surface via `runSelfChecks` if the
+    condition persists.
+  - Why the rule exists: `cacheSave()` swallowed `QuotaExceededError` for ~3 months. The app
+    stayed functionally correct, so nobody suspected anything — it was merely slow forever.
+    A broken cache must be as loud as a broken request. See r145/r146.
+- **Assert that your optimisations actually happen.** Before r146 the app had 8 invariant
+  checks for DATA and zero for its own MACHINERY, so a cache with a 0% hit rate was invisible.
+  `cacheStatsRecord()` counts hits/misses per page open; self-check 9 fires when the last 5
+  opens all missed. If you add a cache, a lazy-load, or a dedupe, add the counter that proves
+  it works — an optimisation nobody measures is an optimisation nobody knows is dead.
 - Plain ES (no modules). Globals: `curUser`, `allData`, `auditData`, `charts`.
 - `g(id)` = `getElementById`; `s(id,txt)` = set textContent. Used everywhere.
 - **All user-facing text is English** — UI labels, toasts, alerts, error messages, exports.
@@ -399,7 +415,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.08.28-r145
+Rev current: 2026.08.28-r146
 
 ORG_UNIT_IDS          ← main pages: 'QA AMO' + ALL its sub-units, resolved at load
                          from dwreporting_organisational_unit_hierarchy (r143).

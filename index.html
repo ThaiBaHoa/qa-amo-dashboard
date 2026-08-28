@@ -2416,7 +2416,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.28-r145';
+const APP_REV = '2026.08.28-r146';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2873,8 +2873,8 @@ function initApp() {
   }
   // [r145] cacheLoad() là async (IndexedDB). Dùng .then() chứ KHÔNG await: giữ initApp()
   // đồng bộ như cũ để startAutoRefresh()/startKiosk() chạy ngay, không chờ đĩa.
-  cacheLoad().then(ok => { if(!ok) loadData(); })
-             .catch(() => loadData());
+  cacheLoad().then(ok => { cacheStatsRecord(ok); if(!ok) loadData(); })
+             .catch(() => { cacheStatsRecord(false); loadData(); });
   startAutoRefresh();
   startKiosk();          // [r137] no-op khi URL không có ?kiosk=
 }
@@ -2971,6 +2971,42 @@ const CACHE_STORE = 'blobs';
 // [r145] Lỗi ghi cache gần nhất, để runSelfChecks (kiểm 8) đẩy lên UI cho admin.
 // KHÔNG để null nghĩa là "cache đang không hoạt động" — xem luật "phải kêu" ở cacheSave().
 let cacheSaveError = null;
+
+// [r146] ĐO xem cache có THẬT SỰ được dùng không, đừng chỉ tin là nó chạy.
+// Bài học 28/08/2026: app có 8 kiểm bất biến cho DỮ LIỆU nhưng 0 kiểm cho MÁY MÓC của
+// chính nó, nên cache hiệu quả 0% suốt ~3 tháng mà không cơ chế nào nhận ra. Toast
+// "Cache (5m ago)" là tín hiệu THOÁNG QUA — tắt là mất, không ai đối chiếu qua nhiều
+// phiên. Cần một con số ĐỌNG LẠI: bao nhiêu lượt mở trang thực sự dùng được cache.
+// Ghi trong IndexedDB (không phải localStorage) vì chính localStorage là thứ vừa hết chỗ.
+const CACHE_STATS_KEY = 'stats';
+let cacheStats      = null;   // {opens, hits, misses, recent:['H'|'M'…], lastReason}
+let cacheMissReason = null;   // vì sao LƯỢT MỞ NÀY không dùng được cache
+let cacheLastTs     = null;   // ts của bản cache đang phục vụ, để vẽ lại tooltip
+
+function cacheStatsSuffix(){
+  if(!cacheStats || !cacheStats.opens) return '';
+  return ` · cache hit ${cacheStats.hits}/${cacheStats.opens} opens (recent ${(cacheStats.recent||[]).join('')})`;
+}
+
+// Gọi ĐÚNG MỘT LẦN mỗi lượt mở trang (từ initApp), KHÔNG gọi ở mỗi lần Refresh tay:
+// đếm "lượt mở trang" mới trả lời được câu "mở lên có dùng được cache không".
+async function cacheStatsRecord(hit){
+  try{
+    const s = (await idbGet(CACHE_STATS_KEY)) || {opens:0, hits:0, misses:0, recent:[], lastReason:null};
+    s.opens++;
+    if(hit) s.hits++; else s.misses++;
+    s.recent     = (s.recent || []).concat(hit ? 'H' : 'M').slice(-20);
+    s.lastReason = hit ? null : cacheMissReason;
+    cacheStats = s;
+    await idbSet(CACHE_STATS_KEY, s);
+    console.log('%c[cache] ' + (hit ? 'HIT' : 'MISS — ' + (cacheMissReason || 'không rõ')) +
+      ' · ' + s.hits + '/' + s.opens + ' lượt mở dùng được cache · gần đây: ' + s.recent.join(''),
+      'color:' + (hit ? '#3FB950' : '#D29922') + ';font-weight:700');
+    if(cacheLastTs) updateCacheAge(cacheLastTs);   // gắn tỉ lệ hit vào tooltip
+  }catch(e){
+    console.warn('[cache] không ghi được thống kê hit/miss:', e && e.message);
+  }
+}
 
 // ── IndexedDB: 4 hàm tối thiểu, mỗi hàm tự mở/đóng ───────────
 // Cố tình KHÔNG giữ một handle db dài hạn: kết nối treo khi có tab khác đang
@@ -3147,13 +3183,20 @@ function kioskShow(i){
 // [r145] ASYNC kể từ r145 (IndexedDB). Người gọi: initApp() dùng .then(), KHÔNG await,
 // để startAutoRefresh()/startKiosk() vẫn chạy ngay như trước.
 async function cacheLoad() {
+  cacheMissReason = null;
   try {
     const c = await idbGet(CACHE_KEY);
-    if (!c) return false;
-    if (!c.ts || !c.a || Date.now() - c.ts > CACHE_TTL) return false;
+    // [r146] Mỗi đường thoát ghi rõ LÝ DO. "Không dùng cache" có ít nhất 4 nguyên nhân
+    // khác hẳn nhau về mức nghiêm trọng, gộp chung thành một chữ "miss" là mất thông tin.
+    if (!c) { cacheMissReason = 'chưa có cache nào được ghi'; return false; }
+    if (!c.ts || !c.a)                      { cacheMissReason = 'bản cache hỏng cấu trúc'; return false; }
+    if (Date.now() - c.ts > CACHE_TTL)      { cacheMissReason = 'quá hạn 4 giờ'; return false; }
     // Vứt cache khi lên rev mới (deploy đổi logic/field) → tránh phục vụ data cũ
     // tính theo code cũ. Vd r126 nới filter Audit Plan nhưng cache r125 vẫn thiếu audit.
-    if (c.rev !== APP_REV) { idbDel(CACHE_KEY).catch(()=>{}); return false; }
+    if (c.rev !== APP_REV) {
+      cacheMissReason = 'lên rev mới (' + c.rev + ' → ' + APP_REV + ')';
+      idbDel(CACHE_KEY).catch(()=>{}); return false;
+    }
     allData   = c.a;
     auditData = c.b || [];
     if (Array.isArray(c.ou) && c.ou.length) ORG_UNIT_IDS = c.ou;   // [r143] phiên mở từ cache không chạy loadData
@@ -3173,6 +3216,7 @@ async function cacheLoad() {
   } catch(e) {
     // [r145] ĐỌC hỏng thì im lặng là chấp nhận được — hậu quả chỉ là nạp lại từ Galileo,
     // đúng thứ sẽ xảy ra tiếp theo. GHI hỏng mới là thứ phải kêu (xem cacheSave).
+    cacheMissReason = 'lỗi đọc: ' + (e && e.message ? e.message : String(e));
     console.warn('[cache] cacheLoad lỗi, sẽ nạp lại từ Galileo:', e && e.message);
     return false;
   }
@@ -3210,12 +3254,13 @@ async function cacheSave() {
 }
 
 function updateCacheAge(ts) {
+  if (ts) cacheLastTs = ts;                      // [r146] nhớ lại để vẽ lại được tooltip
   const el = g('cacheAge');
-  if (!el) return;
-  const age = Math.round((Date.now()-ts)/60000);
-  const nextH = Math.ceil((CACHE_TTL - (Date.now()-ts)) / 3600000);
+  if (!el || !cacheLastTs) return;
+  const age = Math.round((Date.now()-cacheLastTs)/60000);
+  const nextH = Math.ceil((CACHE_TTL - (Date.now()-cacheLastTs)) / 3600000);
   el.textContent = age < 2 ? 'Just loaded' : age < 60 ? `${age}m ago` : `${Math.floor(age/60)}h${age%60?age%60+'m':''} ago`;
-  el.title = `Cache expires in ~${nextH}h — click ↻ Refresh to reload now`;
+  el.title = `Cache expires in ~${nextH}h — click ↻ Refresh to reload now` + cacheStatsSuffix();
 }
 
 // ── ORG UNIT ─────────────────────────────────────────────────
@@ -3886,6 +3931,17 @@ function runSelfChecks(){
     //    ném QuotaExceededError và bị catch{} nuốt → không một dấu hiệu nào, suốt 3 tháng.
     if(cacheSaveError)
       warn.push('Cache write is failing (' + cacheSaveError + ') — every page open reloads all data from Galileo (~24s) instead of using the 4-hour cache');
+    // 9) [r146] Cache GHI được nhưng không bao giờ ĐỌC trúng — hỏng khác hẳn kiểm 8.
+    //    Kiểm 8 bắt lỗi ghi; kiểm này bắt ca cache bị xoá/hết hạn/lệch rev liên tục, tức
+    //    vẫn "nạp nguội mọi lần" nhưng không có một lỗi nào để mà bắt. Đây chính là con số
+    //    mà nếu có từ tháng 5 thì đã không mất 3 tháng: hit 0/N là nhìn phát thấy ngay.
+    {
+      const rc = (cacheStats && cacheStats.recent) ? cacheStats.recent : [];
+      if(rc.length >= 5 && !rc.slice(-5).includes('H'))
+        warn.push('Cache has not been hit in the last 5 page opens (' + cacheStats.hits + '/' +
+          cacheStats.opens + ' overall · last reason: ' + (cacheStats.lastReason || 'unknown') +
+          ') — every open is reloading everything from Galileo instead of using the 4-hour cache');
+    }
     // Kết quả
     if(warn.length){ console.warn('%c[self-check] '+warn.length+' warning(s):','color:#D29922;font-weight:700'); warn.forEach(w=>console.warn('  • '+w)); }
     else console.log('%c[self-check] OK — By-status=Audit-vs-Inspection='+donutSum+' · status/semantic valid','color:#3FB950');
@@ -7801,7 +7857,10 @@ async function exportPDF(){
 
     // Font Việt cho THÂN bảng (header/nhãn ASCII dùng helvetica sẵn có)
     let bodyFont='helvetica';
-    if(window.VJ_FONT){ try{ doc.addFileToVFS('Roboto-Regular.ttf',VJ_FONT); doc.addFont('Roboto-Regular.ttf','Roboto','normal'); bodyFont='Roboto'; }catch(e){} }
+    // [r146] Nhúng font hỏng → tụt về helvetica → PDF MẤT DẤU TIẾNG VIỆT. Đây là hỏng nội
+  // dung của một hồ sơ đem nộp, không phải hỏng thẩm mỹ, nên phải kêu.
+  if(window.VJ_FONT){ try{ doc.addFileToVFS('Roboto-Regular.ttf',VJ_FONT); doc.addFont('Roboto-Regular.ttf','Roboto','normal'); bodyFont='Roboto'; }
+    catch(e){ console.warn('[pdf] không nhúng được font Roboto — bản PDF này sẽ MẤT DẤU tiếng Việt:', e.message); } }
 
     const INK=[26,31,43], MUT=[122,129,148], LINE=[214,220,228], HEADBG=[36,48,73], HEADTX=[223,230,242], STRIPE=[247,249,252];
     // SYNC: biến thể màu SÁNG cho báo cáo in (nền trắng) của CFG.SEM — đổi màu ở SEM thì cân nhắc chỉnh cả đây.
@@ -7832,10 +7891,16 @@ async function exportPDF(){
         const cv=document.createElement('canvas'); cv.width=wpx; cv.height=hpx;
         cv.style.cssText='position:fixed;left:-99999px;top:0';
         document.body.appendChild(cv);
-        let ch; try{ ch=new Chart(cv.getContext('2d'), cfg); }catch(e){ cv.remove(); return resolve(null); }
+        // [r146] Hai nhánh dưới đây trả null → PDF xuất ra THIẾU HẲN biểu đồ mà không báo gì.
+        // Người nhận báo cáo không thể biết là chart hỏng hay là "kỳ này không có dữ liệu".
+        let ch; try{ ch=new Chart(cv.getContext('2d'), cfg); }
+        catch(e){ console.warn('[pdf] dựng biểu đồ thất bại — PDF sẽ thiếu biểu đồ này:', e.message);
+                  cv.remove(); return resolve(null); }
         // animation:false → chart vẽ đồng bộ; dùng setTimeout (fire cả khi tab nền, khác requestAnimationFrame bị pause)
         setTimeout(()=>{
-          let url=null; try{ url=cv.toDataURL('image/png'); }catch(e){}
+          let url=null;
+          try{ url=cv.toDataURL('image/png'); }
+          catch(e){ console.warn('[pdf] không xuất được ảnh biểu đồ — PDF sẽ thiếu biểu đồ này:', e.message); }
           try{ch.destroy();}catch(e){} cv.remove(); resolve(url);
         }, 50);
       });
@@ -8087,11 +8152,16 @@ function pdfLetterhead(doc, pageNo, totalPages){
   doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(90,90,90);
   doc.text('Quality Assurance AMO',8,18.5);
   doc.setDrawColor(227,6,19); doc.setLineWidth(0.5); doc.line(8,21,W-44,21);
-  if(window.VJ_LH){ try{ doc.addImage(VJ_LH.logo,'PNG', W-40, 4, 32, 25, undefined,'FAST'); }catch(e){} }
+  // [r146] Thiếu letterhead trên hồ sơ QA nộp cho MQA Director là hỏng có hậu quả, không
+  // phải cosmetic — báo ra Console thay vì nuốt.
+  if(window.VJ_LH){ try{ doc.addImage(VJ_LH.logo,'PNG', W-40, 4, 32, 25, undefined,'FAST'); }
+    catch(e){ console.warn('[pdf] không chèn được logo letterhead — PDF xuất ra thiếu logo:', e.message); } }
   // Footer: dải sóng góc phải + khối liên hệ góc trái (giữ đúng tỉ lệ ảnh, không kéo méo)
   if(window.VJ_LH){
-    try{ doc.addImage(VJ_LH.wave,'PNG', W-58, H-34, 54, 34, undefined,'FAST'); }catch(e){}
-    try{ doc.addImage(VJ_LH.contact,'PNG', 8, H-26, 42, 22, undefined,'FAST'); }catch(e){}
+    try{ doc.addImage(VJ_LH.wave,'PNG', W-58, H-34, 54, 34, undefined,'FAST'); }
+    catch(e){ console.warn('[pdf] không chèn được dải sóng footer:', e.message); }
+    try{ doc.addImage(VJ_LH.contact,'PNG', 8, H-26, 42, 22, undefined,'FAST'); }
+    catch(e){ console.warn('[pdf] không chèn được khối liên hệ footer:', e.message); }
   }
   if(pageNo){ doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
     doc.text('Trang '+pageNo+(totalPages?(' / '+totalPages):''), W/2, H-4, {align:'center'}); }
@@ -10472,12 +10542,18 @@ window.toggleTheme = function(){
   var html = document.documentElement;
   var next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
   html.setAttribute('data-theme', next);
-  try { localStorage.setItem('qa_theme', next); } catch(e){}
+  // [r146] Đường TRẠNG THÁI (ghi lựa chọn của người dùng) → không được nuốt im lặng.
+  try { localStorage.setItem('qa_theme', next); }
+  catch(e){ console.warn('[theme] không lưu được lựa chọn theme (' + e.name + ') — mở lại trang sẽ mất:', e.message); }
   var btn = document.querySelector('#btnTheme .nav-ic');
   if (btn) { btn.dataset.painted=''; btn.dataset.ic = next === 'light' ? 'moon' : 'sun'; window.paintIcons(btn.parentElement); }
   // charts read màu chữ tại build time → rebuild để đổi theo theme mới
-  try { if (window.allData && allData.length) renderAll(); } catch(e){}
-  try { if (typeof _spiData!=='undefined' && _spiData && document.getElementById('page-spi')?.classList.contains('active') && typeof renderSPIYear==='function') renderSPIYear(); } catch(e){}
+  // [r146] renderAll() sập mà nuốt im lặng = dashboard đứng hình với biểu đồ sai màu và
+  // KHÔNG một dấu hiệu nào — đúng hình dạng "chạy đúng nhưng hỏng" đã giấu lỗi cache 3 tháng.
+  try { if (window.allData && allData.length) renderAll(); }
+  catch(e){ console.error('[theme] renderAll() sập khi đổi theme — biểu đồ giữ màu cũ:', e); }
+  try { if (typeof _spiData!=='undefined' && _spiData && document.getElementById('page-spi')?.classList.contains('active') && typeof renderSPIYear==='function') renderSPIYear(); }
+  catch(e){ console.error('[theme] renderSPIYear() sập khi đổi theme:', e); }
 };
 (function(){
   try { var t = localStorage.getItem('qa_theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch(e){}
