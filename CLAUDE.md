@@ -332,6 +332,12 @@ Do not ask when:
   this wrong by counting every task-less PAVOI — measured on live 2026 data that read
   **15.9%** not-assessed instead of the correct **7.9%** (5 closed PAVOI without tasks). If you
   touch `kpi7Stats()`, re-read the block comment above it first.
+- **Canvas does not understand `var(--x)` (r150).** Assigning `ctx.fillStyle = 'var(--green)'` is
+  ignored **silently** — the property keeps its previous value and the shape paints **black**.
+  Measured in the browser: `fillStyle` stayed `#123456` after the assignment, and the bar pixel
+  came back `rgba(0,0,0,255)`. Colour helpers that also serve HTML (`kpi7Color()` feeds
+  `<td style="color:…">`) return CSS tokens, so anything handed to Chart.js must go through
+  `cssVar()` first. It reads computed style, so it stays theme-aware and resolves nested tokens.
 - **`s(id, v)` writes `textContent`, not `innerHTML`.** HTML entities passed to it render
   literally. A stray `&amp;` sat in the KPI 7 subtitle on screen from r142 to r148 before
   anyone noticed; a `%%` in the same card printed as `%%`. Write real characters.

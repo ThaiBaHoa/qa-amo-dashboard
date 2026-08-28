@@ -644,6 +644,27 @@ body.kiosk .mob-menu{display:none!important}
               </div>
             </div>
           </div>
+
+          <!-- SECTION 3: PAVOI Assessment — KPI 7  [r150] -->
+          <!-- Dùng bộ lọc năm sẵn có ở đầu trang (#ovYearFilter) — một trang một bộ lọc năm. -->
+          <div class="sec-title" style="margin-top:16px">PAVOI Assessment &middot; KPI 7</div>
+          <div id="ovKpi7Warn" style="display:none;font-size:11px;color:var(--yellow);margin-bottom:8px"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="chart-card">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <div style="font-size:13px;font-weight:600" title="(Open &amp; assessed + Closed) &divide; Total PAVOI &times; 100%">By section <span style="font-size:11px;color:var(--muted);font-weight:400">&middot; higher is better</span></div>
+                <div style="font-size:11px;color:var(--muted)" id="ov-kpi7-cnt"></div>
+              </div>
+              <div style="height:230px;position:relative"><canvas id="ovKpi7Sec"></canvas></div>
+            </div>
+            <div class="chart-card">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <div style="font-size:13px;font-weight:600">Monthly <span style="font-size:11px;color:var(--muted);font-weight:400">&middot; by the month the PAVOI was raised</span></div>
+                <div style="font-size:11px;color:var(--muted)" id="ov-kpi7-mon-cnt"></div>
+              </div>
+              <div style="height:230px;position:relative"><canvas id="ovKpi7Mon"></canvas></div>
+            </div>
+          </div>
         </div>
 
         <!-- SAFETY — MSAG Report Status -->
@@ -2417,7 +2438,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.28-r149-i1';
+const APP_REV = '2026.08.28-r150';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3987,6 +4008,11 @@ function renderAll() {
   renderPavoi();
   renderAudit();
   filterKpiYear();
+  // [r150] KPI 7 nay có chart trên Overview — trang MẶC ĐỊNH. Nạp ở đây, nhưng theo ĐÚNG cổng
+  // `onKpiPage` của r147: chỉ nạp khi trang thật sự đang mở, không nạp cho panel người dùng
+  // không nhìn thấy. Không `await`: ~3 request này chạy song song, không chắn số liệu chính.
+  const onOverview = !!(g('page-overview') && g('page-overview').classList.contains('active'));
+  if(onOverview && !kpi7Loaded) loadKpi7Tasks();
   runSelfChecks();
 }
 
@@ -4218,6 +4244,7 @@ function filterOverviewYear() {
   const countEl = g('ovYearCount');
   if(countEl) countEl.textContent = all ? `${allData.length} records` : `${d.length} records for ${ymText('ovYearFilter')}`;
   renderOverview(d);
+  renderOvKpi7();      // [r150] chart KPI 7 bám cùng bộ lọc năm của trang
 }
 
 function renderOverview(d) {
@@ -4257,6 +4284,18 @@ function renderOverview(d) {
 // Màu chữ theo theme (đọc --text) cho label vẽ trên canvas
 // Màu chữ chart: TRẮNG trên dark, ĐEN trên light (đọc tại thời điểm vẽ; charts re-render khi đổi theme)
 function ovInk(){ return document.documentElement.getAttribute('data-theme')==='light' ? '#1a2230' : '#ffffff'; }
+
+// [r150] Canvas KHÔNG hiểu `var(--x)`. Gán `ctx.fillStyle='var(--green)'` bị bỏ qua **IM LẶNG**
+// (fillStyle giữ nguyên giá trị cũ) nên thanh vẽ ra màu ĐEN — đo trên trình duyệt: fillStyle
+// vẫn là '#123456' sau khi gán, pixel thanh ra rgba(0,0,0,255). Mọi hàm màu trả về token CSS
+// (kpi7Color, semColorMap…) PHẢI đi qua đây trước khi đưa cho Chart.js. Đọc computed style nên
+// tự đúng theo theme, kể cả token lồng nhau (`--green` → `var(--c-green)` → `#3ecf8e`).
+function cssVar(v){
+  const m = String(v).match(/^var\((--[\w-]+)\)$/);
+  if(!m) return v;
+  const out = getComputedStyle(document.documentElement).getPropertyValue(m[1]).trim();
+  return out || '#8B949E';       // token không tồn tại → xám, KHÔNG trả chuỗi canvas nuốt mất
+}
 
 // Plugin: vẽ % ngay trên từng lát donut (bỏ lát <6% cho đỡ rối)
 const ovArcPct = { id:'ovArcPct', afterDatasetsDraw(chart){
@@ -5775,13 +5814,13 @@ async function loadKpi7Tasks(force=false){
     kpi7Loaded=false; kpi7Cnt={}; kpi7Done=new Set();
     try{ localStorage.removeItem(KPI7_CACHE_KEY); }catch{}
   }
-  if(kpi7Loaded && !force){ renderKpi7(); return; }
+  if(kpi7Loaded && !force){ kpi7RenderAll(); return; }
   // [r144] CHỈ cần task của PAVOI ĐANG OPEN. Mẫu số là toàn bộ PAVOI (Open + Closed) nhưng
   // lấy thẳng từ allData, không cần task; còn tử số theo định nghĩa chỉ gồm PAVOI đang Open
   // chưa được đánh giá — PAVOI đã Closed KHÔNG BAO GIỜ vào tử số. Nhờ vậy số request tụt
   // từ ~17 (246 report) xuống ~3 (39 report đang Open).
   const ids = [...new Set(allData.filter(r=>r.report_title==='PAVOI' && r.report_id && r.report_status==='Open').map(r=>r.report_id))];
-  if(!ids.length){ kpi7Loaded=true; renderKpi7(); return; }
+  if(!ids.length){ kpi7Loaded=true; kpi7RenderAll(); return; }
   if(!force && !kpi7Done.size) kpi7CacheLoad();
   // Mượn kết quả loadPavoiRfi đã fetch (nếu user vào trang PAVOI trước). CHỈ mượn key có
   // trong pavoiRfiMap (đã có ≥1 item) — pavoiRfiDone chứa cả report đã đóng KHÔNG hề
@@ -5791,7 +5830,7 @@ async function loadKpi7Tasks(force=false){
     if(n && !kpi7Done.has(id)){ kpi7Cnt[id]=n; kpi7Done.add(id); }
   });
   const todo = ids.filter(id=>!kpi7Done.has(id));
-  if(!todo.length){ kpi7Loaded=true; kpi7CacheSave(); renderKpi7(); runSelfChecks(); return; }
+  if(!todo.length){ kpi7Loaded=true; kpi7CacheSave(); kpi7RenderAll(); runSelfChecks(); return; }
 
   setOv(true,'Loading PAVOI assessment (KPI 7)...','',0);
   const CHUNK = 15, MAX_TRY = 3;
@@ -5825,7 +5864,7 @@ async function loadKpi7Tasks(force=false){
   kpi7CacheSave();
   setOv(false);
   if(failed) toast(`KPI 7: ${failed} group(s) failed to load — reopen the KPI page to retry`,'err');
-  renderKpi7();
+  kpi7RenderAll();
   runSelfChecks();
 }
 
@@ -5843,18 +5882,24 @@ async function loadKpi7Tasks(force=false){
 // xong. Tử số mới cần task, và chỉ cho PAVOI đang Open: report Open chưa fetch rơi vào
 // `openPending`, không được xếp bừa vào đã/chưa đánh giá.
 // Bất biến từng dòng: openAssessed + openNotAssessed + openPending + closed === total.
-function kpi7Stats(){
+//
+// [r150] `pass` = predicate lọc TUỲ CHỌN, mặc định giữ nguyên hành vi cũ (#kpi7Year +
+// #kpi7Month của trang KPI). Chart KPI 7 trên Overview truyền predicate riêng (#ovYearFilter,
+// và thêm tháng khi vẽ cột tháng) để KHÔNG phải viết lại logic phân loại — bảng ở trang KPI
+// và chart ở Overview vì thế không thể lệch nhau. Đây là lý do hàm này vẫn là nguồn DUY NHẤT.
+function kpi7Stats(pass){
+  const keep = pass || (r => ymHas('kpi7Year', r.raised_year)
+                          && ymHas('kpi7Month', r.raised_ym ? +r.raised_ym.slice(5,7) : null));
   const order = [...KPI7_SECTIONS, KPI7_UNASSIGNED];
   const rows = {};
   order.forEach(k=>{ rows[k] = {key:k, openAssessed:0, openNotAssessed:0, openPending:0, closed:0, total:0, notList:[]}; });
   const tot = {openAssessed:0, openNotAssessed:0, openPending:0, closed:0, total:0, inGroup:0, all:0};
   allData.forEach(r=>{
     if(r.report_title!=='PAVOI' || !r.report_id) return;
-    if(!ymHas('kpi7Year', r.raised_year)) return;
     // [r149] Lọc tháng đọc lại raised_ym ("YYYY-MM") — KHÔNG thêm field mới vào allData để
     // khỏi đụng shape của cache IndexedDB. raised_ym rỗng → bị loại khi có tháng được chọn
     // (đúng: không có ngày phát hành thì không thuộc tháng nào), nhưng vẫn vào khi "All months".
-    if(!ymHas('kpi7Month', r.raised_ym ? +r.raised_ym.slice(5,7) : null)) return;
+    if(!keep(r)) return;
     tot.all++;
     const inGroup = KPI7_SECTIONS.includes(r.owner_name);
     if(inGroup) tot.inGroup++;
@@ -5947,6 +5992,122 @@ function renderKpi7(){
     w.style.color = openBlindT ? '#ff6b6b' : 'var(--yellow)';   // [r142-i1] hỏng hoàn toàn → đỏ, đừng để lẫn với cảnh báo thường
   }
 }
+
+// ── [r150] KPI 7 trên Overview — 2 chart, DÙNG CHUNG kpi7Stats() ──────────────────────
+// Không có một phép đếm nào ở đây tự làm lấy: mọi con số đi qua kpi7Stats(pass), nên bảng ở
+// trang KPI và chart ở Overview không thể lệch nhau. Khác biệt DUY NHẤT là bộ lọc — trang KPI
+// dùng #kpi7Year + #kpi7Month, Overview dùng #ovYearFilter sẵn có ở đầu trang.
+//
+// Chart phải giữ ĐÚNG luật "thà không vẽ còn hơn vẽ số sai" của bảng (r144): kỳ nào còn
+// PAVOI Open chưa fetch xong task thì KHÔNG có điểm — tử số lúc đó chắc chắn thiếu, vẽ ra sẽ
+// là một điểm thấp giả, tức nói dối theo chiều "ổn cả".
+const KPI7_SEC_SHORT = k => k===KPI7_UNASSIGNED ? 'Unassigned'
+  : String(k).replace(/^(MQA|AMO)\s*-\s*/,'').replace(/\s*Section$/,'');
+
+// Nhãn % trên thanh ngang. Thanh dài (>82%) thì viết ĐÈ vào trong cho khỏi tràn mép phải.
+const ovKpi7Val = { id:'ovKpi7Val', afterDatasetsDraw(chart){
+  const ds=chart.data.datasets[0], ctx=chart.ctx;
+  ctx.save(); ctx.font='700 11px Manrope, sans-serif'; ctx.textBaseline='middle';
+  chart.getDatasetMeta(0).data.forEach((bar,i)=>{
+    const v=ds.data[i]; if(v===null||v===undefined) return;
+    const inside = v>82;
+    ctx.fillStyle = inside ? '#ffffff' : ovInk();   // thanh luôn là màu bão hoà ở cả 2 theme
+    ctx.textAlign = inside ? 'right' : 'left';
+    ctx.fillText(v.toFixed(1)+'%', bar.x + (inside?-6:6), bar.y);
+  });
+  ctx.restore();
+}};
+
+function renderOvKpi7(){
+  if(!g('ovKpi7Sec') || !window.Chart) return;
+  const ovPass = r => ymHas('ovYearFilter', r.raised_year);
+  const st = kpi7Stats(ovPass);
+  // Cùng luật với bảng: còn openPending → giữ lại, KHÔNG vẽ điểm.
+  const rate = r => (r.total && !r.openPending) ? kpi7Rate(r) : null;
+
+  // ── Chart trái: theo ban. Bỏ dòng không có PAVOI nào (vẽ thanh rỗng chỉ gây rối),
+  //    luôn giữ TOTAL — MQA ở cuối làm mốc so sánh.
+  const secKeys = st.order.filter(k => st.rows[k].total > 0);
+  const labels  = secKeys.map(KPI7_SEC_SHORT).concat(['TOTAL — MQA']);
+  const vals    = secKeys.map(k => rate(st.rows[k])).concat([rate(st.tot)]);
+  const cols    = vals.map(v => v===null ? '#6E7681' : cssVar(kpi7Color(v)));
+  dc('ovKpi7Sec');
+  charts['ovKpi7Sec'] = new Chart(g('ovKpi7Sec').getContext('2d'), {type:'bar',
+    data:{labels, datasets:[{data:vals, backgroundColor:cols, borderWidth:0, borderRadius:4, maxBarThickness:26}]},
+    options:{responsive:true, maintainAspectRatio:false, indexAxis:'y',
+      layout:{padding:{right:14}},
+      plugins:{legend:{display:false},
+               tooltip:{callbacks:{label:c=>{
+                 const r = c.dataIndex < secKeys.length ? st.rows[secKeys[c.dataIndex]] : st.tot;
+                 return c.parsed.x===null ? 'not loaded'
+                   : `${c.parsed.x.toFixed(1)}% · ${r.openAssessed + r.closed} of ${r.total} assessed or closed`;
+               }}}},
+      scales:{x:{beginAtZero:true, max:100, grid:{color:'rgba(140,148,163,.15)'},
+                 ticks:{color:ovInk(), callback:v=>v+'%'}},
+              y:{grid:{display:false}, ticks:{color:ovInk(), font:{size:11}}}}},
+    plugins:[ovKpi7Val]});
+
+  // ── Chart phải: 12 tháng. Gọi kpi7Stats() 12 lượt thay vì tự gom một vòng — CHỦ Ý:
+  //    12 × ~3.500 dòng là vài mili giây, đổi lại phân loại chắc chắn y hệt bảng. Tự gom
+  //    riêng ở đây là cách chắc chắn nhất để đẻ ra lệch số âm thầm (bài học r148 #4).
+  const mRate=[], mTot=[]; let mSum=0;
+  for(let m=1;m<=12;m++){
+    const k = kpi7Stats(r => ovPass(r) && (r.raised_ym ? +r.raised_ym.slice(5,7) : null) === m);
+    mRate.push(rate(k.tot)); mTot.push(k.tot.total); mSum += k.tot.total;
+  }
+  dc('ovKpi7Mon');
+  charts['ovKpi7Mon'] = new Chart(g('ovKpi7Mon').getContext('2d'), {
+    data:{labels:MONTH_ABBR3.slice(1), datasets:[
+      // Cột số lượng đứng SAU đường KPI để đọc được "100% của 1 hồ sơ" khác "100% của 20".
+      // Cột = SỐ LƯỢNG, cố ý để xám trung tính: nó là bối cảnh, không mang nghĩa tốt/xấu.
+      {type:'bar', label:'Total PAVOI', data:mTot, yAxisID:'y1', order:2,
+       backgroundColor:'rgba(140,148,163,.25)', borderWidth:0, borderRadius:3, maxBarThickness:26},
+      // Đường = xu hướng (xanh dương TRUNG TÍNH — trong dashboard này đỏ nghĩa là XẤU, vẽ cả
+      // đường màu đỏ sẽ đọc thành "đang tệ" ngay cả khi mọi tháng đều 100%). Sức khoẻ nằm ở
+      // MÀU CHẤM, chấm tô theo đúng ngưỡng của kpi7Color để khớp bảng và chart bên trái.
+      {type:'line', label:'KPI %', data:mRate, yAxisID:'y', order:1, spanGaps:false,
+       borderColor:'#58A6FF', backgroundColor:'#58A6FF', borderWidth:2, tension:.25,
+       pointRadius:4, pointHoverRadius:6, pointBorderWidth:1,
+       pointBackgroundColor:mRate.map(v=>v===null?'#6E7681':cssVar(kpi7Color(v))),
+       pointBorderColor:mRate.map(v=>v===null?'#6E7681':cssVar(kpi7Color(v)))},
+    ]},
+    options:{responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false},
+               tooltip:{callbacks:{label:c=> c.dataset.yAxisID==='y1'
+                 ? `${c.parsed.y} PAVOI raised`
+                 : (c.parsed.y===null ? 'KPI: not loaded' : `KPI ${c.parsed.y.toFixed(1)}%`)}}},
+      scales:{x:{grid:{display:false}, ticks:{color:ovInk(), font:{size:10}}},
+              y :{position:'left',  beginAtZero:true, max:100,
+                  grid:{color:'rgba(140,148,163,.15)'}, ticks:{color:ovInk(), callback:v=>v+'%'}},
+              y1:{position:'right', beginAtZero:true, grid:{display:false},
+                  ticks:{color:'#8B949E', precision:0}}}}});
+
+  // ── Nhãn đếm + cảnh báo. "Chưa nạp" KHÁC "bằng 0" — nói rõ, đừng để đọc thành 0%.
+  // ⚠ Còn openPending thì KHÔNG in "x / y assessed or closed": lúc đó x mới chỉ là số CLOSED,
+  // đọc lên thành một con số đã chốt trong khi chart bên dưới cố tình để trống. Đúng bài học
+  // r142-i1 — "bằng 0" (hay "mới có một phần") KHÁC "không có dữ liệu". Cùng khuôn kpi7-frac.
+  s('ov-kpi7-cnt', !st.tot.total ? 'no PAVOI'
+                 : st.tot.openPending ? `${st.tot.openPending} open not loaded`
+                 : `${st.tot.openAssessed + st.tot.closed} / ${st.tot.total} assessed or closed`);
+  s('ov-kpi7-mon-cnt', `${mSum} of ${st.tot.total} PAVOI dated`);
+  const w = g('ovKpi7Warn');
+  if(w){
+    const msgs = [];
+    if(!kpi7Loaded && !kpi7Done.size)
+      msgs.push('PAVOI assessment is still loading — bars appear once it finishes.');
+    else if(st.tot.openPending)
+      msgs.push(`${st.tot.openPending} open PAVOI not loaded yet — any period containing them is left blank, because its numerator would be understated.`);
+    // PAVOI không có ngày phát hành lọt khỏi chart tháng nhưng vẫn nằm trong chart ban.
+    if(st.tot.total - mSum > 0)
+      msgs.push(`${st.tot.total - mSum} PAVOI have no raised date, so they are counted by section but not in the monthly chart.`);
+    w.innerHTML = msgs.length ? '⚠ ' + msgs.map(esc).join('  ·  ') : '';
+    w.style.display = msgs.length ? '' : 'none';
+  }
+}
+
+// [r150] Một lượt nạp xong phải vẽ lại CẢ HAI nơi tiêu thụ kpi7Cnt (bảng trang KPI + chart
+// Overview). Quên một nơi = số cũ nằm lại trên màn hình mà không ai biết.
+function kpi7RenderAll(){ renderKpi7(); renderOvKpi7(); }
 
 // Click ô "Open · not assessed" → liệt kê đúng các PAVOI ĐANG OPEN không có RFI/Task.
 // Click 1 dòng → mở PAVOI Detail (pavoiModal z-index 215 nằm trên kpi7Modal z-index 210).
@@ -8905,6 +9066,9 @@ function showPage(name,btn){
   if(name==='safety'){ if(!safetyLoaded) loadSafety(); else renderSafety(); }
   if(name==='rptstatus'){ if(!rsLoaded) loadRptStatus(); else renderRptStatus(); }
   if(name==='overview'){
+    // [r150] Người dùng có thể đang đứng ở trang khác lúc loadData xong → cổng ở renderAll()
+    // không bắn. Ghé lại Overview thì nạp nốt; đã có data rồi thì chỉ vẽ.
+    if(!kpi7Loaded) loadKpi7Tasks(); else renderOvKpi7();
     setTimeout(()=>{
       Object.values(charts).forEach(c=>{ try{c.resize()}catch(e){} });
     },50);
