@@ -849,11 +849,12 @@ body.kiosk .mob-menu{display:none!important}
           <div class="chart-card" style="flex-shrink:0;margin-top:8px">
             <div class="chart-head" style="margin-bottom:10px">
               <div>
-                <div class="chart-title">KPI 7 — PAVOI KPI (not-assessed rate)</div>
-                <div class="chart-sub" id="kpi7Sub">Not assessed ÷ Total × 100% · assessed = has ≥1 RFI or Task</div>
+                <div class="chart-title">KPI 7 — PAVOI KPI (assessment rate)</div>
+                <div class="chart-sub" id="kpi7Sub">(Open &amp; assessed + Closed) ÷ Total × 100% · assessed = has ≥1 RFI or Task · higher is better</div>
               </div>
               <div style="display:flex;gap:6px;align-items:center">
                 <div class="ymulti" id="kpi7Year"></div>
+                <div class="ymulti" id="kpi7Month"></div>
                 <button class="btn-sm" onclick="loadKpi7Tasks(true)" title="Re-fetch RFI / Task for every PAVOI" style="white-space:nowrap;flex-shrink:0">↻</button>
                 <div style="text-align:right;min-width:108px">
                   <div class="kpi-val" id="kpi7-val" style="font-size:20px">—</div>
@@ -870,7 +871,7 @@ body.kiosk .mob-menu{display:none!important}
                   <th style="text-align:center;color:#ff6b6b">Open · not assessed</th>
                   <th style="text-align:center;color:var(--muted)">Closed</th>
                   <th style="text-align:center">Total PAVOI</th>
-                  <th style="text-align:center">KPI %</th>
+                  <th style="text-align:center" title="(Open &amp; assessed + Closed) ÷ Total PAVOI — higher is better">KPI % ↑</th>
                 </tr></thead>
                 <tbody id="kpi7Body"></tbody>
               </table>
@@ -2416,7 +2417,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.28-r148-i2';
+const APP_REV = '2026.08.28-r149';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2675,6 +2676,8 @@ const KPI7_SECTIONS = [                      // phải khớp TUYỆT ĐỐI own
 ];
 const KPI7_UNASSIGNED = '__unassigned__';    // bucket owner cá nhân / rỗng (Galileo đang chuyển owner sang User Group)
 const KPI7_CACHE_KEY  = 'qaAmoKpi7V1';
+// [r149] Nhãn tháng dùng chung cho bộ lọc tháng KPI 7 (index 1..12).
+const MONTH_ABBR3 = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 let kpi7Loaded = false;
 let kpi7Cnt  = {};          // report_id -> số item hợp lệ (RFI + Task). 0 = thật sự chưa đánh giá.
 let kpi7Done = new Set();   // report_id ĐANG OPEN đã fetch xong. [r144] KHÔNG liên quan mẫu số:
@@ -4028,8 +4031,10 @@ function runSelfChecks(){
             warn.push(`KPI 7 row mismatch (${nm}): open assessed ${r.openAssessed} + open not assessed ${r.openNotAssessed} + open not loaded ${r.openPending} + closed ${r.closed} does not equal total ${r.total}`);
           if(r.notList.length !== r.openNotAssessed)
             warn.push(`KPI 7 drill-down mismatch (${nm}): the modal would list ${r.notList.length} PAVOI but the cell says ${r.openNotAssessed}`);
+          // [r149] Từ r149 PAVOI đã đóng ĐƯỢC tính vào tử số, nên phép kiểm này không còn nói
+          // về tử số nữa — nó canh danh sách drill-down: notList CHỈ được chứa PAVOI đang Open.
           if(r.notList.some(x=>x.report_status!=='Open'))
-            warn.push(`KPI 7 numerator contamination (${nm}): a CLOSED PAVOI reached the numerator — closed reports must only ever count in the denominator`);
+            warn.push(`KPI 7 drill-down contamination (${nm}): a CLOSED PAVOI landed in the "open & not assessed" list — that list may only ever contain Open reports`);
           sumRows += r.total;
         });
         if(sumRows !== k7.tot.total)
@@ -4192,6 +4197,16 @@ function populateFilters() {
   initYearMulti('ovYearFilter', years, {onChange:filterOverviewYear, default:'current'});
   initYearMulti('kpiYear',      years, {onChange:filterKpiYear,      default:'current'});
   initYearMulti('kpi7Year',     years, {onChange:renderKpi7,          default:'current'});
+  // [r149] KPI 7 — bộ lọc tháng, dùng lại đúng widget multi-select của Year.
+  // Mặc định "All months" CHỦ Ý: chọn sẵn tháng hiện tại sẽ làm bảng gần như rỗng
+  // (PAVOI phát hành thưa), người xem tưởng mất dữ liệu chứ không hiểu là do lọc.
+  initYearMulti('kpi7Month', ['1','2','3','4','5','6','7','8','9','10','11','12'], {
+    onChange: renderKpi7,
+    icon:     '🗓',
+    allLabel: 'All months',
+    sortFn:   (a,b) => a-b,
+    labelOf:  v => MONTH_ABBR3[+v] || v,
+  });
 
   // Audit year filter
   populateAuditYearFilter();
@@ -5696,16 +5711,28 @@ function closeRfiModal(e){ if(e&&e.target!==g('rfiModal'))return; g('rfiModal').
 //   · "Chưa đánh giá" = không có item hợp lệ nào.
 //   · Đếm theo REPORT, không theo task: 1 PAVOI có 12 RFI vẫn chỉ là 1.
 //
-//   ⭐ TỬ SỐ VÀ MẪU SỐ NẰM TRÊN HAI TẬP KHÁC NHAU — CHỦ Ý, KHÔNG PHẢI NHẦM LẪN:
+//   ⭐ [r149 — Eric chốt 28/08/2026] KPI ĐỔI CHIỀU: đo HIỆU QUẢ, CÀNG CAO CÀNG TỐT.
 //        TONG  = OPEN + CLOSED                            ← mẫu số: MỌI PAVOI đã phát hành
 //        OPEN  = OPEN_DA_DANH_GIA + OPEN_CHUA_DANH_GIA    ← chỉ trong tập Open
-//        KPI%  = OPEN_CHUA_DANH_GIA ÷ TONG × 100
-//     PAVOI đã Closed KHÔNG BAO GIỜ vào tử số, nhưng LUÔN nằm trong mẫu số.
-//     CÀNG THẤP CÀNG TỐT, 0% = không còn việc đang mở nào chưa đánh giá.
+//        KPI%  = (OPEN_DA_DANH_GIA + CLOSED) ÷ TONG × 100
+//     100% = không còn PAVOI đang mở nào chưa được đánh giá.
+//     PAVOI đã Closed coi như ĐÃ XỬ LÝ → nằm trong CẢ tử số lẫn mẫu số.
 //
-//   ⚠ r142 làm sai chỗ này: đếm mọi PAVOI không có task vào tử số, kể cả đã đóng. Đo trên
-//     data thật 25/08/2026 (2026): sai cho ra 15.9%, đúng phải là 7.9% — 5 PAVOI đã đóng
-//     không có task bị tính nhầm. Khi sửa vùng này, ĐỌC LẠI khối trên trước.
+//   ⚠ Con số này ĐÚNG BẰNG 100% − KPI cũ (r142–r148), vì OPEN_CHUA_DANH_GIA là phần bù:
+//        OPEN_DA_DANH_GIA + CLOSED = TONG − OPEN_CHUA_DANH_GIA   (khi đã fetch xong)
+//     Nên r149 KHÔNG đổi cách phân loại report, chỉ đổi cách ghép các ô thành %. Mọi bất
+//     biến và drill-down của r144 giữ nguyên hiệu lực.
+//
+//   ⚠ Vì sao KHÔNG dùng OPEN_DA_DANH_GIA ÷ TONG (phương án Eric nêu đầu tiên 28/08/2026):
+//     PAVOI đã đóng nằm ở mẫu số mà không ở tử số → TRẦN BỊ CHẶN. Data thật 2026:
+//     22/63 = 34.9% dù phần đang mở đã đánh giá gần hết, trần tối đa chỉ 27/63 = 42.9%;
+//     càng đóng nhiều hồ sơ điểm càng tụt. Một KPI hiệu quả mà phạt việc đóng hồ sơ là sai
+//     chiều — Eric chốt (đã đánh giá + đã đóng) ÷ tổng sau khi đối chiếu 3 phương án.
+//
+//   ⚠ r142 từng làm sai PHÂN LOẠI (khác chuyện chiều KPI): đếm mọi PAVOI không có task vào
+//     "chưa đánh giá", kể cả đã đóng. Đo trên data thật 25/08/2026: ra 15.9% chưa-đánh-giá,
+//     đúng phải 7.9% — 5 PAVOI đã đóng không có task bị tính nhầm. Sửa vùng này thì ĐỌC LẠI
+//     khối trên trước.
 //
 // ⚠ Vì sao KPI 7 vẫn có kho đếm RIÊNG (kpi7Cnt/kpi7Done) thay vì đọc thẳng pavoiRfiMap:
 // pavoiRfiMap chỉ được nạp KHI người dùng mở trang PAVOI Detail, và có thể còn thiếu chunk
@@ -5804,15 +5831,16 @@ async function loadKpi7Tasks(force=false){
 
 // [r144] Gom số liệu KPI 7 theo ban. Nguồn DUY NHẤT cho render, modal và self-check.
 //
-// PHÂN HOẠCH (Eric chốt 25/08/2026 — điểm dễ làm sai nhất, tử số và mẫu số nằm trên HAI
-// tập khác nhau, đây là CHỦ Ý chứ không phải nhầm lẫn):
+// PHÂN HOẠCH (Eric chốt 25/08/2026; chiều KPI đổi ở r149 — 28/08/2026):
 //     TONG  = OPEN + CLOSED                              ← mẫu số: MỌI PAVOI đã phát hành
 //     OPEN  = OPEN_DA_DANH_GIA + OPEN_CHUA_DANH_GIA      ← chỉ trong tập Open
-//     KPI%  = OPEN_CHUA_DANH_GIA ÷ TONG × 100
-// PAVOI đã Closed KHÔNG BAO GIỜ vào tử số, nhưng LUÔN nằm trong mẫu số.
+//     KPI%  = (OPEN_DA_DANH_GIA + CLOSED) ÷ TONG × 100   ← CÀNG CAO CÀNG TỐT
+// HÀM NÀY KHÔNG ĐỔI TỪ r144: nó vẫn phân loại y hệt (openAssessed / openNotAssessed /
+// openPending / closed) và `notList` vẫn CHỈ chứa PAVOI đang Open chưa đánh giá. Việc ghép
+// các ô đó thành % nằm ở kpi7Rate() — đổi công thức thì sửa ở ĐÓ, đừng sửa ở đây.
 //
 // Mẫu số KHÔNG cần dữ liệu task → `total` và `closed` luôn chính xác kể cả khi chưa fetch
-// xong. Chỉ tử số mới cần task, và chỉ cho PAVOI đang Open: report Open chưa fetch rơi vào
+// xong. Tử số mới cần task, và chỉ cho PAVOI đang Open: report Open chưa fetch rơi vào
 // `openPending`, không được xếp bừa vào đã/chưa đánh giá.
 // Bất biến từng dòng: openAssessed + openNotAssessed + openPending + closed === total.
 function kpi7Stats(){
@@ -5823,6 +5851,10 @@ function kpi7Stats(){
   allData.forEach(r=>{
     if(r.report_title!=='PAVOI' || !r.report_id) return;
     if(!ymHas('kpi7Year', r.raised_year)) return;
+    // [r149] Lọc tháng đọc lại raised_ym ("YYYY-MM") — KHÔNG thêm field mới vào allData để
+    // khỏi đụng shape của cache IndexedDB. raised_ym rỗng → bị loại khi có tháng được chọn
+    // (đúng: không có ngày phát hành thì không thuộc tháng nào), nhưng vẫn vào khi "All months".
+    if(!ymHas('kpi7Month', r.raised_ym ? +r.raised_ym.slice(5,7) : null)) return;
     tot.all++;
     const inGroup = KPI7_SECTIONS.includes(r.owner_name);
     if(inGroup) tot.inGroup++;
@@ -5836,10 +5868,12 @@ function kpi7Stats(){
   return { order, rows, tot };
 }
 
-function kpi7Rate(n,d){ return d ? n/d*100 : null; }
+// [r149] Nhận NGUYÊN một dòng của kpi7Stats() (không nhận cặp n/d rời như r142) để không ai
+// gọi nhầm tử số. Tử số = OPEN đã đánh giá + CLOSED; mẫu số = tổng PAVOI.
+function kpi7Rate(r){ return r && r.total ? (r.openAssessed + r.closed)/r.total*100 : null; }
 function kpi7Fmt(v){ return v===null ? '—' : (Math.round(v*10)/10).toFixed(1)+'%'; }
-// Chiều KPI: càng thấp càng tốt. 0% = đã đánh giá hết.
-function kpi7Color(v){ return v===null ? 'var(--muted)' : v===0 ? 'var(--green)' : v<=25 ? 'var(--yellow)' : '#ff6b6b'; }
+// [r149] Chiều KPI ĐẢO so với r142–r148: càng CAO càng tốt. 100% = đã đánh giá hết phần đang mở.
+function kpi7Color(v){ return v===null ? 'var(--muted)' : v>=100 ? 'var(--green)' : v>=75 ? 'var(--yellow)' : '#ff6b6b'; }
 
 function renderKpi7(){
   const body = g('kpi7Body'); if(!body) return;
@@ -5853,7 +5887,7 @@ function renderKpi7(){
   // Open mới cần task: còn report Open chưa fetch (`openPending`) thì KPI% hiện '—' vì tử
   // số lúc đó chắc chắn ĐANG THIẾU — hiển thị một % thấp giả là nói dối theo chiều "ổn cả".
   const dash = '<span style="color:var(--muted)">—</span>';
-  const rowRate = r => (r.total && !r.openPending) ? kpi7Rate(r.openNotAssessed, r.total) : null;
+  const rowRate = r => (r.total && !r.openPending) ? kpi7Rate(r) : null;
   const subRows = st.order.map((k,i)=>{
     const r = st.rows[k], p = rowRate(r), un = (k===KPI7_UNASSIGNED);
     const noData   = r.total === 0;
@@ -5889,8 +5923,10 @@ function renderKpi7(){
   if(v){ v.textContent = kpi7Fmt(pT); v.style.color = kpi7Color(pT); }
   s('kpi7-frac', !st.tot.total ? 'no PAVOI'
                : st.tot.openPending ? `${st.tot.openPending} open not loaded`
-               : `${st.tot.openNotAssessed} / ${st.tot.total} open & not assessed`);
-  s('kpi7Sub', `Open &amp; not assessed ÷ Total PAVOI (Open + Closed) × 100% · assessed = has ≥1 RFI or Task · closed PAVOI count in the denominator only, never in the numerator · year ${ymText('kpi7Year')} · lower is better`);
+               : `${st.tot.openAssessed + st.tot.closed} / ${st.tot.total} assessed or closed · ${st.tot.openNotAssessed} still open & not assessed`);
+  // ⚠ s() ghi bằng textContent, KHÔNG phải innerHTML — entity HTML ở đây hiện ra nguyên xi
+  // ("&amp;" đã lọt lên màn hình suốt r142–r148). Viết ký tự thật, đừng escape.
+  s('kpi7Sub', `(Open & assessed + Closed) ÷ Total PAVOI (Open + Closed) × 100% · assessed = has ≥1 RFI or Task · closed PAVOI count as handled — in both numerator and denominator · year ${ymText('kpi7Year')} · month ${ymText('kpi7Month')} · higher is better`);
 
   // Cảnh báo hiện trạng (PA1): owner đang được Galileo chuyển từ cá nhân sang User Group.
   const w = g('kpi7Warn');
@@ -5901,7 +5937,7 @@ function renderKpi7(){
     if(st.tot.openPending)
       msgs.push(openBlindT
         ? `Could not load RFI / Task for any of the ${st.tot.openPending} open PAVOI — the KPI is NOT low, it is unknown. Press ↻ to retry.`
-        : `${st.tot.openPending} open PAVOI not loaded yet — the KPI %% is withheld until they are, because the numerator would be understated.`);
+        : `${st.tot.openPending} open PAVOI not loaded yet — the KPI % is withheld until they are, because the numerator would be understated.`);
     w.innerHTML = msgs.length ? '⚠ ' + msgs.map(esc).join('  ·  ') : '';
     w.style.display = msgs.length ? '' : 'none';
     w.style.color = openBlindT ? '#ff6b6b' : 'var(--yellow)';   // [r142-i1] hỏng hoàn toàn → đỏ, đừng để lẫn với cảnh báo thường
@@ -5915,7 +5951,7 @@ function showKpi7NotAssessed(idx){
   const k = st.order[idx]; if(!k) return;
   const r = st.rows[k];
   s('kpi7MTitle', k===KPI7_UNASSIGNED ? 'Unassigned owner' : k);
-  s('kpi7MSub', `${r.openNotAssessed} OPEN PAVOI with no RFI and no Task · closed PAVOI are never counted here · year ${ymText('kpi7Year')}`);
+  s('kpi7MSub', `${r.openNotAssessed} OPEN PAVOI with no RFI and no Task · closed PAVOI are never listed here · year ${ymText('kpi7Year')} · month ${ymText('kpi7Month')}`);
   const td = 'padding:8px 10px;border-bottom:1px solid var(--border)';
   const list = r.notList.slice().sort((a,b)=>String(b.raised_date||'').localeCompare(String(a.raised_date||'')));
   g('kpi7ModalBody').innerHTML = list.length

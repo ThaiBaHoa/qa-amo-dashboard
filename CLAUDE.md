@@ -319,12 +319,22 @@ Do not ask when:
 
 ## Known issues / gotchas
 
-- **KPI 7 numerator and denominator live on DIFFERENT sets (r144)** — deliberate, not a bug:
-  `TOTAL = OPEN + CLOSED` is the denominator (every PAVOI ever raised), while the numerator
-  counts **only OPEN PAVOI with no RFI/Task**. A closed PAVOI never enters the numerator but
-  always sits in the denominator. r142 got this wrong by counting every task-less PAVOI —
-  measured on live 2026 data that read **15.9%** instead of the correct **7.9%** (5 closed
-  PAVOI without tasks). If you touch `kpi7Stats()`, re-read the block comment above it first.
+- **KPI 7 changed direction at r149 — higher is now better.** The formula is
+  `(OPEN_ASSESSED + CLOSED) ÷ TOTAL × 100`, i.e. exactly `100% − the old r144 KPI`, because
+  `OPEN_NOT_ASSESSED` is the complement. So r149 changed **only `kpi7Rate()`** — `kpi7Stats()`
+  still partitions reports exactly as r144 did. Change the formula in `kpi7Rate()`, never in
+  `kpi7Stats()`. Rejected alternative: `OPEN_ASSESSED ÷ TOTAL` caps the ceiling at
+  `open ÷ total` (2026: 42.9%), so closing PAVOI *lowers* the score — an efficiency KPI must
+  not penalise closing files.
+- **The classification is still r144's, and it is still the easy thing to get wrong:**
+  `TOTAL = OPEN + CLOSED` is the denominator (every PAVOI ever raised); `openNotAssessed`
+  counts **only OPEN PAVOI with no RFI/Task** and is what the drill-down modal lists. r142 got
+  this wrong by counting every task-less PAVOI — measured on live 2026 data that read
+  **15.9%** not-assessed instead of the correct **7.9%** (5 closed PAVOI without tasks). If you
+  touch `kpi7Stats()`, re-read the block comment above it first.
+- **`s(id, v)` writes `textContent`, not `innerHTML`.** HTML entities passed to it render
+  literally. A stray `&amp;` sat in the KPI 7 subtitle on screen from r142 to r148 before
+  anyone noticed; a `%%` in the same card printed as `%%`. Write real characters.
 - **A denominator that needs no fetch must not be gated on fetch state (r144)**: KPI 7's
   denominator comes straight from `allData`, so Total/Closed stay correct even while task
   chunks are still loading; only the numerator waits. The KPI **%** is withheld (`—`) while
