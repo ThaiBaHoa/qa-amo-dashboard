@@ -2416,7 +2416,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.28-r146';
+const APP_REV = '2026.08.28-r147';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -4454,8 +4454,19 @@ function qcsFindingList(){
 }
 
 function renderATACompare() {
-  // Cần CMR + ECAR + QCS finding data (lazy-load 1 lần rồi tự re-render)
-  if((!cmrLoaded || !ecarLoaded || !qcsLoaded) && !renderATACompare._loading){
+  // [r147] Panel này nằm trên trang KPI Charts, NHƯNG filterKpiYear() gọi nó từ trong
+  // renderAll() — nên trước r147 mọi lượt mở dashboard đều kéo CMR + ECAR + QCS về, kể
+  // cả khi người dùng đang đứng ở Overview và không hề nhìn tới panel này.
+  // Đo 28/08/2026 trên bản LIVE, lượt reload CÓ cache hit: vẫn 10 request Galileo chạy
+  // tới giây 26,6 — cache (r145) che được 6 request chính của loadData() nhưng KHÔNG che
+  // được đợt này, nên tổng thời gian tới lúc mọi thứ xong gần như không đổi (24,1s nguội
+  // → 26,6s ấm). Cái r145 cải thiện là thời gian tới lúc số liệu chính hiện lên (~15s →
+  // 337ms); đợt này mới là phần tốn nhất còn lại.
+  // Nay theo ĐÚNG khuôn đã dùng cho KPI7 / PAVOI / CMR / ECAR / Safety / Report Status:
+  // chỉ tự nạp khi trang chứa nó đang mở. showPage('kpi') gán class 'active' TRƯỚC khi
+  // gọi filterKpiYear(), nên cờ này đọc đúng ngay ở lượt mở trang KPI đầu tiên.
+  const onKpiPage = !!(g('page-kpi') && g('page-kpi').classList.contains('active'));
+  if(onKpiPage && (!cmrLoaded || !ecarLoaded || !qcsLoaded) && !renderATACompare._loading){
     renderATACompare._loading = true;
     const jobs = [];
     if(!cmrLoaded)  jobs.push(loadCmr());
