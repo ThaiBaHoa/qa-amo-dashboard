@@ -3,3 +3,14 @@
 # Ignore local Claude config, NHƯNG version hóa skills để clone máy khác là có ngay
 .claude/*
 !.claude/skills/
+
+# Output của knowledge graph (Understand-Anything)
+.ua/
+# LƯU Ý: KHÔNG ignore .ua-src/ — scanner của plugin chạy
+# `git ls-files -co --exclude-standard`, ignore là nó không thấy file, coi như
+# chưa tách gì. Để .ua-src/ untracked (git status báo ??) là đúng: scanner đọc
+# được, mà bản dẫn xuất không lọt vào repo. Đừng `git add -A` bừa.
+
+# wrangler build cache
+.wrangler/
+node_modules/

@@ -1,0 +1,12 @@
+name = "qa-feedback"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+# Công khai sẵn trong index.html (dòng 2315-2316) — không phải secret.
+[vars]
+SUPA_URL = "https://czftzgdcnpnspbbegwjt.supabase.co"
+SUPA_KEY = "sb_publishable_eGdEXBCSD_19tu4sOV8NWQ_8mZmUqqq"
+
+# TG_TOKEN và TG_CHAT là SECRET — không đặt ở đây.
+#   npx wrangler secret put TG_TOKEN
+#   npx wrangler secret put TG_CHAT
