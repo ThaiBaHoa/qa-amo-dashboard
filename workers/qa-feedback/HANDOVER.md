@@ -50,21 +50,35 @@ git push                                  # = deploy lên vjc-qa-amo.com
 lần**, sai là dừng và **không ghi gì**. Chạy lại lần hai sẽ báo lỗi ở bước 1 (đã có
 `FB_URL`) — đúng như mong đợi.
 
-## 4. PHÉP THỬ THẬT — chưa ai làm
+## 4. PHÉP THỬ THẬT — ✅ ĐÃ CHẠY 03/09/2026
 
-Chặng **worker → Telegram chưa chạy thật lần nào**. Sau khi push:
+r151 ship ở commit `fd5dfe7`. Chặng **app → worker → Telegram đã chạy thật**: tin nhắn
+và ảnh màn hình về tới máy admin, `wrangler tail` in `POST … - Ok` không kèm dòng lỗi.
+Giao diện modal cũng đã xem bằng mắt trên production.
+
+Cách chạy lại phép thử:
 
 1. Mở `vjc-qa-amo.com`, đăng nhập
-2. Chạy `npx.cmd wrangler tail` trong `workers/qa-feedback/`
+2. `cd "…\workers\qa-feedback"; npx.cmd wrangler tail` — **PowerShell 5.1 không có `&&`**, dùng `;`
 3. Bấm nút Feedback, gõ gì đó, gửi
 4. Kỳ vọng: toast xanh trong app + tin nhắn Telegram + ảnh màn hình
 
-Nếu hỏng, `wrangler tail` sẽ in nguyên văn lỗi Telegram trả về (worker cố ý trả `502`
-kèm `detail`). Nguyên nhân hay gặp: `TG_CHAT` sai, hoặc chưa nhắn câu nào cho bot nên
-bot không được phép nhắn trước.
+### Ba lỗi đã gặp khi chạy thử lần đầu — đọc trước khi nghi ngờ code
 
-**Giao diện modal cũng chưa xem bằng mắt** — máy nhà không chạy được server xem trước
-(ExecutionPolicy chặn `.ps1`).
+Lỗi Telegram giờ được `console.error` ra `wrangler tail` chứ không chỉ nằm trong body
+response — bản đầu chỉ trả `detail` trong body, mà `tail` không đọc body, nên lúc hỏng
+thì tail in `POST - Ok` và không nói gì thêm. Cùng họ lỗi với r146 (catch nuốt lỗi).
+
+| Log | Nghĩa thật | Sửa |
+|---|---|---|
+| `404 Not Found` | **Token sai**, không phải 401. Ở đây `TG_TOKEN` chỉ có 35 ký tự và **không có dấu `:`** — tức chỉ lưu nửa sau của token, mất phần `<bot_id>:` ở đầu | `wrangler secret put TG_TOKEN`, dán **full** token từ BotFather |
+| `400 chat not found` | Chưa ai bấm **Start** với chính bot đó. Telegram trả `chat not found` (không phải `Forbidden`) cho chat riêng chưa tồn tại | Mở Telegram, tìm `@MQA_AMObot`, bấm Start — **không phải đổi secret** |
+| — | Bot đang dùng là **`@MQA_AMObot`** | |
+
+Worker tự chẩn đoán khi hỏng: khi gặp 404 nó log **hình dạng** `TG_TOKEN` (độ dài, có
+khoảng trắng không, có đúng định dạng không — **không bao giờ log giá trị**); khi gặp
+`chat not found` nó gọi `getMe` + `getUpdates` để in ra tên bot và những chat id đã nhắn
+cho bot, so với `TG_CHAT` đang đặt.
 
 ## 5. Hook pre-commit SẼ CHẶN — và đó là đúng
 
