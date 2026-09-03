@@ -332,6 +332,13 @@ Do not ask when:
   this wrong by counting every task-less PAVOI — measured on live 2026 data that read
   **15.9%** not-assessed instead of the correct **7.9%** (5 closed PAVOI without tasks). If you
   touch `kpi7Stats()`, re-read the block comment above it first.
+- **"Has a Withdrawn stage" is not "is withdrawn" (r152).** `dwreporting_report_workflow` is
+  append-only: when a section fixes a wrongly-withdrawn report (reopen, then close properly) the
+  old `Withdrawn` stage rows **stay**, and only a new `ReportAcceptReject: Completed` appears.
+  A filter written as "any stage Withdrawn → exclude" therefore excludes fixed reports forever
+  and the KPI can never self-correct. The rule is: has a Withdrawn stage **and** has no
+  `ReportAcceptReject: Completed`. Confirmed on live data — PAVOI-258, 333 and 423 are all fixed
+  yet still carry Withdrawn rows.
 - **Canvas does not understand `var(--x)` (r150).** Assigning `ctx.fillStyle = 'var(--green)'` is
   ignored **silently** — the property keeps its previous value and the shape paints **black**.
   Measured in the browser: `fillStyle` stayed `#123456` after the assignment, and the bar pixel

@@ -2460,7 +2460,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.01-r151';
+const APP_REV = '2026.09.03-r152';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -4083,6 +4083,11 @@ function runSelfChecks(){
           // về tử số nữa — nó canh danh sách drill-down: notList CHỈ được chứa PAVOI đang Open.
           if(r.notList.some(x=>x.report_status!=='Open'))
             warn.push(`KPI 7 drill-down contamination (${nm}): a CLOSED PAVOI landed in the "open & not assessed" list — that list may only ever contain Open reports`);
+          // [r152] Hồ sơ bị loại vì Withdrawn không được lọt vào bất kỳ ô đếm nào của KPI.
+          if(r.wdList.some(x=>!kpi7Withdrawn(x)))
+            warn.push(`KPI 7 exclusion mismatch (${nm}): a report in the withdrawn list is not actually withdrawn any more — the list and the filter disagree`);
+          if(r.wdList.length !== r.withdrawn)
+            warn.push(`KPI 7 withdrawn drill-down mismatch (${nm}): the modal would list ${r.wdList.length} PAVOI but the cell says ${r.withdrawn}`);
           sumRows += r.total;
         });
         if(sumRows !== k7.tot.total)
@@ -5909,13 +5914,39 @@ async function loadKpi7Tasks(force=false){
 // #kpi7Month của trang KPI). Chart KPI 7 trên Overview truyền predicate riêng (#ovYearFilter,
 // và thêm tháng khi vẽ cột tháng) để KHÔNG phải viết lại logic phân loại — bảng ở trang KPI
 // và chart ở Overview vì thế không thể lệch nhau. Đây là lý do hàm này vẫn là nguồn DUY NHẤT.
+// ── [r152] Hồ sơ ĐANG ở trạng thái Withdrawn thì KHÔNG vào KPI 7 ────────────────────────
+// Eric chốt 03/09/2026: loại trừ hẳn khỏi cả tử số lẫn mẫu số. Lý do: PAVOI bị Withdrawn
+// không phải "việc chưa làm" — nó là hồ sơ đang SAI TRẠNG THÁI, giữ trong mẫu số thì vừa
+// phạt oan (cái không RFI kéo điểm xuống) vừa thưởng oan (cái có RFI đẩy điểm lên).
+//
+// ⚠ ĐIỂM DỄ CÀI SAI NHẤT — "có stage Withdrawn" KHÁC "đang bị Withdrawn".
+//   `dwreporting_report_workflow` là bảng APPEND-ONLY: khi một ban sửa hồ sơ (mở lại rồi đóng
+//   hợp lệ), dòng Withdrawn CŨ VẪN NẰM LẠI, chỉ có thêm một stage ReportAcceptReject:Completed.
+//   Nếu cài đúng chữ "hễ có Withdrawn thì loại" thì hồ sơ ĐÃ SỬA sẽ bị loại VĨNH VIỄN, và hệ
+//   thống không bao giờ tự tính lại được — đúng thứ Eric muốn tránh ("khi nào họ sửa thì hệ
+//   thống tự tính lại thôi").
+//   Bằng chứng trên data thật 03/09/2026: PAVOI-258 (sửa 30/07), PAVOI-333 và PAVOI-423 (cùng
+//   sửa 29/08) đều CÒN dòng Withdrawn nhưng đã có ReportAcceptReject:Completed.
+//
+// Vì vậy luật là: có stage Withdrawn **VÀ CHƯA** có stage ReportAcceptReject:Completed.
+// Ban nào đóng lại hợp lệ → hồ sơ tự quay về mẫu số ở lượt nạp kế tiếp, không cần sửa code.
+//
+// Nguyên nhân gốc của trạng thái này (Eric giải thích 28/08): Coruson bắt đóng STAGE trước
+// rồi mới đóng REPORT; đóng report khi stage còn mở thì bị ghi thành Withdrawn, không cảnh
+// báo gì. Chi tiết + danh sách hồ sơ tồn: `MQA dashboard website/KE_HOACH_KPI7_R151.md`.
+function kpi7Withdrawn(r){
+  const st = r.wf_stages || [];
+  if(!st.some(w => w.stage_status === 'Withdrawn')) return false;
+  return !st.some(w => w.stage_type === 'ReportAcceptReject' && w.stage_status === 'Completed');
+}
+
 function kpi7Stats(pass){
   const keep = pass || (r => ymHas('kpi7Year', r.raised_year)
                           && ymHas('kpi7Month', r.raised_ym ? +r.raised_ym.slice(5,7) : null));
   const order = [...KPI7_SECTIONS, KPI7_UNASSIGNED];
   const rows = {};
-  order.forEach(k=>{ rows[k] = {key:k, openAssessed:0, openNotAssessed:0, openPending:0, closed:0, total:0, notList:[]}; });
-  const tot = {openAssessed:0, openNotAssessed:0, openPending:0, closed:0, total:0, inGroup:0, all:0};
+  order.forEach(k=>{ rows[k] = {key:k, openAssessed:0, openNotAssessed:0, openPending:0, closed:0, total:0, withdrawn:0, wdList:[], notList:[]}; });
+  const tot = {openAssessed:0, openNotAssessed:0, openPending:0, closed:0, total:0, withdrawn:0, inGroup:0, all:0};
   allData.forEach(r=>{
     if(r.report_title!=='PAVOI' || !r.report_id) return;
     // [r149] Lọc tháng đọc lại raised_ym ("YYYY-MM") — KHÔNG thêm field mới vào allData để
@@ -5926,6 +5957,10 @@ function kpi7Stats(pass){
     const inGroup = KPI7_SECTIONS.includes(r.owner_name);
     if(inGroup) tot.inGroup++;
     const row = rows[inGroup ? r.owner_name : KPI7_UNASSIGNED];
+    // [r152] Đang Withdrawn → ra khỏi CẢ tử số lẫn mẫu số, nhưng vẫn ĐẾM và GIỮ DANH SÁCH.
+    // Không xoá âm thầm: người đọc phải thấy mẫu số vừa bị rút bớt bao nhiêu, và bấm xem được
+    // là hồ sơ nào — nếu không, một hồ sơ sai trạng thái sẽ biến mất khỏi mọi báo cáo.
+    if(kpi7Withdrawn(r)){ row.withdrawn++; tot.withdrawn++; row.wdList.push(r); return; }
     row.total++; tot.total++;                                   // mẫu số: mọi PAVOI, không cần task
     if(r.report_status !== 'Open'){ row.closed++; tot.closed++; return; }   // Closed: chỉ ở mẫu số
     if(!kpi7Done.has(r.report_id)){ row.openPending++; tot.openPending++; return; }
@@ -5965,11 +6000,13 @@ function renderKpi7(){
     const openBlind = (r.openAssessed + r.openNotAssessed) === 0 && r.openPending > 0;
     const nameStyle = un ? ' style="color:var(--muted);font-style:italic"' : '';
     const pend = r.openPending ? ` <span style="font-size:10px;color:var(--muted)">(${r.openPending} open not loaded)</span>` : '';
+    // [r152] Hồ sơ bị loại vì đang Withdrawn — bấm vào xem được đúng danh sách.
+    const wdr = r.withdrawn ? ` <span style="font-size:10px;color:var(--yellow);cursor:pointer;text-decoration:underline dotted" onclick="showKpi7Withdrawn(${i})" title="List the ${r.withdrawn} PAVOI excluded because they are withdrawn on Coruson">(${r.withdrawn} withdrawn, excluded)</span>` : '';
     const naCell = (noData || openBlind) ? dash : (r.openNotAssessed
       ? `<span style="cursor:pointer;text-decoration:underline dotted;color:#ff6b6b" onclick="showKpi7NotAssessed(${i})" title="List the ${r.openNotAssessed} open PAVOI with no RFI or Task">${r.openNotAssessed}</span>`
       : '<span style="color:var(--muted)">0</span>');
     return `<tr>
-      <td${nameStyle}>${esc(label(k))}${pend}</td>
+      <td${nameStyle}>${esc(label(k))}${pend}${wdr}</td>
       <td style="text-align:center;color:var(--green)">${(noData||openBlind) ? dash : r.openAssessed}</td>
       <td style="text-align:center">${naCell}</td>
       <td style="text-align:center;color:var(--muted)">${noData ? dash : r.closed}</td>
@@ -5997,12 +6034,16 @@ function renderKpi7(){
                : `${st.tot.openAssessed + st.tot.closed} / ${st.tot.total} assessed or closed · ${st.tot.openNotAssessed} still open & not assessed`);
   // ⚠ s() ghi bằng textContent, KHÔNG phải innerHTML — entity HTML ở đây hiện ra nguyên xi
   // ("&amp;" đã lọt lên màn hình suốt r142–r148). Viết ký tự thật, đừng escape.
-  s('kpi7Sub', `(Open & assessed + Closed) ÷ Total PAVOI (Open + Closed) × 100% · assessed = has ≥1 RFI or Task · closed PAVOI count as handled — in both numerator and denominator · year ${ymText('kpi7Year')} · month ${ymText('kpi7Month')} · higher is better`);
+  s('kpi7Sub', `(Open & assessed + Closed) ÷ Total PAVOI (Open + Closed) × 100% · assessed = has ≥1 RFI or Task · closed PAVOI count as handled — in both numerator and denominator · withdrawn PAVOI excluded entirely · year ${ymText('kpi7Year')} · month ${ymText('kpi7Month')} · higher is better`);
 
   // Cảnh báo hiện trạng (PA1): owner đang được Galileo chuyển từ cá nhân sang User Group.
   const w = g('kpi7Warn');
   if(w){
     const msgs = [];
+    // [r152] Nói rõ mẫu số đã bị rút bớt bao nhiêu — con số này là VIỆC PHẢI SỬA trên Coruson,
+    // không phải nhiễu kỹ thuật, nên để ở dòng cảnh báo chứ không giấu trong tooltip.
+    if(st.tot.withdrawn)
+      msgs.push(`${st.tot.withdrawn} PAVOI excluded — currently withdrawn on Coruson (report closed while a workflow stage was still open). They return to the KPI automatically once the stage is closed properly.`);
     if(st.tot.all && st.tot.inGroup < st.tot.all)
       msgs.push(`Owner migration in progress — ${st.tot.inGroup}/${st.tot.all} PAVOI already owned by a Section group; the rest are counted under "Unassigned owner".`);
     if(st.tot.openPending)
@@ -6153,6 +6194,29 @@ function showKpi7NotAssessed(idx){
   g('kpi7Modal').style.display='flex';
 }
 function closeKpi7Modal(e){ if(e&&e.target!==g('kpi7Modal'))return; g('kpi7Modal').style.display='none'; }
+
+// [r152] Danh sách hồ sơ bị LOẠI vì đang Withdrawn. Dùng chung modal với "not assessed" —
+// khác nội dung, cùng khung, nên không đẻ thêm markup.
+function showKpi7Withdrawn(idx){
+  const st = kpi7Stats();
+  const k = st.order[idx]; if(!k) return;
+  const r = st.rows[k];
+  s('kpi7MTitle', (k===KPI7_UNASSIGNED ? 'Unassigned owner' : k) + ' — excluded (withdrawn)');
+  s('kpi7MSub', `${r.withdrawn} PAVOI excluded from KPI 7 because they are currently withdrawn on Coruson · they come back automatically once the workflow stage is closed properly · year ${ymText('kpi7Year')} · month ${ymText('kpi7Month')}`);
+  const td = 'padding:8px 10px;border-bottom:1px solid var(--border)';
+  const list = r.wdList.slice().sort((a,b)=>String(b.raised_date||'').localeCompare(String(a.raised_date||'')));
+  const stg = x => (x.wf_stages||[]).map(w=>w.stage_type+':'+w.stage_status).join(' · ') || '—';
+  g('kpi7ModalBody').innerHTML = list.length
+    ? list.map(x=>`<tr style="cursor:pointer" title="Open PAVOI Detail" onclick="showPavoiDetail('${x.report_id}')">
+        <td style="${td}"><b>${esc(x.report_number)||'—'}</b></td>
+        <td style="${td};font-size:11px;color:var(--muted)">${fd(x.raised_date)}</td>
+        <td style="${td};font-size:11px">${esc(x.owner_name)||'—'}</td>
+        <td style="${td};font-size:11px;color:var(--yellow)">${esc(stg(x))}</td>
+        <td style="${td};font-size:11px;color:var(--muted)">${esc(x.dept)||'—'}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">No withdrawn PAVOI</td></tr>';
+  g('kpi7Modal').style.display='flex';
+}
 
 // ── CMR-CAR ───────────────────────────────────────────────────
 function parseAircraftFromTitle(title){
