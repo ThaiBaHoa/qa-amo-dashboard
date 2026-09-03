@@ -5,6 +5,7 @@
 ```javascript
 const G_URL     = 'https://galileo-proxy.thaibahoa2308.workers.dev/proxy/';
 const AI_URL    = 'https://galileo-ai.thaibahoa2308.workers.dev';  // AI Assistant (r112)
+const FB_URL    = 'https://qa-feedback.thaibahoa2308.workers.dev'; // Bug report → Telegram (r151)
 const SUPA_URL  = 'https://czftzgdcnpnspbbegwjt.supabase.co';
 const ORG_UNIT  = 'QA AMO';   // Dùng cho loadData() chính
 ```
@@ -426,7 +427,7 @@ sessionStorage.setItem('qaCache', JSON.stringify({ ts: Date.now(), data: allData
 
 ## Cloudflare Workers
 
-App có **2 Worker riêng** — đừng nhầm:
+App có **3 Worker riêng** — đừng nhầm:
 
 ### 1. `galileo-proxy` (dữ liệu — `G_URL`)
 
@@ -450,6 +451,23 @@ const ALLOWED_ORIGINS = [
 - Nhận **POST** `{ system, tools, messages }`, trả nguyên response Messages API (`content[]`, `stop_reason`).
 - Client chạy **tool-use tại browser**: Claude sinh `tool_use` → JS truy vấn `allData`/`auditData` → `tool_result` → lặp ≤6 round. **Chỉ kết quả truy vấn được gửi lên API, KHÔNG upload dữ liệu thô.**
 - Chi tiết kiến trúc: `PROJECT_TECH_SPEC.md` §8.9.
+
+### 3. `qa-feedback` (Bug report → Telegram — `FB_URL`, r151)
+
+- Nhận **POST** JSON `{message, name, role, page, rev, ua, shot?}` từ modal Bug Report.
+- **Bắt buộc `Authorization: Bearer <supabase access_token>`** — worker gọi
+  `SUPA_URL/auth/v1/user` xác thực trước khi bắn Telegram. Không có bước này thì endpoint là
+  công khai: ai biết URL cũng bơm tin nhắn vào Telegram admin không giới hạn. Email trong
+  tin nhắn là email **đã xác thực phía server**, không phải người dùng tự khai.
+- Origin ≠ `https://vjc-qa-amo.com` → 403. GET → 405.
+- Secret: `TG_TOKEN` (bot @BotFather), `TG_CHAT` (chat_id admin). Vars: `SUPA_URL`, `SUPA_KEY`.
+- `shot` (dataURL JPEG) gửi bằng `sendPhoto` **rời** khỏi tin nhắn text — caption Telegram
+  giới hạn 1024 ký tự, nhét chung sẽ bị cắt. Ảnh hỏng thì bỏ qua, tin text đã gửi xong.
+- **Source nằm TRONG repo:** `workers/qa-feedback/` (wrangler). Deploy `npx.cmd wrangler deploy`,
+  xem log `npx.cmd wrangler tail`. Khác `galileo-proxy` và `galileo-ai` — hai worker đó chỉ
+  tồn tại trong editor trên Cloudflare dashboard, không có bản nào trong git.
+- Tách riêng khỏi `galileo-proxy` **có chủ đích**: proxy là đường dữ liệu sống của toàn app,
+  hỏng nó là mất data mọi trang; kênh báo lỗi hỏng thì chỉ hỏng nút báo lỗi.
 
 ---
 

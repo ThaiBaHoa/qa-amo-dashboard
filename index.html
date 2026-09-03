@@ -541,7 +541,7 @@ body.kiosk .mob-menu{display:none!important}
         <button class="nav-item" onclick="showPage('mcar',this)"><span class="nav-ic" data-ic="list"></span>MCAR</button>
         <button class="nav-item" onclick="showPage('docs',this)"><span class="nav-ic" data-ic="folder"></span>Documents</button>
         <button class="nav-item" onclick="showPage('help',this)"><span class="nav-ic" data-ic="doc"></span>User Guide</button>
-        <button class="nav-item" onclick="window.open('https://docs.google.com/forms/d/e/1FAIpQLSdzEq_BPTZ1ZCkLtpf3gG4NhnZ8kfojbrgIWeye56wYOmqo-A/viewform','_blank','noopener')"><span class="nav-icon">💬</span>Feedback / Bug Report</button>
+        <button class="nav-item" onclick="openBugReport()"><span class="nav-icon">💬</span>Feedback / Bug Report</button>
         <div id="adminNav" style="display:none">
           <div class="nav-sec" style="margin-top:6px">Admin</div>
           <button class="nav-item" onclick="showPage('admin',this)"><span class="nav-ic" data-ic="users"></span>User Management</button>
@@ -2378,6 +2378,27 @@ body.kiosk .mob-menu{display:none!important}
   </div>
 </div>
 
+<div class="overlay" id="bugModal" onclick="closeBugReport(event)" style="z-index:240;display:none">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:95%;max-width:540px;display:flex;flex-direction:column" onclick="event.stopPropagation()">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between">
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">Feedback</div>
+        <div style="font-size:15px;font-weight:700;color:var(--text);margin-top:2px">Report a problem</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px" id="bugCtx">—</div>
+      </div>
+      <button onclick="closeBugReport()" style="background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);font-size:16px;cursor:pointer;padding:3px 10px;border-radius:6px;flex-shrink:0;margin-left:12px">✕</button>
+    </div>
+    <div style="padding:16px 18px">
+      <textarea id="bugMsg" rows="5" maxlength="1500" placeholder="What went wrong? What did you expect to see instead?" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:13px;line-height:1.6;padding:10px 12px;resize:vertical"></textarea>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12px;color:var(--text-2);cursor:pointer">
+        <input type="checkbox" id="bugShot" checked style="cursor:pointer">
+        Attach a screenshot of this page
+      </label>
+      <button class="btn-primary" id="bugSend" onclick="sendBugReport()">Send report</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="overlay">
   <div class="ov-box">
     <div class="spinner" id="ovSpinner"></div>
@@ -2396,6 +2417,7 @@ body.kiosk .mob-menu{display:none!important}
 const SUPA_URL  = 'https://czftzgdcnpnspbbegwjt.supabase.co';
 const SUPA_KEY  = 'sb_publishable_eGdEXBCSD_19tu4sOV8NWQ_8mZmUqqq';
 const G_URL     = 'https://galileo-proxy.thaibahoa2308.workers.dev/proxy/';
+const FB_URL    = 'https://qa-feedback.thaibahoa2308.workers.dev';  // bug report -> Telegram (r151)
 // G_KEY removed — stored securely in Cloudflare Worker environment
 const ORG_UNIT  = 'QA AMO';
 // [r143] Lọc report theo org unit phải bao cả BAN CON. Cây thật trên Galileo:
@@ -2438,7 +2460,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.08.28-r150';
+const APP_REV = '2026.09.01-r151';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -9143,6 +9165,61 @@ function toast(msg,type='info'){
   el.className=`toast t-${type}`;el.textContent=msg;w.appendChild(el);
   setTimeout(()=>{el.style.opacity='0';el.style.transform='translateX(100%)';setTimeout(()=>el.remove(),300)},4500);
 }
+// ── BUG REPORT → Telegram qua worker qa-feedback (r151) ──────────────
+function openBugReport(){
+  if(!curUser){ toast('Please sign in first','err'); return; }
+  g('bugMsg').value=''; g('bugShot').checked=true;
+  s('bugCtx',(g('pageTitle')?.textContent||'\u2014')+' \u00b7 Rev '+APP_REV);
+  g('bugModal').style.display='flex';
+  setTimeout(()=>g('bugMsg').focus(),50);
+}
+function closeBugReport(e){
+  if(e&&e.target!==e.currentTarget)return;
+  g('bugModal').style.display='none';
+}
+async function sendBugReport(){
+  const msg=g('bugMsg').value.trim();
+  if(!msg){ toast('Please describe the problem','err'); return; }
+  const btn=g('bugSend'); btn.disabled=true; btn.textContent='Sending\u2026';
+  try{
+    const {data}=await sb.auth.getSession();
+    const tok=data?.session?.access_token;
+    if(!tok) throw new Error('session expired, please sign in again');
+
+    let shot=null;
+    if(g('bugShot').checked){
+      g('bugModal').style.display='none';          // dung chup ca cai modal vao anh
+      try{
+        const c=await html2canvas(document.body,{
+          scale:.6, logging:false,
+          backgroundColor:getComputedStyle(document.body).backgroundColor,
+          x:window.scrollX, y:window.scrollY,
+          width:window.innerWidth, height:window.innerHeight
+        });
+        shot=c.toDataURL('image/jpeg',.6);
+      }catch(err){ console.warn('[bug] screenshot failed:',err.message); }
+      g('bugModal').style.display='flex';
+    }
+
+    const r=await fetch(FB_URL,{
+      method:'POST',
+      headers:{'content-type':'application/json','Authorization':'Bearer '+tok},
+      body:JSON.stringify({
+        message:msg, name:curUser.full_name||curUser.email, role:curUser.role,
+        page:g('pageTitle')?.textContent||'\u2014', rev:APP_REV,
+        ua:navigator.userAgent, shot
+      })
+    });
+    if(!r.ok){ const j=await r.json().catch(()=>({})); throw new Error(j.error||('HTTP '+r.status)); }
+    closeBugReport();
+    toast('Thanks \u2014 your report has been sent','ok');
+  }catch(err){
+    toast('Could not send report: '+err.message,'err');
+  }finally{
+    btn.disabled=false; btn.textContent='Send report';
+  }
+}
+
 function toggleSidebar(){
   const sb=g('sidebar'),ov=g('sbOverlay');
   if(!sb)return;
