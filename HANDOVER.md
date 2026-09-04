@@ -1,26 +1,40 @@
-# HANDOVER — nhánh `fix/r154-report-status`
+# HANDOVER — `main`
 
-> Nhánh này **tách khỏi `origin/main` (r152)**, chỉ chứa **r154**. **KHÔNG có r153.**
 > Trạng thái tức thời cấp vault ở `obsidian-mind\.claude-memory\DANG-LAM.md`;
 > lịch sử rev đầy đủ ở `PROJECT_TECH_SPEC.md` §14.
 
 ---
 
-## Vì sao có nhánh này
+## Đang ở đâu (04/09/2026)
 
-`main` ở máy làm việc đang giữ **r153** (KPI 7 đổi điểm tham chiếu, commit `c744589`)
-**chưa được duyệt và cố ý chưa push**. Deploy là push `main` → GitHub Pages, nên đẩy
-`main` lên là r153 lên sản xuất luôn. r154 không liên quan gì tới KPI 7, nên tách ra
-nhánh riêng để đi trước.
+```
+origin/main = main = e5e8e05 (r152) → 498e4d1 (r154) → 5c5d975 → …   ← ĐANG CHẠY THẬT
+hold/r153-kpi7 = c744589 (r153)  ← CHỈ CÓ Ở MÁY, KHÔNG PUSH, CHỜ SẾP DUYỆT
+```
 
-Kiểm chứng việc tách sạch: `git diff origin/main -- index.html` trên nhánh này ra **đúng
-11 hunk** giống hệt diff r154-only trên `main` (`c744589..afeb8bf`), chỉ lệch số dòng do
-r153 không có mặt. Không một dòng KPI 7 nào lọt sang.
+**`main` KHÔNG chứa r153.** r153 (KPI 7 đổi điểm tham chiếu) được giữ nguyên vẹn trên
+nhánh **`hold/r153-kpi7`**, chỉ tồn tại ở máy này. Nếu clone ở máy khác thì **không thấy
+r153** — phải lấy lại từ máy có nhánh đó, hoặc viết lại theo phương án được duyệt.
 
-⚠️ **Nhánh này KHÔNG deploy.** Site `vjc-qa-amo.com` chỉ đổi khi `main` được push.
-Muốn r154 lên sản xuất mà vẫn giữ r153 lại thì merge nhánh này vào `main` **phía
-GitHub**, rồi ở máy `git fetch && git reset --hard origin/main` và commit lại r153 lên
-trên — hoặc chờ r153 được duyệt rồi push cả hai.
+### Khi r153 được duyệt thì làm gì
+
+```bash
+git checkout main && git pull
+git cherry-pick c744589        # xung đột dự kiến CHỈ ở APP_REV (r152→r153 vs r154)
+# sửa APP_REV thành r155 (r153 lên sau r154 nên phải mang số mới)
+# thêm hàng r153 vào PROJECT_TECH_SPEC §14 — hàng đó đã bị bỏ khi tách nhánh r154
+```
+
+Nếu chốt **phương án B** (Verification Result) thì **không cherry-pick** — phải viết lại,
+xem `mail/Email-Chot-diem-tham-chieu-danh-gia-PAVOI-2026-09-03.md`.
+
+### Lùi lại nếu r154 hỏng trên sản xuất
+
+```bash
+git revert 498e4d1 && git push      # cách an toàn, giữ nguyên lịch sử
+```
+
+Nhánh `fix/r154-report-status` trên GitHub nay đã nằm trọn trong `main` — xoá được.
 
 ---
 
