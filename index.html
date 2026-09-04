@@ -2460,7 +2460,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.03-r152';
+const APP_REV = '2026.09.04-r154';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -8801,8 +8801,10 @@ const RS_FORMS = {
   f088: { title: RS_F088_TITLE, stage: 'Event Report F-088 Management', label: 'F-088', pavoi: false },
   eis:  { title: EIS_TITLE,     stage: 'EIS Management',                label: 'EIS',   pavoi: true  },
 };
-// Row EAV KHÔNG phải field nhập liệu (0% fill trên toàn bộ dataset) → không tính vào cột E.
-// Row có repeater_section_name = header của repeater, cũng loại.
+// Row KHÔNG phải field nhập liệu (0% fill trên toàn bộ dataset) → không tính vào cột E.
+// Bốn tên này cũng chính là HEADER của repeater (is_repeater_field=true, tên trùng
+// section_name của các ô con) — đã đối chiếu toàn bộ 4.976 row EIS + F-088, không còn
+// header nào khác lọt lưới ngoài 'CORRECTIVE ACTIONS…' đã lọc riêng bằng prefix. [r154]
 const RS_NON_FIELDS = new Set(['VietJet_Air_logo.svg','Add number of involved persons','Team',
   'Add info of person performing read&sign/error briefing (as many as required)']);
 const RS_VOI = 'Verification of implementation (VOI)';
@@ -8812,13 +8814,17 @@ const RS_VOI = 'Verification of implementation (VOI)';
 // Form revision cũ / EIS không có radio này → không có cổng miễn trừ, vẫn tính bắt buộc.
 const RS_MEDA_GATE = 'MEDA Checklist';
 const RS_MEDA_FIELD = 'Contributing Factors Checklist MEDA';
-// "Other (explain here)" chỉ phải điền khi checklist TYPE OF EVENT chọn "Other".
-// GIỚI HẠN đã biết: mỗi report có NHIỀU ô cùng tên "Other (explain here)" (ô con của
-// TYPE OF EVENT, Consequence, Initial Source…) và không phân biệt nổi ô nào của ai —
-// giống hệt vấn đề 2 ô "Detailed Description" bên EIS. Nên chỉ gate được theo
-// TYPE OF EVENT (Eric chốt 18/08/2026); Consequence/Initial Source chọn Other mà
-// không giải thích thì dashboard KHÔNG bắt được. Luật nhập liệu vẫn yêu cầu giải thích.
-const RS_OTHER_GATE = 'TYPE OF EVENT';
+// "Other (explain here)" chỉ phải điền khi checklist cha chọn "Other".
+// [r154] GIỚI HẠN CŨ ĐÃ GỠ: mỗi report có NHIỀU ô cùng tên "Other (explain here)" (ô con
+// của TYPE OF EVENT, Consequence, Contributing Factors MEDA…) và view EAV
+// `report_form_section_field` không có gì phân biệt được, nên r131 đành gate chung theo
+// TYPE OF EVENT — Consequence chọn Other mà không giải thích thì KHÔNG bắt được.
+// View `dwanalytics_report_field` có `section_name`: đã đo trên 399 row "Other (explain
+// here)" của EIS + F-088, MỌI ô đều nằm CÙNG section với checklist cha của nó
+// (General Information · DESCRIPTION OF THE EVENT · MEDA CHECKLIST · CONTRIBUTING
+// FACTORS…), và các checklist cha đều có is_checklist=true. Nên luật mới: ô "Other
+// (explain here)" bắt buộc điền KHI VÀ CHỈ KHI có một checklist CÙNG SECTION, CÙNG
+// REPORT đang chọn giá trị bắt đầu bằng "Other".
 const RS_OTHER_FIELD = 'Other (explain here)';
 // Tiêu đề report nằm ở field khác nhau tuỳ form và tuỳ revision — rank nhỏ hơn thắng.
 // F-088 = SUBJECT · EIS 015+ = Investigation · EIS cũ = BRIEF DETAILS.
@@ -8844,7 +8850,11 @@ const RS_COLS = [
   { id:'subj',   label:'Report Title',                      key:r=>r.subject||'' },
   { id:'owner',  label:'Incharge Person',                   key:r=>r.owner||'' },
   { id:'done',   label:'Completion on Coruson',             key:r=>rsDone(r)?1:0 },
-  { id:'fill',   label:'Report Section / Fill Information',  key:r=>rsOkE(r)?1:0 },
+  // [r154] Cột 'Report Section / Fill Information' đã bỏ theo yêu cầu Eric 04/09/2026:
+  // nó lặp lại đúng thứ cột 'Completion on Coruson' đã nói (Satis/Unsatis + danh sách
+  // field còn trống). Luật chấm E KHÔNG đổi — rsOkE() vẫn là một trong ba điều kiện của
+  // rsDone(), vẫn hiện trong dòng tổng kết dưới bảng và vẫn xuất ra Excel (file Excel
+  // phải giữ nguyên bố cục cột D..J của bản làm tay).
   { id:'wf',     label:'Workflow / Add Task',               key:r=>rsOkF(r)?1:0 },
   { id:'links',  label:'Evaluation / Linked Report',        key:r=>r.links.length },
   { id:'files',  label:'Final Report (tab REPORT)',         key:r=>rsOkH(r)?1:0 },
@@ -8879,12 +8889,24 @@ async function loadRptStatus(){
     const stages = forms.map(x=>x[1].stage);
 
     // 4 fetch song song. Tất cả truyền skipOv=true (Invariant I11 — không cướp overlay chung).
-    // EAV/task/link lọc theo report_title rồi post-filter bằng Set (Invariant I1 — view EAV không
-    // filter được theo report_id: query có `report_id eq <uuid>` trả về RỖNG chứ không báo lỗi).
+    // task/link lọc theo report_title rồi post-filter bằng Set (Invariant I1 — view EAV
+    // `report_form_section_field` không filter được theo report_id: query có
+    // `report_id eq <uuid>` trả về RỖNG chứ không báo lỗi).
+    // [r154] Cột E đổi nguồn sang `dwanalytics_report_field`. Ba lý do, đã đo 04/09/2026:
+    //   1. Có `field_id` → phân biệt được TỪNG Ô trên form. View EAV cũ chỉ có tên field,
+    //      nên 4 ô "Date completed" của 4 corrective action gộp thành MỘT (xem rsGroup).
+    //   2. Có `section_name` → gate "Other (explain here)" theo đúng checklist cha.
+    //   3. View NÀY filter được `report_id in (…)` — khác hẳn view EAV. Đã đo: 171 UUID
+    //      trong một request → HTTP 200, 4.976 row, 2,5s, không phân trang. Nhờ vậy còn
+    //      rẻ hơn cách cũ (lọc theo title rồi vứt bớt phía client).
+    // Vẫn chunk 120 id/request để không phụ thuộc vào một trần chưa được ghi ở đâu cả.
+    const idChunks = [];
+    for(let i=0;i<ids.length;i+=120) idChunks.push(ids.slice(i,i+120));
     const res = await Promise.all([
-      fetchAll(G_URL+'dwanalytics_report_form_section_field'+
-        '?$select=report_id,field_name,text_value,repeater_section_name'+
-        '&$filter='+encodeURIComponent(rsIn('report_title',titles,true)), true),
+      Promise.all(idChunks.map(ch=>fetchAll(G_URL+'dwanalytics_report_field'+
+        '?$select=report_id,field_id,field_name,section_name,is_checklist,value_text'+
+        '&$filter='+encodeURIComponent(rsIn('report_id',ch,false)), true)))
+        .then(a=>[].concat.apply([],a)),
       fetchAll(G_URL+'dwreporting_report_task'+
         '?$select=report_id,task_title,task_status,stage_title,stage_status'+
         '&$filter='+encodeURIComponent(rsIn('report_title',titles,true)), true),
@@ -8897,21 +8919,35 @@ async function loadRptStatus(){
     ]);
     const eavRaw=res[0], taskRaw=res[1], linkRaw=res[2], attRaw=res[3];
 
-    // ── cột E: field đã điền / bỏ trống. Row VẪN tồn tại khi field trống (text_value rỗng) ──
-    const fld={}, subj={}, meda={}, toe={};
+    // ── cột E: từng Ô trên form đã điền / bỏ trống ──
+    // Row VẪN tồn tại khi ô trống (value_text rỗng), nên "không có row" ≠ "đã điền".
+    // [r154] Gom theo `field_id`, KHÔNG theo `field_name`. Đây chính là chỗ hỏng của
+    // r131: một report có 4 corrective action thì có 4 ô "Date completed" và 4 ô VOI,
+    // mang 4 field_id khác nhau nhưng CÙNG một tên — dòng `m[n] = m[n] || !!v` cũ gộp
+    // chúng thành một ô và coi là đã điền nếu BẤT KỲ ô nào có giá trị. Đo trên bản live
+    // 04/09/2026: MQA-RP-071-2026 có 4 VOI + 4 Date completed đều trống, bảng chỉ báo
+    // "2 missing"; MQA-RP-066-2026 có 2 VOI trống + 1 Date completed trống, chỉ báo "1".
+    // Ngược lại, checklist nhiều lựa chọn (TYPE OF EVENT, Consequence, Contributing
+    // Factors MEDA) trả MỘT row cho MỖI giá trị đã tick — cùng field_id, khác value_id —
+    // nên gom theo field_id cũng đúng: một ô, đã điền, đếm một lần.
+    const fld={}, subj={}, meda={}, secOther={};
     eavRaw.forEach(f=>{
       if(!idSet.has(f.report_id)) return;
-      const n=f.field_name, v=(f.text_value||'').trim();
+      const n=f.field_name, v=(f.value_text||'').trim();
       if(n===RS_MEDA_GATE && v) meda[f.report_id]=v;
-      if(n===RS_OTHER_GATE && v) (toe[f.report_id]||(toe[f.report_id]=[])).push(v);
+      // section nào đang có một checklist chọn "Other…" → ô "Other (explain here)" của
+      // riêng section đó mới bắt buộc điền.
+      if(f.is_checklist && /^other/i.test(v))
+        (secOther[f.report_id]||(secOther[f.report_id]=new Set())).add(f.section_name||'');
       const rank = RS_SUBJ_RANK[n];
       if(v && rank!==undefined){
         const cur=subj[f.report_id];
         if(!cur || rank<cur.rank) subj[f.report_id]={rank:rank,v:v};
       }
-      if(RS_NON_FIELDS.has(n) || f.repeater_section_name || n.indexOf('CORRECTIVE ACTIONS')===0) return;
+      if(RS_NON_FIELDS.has(n) || n.indexOf('CORRECTIVE ACTIONS')===0) return;
       const m=fld[f.report_id]||(fld[f.report_id]={});
-      m[n] = m[n] || !!v;
+      const g=m[f.field_id]||(m[f.field_id]={n:n, sec:f.section_name||'', ok:false});
+      if(v) g.ok = true;
     });
 
     // ── cột F: RFI / Task trên stage quản lý; task_title rỗng = stage placeholder → loại ──
@@ -8951,18 +8987,20 @@ async function loadRptStatus(){
         const isOpen = r.report_status!=='Closed';
         const m = fld[r.report_id]||{};
         const medaOff = meda[r.report_id]==='No';
-        const noOther = !(toe[r.report_id]||[]).some(v=>/other/i.test(v));
-        const names = Object.keys(m).filter(n=>
-          !(isOpen && n===RS_VOI) &&              // report còn Open thì chưa cần VOI
-          !(medaOff && n===RS_MEDA_FIELD) &&      // tick No thì không dùng Contributing Factors
-          !(noOther && n===RS_OTHER_FIELD));      // TYPE OF EVENT không chọn Other thì không cần giải thích
-        const miss = names.filter(n=>!m[n]).sort();
+        const so = secOther[r.report_id]||new Set();
+        // Mỗi phần tử = MỘT ô trên form (một field_id), nên cùng một tên có thể xuất hiện
+        // nhiều lần — đúng như form có nhiều corrective action.
+        const req = Object.keys(m).map(k=>m[k]).filter(g=>
+          !(isOpen && g.n===RS_VOI) &&                        // report còn Open thì chưa cần VOI
+          !(medaOff && g.n===RS_MEDA_FIELD) &&                // tick No thì không dùng Contributing Factors
+          !(g.n===RS_OTHER_FIELD && !so.has(g.sec)));         // không checklist nào cùng section chọn Other
+        const miss = req.filter(g=>!g.ok).map(g=>g.n).sort();
         const w = wf[r.report_id]||{rfi:0,task:0,stage:null};
         const links=Array.from(perRep[r.report_id]||[]).map(k=>keyMap[k]).filter(n=>n && n!==r.report_number);
         return {
           num:r.report_number||'—', owner:r.owner_name||'—', year:r.raised_year||null,
           subject:(subj[r.report_id]||{}).v||'—', status:r.report_status||'—', open:isOpen,
-          nreq:names.length, miss:miss, rfi:w.rfi, task:w.task, stage:w.stage,
+          nreq:req.length, miss:miss, rfi:w.rfi, task:w.task, stage:w.stage,
           links:Array.from(new Set(links)).sort(), files:att[r.report_id]||[],
         };
       }).sort((a,b)=>String(a.num).localeCompare(String(b.num),undefined,{numeric:true}));
@@ -8986,11 +9024,20 @@ const RS_GAP_CAP = 6;   // số tên field in thẳng ra ô, phần dư gộp th
 // CSS global `td{white-space:nowrap}` khiến max-width trên <td> vô hiệu và chữ dài tràn
 // đè sang cột bên (vết r131-i2). Ô nào cho phép nhiều dòng thì phải mở lại white-space.
 const RS_WRAP = 'white-space:normal;word-break:break-word;line-height:1.4;';
+// [r154] `miss` nay đếm theo Ô chứ theo tên, nên cùng một tên lặp lại nhiều lần (4 ô VOI
+// trống ⇒ 4 phần tử). In thẳng ra sẽ thành "VOI, VOI, VOI, VOI" — gộp lại thành "VOI ×4".
+// Tổng số vẫn là số Ô còn trống, KHÔNG phải số tên.
+function rsMissNames(miss){
+  const c={}, order=[];
+  miss.forEach(n=>{ if(c[n]===undefined){ c[n]=0; order.push(n); } c[n]++; });
+  return order.map(n=>n+(c[n]>1?' ×'+c[n]:''));
+}
 function rsGaps(r){
   const out=[];
   if(!rsOkE(r)){
-    const names=r.miss.slice(0,RS_GAP_CAP).join(', ')+(r.miss.length>RS_GAP_CAP?', +'+(r.miss.length-RS_GAP_CAP)+' more':'');
-    out.push({k:'Fill Information', d:r.miss.length+' missing: '+names, full:r.miss.join(' · ')});
+    const lbl=rsMissNames(r.miss);
+    const names=lbl.slice(0,RS_GAP_CAP).join(', ')+(lbl.length>RS_GAP_CAP?', +'+(lbl.length-RS_GAP_CAP)+' more':'');
+    out.push({k:'Fill Information', d:r.miss.length+' missing: '+names, full:lbl.join(' · ')});
   }
   if(!rsOkF(r)) out.push({k:'Workflow', d:'no RFI/Task · stage '+(r.stage||'none'), full:''});
   if(!rsOkH(r)) out.push({k:'Final report', d:'no file in tab REPORT', full:''});
@@ -9032,7 +9079,7 @@ function rsExport(){
     'Final report (tab REPORT)','Status of report on Coruson'].concat(f.pavoi?['PAVOI']:[]);
   const body=rows.map(r=>[r.num, r.subject, r.owner,
     rsDone(r)?'Completed':'Not Completed — '+rsGaps(r).map(x=>x.k+': '+(x.full||x.d)).join(' | '),
-    rsOkE(r)?'Satis':'Unsatis — missing: '+r.miss.join('; '),
+    rsOkE(r)?'Satis':'Unsatis — missing: '+rsMissNames(r.miss).join('; '),
     rsOkF(r)?'Satis':'Unsatis',
     r.links.join(', ')||'—',
     r.files.length?'Uploaded ('+r.files.length+')':'Miss final report',
@@ -9077,9 +9124,6 @@ function renderRptStatus(){
   const badB = t=>'<span class="badge b-over">'+t+'</span>';
   const mut  = (t,tip)=>'<span style="font-size:10px;color:var(--muted);margin-left:5px"'+(tip?' title="'+esc(tip)+'"':'')+'>'+t+'</span>';
   body.innerHTML = rows.map(r=>{
-    const eCell = rsOkE(r)
-      ? okB('Satis')+mut(r.nreq+'/'+r.nreq)
-      : badB('Unsatis')+mut((r.nreq-r.miss.length)+'/'+r.nreq+' · '+r.miss.length+' missing', 'Missing: '+r.miss.join(' · '));
     const fDet = (r.rfi+r.task)>0
       ? [r.rfi?r.rfi+' RFI':'', r.task?r.task+' Task':''].filter(Boolean).join(' · ')
       : (r.stage||'no stage');
@@ -9107,7 +9151,6 @@ function renderRptStatus(){
               (x.full?' title="'+esc(x.full)+'"':'')+
               '><b style="color:var(--text-2)">'+x.k+'</b> — '+esc(x.d)+'</div>').join('')
         )+'</td>'+
-      '<td style="white-space:nowrap">'+eCell+'</td>'+
       '<td style="white-space:nowrap">'+fCell+'</td>'+
       '<td>'+gCell+'</td>'+
       '<td style="white-space:nowrap">'+hCell+'</td>'+

@@ -474,7 +474,8 @@ const ALLOWED_ORIGINS = [
 ## Quy tắc khi sửa code
 
 1. **Không đổi `org_unit_name` của CMR-CAR và ECAR** — luôn là `'TQA'`, không phải `ORG_UNIT`
-2. **Không thêm `report_id` vào `$filter`** của `dwanalytics_report_form_section_field` **và `dwanalytics_report_field`** — trên `report_field` trả **HTTP 400** (cột không filter được), không chỉ là chuyện MaxNodeCount. Luôn fetch theo `field_name` + post-filter JS bằng `Set` report_id.
+2. **Không thêm `report_id` vào `$filter` của `dwanalytics_report_form_section_field`** — query có `report_id eq <uuid>` trả về **RỖNG** chứ không báo lỗi. Luôn fetch theo `field_name`/`report_title` rồi post-filter JS bằng `Set` report_id.
+   - ✅ **ĐÍNH CHÍNH r154 (04/09/2026):** luật này **KHÔNG áp cho `dwanalytics_report_field`**. Bản ghi cũ nói view đó trả HTTP 400 khi filter `report_id`; đo lại trên proxy: `report_id eq <uuid>` → **200**, và `report_id in (<171 UUID>)` → **200, 4.976 row, 2,5s, không phân trang**. Trang Report Status (cột E) nay dùng đúng đường này. View `report_field` còn có `section_name` / `section_hierarchy_path` / `is_repeater_field` / `is_checklist` — thứ mà view EAV không có, và là thứ duy nhất phân biệt được hai ô trùng tên. Giá trị hai view khớp row-for-row theo `report_field_key`.
    - ⚠ **Field name generic timeout (r107):** `'Finding description'` ~14k row toàn hệ thống → query `field_name`-only quá 30s → rỗng. Thu hẹp bằng `report_raised_date ge <raised sớm nhất − 2d>` (suy động từ `allData`) + chunk ~8 field/query. Xem `loadQcsDetail`, PROJECT_TECH_SPEC §8.8 / I11.
 3. **Không đổi `ORG_UNIT`** — ảnh hưởng tất cả pages chính
 4. **Không bật `ALLOWED_ORIGINS = '*'`** trong Worker

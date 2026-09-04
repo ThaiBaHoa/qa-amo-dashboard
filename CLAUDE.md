@@ -240,7 +240,7 @@ These rules are non-negotiable. Violating them causes silent data loss or HTTP 4
 
 | # | Rule | Detail |
 |---|------|--------|
-| I1 | **Never filter EAV by `report_id` in `$filter`** | `report_id eq '<uuid>'` → HTTP 400. Fetch by `field_name`, post-filter with a JS `Set`. |
+| I1 | **Never filter the EAV view `dwanalytics_report_form_section_field` by `report_id`** | `report_id eq '<uuid>'` fails. Fetch by `field_name`/`report_title`, post-filter with a JS `Set`. **Does not apply to `dwanalytics_report_field`** — measured r154: `report_id in (171 uuids)` → 200, 4,976 rows, 2.5s. |
 | I2 | **Narrow generic `field_name` queries** | A broad `field_name eq 'Finding description'` hits ~14k rows and times out. Add `report_raised_date ge <ISO>` derived from the earliest report in `allData`, and chunk `field_name` lists (~8/request). |
 | I3 | **EAV table field names differ** | `report_form_section_field` uses `text_value`; `report_field` uses `value_text`. Never swap. |
 | I4 | **UUID filter — no quotes** | UUIDs in `$filter` must not be quoted. String fields require single quotes. Exception: `dwreporting_document_task` UUIDs also unquoted (OData inconsistency). |
@@ -332,6 +332,23 @@ Do not ask when:
   this wrong by counting every task-less PAVOI — measured on live 2026 data that read
   **15.9%** not-assessed instead of the correct **7.9%** (5 closed PAVOI without tasks). If you
   touch `kpi7Stats()`, re-read the block comment above it first.
+- **A form field is a `field_id`, not a `field_name` (r154).** In
+  `dwanalytics_report_form_section_field` / `dwanalytics_report_field`, a repeated block
+  emits one row per instance carrying the **same** `field_name` — an F-088 with four
+  corrective actions has four `Date completed` boxes and four `Verification of
+  implementation (VOI)` boxes. Keying a completeness map by name collapses them and, worse,
+  marks the whole name filled when **any** instance is filled: MQA-RP-071-2026 has 4 empty
+  VOI + 4 empty `Date completed` yet r131..r153 reported "2 missing". Key by `field_id`.
+  A multi-select checklist works the other way — one row per **ticked value**, same
+  `field_id` — so `field_id` is right for both.
+- **`dwanalytics_report_field` DOES filter by `report_id`, and carries `section_name` (r154).**
+  Invariant I1 (no `report_id` filter, `eq` returns empty) holds for the EAV view
+  `dwanalytics_report_form_section_field` — it does **not** hold for `dwanalytics_report_field`.
+  Measured 04/09/2026: `report_id in (…)` with **171 UUIDs** → HTTP 200, 4.976 rows, 2,5s,
+  no paging. That view also carries `section_name` / `section_hierarchy_path` /
+  `is_repeater_field` / `is_checklist`, which is what finally tells two boxes with the same
+  name apart (the three `Other (explain here)` boxes, the two `Date` boxes). Same values as
+  the EAV view: row-for-row identical on `report_field_key` for the reports checked.
 - **"Has a Withdrawn stage" is not "is withdrawn" (r152).** `dwreporting_report_workflow` is
   append-only: when a section fixes a wrongly-withdrawn report (reopen, then close properly) the
   old `Withdrawn` stage rows **stay**, and only a new `ReportAcceptReject: Completed` appears.
@@ -438,7 +455,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.09.01-r151
+Rev current: 2026.09.04-r154
 
 ORG_UNIT_IDS          ← main pages: 'QA AMO' + ALL its sub-units, resolved at load
                          from dwreporting_organisational_unit_hierarchy (r143).
