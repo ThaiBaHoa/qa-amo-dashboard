@@ -178,8 +178,15 @@ body{font-family:'Manrope','Segoe UI',system-ui,sans-serif;background:var(--bg);
    hậu quả là zoom lên chữ vẫn nhỏ. Nay giữ nguyên cỡ chữ của bảng (13px, 15px trên màn rộng)
    và lấy lại bề ngang bằng cách CẮT chữ dài, không phải bằng cách thu nhỏ chữ.
    Nội dung đầy đủ nằm ở thuộc tính title — rê chuột là thấy. */
-.pav-long{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pav-owner{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+/* [r156-i2] Audit Ref (MNT) + Audit Title da bo khoi bang (Eric chot 08/09) — hai gia tri do
+   VAN tim duoc bang o Search, va van xem duoc khi bam vao dong de mo chi tiet PAVOI.
+   .pav-long gio chi con phuc vu cot Request For Verification. */
+.pav-long{max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pav-owner{max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+/* [r156-i2] Padding 14px x 2 x 11 cot = 308px, mot minh no la rao can lon nhat khien bang khong
+   vua khi zoom. Ha xuong 10px CHI cho bang nay (cac bang khac giu nguyen) => be rong toi thieu
+   1422 -> 1312px, vua man 1366 tuc zoom ~140%. Do bang trinh duyet 08/09/2026. */
+.pav-tbl th,.pav-tbl td{padding-left:10px;padding-right:10px}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{padding:11px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;background:var(--surface-2);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
 th:hover{color:var(--text-2)}
@@ -984,7 +991,7 @@ body.kiosk .mob-menu{display:none!important}
               </div>
             </div>
             <div class="tbl-wrap">
-              <table>
+              <table class="pav-tbl">
                 <thead><tr>
                   <th onclick="pavSort('report_number')">Report No ↕</th>
                   <th onclick="pavSort('owner_name')">Owner ↕</th>
@@ -997,8 +1004,6 @@ body.kiosk .mob-menu{display:none!important}
                   <th title="Earliest Date verified, and how it sits against the 30-day rule agreed on 07 Sep 2026">Verified (30d)</th>
                   <th>Department</th>
                   <th>RFI / Task</th>
-                  <th>Audit Ref (MNT)</th>
-                  <th>Audit Title</th>
                 </tr></thead>
                 <tbody id="pavoiBody"></tbody>
               </table>
@@ -2466,7 +2471,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.08-r156-i1';
+const APP_REV = '2026.09.08-r156-i2';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -5628,8 +5633,6 @@ function renderPavoi() {
       <td>${pavoiVerCell(r)}</td>
       <td>${esc(r.dept)||'—'}</td>
       <td>${pavoiRfiCell(r.report_id)}</td>
-      <td style="color:var(--blue)">${esc(r.audit_number)||'—'}</td>
-      <td class="pav-long" style="color:var(--muted)" title="${esc(r.audit_title)||''}">${esc(r.audit_title)||'—'}</td>
     </tr>`);
 }
 
