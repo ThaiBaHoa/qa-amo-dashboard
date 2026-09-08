@@ -174,6 +174,12 @@ body{font-family:'Manrope','Segoe UI',system-ui,sans-serif;background:var(--bg);
 .srch{padding:6px 10px 6px 28px;background:var(--surface-2);border:1px solid var(--border);color:var(--text);border-radius:8px;font-size:12.5px;width:180px;outline:none;font-family:inherit}
 .srch:focus{border-color:var(--accent)}
 .tbl-wrap{overflow-x:auto;flex:1;overflow-y:auto;min-height:0}
+/* [r156] Bảng PAVOI Detail có 13 cột nên trước đây mỗi ô tự ghi đè font-size:11px cho vừa —
+   hậu quả là zoom lên chữ vẫn nhỏ. Nay giữ nguyên cỡ chữ của bảng (13px, 15px trên màn rộng)
+   và lấy lại bề ngang bằng cách CẮT chữ dài, không phải bằng cách thu nhỏ chữ.
+   Nội dung đầy đủ nằm ở thuộc tính title — rê chuột là thấy. */
+.pav-long{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pav-owner{max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{padding:11px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;background:var(--surface-2);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
 th:hover{color:var(--text-2)}
@@ -986,7 +992,6 @@ body.kiosk .mob-menu{display:none!important}
                   <th onclick="pavSort('raised_date')">Raised Date ↕</th>
                   <th onclick="pavSort('Target_date')">Target Date ↕</th>
                   <th onclick="pavSort('report_ageing')">Days to Due ↕</th>
-                  <th>Report Ref</th>
                   <th>Request For Verification</th>
                   <th>Verification Result</th>
                   <th title="Earliest Date verified, and how it sits against the 30-day rule agreed on 07 Sep 2026">Verified (30d)</th>
@@ -2461,7 +2466,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.08-r155-i1';
+const APP_REV = '2026.09.08-r156';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -5582,6 +5587,15 @@ function pavoiVerCell(r){
   return '<span style="color:var(--muted)">—</span>';
 }
 
+// [r156] Owner của PAVOI luôn là một trong 4 nhóm Section, tên dài và lặp trên MỌI dòng
+// ("MQA - Standard and Compliance Section" = 37 ký tự). Cột này một mình ăn gần 300px.
+// Rút gọn phần lặp; giá trị ĐẦY ĐỦ vẫn còn trong `title` (rê chuột thấy) và trong ô Search.
+// Không đụng vào dữ liệu — chỉ đổi cách hiển thị.
+function pavOwnerShort(v){
+  if(!v) return v;
+  return String(v).replace(/^(MQA|AMO)\s*-\s*/, '').replace(/\s+Section$/, '');
+}
+
 function renderPavoi() {
   const srch=(g('pavoiSrch')?.value||'').toLowerCase();
   const sect=g('pavoiSectF')?.value||'';               // '' = All; else lọc theo OWNER = nhóm Section (owner_name)
@@ -5604,19 +5618,18 @@ function renderPavoi() {
   renderPaged('pavoiBody','pavoiInfo','pavoiPg','pavoiCnt',data,ts,r=>`
     <tr style="cursor:pointer" onclick="showPavoiDetail('${r.report_id}')">
       <td><b>${esc(r.report_number)||'—'}</b></td>
-      <td style="font-size:11px;color:var(--muted)">${esc(r.owner_name)||'—'}</td>
+      <td class="pav-owner" title="${esc(r.owner_name)||''}">${esc(pavOwnerShort(r.owner_name))||'—'}</td>
       <td>${sBadge(r.semantic_status)}</td>
-      <td style="font-size:11px;color:var(--muted)">${fd(r.raised_date)}</td>
+      <td style="color:var(--muted)">${fd(r.raised_date)}</td>
       <td>${fd(r.Target_date)}</td>
       <td>${ageDis(r.report_ageing,r.semantic_status)}</td>
-      <td style="font-size:11px;color:var(--blue)">${esc(r.report_ref)||'—'}</td>
-      <td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;font-size:11px">${esc(r.rfv)||'—'}</td>
+      <td class="pav-long" title="${esc(r.rfv)||''}">${esc(r.rfv)||'—'}</td>
       <td>${r.verif_result?`<span style="color:${r.verif_result==='Satisfactory'?'var(--green)':'#ff6b6b'}">${esc(r.verif_result)}</span>`:'—'}</td>
-      <td style="font-size:11px">${pavoiVerCell(r)}</td>
-      <td style="font-size:11px">${esc(r.dept)||'—'}</td>
-      <td style="font-size:11px">${pavoiRfiCell(r.report_id)}</td>
-      <td style="font-size:11px;color:var(--blue)">${esc(r.audit_number)||'—'}</td>
-      <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;font-size:11px;color:var(--muted)">${esc(r.audit_title)||'—'}</td>
+      <td>${pavoiVerCell(r)}</td>
+      <td>${esc(r.dept)||'—'}</td>
+      <td>${pavoiRfiCell(r.report_id)}</td>
+      <td style="color:var(--blue)">${esc(r.audit_number)||'—'}</td>
+      <td class="pav-long" style="color:var(--muted)" title="${esc(r.audit_title)||''}">${esc(r.audit_title)||'—'}</td>
     </tr>`);
 }
 

@@ -44,6 +44,25 @@ const EXTRACTED = [
 console.log('[extract] da trich %d ky tu tu index.html', EXTRACTED.length);
 console.log('[extract] cac ham: kpi7Withdrawn, kpi7Stats, kpi7Rate, kpi7Fmt, pavoiVerCell, loadKpi7Tasks');
 
+// ── Kiem TINH tren index.html (khong can du lieu live) ──────────────────
+// [r156] Bang PAVOI Detail: so <th> phai bang so <td> cua mau hang. Lech cot la loi
+// IM LANG — bang van render binh thuong, chi la du lieu nam sai cot. Rat de gay ra khi
+// them/bo cot, va khong bao gio lo ra qua test logic nghiep vu.
+let SFAIL = 0;
+const sok = (c, m) => { console.log((c ? '  PASS  ' : '  FAIL  ') + m); if (!c) SFAIL++; };
+
+const thead  = SRC.match(/<div class="tbl-title">PAVOI Detail<\/div>[\s\S]*?<thead><tr>([\s\S]*?)<\/tr><\/thead>/);
+const rowTpl = SRC.match(/renderPaged\('pavoiBody'[\s\S]*?<tr [\s\S]*?>([\s\S]*?)<\/tr>`\)/);
+const nTh = thead  ? (thead[1].match(/<th[\s>]/g)  || []).length : -1;
+const nTd = rowTpl ? (rowTpl[1].match(/<td[\s>]/g) || []).length : -1;
+
+console.log('\nBang PAVOI Detail: ' + nTh + ' cot header / ' + nTd + ' o moi hang');
+sok(nTh > 0 && nTh === nTd, 'so cot header === so o moi hang');
+sok(!/<th>Report Ref<\/th>/.test(SRC), 'cot Report Ref da duoc bo (r156)');
+sok(!!rowTpl && !/font-size:11px/.test(rowTpl[1]),
+    'hang PAVOI khong con ghi de font-size:11px (chu theo co cua bang)');
+if (SFAIL) { console.log('\nKIEM TINH FAIL — dung lai, khong chay phan live.'); process.exit(1); }
+
 // ── Stub tối thiểu: chỉ thay phần DOM/overlay, KHÔNG thay logic ──────────
 const PRELUDE = `
 let allData = [], kpi7Cnt = {}, kpi7Ver = {}, kpi7Done = new Set();
