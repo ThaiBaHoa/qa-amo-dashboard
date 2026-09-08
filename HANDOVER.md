@@ -42,10 +42,33 @@ kiểm bốn thứ:
    vàng** (phát hành 22/01, xác minh sau 50 ngày — vẫn vào tử số, chỉ bị tô vàng);
 4. Không report nào kẹt ở `…` sau khi nạp xong.
 
-Số liệu đo trước khi ship (08/09, qua proxy): **63 PAVOI phát hành 2026 trong cây QA AMO**
-(khớp đúng con số 63 của email 03/09), **47 hồ sơ có ≥1 lượt xác minh** — 74,6% *thô*, chưa
-trừ hồ sơ Withdrawn nên **không phải** con số KPI cuối. Trong 47 hồ sơ đó: **27 đúng hạn
-≤30 ngày · 18 trễ · 2 có lượt nhưng chưa điền ngày**.
+### Số thật, đo bằng harness trên bản live 08/09/2026
+
+```bash
+node scripts/test-r155-kpi7.mjs      # trích thẳng hàm từ index.html, chạy trên Galileo live
+```
+
+Harness **không viết lại logic** — nó trích `kpi7Withdrawn` / `kpi7Stats` / `kpi7Rate` /
+`pavoiVerCell` / `loadKpi7Tasks` thẳng từ `index.html` rồi dựng `allData` đúng như
+`loadData()` (cây org unit, dedup `modified_date`, `wf_stages`, `owner_name`, `Target_date`).
+**16/16 assert PASS** trên 246 PAVOI.
+
+| | Số |
+|---|---|
+| **KPI 7 năm 2026** | **76,8%** — 43 đã đánh giá / 56 hồ sơ (loại 7 withdrawn khỏi 63) |
+| **KPI 7 toàn lịch sử** | **69,5%** — 162 / 233 |
+| Cờ trên PAVOI Detail (246 hồ sơ) | **65 xanh · 104 vàng · 76 đỏ · 1 xám** |
+| `loadKpi7Tasks()` | **1 request**, phân loại đủ 246/246, `pending = 0` |
+
+⚠️ **Email 03/09 ghi 72,7% (40/55) và 8 hồ sơ withdrawn — dữ liệu đã thay đổi từ đó.**
+Đừng trích lại số cũ; chạy lại harness khi cần số mới.
+
+⚠️ **Đa số hồ sơ lịch sử là vàng/đỏ** (180/246). Đúng theo luật 30 ngày, không phải lỗi —
+nhưng ai mở trang lần đầu sẽ thấy một biển màu, nên biết trước.
+
+⚠️ **Bài học từ chính harness này:** lần chạy đầu để `Target_date = null` nên **nhánh đỏ ra 0 ca
+mà vẫn PASS**. Assert "không có lỗi" không chứng minh nhánh đó đã chạy — phải assert **số ca > 0**
+cho mỗi nhánh.
 
 ### Lùi lại nếu r155 hỏng trên sản xuất
 

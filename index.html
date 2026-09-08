@@ -2461,7 +2461,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.08-r155';
+const APP_REV = '2026.09.08-r155-i1';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -6046,7 +6046,12 @@ function kpi7Stats(pass){
 // Ba phương án đã đối chiếu trên data thật 2026 (55 hồ sơ trong phạm vi):
 //     · r152 (Closed = đã xử lý vô điều kiện)        → 90,9%  — đóng hồ sơ không phải bằng chứng
 //     · r153 (RFI/Task + task_completed_date)        → 89,1%  — đo "đã bắt tay vào việc"
-//     · r155 lượt Verification Result  (ĐANG DÙNG)   → 72,7%  — đo "đã xác minh xong"
+//     · r155 lượt Verification Result  (ĐANG DÙNG)   → 76,8%  — đo "đã xác minh xong"
+//
+// [r155-i1] Số 76,8% là **đo thật trên bản live 08/09/2026** bằng harness chạy chính các hàm này
+//   (`scripts/test-r155-kpi7.mjs`): 2026 có **43 đã đánh giá / 56 hồ sơ** sau khi loại **7 withdrawn**
+//   khỏi 63. Email 03/09 ghi 72,7% (40/55) — **dữ liệu đã thay đổi từ đó**, đừng trích lại số cũ.
+//   Toàn lịch sử: **162/233 = 69,5%**.
 //
 // ⚠ Đánh đổi đã biết: 6 hồ sơ 2026 đã ghi Final Conclusion nhưng KHÔNG có lượt xác minh nào
 //   sẽ bị xếp là "chưa đánh giá" — PAVOI-422, 418, 411, 407, 397, 388, trong đó 4 hồ sơ đã
