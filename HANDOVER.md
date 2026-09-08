@@ -5,28 +5,54 @@
 
 ---
 
-## Đang ở đâu (04/09/2026)
+## Đang ở đâu (08/09/2026)
 
 ```
-origin/main = main = e5e8e05 (r152) → 498e4d1 (r154) → 5c5d975 → …   ← ĐANG CHẠY THẬT
-hold/r153-kpi7 = c744589 (r153)  ← CHỈ CÓ Ở MÁY, KHÔNG PUSH, CHỜ SẾP DUYỆT
+origin/main = 9ee428a (r154)                       ← ĐANG CHẠY THẬT
+feat/r155-kpi7-verification  ← BẠN ĐANG Ở ĐÂY, CHƯA PUSH, CHƯA MERGE
+hold/r153-kpi7 = c744589 (r153)                    ← bản ghi, KHÔNG dùng nữa
 ```
 
-**`main` KHÔNG chứa r153.** r153 (KPI 7 đổi điểm tham chiếu) được giữ nguyên vẹn trên
-nhánh **`hold/r153-kpi7`**, chỉ tồn tại ở máy này. Nếu clone ở máy khác thì **không thấy
-r153** — phải lấy lại từ máy có nhánh đó, hoặc viết lại theo phương án được duyệt.
+**r155 — KPI 7 đổi sang lượt Verification Result.** Eric chốt 08/09/2026 sau biên bản họp
+07/09 (anh Phan Anh Đức gửi các Trưởng ban). Chi tiết đầy đủ ở `PROJECT_TECH_SPEC.md` §14
+hàng `r155`. Tóm tắt ba quyết định đã chốt, đừng đảo lại nếu không có lệnh mới:
 
-### Khi r153 được duyệt thì làm gì
+1. **KPI 7 = số hồ sơ có ≥1 lượt `Verification Result` ÷ tổng PAVOI còn hiệu lực.**
+   Bất kể sớm muộn, áp chung Open lẫn Closed. Đây là **Phương án B** của email 03/09.
+2. **Mốc 30 ngày KHÔNG nằm trong công thức** — chỉ là đèn cảnh báo trên trang PAVOI Detail.
+   Đưa vào tử số thì hồ sơ xác minh muộn rơi khỏi KPI **vĩnh viễn**, bổ sung cũng không cứu.
+3. **Cờ overdue so với `Target date` của REPORT**, không phải của Workflow — 12/39 PAVOI
+   Open có hai bên lệch nhau, có ca lệch 111 ngày.
+
+**r153 không lên sản xuất.** Nó được cherry-pick lại chỉ để lấy khung (phân hoạch
+`assessed/notAssessed/pending`, self-check, modal drill-down), rồi đổi nguồn dữ liệu sang
+`dwanalytics_report_field`. Commit r153 gốc vẫn nằm ở `hold/r153-kpi7` làm bản ghi.
+
+### Còn dở — việc tiếp theo là gì
+
+- ⚠️ **CHƯA MỞ TRANG THẬT LẦN NÀO.** Proxy Galileo chỉ nhận origin `vjc-qa-amo.com` nên bản
+  local không gọi được dữ liệu (vết r142-i1). **Phép thử thật là lần mở trang đầu tiên.**
+  Kiểm bốn thứ:
+  1. Trang KPI dựng được bảng, `KPI %` không phải `—`;
+  2. Cột `No verification` có số, bấm vào mở đúng danh sách;
+  3. Trang PAVOI Detail có cột **`Verified (30d)`**, và PAVOI-381 hiện **ngày 13/03/2026 màu
+     vàng** (xác minh sau 50 ngày);
+  4. Không có report nào kẹt ở `…` sau khi nạp xong.
+- **Chưa push, chưa merge vào `main`.** Chờ Eric xem trang thật rồi mới quyết.
+- **Chưa gửi thư cho anh Đức** — bản nháp ở workspace `mail/Email-Hoi-lai-anh-Duc-ve-bien-ban-PAVOI-2026-09-08.md`.
+  Ba câu trong thư nay Eric đã tự trả lời hết, nên thư chỉ còn giá trị lấy xác nhận bằng văn bản.
+- **Chưa làm:** nội dung 2 của biên bản — *số lượng đánh giá REPORT phải khớp WORKFLOW*. Đây
+  là một phép kiểm mới, chưa có ở đâu trong app. Rev riêng.
+- **Chưa làm:** gán KPI theo tháng (tử/mẫu lệch rổ tháng ⇒ có tháng vượt 100%, phải cảnh báo trên UI).
+
+### Lùi lại nếu r155 hỏng
 
 ```bash
-git checkout main && git pull
-git cherry-pick c744589        # xung đột dự kiến CHỈ ở APP_REV (r152→r153 vs r154)
-# sửa APP_REV thành r155 (r153 lên sau r154 nên phải mang số mới)
-# thêm hàng r153 vào PROJECT_TECH_SPEC §14 — hàng đó đã bị bỏ khi tách nhánh r154
+git checkout main        # r155 chưa merge nên chỉ cần rời nhánh là xong
 ```
 
-Nếu chốt **phương án B** (Verification Result) thì **không cherry-pick** — phải viết lại,
-xem `mail/Email-Chot-diem-tham-chieu-danh-gia-PAVOI-2026-09-03.md`.
+Đã merge rồi thì `git revert <sha r155>`. Cache `qaAmoKpi7V3` tự chết khi `APP_REV` đổi,
+không cần dọn tay.
 
 ### Lùi lại nếu r154 hỏng trên sản xuất
 

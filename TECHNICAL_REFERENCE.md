@@ -78,6 +78,7 @@ const ORG_UNIT  = 'QA AMO';   // Dùng cho loadData() chính
 | Documents | `loadDocuments()` | `dwreporting_document_summary` | không filter | filter `Active` client-side |
 | Report Status (r131) | `loadRptStatus()` | base từ `allData`; phụ: `dwanalytics_report_form_section_field`, `dwreporting_report_task`, `dwanalytics_report_fact_other_reports`, `dwanalytics_report`, `dwanalytics_attachment` | `'QA AMO'` (qua `allData`) | `report_title in ('MQA Event Report F-088','MQA Event Investigation Summary')` |
 | Documents (detail) | on-demand | `dwreporting_document_task` | — | `document_revision_id eq '{id}'` |
+| KPI 7 — PAVOI assessment (r155) | `loadKpi7Tasks()` | `dwanalytics_report_field` | — (post-filter client-side theo `report_id` của PAVOI trong `allData`) | `section_name eq 'Verification Result' and section_level eq 1` — ⚠️ **phải lọc CẢ HAI**: `field_name = 'Verification Result'` cũng nằm ở `section_level 0` / section `Final Conclusion` (kết luận của cả hồ sơ, KHÔNG phải một lượt). Đếm lượt = đếm `section_id` khác nhau; ngày đánh giá = `MIN(Date verified)` |
 
 > ⚠️ **QUAN TRỌNG:** CMR-CAR và ECAR dùng `org_unit_name = 'TQA'` — KHÔNG phải `ORG_UNIT`. Đây là đặc thù của hệ thống Galileo, không phải bug. Không được đổi sang `ORG_UNIT`.
 

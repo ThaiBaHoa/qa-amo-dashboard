@@ -349,6 +349,11 @@ Do not ask when:
   `is_repeater_field` / `is_checklist`, which is what finally tells two boxes with the same
   name apart (the three `Other (explain here)` boxes, the two `Date` boxes). Same values as
   the EAV view: row-for-row identical on `report_field_key` for the reports checked.
+- **KPI 7 measures STARTED, not FINISHED (r153).** "Assessed" = the PAVOI has at least one
+  valid RFI/Task (`isPavoiItem`), open or closed alike; the assessment date is the earliest
+  `task_completed_date`. Opening an RFI already counts. If someone asks for "verified", that is
+  a different signal (`Date verified` in the Verification Result repeater) and a different
+  number — measured 2026: 89,1% vs 83,6%. The two dates agree on only 42 of 152 reports.
 - **"Has a Withdrawn stage" is not "is withdrawn" (r152).** `dwreporting_report_workflow` is
   append-only: when a section fixes a wrongly-withdrawn report (reopen, then close properly) the
   old `Withdrawn` stage rows **stay**, and only a new `ReportAcceptReject: Completed` appears.
@@ -455,7 +460,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.09.04-r154
+Rev current: 2026.09.08-r155
 
 ORG_UNIT_IDS          ← main pages: 'QA AMO' + ALL its sub-units, resolved at load
                          from dwreporting_organisational_unit_hierarchy (r143).
