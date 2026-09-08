@@ -178,8 +178,8 @@ body{font-family:'Manrope','Segoe UI',system-ui,sans-serif;background:var(--bg);
    hậu quả là zoom lên chữ vẫn nhỏ. Nay giữ nguyên cỡ chữ của bảng (13px, 15px trên màn rộng)
    và lấy lại bề ngang bằng cách CẮT chữ dài, không phải bằng cách thu nhỏ chữ.
    Nội dung đầy đủ nằm ở thuộc tính title — rê chuột là thấy. */
-.pav-long{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pav-owner{max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.pav-long{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pav-owner{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{padding:11px 14px;text-align:left;font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.05em;background:var(--surface-2);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
 th:hover{color:var(--text-2)}
@@ -2466,7 +2466,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.08-r156';
+const APP_REV = '2026.09.08-r156-i1';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
