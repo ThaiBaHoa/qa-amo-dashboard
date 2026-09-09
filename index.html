@@ -995,7 +995,7 @@ body.kiosk .mob-menu{display:none!important}
                 <thead><tr>
                   <th onclick="pavSort('report_number')">Report No ↕</th>
                   <th onclick="pavSort('owner_name')">Owner ↕</th>
-                  <th onclick="pavSort('semantic_status')">Status ↕</th>
+                  <th onclick="pavSort('report_status')" title="Trạng thái thô trên Coruson: Open hoặc Closed">Status ↕</th>
                   <th onclick="pavSort('raised_date')">Raised Date ↕</th>
                   <th onclick="pavSort('Target_date')">Target Date ↕</th>
                   <th onclick="pavSort('report_ageing')">Days to Due ↕</th>
@@ -2471,7 +2471,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.08-r156-i2';
+const APP_REV = '2026.09.09-r157';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -5592,6 +5592,16 @@ function pavoiVerCell(r){
   return '<span style="color:var(--muted)">—</span>';
 }
 
+// [r157] Cột Status của trang PAVOI Detail hiện THẲNG `report_status` của Coruson — Eric chốt
+// 09/09/2026: chỉ cần Open hoặc Closed. Trước đó cột này hiện `semantic_status` (Open · Overdue ·
+// On-time Closed · Lately Closed) — bốn giá trị SUY RA từ ngày, lại trùng ý với cột `Days to Due`
+// vốn đã nói đúng chuyện trễ hay còn hạn.
+// ⚠ Probe 09/09/2026 trên 469 PAVOI: `report_status` CHỈ có hai giá trị — Open (63) · Closed (406).
+//   Vẫn truyền thẳng giá trị thô vào sBadge() thay vì tự quy về đúng hai nhãn: nếu Coruson sinh
+//   thêm trạng thái mới thì bảng hiện đúng chữ đó (badge xám), chứ không gán bừa thành "Closed".
+// `semantic_status` KHÔNG bị bỏ — các nút lọc All/Open/Overdue/On-time/Lately, ô Search, donut
+// trang Overview và các bảng report khác vẫn dùng nguyên.
+
 // [r156] Owner của PAVOI luôn là một trong 4 nhóm Section, tên dài và lặp trên MỌI dòng
 // ("MQA - Standard and Compliance Section" = 37 ký tự). Cột này một mình ăn gần 300px.
 // Rút gọn phần lặp; giá trị ĐẦY ĐỦ vẫn còn trong `title` (rê chuột thấy) và trong ô Search.
@@ -5624,7 +5634,7 @@ function renderPavoi() {
     <tr style="cursor:pointer" onclick="showPavoiDetail('${r.report_id}')">
       <td><b>${esc(r.report_number)||'—'}</b></td>
       <td class="pav-owner" title="${esc(r.owner_name)||''}">${esc(pavOwnerShort(r.owner_name))||'—'}</td>
-      <td>${sBadge(r.semantic_status)}</td>
+      <td>${sBadge(r.report_status)}</td>
       <td style="color:var(--muted)">${fd(r.raised_date)}</td>
       <td>${fd(r.Target_date)}</td>
       <td>${ageDis(r.report_ageing,r.semantic_status)}</td>
