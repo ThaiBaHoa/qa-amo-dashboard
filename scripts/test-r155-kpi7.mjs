@@ -61,6 +61,24 @@ sok(nTh > 0 && nTh === nTd, 'so cot header === so o moi hang');
 sok(!/<th>Report Ref<\/th>/.test(SRC), 'cot Report Ref da duoc bo (r156)');
 sok(!!rowTpl && !/font-size:11px/.test(rowTpl[1]),
     'hang PAVOI khong con ghi de font-size:11px (chu theo co cua bang)');
+// [r158] Bo loc cua trang PAVOI phai KHOP dung cot Status. Tu r157 cot Status hien
+// `report_status` (Open/Closed) nen bo loc cu theo `semantic_status` (Overdue/On-time/Lately)
+// se loc ra thu khong con nhin thay tren bang — bam Overdue ma cot Status ghi "Open" thi
+// nguoi dung tuong bang hong. Day la loai lech CHI lo ra khi doi chieu hai cho voi nhau.
+const pills = [...SRC.matchAll(/onclick="setPAV\('([^']*)'/g)].map(m => m[1]);
+console.log('\nBo loc PAVOI Detail: ' + JSON.stringify(pills));
+sok(JSON.stringify(pills) === JSON.stringify(['all', 'Open', 'Closed']),
+    'bo loc chi con All / Open / Closed');
+sok(/if\(ts\.sf!=='all' && r\.report_status!==ts\.sf\) return false;/.test(SRC),
+    'renderPavoi loc theo report_status (khop cot Status)');
+
+// [r158] Chart "Monthly" cua KPI 7 tren Overview da bo — khong duoc con manh nao sot lai,
+// vi mot canvas mo coi hay mot charts['ovKpi7Mon'] treo lai la loi im lang.
+const mon = (SRC.match(/ovKpi7Mon|ov-kpi7-mon-cnt|mSum/g) || []).length;
+sok(mon === 0, 'khong con manh nao cua chart Monthly (tim thay ' + mon + ')');
+sok(!/\(Open &amp; assessed \+ Closed\)/.test(SRC),
+    'khong con tooltip ghi cong thuc KPI cu cua r152');
+
 if (SFAIL) { console.log('\nKIEM TINH FAIL — dung lai, khong chay phan live.'); process.exit(1); }
 
 // ── Stub tối thiểu: chỉ thay phần DOM/overlay, KHÔNG thay logic ──────────
