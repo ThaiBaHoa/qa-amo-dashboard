@@ -8,11 +8,28 @@
 ## Đang ở đâu (10/09/2026, chiều)
 
 ```
-origin/main = main = 8702932 (docs) — app r161 (508a3ed), r160 (08c4bbb)   ← ĐÃ PUSH 10/09, ĐANG CHẠY THẬT
+origin/main = main = 94a567a (r162) — trước đó r161 (508a3ed), r160 (08c4bbb)   ← ĐÃ PUSH 10/09, ĐANG CHẠY THẬT
 hold/r153-kpi7 = c744589 (r153)  ← bản ghi, KHÔNG dùng nữa
 ```
 
-Lùi từng rev: `git revert 508a3ed` / `git revert 08c4bbb`.
+Lùi từng rev: `git revert 94a567a` / `git revert 508a3ed` / `git revert 08c4bbb`.
+
+### r162 — KPI QC: bỏ chart trùng với bảng, Ratio TOTAL thành headline to (10/09/2026)
+
+Eric nhìn bản live r161 và nói chart với bảng *"gần như giống nhau, chỉ khác cách trình bày"*, và
+muốn *"con số Ratio hiển thị to ra"*. Chart chỉ vẽ lại 15 dòng đầu của bảng; ECAR ≈ 0 từ 07/2026 nên
+cột đỏ luôn trống. Bỏ canvas + legend + `new Chart`; thêm headline `#ataCmp-val` (30px) + `#ataCmp-frac`
+ở góc phải `.chart-head`, đặt từ chính `cell(totNum,totDen)` nên luôn khớp dòng TOTAL. PDF in dòng
+*Ratio TOTAL* thay ảnh chart. **Không đổi cách đếm.** Muốn chart lại: `git revert 94a567a`.
+
+✅ **Đã kiểm trên bản live 10/09 (Claude in Chrome, admin):** không còn canvas; headline `∞` màu xanh dương, dòng
+dưới `Internal 44 ÷ ECAR 0 · Over-detect · 2026-08 ÷ 2026-09`, khớp dòng TOTAL của bảng; không toast lỗi.
+
+⚠️ **Lượt nạp panel KPI QC trên live lần này mất ~2 phút** (QCS xong ~45s, ECAR ~80s, CMR ~120s) — đúng
+bệnh `report_field` treo ngẫu nhiên (xem "Còn tồn" §r161). **Đã đo thử phương án `report_id in (…)` theo
+lô 170 UUID cho 2.561 CMR: 16 lô, 4 lô treo 20–69s, tổng 73s** → cũng không thoát. Galileo treo theo
+request, không theo hình dạng query. Hướng còn lại: **timeout riêng ~20s cho query `report_field`** (bình
+thường 2–5s) rồi rơi về fallback ghép theo index — chờ Eric quyết vì đổi hành vi nạp.
 
 ### r160 — KPI QC: tử số đổi QC Spot Check Report → QC PI Report (10/09/2026)
 
