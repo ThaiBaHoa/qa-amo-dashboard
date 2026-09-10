@@ -52,9 +52,7 @@ dòng sub có `Nguồn: … ECAR 0 report (0 có ATA)` khi chọn 2026 · tháng
 có số, không còn `Unknown` hàng loạt ở cột Aircraft; **(3)** trang ECAR — bấm Detail một report 2026,
 modal có dòng *ATA Chapter*; **(4)** không thấy toast đỏ *"custom fields failed"*.
 
-⚠️ **Note vault `obsidian-mind/reference/qa-amo-dashboard/QA_AMO_Dashboard.md` header còn r159** —
-hai commit trên phải `--no-verify` vì file đó chỉ được sửa từ phiên mở trong `obsidian-mind`. Mở
-phiên ở đó, sửa `Rev hiện tại: 2026.09.10-r161`, `Cập nhật context: 2026-09-10`, thêm 1 dòng §8.
+✅ Note vault `QA_AMO_Dashboard.md` đã lên r161 (Eric chốt sửa ngay 10/09); `check-doc-sync.sh` xanh trở lại.
 
 ### r159 — nút ✦ AI Assistant rời góc phải-dưới lên topbar (10/09/2026)
 
