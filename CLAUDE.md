@@ -252,6 +252,7 @@ These rules are non-negotiable. Violating them causes silent data loss or HTTP 4
 | I10 | **`category_id` UUID for Category filtering** | Never filter/group by `title`. `groupby` on `report_summary` misses unused options — always read master from `dwanalytics_report_category`. |
 | I11 | **`skipOv=true` on all secondary `fetchAll` calls** | Modal, lazy-load, and detail fetches must pass `true` to avoid hijacking the global overlay. |
 | I12 | **Org units are a TREE — scope by `org_unit_id` of the parent *and every descendant*** | `org_unit_name eq 'QA AMO'` matches the parent row **only** and silently drops every report filed against a child unit (r143: 69 reports missing). Resolve descendants at load from `dwreporting_organisational_unit_hierarchy` (`parent_id` → children, skip `is_archived`), then filter `(org_unit_id eq <uuid> or …)` — UUIDs unquoted per I4. **Never scope by `org_unit_name`**: Galileo does not guarantee unit names are unique across the tree, so a same-named unit in another department would silently pull foreign data in. |
+| I13 | **Scope `dwanalytics_report_form_section_field` by `report_title` — never scan it system-wide** | This view **has a `report_title` column** (`report_field` does not). A system-wide 15-field scan for CMR-CAR is ≈122,560 rows and the proxy returns **504 at exactly 90s** (measured 10/09/2026, 3× in a row; earlier 2× 401) — and `loadCmr` swallowed it, so the CMR-CAR page silently lost ATA / findings / target dates. `report_title eq 'CMR CAR' and (…)` → 66,165 rows in 3.3s; ECAR 58,726 → 7,828 rows. Keep the `Set` post-filter (I1). Surface the failure with a `toast`, never a bare `console.warn`. (r161) |
 
 ---
 
@@ -460,7 +461,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.09.10-r160
+Rev current: 2026.09.10-r161
 
 ORG_UNIT_IDS          ← main pages: 'QA AMO' + ALL its sub-units, resolved at load
                          from dwreporting_organisational_unit_hierarchy (r143).

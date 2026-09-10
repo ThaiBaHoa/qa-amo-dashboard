@@ -2477,7 +2477,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.10-r160';
+const APP_REV = '2026.09.10-r161';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -6355,10 +6355,15 @@ async function loadCmr(){
       const CMR_RF="field_name eq 'Finding description' or field_name eq 'ATA Chapter' or "+
         "field_name eq 'Finding level' or field_name eq 'NC Type'";
       // Fetch both views in parallel: form_section_field for metadata, report_field for section_id pairing
+      // [r161] form_section_field lọc thêm `report_title eq 'CMR CAR'` NGAY TRÊN VIEW (view này có cột
+      // report_title; report_field thì KHÔNG có nên vẫn quét theo field_name). Quét toàn hệ thống 15 field
+      // ≈ 122.560 dòng → proxy trả 504 sau đúng 90s (đo 10/09/2026, 3 lần liên tiếp); lỗi bị catch nuốt
+      // nên trang CMR-CAR mất ATA / finding / target date mà không báo gì. Lọc theo title: 66.165 dòng,
+      // 3,3s. Post-filter bằng cmrIdSet vẫn giữ nguyên (I1: không filter report_id được trên view EAV).
       const [fRaw, rfRaw]=await Promise.all([
         fetchAll(G_URL+'dwanalytics_report_form_section_field'+
           '?$select=report_id,field_name,text_value,report_field_created_date'+
-          '&$filter='+encodeURIComponent(CMR_FF)),
+          '&$filter='+encodeURIComponent("report_title eq 'CMR CAR' and ("+CMR_FF+")")),
         fetchAll(G_URL+'dwanalytics_report_field'+
           '?$select=report_id,field_name,value_text,section_id,report_field_created_date'+
           '&$filter='+encodeURIComponent(CMR_RF), true)
@@ -6367,7 +6372,11 @@ async function loadCmr(){
       fMap = buildFindingRowsByIndex(fRaw, cmrIdSet,
         ['Finding description','ATA Chapter','Finding level','NC Type']);
       applySecIdOverlay(fMap, rfRaw, cmrIdSet);
-    }catch(e){console.warn('CMR fields error:',e);}
+    }catch(e){
+      console.warn('CMR fields error:',e);
+      // [r161] Đừng nuốt im: không có custom field thì bảng vẫn dựng nhưng trống ATA/finding/target date.
+      toast('CMR-CAR custom fields failed (ATA / findings / target dates missing): '+e.message,'err');
+    }
 
     cmrData=summary.map(r=>{
       const f=fMap[r.report_id]||{};
@@ -6820,10 +6829,14 @@ async function loadEcar(){
         "field_name eq 'Date completed' or field_name eq 'Issued by'";
       const ECAR_RF="field_name eq 'Finding description' or field_name eq 'ATA Chapter'";
       // Fetch both views in parallel
+      // [r161] Lọc thêm `report_title eq 'ECAR'` ngay trên view như loadCmr — 58.726 → 7.828 dòng
+      // (4,6s → 2,3s, đo 10/09/2026). Query ECAR chưa hỏng nhưng cùng bệnh với CMR (quét toàn hệ thống),
+      // lọc luôn cho khỏi vượt trần 90s khi dữ liệu lớn dần. ATA Chapter của ECAR nằm ở field cùng tên,
+      // 184 dòng / 168 report có giá trị (2025: 99 · 2026: 69), form gần như ngừng dùng từ 07/2026.
       const [fRaw, rfRaw]=await Promise.all([
         fetchAll(G_URL+'dwanalytics_report_form_section_field'+
           '?$select=report_id,field_name,text_value,report_field_created_date'+
-          '&$filter='+encodeURIComponent(ECAR_FF)),
+          '&$filter='+encodeURIComponent("report_title eq 'ECAR' and ("+ECAR_FF+")")),
         fetchAll(G_URL+'dwanalytics_report_field'+
           '?$select=report_id,field_name,value_text,section_id,report_field_created_date'+
           '&$filter='+encodeURIComponent(ECAR_RF), true)
@@ -6832,7 +6845,10 @@ async function loadEcar(){
       fMap = buildFindingRowsByIndex(fRaw, ecarIdSet,
         ['Finding description','ATA Chapter']);
       applySecIdOverlay(fMap, rfRaw, ecarIdSet);
-    }catch(e){console.warn('ECAR fields error:',e);}
+    }catch(e){
+      console.warn('ECAR fields error:',e);
+      toast('ECAR custom fields failed (ATA / findings / target dates missing): '+e.message,'err');   // [r161]
+    }
 
     ecarData=summary.map(r=>{
       const f=fMap[r.report_id]||{};
@@ -7132,6 +7148,7 @@ function showEcarDetail(report_id){
       <div>
         <div style="margin-bottom:10px">${sBadge(r.semantic_status)}</div>
         ${row('Aircraft',r.aircraft_reg)}
+        ${row('ATA Chapter',r.ata_chapter)}
         ${row('Issued By',r.issued_by)}
       </div>
       <div>

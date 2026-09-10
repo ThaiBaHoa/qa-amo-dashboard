@@ -188,11 +188,12 @@ GET dwreporting_report_summary
   $filter: org_unit_name eq 'TQA' and report_title eq 'CMR CAR'
 ```
 
-**Bước 2 — Custom Fields**
+**Bước 2 — Custom Fields** *(r161: lọc thêm `report_title` ngay trên view)*
 ```
 GET dwanalytics_report_form_section_field
-  $select: report_id, field_name, text_value
-  $filter: field_name eq 'Aircraft Registration'
+  $select: report_id, field_name, text_value, report_field_created_date
+  $filter: report_title eq 'CMR CAR' and (
+           field_name eq 'Aircraft Registration'
         or field_name eq 'Finding description'
         or field_name eq 'Finding level'
         or field_name eq 'NC Type'
@@ -206,10 +207,19 @@ GET dwanalytics_report_form_section_field
         or field_name eq 'Issued to (person)'
         or field_name eq 'Verified by (auditor)'
         or field_name eq 'Date completed'
-        or field_name eq 'RCA analysis'
+        or field_name eq 'RCA analysis' )
 ```
-→ Fetch toàn bộ theo field_name (không filter report_id), sau đó post-filter bằng `cmrIdSet`.
+→ View này **có cột `report_title`** nên lọc được theo form. Trước r161 quét toàn hệ thống 15 field
+  ≈ 122.560 dòng → proxy trả **504 sau đúng 90s** (đo 10/09/2026, 3 lần liên tiếp); lỗi bị `catch`
+  nuốt nên trang CMR-CAR mất ATA / finding / target date mà không báo. Lọc theo title: 66.165 dòng, 3,3s.
+  Vẫn post-filter bằng `cmrIdSet` (I1: không filter `report_id` trên view EAV). Lỗi nay hiện `toast`.
 → `Finding description` được gom thành array `findings[]`, sort theo số đầu dòng.
+
+**Bước 2b — `dwanalytics_report_field`** (ghép finding theo `section_id`, `CMR_RF` = Finding description /
+ATA Chapter / Finding level / NC Type, ~35,5k dòng): view này **KHÔNG có `report_title`** nên vẫn quét theo
+`field_name`. ⚠️ Query này **treo ngẫu nhiên tới 504 ở 90s** (đo 10/09/2026: 1/7 lượt, kể cả query nhỏ
+hơn của ECAR; tách 2+2 field không giúp). Đã có `.catch → []` + fallback ghép theo index từ Bước 2, nên
+dữ liệu không mất, nhưng trang phải **chờ hết 90s + 2 retry** trước khi dựng. Chưa xử.
 
 ---
 
@@ -223,17 +233,24 @@ GET dwreporting_report_summary
   $filter: org_unit_name eq 'TQA' and report_title eq 'ECAR'
 ```
 
-**Bước 2 — Custom Fields**
+**Bước 2 — Custom Fields** *(r161: lọc thêm `report_title`)*
 ```
 GET dwanalytics_report_form_section_field
-  $select: report_id, field_name, text_value
-  $filter: field_name eq 'Target date'
+  $select: report_id, field_name, text_value, report_field_created_date
+  $filter: report_title eq 'ECAR' and (
+           field_name eq 'Target date'
         or field_name eq 'Aircraft Registration'
         or field_name eq 'Finding description'
+        or field_name eq 'ATA Chapter'
         or field_name eq 'Date completed'
-        or field_name eq 'Issued by'
+        or field_name eq 'Issued by' )
 ```
-→ Cùng pattern với CMR: fetch toàn bộ theo field_name, post-filter bằng `ecarIdSet`.
+→ Cùng pattern với CMR, post-filter bằng `ecarIdSet`. Lọc title: 58.726 → 7.828 dòng (4,6s → 2,3s, đo
+  10/09/2026). ATA Chapter của ECAR: 184 dòng / **168 report có giá trị** (2025: 99 · 2026: 69), 50 giá trị
+  khác nhau → bộ lọc `#ecarAtaF` và modal `showEcarDetail` (r161 thêm dòng *ATA Chapter*). Form ECAR
+  (TQA, `VJC-ECAR-…`) raised 06/2026 = 16, 07 = 1, 08 = 1, 09/2026 = 0 — gần như ngừng dùng.
+→ Bước 2b `dwanalytics_report_field` (`ECAR_RF` = Finding description / ATA Chapter, ~25,7k dòng) cùng
+  bệnh treo ngẫu nhiên như CMR — xem §2.
 
 ---
 
