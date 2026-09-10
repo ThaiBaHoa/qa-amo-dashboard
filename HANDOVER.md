@@ -8,13 +8,11 @@
 ## Đang ở đâu (10/09/2026, chiều)
 
 ```
-main        = 508a3ed (r161)   ← ĐÃ COMMIT, CHƯA PUSH
-              08c4bbb (r160)
-origin/main = 6ec9709 (r159)   ← ĐANG CHẠY THẬT
+origin/main = main = 8702932 (docs) — app r161 (508a3ed), r160 (08c4bbb)   ← ĐÃ PUSH 10/09, ĐANG CHẠY THẬT
 hold/r153-kpi7 = c744589 (r153)  ← bản ghi, KHÔNG dùng nữa
 ```
 
-Lên sản xuất: `git push` (deploy = push `main`). Lùi từng rev: `git revert 508a3ed` / `git revert 08c4bbb`.
+Lùi từng rev: `git revert 508a3ed` / `git revert 08c4bbb`.
 
 ### r160 — KPI QC: tử số đổi QC Spot Check Report → QC PI Report (10/09/2026)
 
@@ -47,7 +45,7 @@ nên không mất dữ liệu, nhưng lượt mở trang CMR-CAR/ECAR/KPI có th
 timeout riêng cho query này, hoặc lọc `report_raised_date`, hoặc `report_id in (…)` theo lô (r154 đo
 được 171 UUID/request).
 
-⛔ **CHƯA NHÌN GIAO DIỆN THẬT** (proxy chỉ nhận origin `vjc-qa-amo.com`). Sau khi push, mở
+⛔ **CHƯA NHÌN GIAO DIỆN THẬT** (proxy chỉ nhận origin `vjc-qa-amo.com`; đã push, Eric bảo *"push luôn đi"*). Mở
 `https://vjc-qa-amo.com/` kiểm: **(1)** trang KPI Charts, panel *KPI QC* — tiêu đề ghi *QC PI Report*,
 dòng sub có `Nguồn: … ECAR 0 report (0 có ATA)` khi chọn 2026 · tháng 9; chọn tháng 8 thì mẫu số
 `ECAR 1 report`, tử số có ATA 32; **(2)** trang CMR-CAR — bộ lọc *All ATA* có danh sách, cột Findings
