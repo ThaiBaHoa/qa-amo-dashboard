@@ -848,8 +848,8 @@ body.kiosk .mob-menu{display:none!important}
           <div class="chart-card" style="flex-shrink:0;margin-top:8px">
             <div class="chart-head" style="margin-bottom:10px">
               <div>
-                <div class="chart-title">KPI QC — (CMR-CAR gán cờ QC + QC Spot Check) vs ECAR theo ATA</div>
-                <div class="chart-sub" id="ataCompareSub">Tử = CMR-CAR + QC Spot Check tháng N−1 · Mẫu = ECAR tháng N</div>
+                <div class="chart-title">KPI QC — (CMR-CAR gán cờ QC + QC PI Report) vs ECAR theo ATA</div>
+                <div class="chart-sub" id="ataCompareSub">Tử = CMR-CAR gán cờ QC + QC PI Report tháng N−1 · Mẫu = ECAR tháng N</div>
               </div>
               <div style="display:flex;gap:6px;align-items:center">
                 <select class="sel" id="ataGroupLevel" onchange="renderATACompare()" style="font-size:11px">
@@ -864,7 +864,7 @@ body.kiosk .mob-menu{display:none!important}
             </div>
             <!-- Legend -->
             <div style="display:flex;gap:16px;margin-bottom:10px;font-size:11px">
-              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#58A6FF;border-radius:2px;display:inline-block"></span>QC (CMR-CAR gán cờ + QC Spot Check) · tháng N−1</span>
+              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#58A6FF;border-radius:2px;display:inline-block"></span>QC (CMR-CAR gán cờ + QC PI Report) · tháng N−1</span>
               <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#ff6b6b;border-radius:2px;display:inline-block"></span>ECAR (authority) · tháng N</span>
             </div>
             <div class="ch-wrap" style="height:380px"><canvas id="cATACompare"></canvas></div>
@@ -2477,7 +2477,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.10-r159';
+const APP_REV = '2026.09.10-r160';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -4663,13 +4663,15 @@ function populateAtaYM(){
   }
 }
 
-// QCS finding list [{ym,ata}] từ qcsMap (r107) + raised_date của allData
+// QC finding list [{ym,ata,title}] từ qcsMap (r107) + raised_date/report_title của allData.
+// qcsMap gom CẢ QC Spot Check Report (form cũ) lẫn QC PI Report (r160) — người gọi lọc theo title.
 function qcsFindingList(){
   const out=[];
   Object.entries(qcsMap||{}).forEach(([rid,m])=>{
     const rep=allData.find(r=>r.report_id===rid);
     const ym=rep&&rep.raised_date?String(rep.raised_date).slice(0,7):'';
-    (m.findings||[]).forEach(f=>{ if(f && f.ata!=null && f.ata!=='') out.push({ym,ata:f.ata}); });
+    const title=rep?rep.report_title:'';
+    (m.findings||[]).forEach(f=>{ if(f && f.ata!=null && f.ata!=='') out.push({ym,ata:f.ata,title}); });
   });
   return out;
 }
@@ -4703,31 +4705,45 @@ function renderATACompare() {
   const Y = parseInt(g('ataYear')?.value  || now.getFullYear());
   const M = parseInt(g('ataMonth')?.value || (now.getMonth()+1));
 
-  // mẫu = (Y,M) ECAR ; tử = (Y,M−1) CMR+QCS, rollover tháng 1 → tháng 12 năm trước
+  // mẫu = (Y,M) ECAR ; tử = (Y,M−1) CMR gán cờ QC + QC PI Report, rollover tháng 1 → tháng 12 năm trước
   const pad = n => String(n).padStart(2,'0');
   const denYM = `${Y}-${pad(M)}`;
   const nY = M===1 ? Y-1 : Y, nM = M===1 ? 12 : M-1;
   const numYM = `${nY}-${pad(nM)}`;
   const ymOf = d => d ? String(d).slice(0,7) : '';
 
-  // cập nhật sub
+  // Ba tập report nguồn của tháng đang xem — dùng cho cả dòng sub lẫn vòng đếm bên dưới.
+  // [r160] Tử số đổi QC Spot Check Report → QC PI Report: form cũ dừng ở VJC-MQA-SCR-0025
+  // (06/08/2026), form mới VJC-MQA-QCPI-0001 từ 31/07/2026, CÙNG bộ field finding
+  // (Finding description / ATA Chapter / Defect Classification / Position / AOG). 8 finding
+  // QCS tháng 7 đã được NHẬP LẠI thành QCPI-0002…0009 (raised 04/08) nên KHÔNG cộng cả hai
+  // form — cộng là đếm trùng. Probe 10/09/2026.
+  const cmrQcRep = cmrData.filter(r=>ymOf(r.raised_date)===numYM && r.category_id===QC_CAT_UUID);
+  const qcpiRep  = allData.filter(r=>r.report_title===QCPI_TITLE && ymOf(r.raised_date)===numYM);
+  const ecarRep  = ecarData.filter(r=>ymOf(r.raised_date)===denYM);
+  const ecarAtaN = ecarRep.filter(r=>r.ata_chapter || (r.findingRows||[]).some(fr=>fr.ata)).length;
+
+  // cập nhật sub — kèm số report nguồn từng vế, để "ECAR (N) = 0" đọc ra là THÁNG ĐÓ KHÔNG CÓ
+  // ECAR chứ không phải app quên lấy ATA (probe 10/09/2026: ECAR TQA raised 07/2026 = 1,
+  // 08/2026 = 1, 09/2026 = 0 — form gần như ngừng dùng từ 07/2026).
   const subEl = g('ataCompareSub');
-  if(subEl) subEl.textContent = `Ratio QC = (CMR-CAR gán cờ QC + QC Spot Check ${numYM}) ÷ (ECAR ${denYM}) — số thập phân`;
+  if(subEl) subEl.textContent = `Ratio QC = (CMR-CAR gán cờ QC + QC PI Report ${numYM}) ÷ (ECAR ${denYM}) — số thập phân`
+    + ` · Nguồn: CMR-CAR QC ${cmrQcRep.length} · QC PI ${qcpiRep.length} · ECAR ${ecarRep.length} report (${ecarAtaN} có ATA)`;
 
   // ── đếm finding con per-ATA ──
-  const numCount = {};   // tử: CMR + QCS (tháng N−1)
+  const numCount = {};   // tử: CMR gán cờ QC + QC PI (tháng N−1)
   const denCount = {};   // mẫu: ECAR (tháng N)
   const add = (map, ataRaw) => { const a = normalizeATA(ataRaw, level); if(!a) return; map[a]=(map[a]||0)+1; };
 
   // CMR-CAR tháng N−1 — CHỈ report gán cờ "QC MQA Physical Finding"
-  cmrData.filter(r=>ymOf(r.raised_date)===numYM && r.category_id===QC_CAT_UUID).forEach(r=>{
+  cmrQcRep.forEach(r=>{
     if(r.findingRows && r.findingRows.length) r.findingRows.forEach(fr=>add(numCount, fr.ata||r.ata_chapter));
     else add(numCount, r.ata_chapter);
   });
-  // QC Spot Check tháng N−1
-  qcsFindingList().filter(f=>f.ym===numYM).forEach(f=>add(numCount, f.ata));
+  // QC PI Report tháng N−1 (finding từ qcsMap — lọc đúng title, bỏ QC Spot Check Report cũ)
+  qcsFindingList().filter(f=>f.title===QCPI_TITLE && f.ym===numYM).forEach(f=>add(numCount, f.ata));
   // ECAR tháng N
-  ecarData.filter(r=>ymOf(r.raised_date)===denYM).forEach(r=>{
+  ecarRep.forEach(r=>{
     if(r.findingRows && r.findingRows.length) r.findingRows.forEach(fr=>add(denCount, fr.ata||r.ata_chapter));
     else add(denCount, r.ata_chapter);
   });
@@ -4750,7 +4766,7 @@ function renderATACompare() {
     charts['cATACompare'] = new Chart(ctx, {
       type:'bar',
       data:{ labels, datasets:[
-        {label:'QC (CMR gán cờ + QCS)', data:numVals, backgroundColor:'rgba(88,166,255,0.85)', borderRadius:3, barPercentage:0.6},
+        {label:'QC (CMR gán cờ + QC PI)', data:numVals, backgroundColor:'rgba(88,166,255,0.85)', borderRadius:3, barPercentage:0.6},
         {label:'ECAR',               data:denVals, backgroundColor:'rgba(255,107,107,0.7)', borderRadius:3, barPercentage:0.6},
       ]},
       options:{
@@ -4889,7 +4905,7 @@ async function exportATAComparePDF() {
   doc.setFillColor(13,17,23);
   doc.rect(0,0,W,16,'F');
   doc.setFontSize(11);doc.setFont(undefined,'bold');doc.setTextColor(230,237,243);
-  doc.text('Internal (CMR-CAR + QC Spot Check) vs ECAR by ATA '+lvlLabel,M,11);
+  doc.text('Internal (CMR-CAR QC + QC PI Report) vs ECAR by ATA '+lvlLabel,M,11);
   doc.setFontSize(8);doc.setFont(undefined,'normal');doc.setTextColor(163,174,184);
   doc.text('Year: '+yr,W/2,11,{align:'center'});
   doc.text('Rev '+APP_REV,W-M,11,{align:'right'});
@@ -5246,6 +5262,7 @@ const AF_EIS_COLS = [
 
 // ── QC SPOT CHECK schema (khai báo TRƯỚC AF_SCHEMAS để tránh TDZ ở computed key) ──
 const QCS_TITLE = 'QC Spot Check Report';
+const QCPI_TITLE = 'QC PI Report';   // r160 — form QC mới thay QCS (VJC-MQA-QCPI-0001 từ 31/07/2026); chỉ KPI QC dùng
 const QCS_HEADER_FIELDS = ['Aircraft Registration','A/C Type','Spot Check Type','Audit Ref. No',
   'Area of standard','Department','Issued to (person)','Verified by (auditor)',
   'Certifying Staff/Foreman Name & Auth. #','Issue Date','Target date','Date completed',
@@ -5397,7 +5414,9 @@ let qcsMap    = {};   // report_id -> { header:{field:val}, findings:[{desc,ata,
 // → thu hẹp bằng `report_raised_date ge <QCS raised sớm nhất − 2 ngày>` (suy ra động từ allData; QCS là
 //   form mới nên mọi report raised gần đây). Chunk field list (8/lần) để giữ node count < MaxNodeCount.
 async function loadQcsDetail(){
-  const qcsReports = allData.filter(r=>r.report_title===QCS_TITLE);
+  // [r160] Gom thêm QC PI Report (form thay QCS từ 08/2026, cùng bộ field finding) vào cùng
+  // qcsMap. All Forms vẫn lọc theo QCS_TITLE (không đổi); KPI QC lọc theo QCPI_TITLE.
+  const qcsReports = allData.filter(r=>r.report_title===QCS_TITLE || r.report_title===QCPI_TITLE);
   const qcsIds = new Set(qcsReports.map(r=>r.report_id).filter(Boolean));
   if(!qcsIds.size){ qcsLoaded=true; return; }
   const q = v => `'${String(v).replace(/'/g,"''")}'`;
