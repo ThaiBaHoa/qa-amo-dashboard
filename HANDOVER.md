@@ -45,12 +45,15 @@ nên không mất dữ liệu, nhưng lượt mở trang CMR-CAR/ECAR/KPI có th
 timeout riêng cho query này, hoặc lọc `report_raised_date`, hoặc `report_id in (…)` theo lô (r154 đo
 được 171 UUID/request).
 
-⛔ **CHƯA NHÌN GIAO DIỆN THẬT** (proxy chỉ nhận origin `vjc-qa-amo.com`; đã push, Eric bảo *"push luôn đi"*). Mở
-`https://vjc-qa-amo.com/` kiểm: **(1)** trang KPI Charts, panel *KPI QC* — tiêu đề ghi *QC PI Report*,
-dòng sub có `Nguồn: … ECAR 0 report (0 có ATA)` khi chọn 2026 · tháng 9; chọn tháng 8 thì mẫu số
-`ECAR 1 report`, tử số có ATA 32; **(2)** trang CMR-CAR — bộ lọc *All ATA* có danh sách, cột Findings
-có số, không còn `Unknown` hàng loạt ở cột Aircraft; **(3)** trang ECAR — bấm Detail một report 2026,
-modal có dòng *ATA Chapter*; **(4)** không thấy toast đỏ *"custom fields failed"*.
+✅ **ĐÃ KIỂM BẢN LIVE 10/09 (chiều, tài khoản admin của Eric, đo bằng Claude in Chrome):**
+**(1)** KPI Charts → panel *KPI QC*: tiêu đề *QC PI Report*; sub `Nguồn: CMR-CAR QC 7 · QC PI 10 · ECAR 0
+report (0 có ATA)` cho 2026·09, TOTAL Internal 08/2026 = **44** finding có ATA (35 CMR + 9 QC PI, khớp
+probe); chọn tháng 8: `ECAR 1 report (1 có ATA)`, TOTAL 23 ÷ 1, dòng *32 – Landing Gear* 0 ÷ 1 ❌ Missed.
+**(2)** CMR-CAR: 2.561 records, bộ lọc ATA **105 mục**, 2.557 report có ATA, 2.560 có Target date, Aircraft
+`Unknown` chỉ 3 (trước r161 rơi về parse từ title). **(3)** ECAR: 864 records, bộ lọc ATA 51 mục; modal
+VJC-ECAR-864 có dòng *ATA CHAPTER 32-21-00*. **(4)** Không có toast lỗi nào (đã hook `toast()` suốt lượt
+nạp). Lượt nạp 3 loader trên live mất **>25s và <85s** (CMR xong trước 25s; ECAR + QCS xong sau) — khớp
+với việc `report_field` đôi lúc treo, xem "Còn tồn" trên.
 
 ✅ Note vault `QA_AMO_Dashboard.md` đã lên r161 (Eric chốt sửa ngay 10/09); `check-doc-sync.sh` xanh trở lại.
 
