@@ -5,13 +5,40 @@
 
 ---
 
-## Đang ở đâu (08/09/2026)
+## Đang ở đâu (10/09/2026)
 
 ```
-origin/main = main = e586ad8 (r155)   ← ĐANG CHẠY THẬT
+origin/main = main = 6ec9709 (r159)   ← ĐANG CHẠY THẬT
 hold/r153-kpi7 = c744589 (r153)       ← bản ghi, KHÔNG dùng nữa
-feat/r155-kpi7-verification           ← đã merge fast-forward vào main, xoá được
 ```
+
+### r159 — nút ✦ AI Assistant rời góc phải-dưới lên topbar (10/09/2026)
+
+Eric báo: *"nút chức năng che khuất mất 1 góc khiến các thao tác chọn trang bị vướng"*.
+
+**Đây là chuyện bố cục, không phải chuyện cái nút.** `.main{height:100vh;overflow:hidden}` ghim
+`.tbl-foot` ở đáy khung nhìn, `justify-content:space-between` đẩy cụm `.pg-btns` dính mép phải
+⇒ góc phải-dưới **không bao giờ trống**, ở cả 9 bảng. Nút tròn 52px `#aiFab` đặt ở
+`right:22px;bottom:22px` đè vĩnh viễn lên nút `›` và vài số trang cuối (đo 1366×768: chân bảng
+y 721–755, phân trang hết x 1337, nút phủ x 1292–1344 / y 694–746).
+
+Đã bỏ `#aiFab`, thêm `#aiTopBtn` (`.icon-btn`) vào `.topbar-right`; `#aiPanel` neo **từ trên**
+(`top:80px;bottom:22px`) để mở bảng chat vẫn bấm được phân trang. Sửa kèm: thêm một nút làm
+`.topbar-right` tràn 18px khỏi màn 375px ⇒ thu `.icon-btn` 36→32px + gap 5px trong media ≤767px.
+
+⛔ **CHƯA AI MỞ BẢN LIVE NHÌN BẰNG MẮT** — mọi phép đo làm trên bản serve nội bộ với bảng **rỗng**.
+Mở `https://vjc-qa-amo.com/` kiểm ba thứ: nút ✦ có trên topbar và bấm ra bảng chat · thanh phân
+trang bấm được cả nút `›` · mở bảng chat mà phân trang vẫn bấm được. Lùi: `git revert 6ec9709`.
+
+⚠️ Đừng dựng lại nút nổi ở góc phải-dưới. Cần chỗ nổi thì dùng topbar hoặc neo từ trên xuống.
+Ghi chú lý do nằm ngay trong CSS `#aiTopBtn` của `index.html`.
+
+⚠️ Nút chuông "Notifications" trên topbar KHÔNG có `onclick` — thẻ chết, nhưng vẫn chiếm 42px
+của hàng nút vốn đã chật trên mobile. Chưa đụng vì ngoài phạm vi.
+
+---
+
+## Trước đó — r155 (08/09/2026)
 
 **r155 — KPI 7 đổi sang lượt Verification Result.** Eric chốt 08/09/2026 sau biên bản họp
 07/09 (anh Phan Anh Đức gửi các Trưởng ban QC/Safety/S&C). Chi tiết đầy đủ ở
