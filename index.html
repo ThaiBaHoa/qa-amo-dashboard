@@ -250,7 +250,7 @@ tr:last-child td{border-bottom:none}
    dữ liệu tươi tới đâu (chấm live + cacheAge) — người đứng xa cần biết số có cũ không. */
 body.kiosk .sidebar{display:none}
 body.kiosk .main{margin-left:0}
-body.kiosk #aiFab{display:none!important}
+body.kiosk #aiTopBtn{display:none!important}
 body.kiosk .mob-menu{display:none!important}
 .mob-menu{display:none;align-items:center;justify-content:center;width:36px;height:36px;border:none;background:rgba(255,255,255,.04);color:var(--text);cursor:pointer;font-size:20px;border-radius:8px;flex-shrink:0;transition:background .2s;line-height:1}
 .mob-menu:hover{background:rgba(255,255,255,.1)}
@@ -341,7 +341,11 @@ body.kiosk .mob-menu{display:none!important}
   /* Topbar compact */
   .topbar { padding: 0 10px; gap: 8px; }
   .topbar-title { font-size: 14px; flex: 1; }
-  .topbar-right { gap: 6px; }
+  /* [r159] Thêm nút ✦ AI Assistant vào .topbar-right là thêm 42px (36 + gap 6). Đo trên
+     375px: hàng nút tràn khỏi mép phải 18px, nút ↻ Refresh bị đẩy ra ngoài màn. Bù lại
+     bằng cách thu nút 36→32px và gap 6→5px: 168 → 148px, tổng topbar 393 → 373 ≤ 375. */
+  .topbar-right { gap: 5px; }
+  .topbar-right .icon-btn { width: 32px; height: 32px; border-radius: 9px; }
 
   /* Content padding */
   .content { padding: 8px; }
@@ -598,6 +602,9 @@ body.kiosk .mob-menu{display:none!important}
           <button class="icon-btn" id="dqBadge" style="display:none;width:auto;gap:6px;padding:0 10px;color:var(--yellow);border-color:var(--yellow)" onclick="showSelfCheckWarnings()">
             <span style="font-size:13px;line-height:1">&#9888;</span><span id="dqCount" style="font-size:12px;font-weight:600">0</span>
           </button>
+          <!-- [r159] AI Assistant: chuyển từ nút nổi góc phải-dưới lên đây vì nút nổi đè lên
+               thanh phân trang của mọi bảng. Ẩn mặc định, initApp() mới bật (display:flex). -->
+          <button class="icon-btn" id="aiTopBtn" title="AI Assistant — hỏi đáp dữ liệu" onclick="aiToggle()">✦</button>
           <button class="icon-btn" id="btnTheme" title="Toggle theme" onclick="toggleTheme()"><span class="nav-ic" data-ic="sun"></span></button>
           <button class="icon-btn" title="Notifications"><span class="nav-ic" data-ic="bell"></span></button>
           <button class="icon-btn" id="btnRefresh" title="Refresh" onclick="loadData(true)"><span class="nav-ic" data-ic="refresh"></span></button>
@@ -2470,7 +2477,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.09-r158';
+const APP_REV = '2026.09.10-r159';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2915,14 +2922,14 @@ async function doLogout() {
   g('authTabs').style.display=''; switchAuth('login');
   g('lUsername').value=g('lPass').value=''; showAl(g('loginAlert'),'','');
   g('pendingBox').style.display='none';
-  if(g('aiFab'))g('aiFab').style.display='none';   // AI Assistant — ẩn khi logout
+  if(g('aiTopBtn'))g('aiTopBtn').style.display='none';   // AI Assistant — ẩn khi logout
   if(g('aiPanel'))g('aiPanel').classList.remove('open');
   if(typeof aiClear==='function')aiClear(true);
 }
 
 function initApp() {
   g('authWrap').style.display='none'; g('app').style.display='block';
-  if(g('aiFab'))g('aiFab').style.display='flex';   // AI Assistant — chỉ hiện sau khi đăng nhập
+  if(g('aiTopBtn'))g('aiTopBtn').style.display='flex';   // AI Assistant — chỉ hiện sau khi đăng nhập
   g('sideAvatar').textContent=curUser.full_name[0].toUpperCase();
   g('sideName').textContent=curUser.full_name;
   g('sideRole').textContent=curUser.role==='admin'?'🔑 Administrator':'👤 Viewer';
@@ -11425,13 +11432,17 @@ async function showSPIPage(btn){
      Dữ liệu KHÔNG được upload toàn bộ lên API — chỉ kết quả truy vấn.
      ═══════════════════════════════════════════════════════════════ -->
 <style>
-#aiFab{position:fixed;right:22px;bottom:22px;z-index:9990;width:52px;height:52px;border-radius:50%;
-  border:none;cursor:pointer;display:none;align-items:center;justify-content:center;
-  background:linear-gradient(160deg,#E30613 0%,#a80010 100%);color:#fff;font-size:22px;
-  box-shadow:0 6px 20px rgba(227,6,19,.35);transition:transform .15s ease}
-#aiFab:hover{transform:scale(1.08)}
-#aiPanel{position:fixed;right:22px;bottom:86px;z-index:9991;width:min(400px,calc(100vw - 28px));
-  height:min(600px,calc(100vh - 120px));display:none;flex-direction:column;overflow:hidden;
+/* [r159 — 10/09/2026] Nút ✦ ĐÃ RỜI khỏi góc phải-dưới, nay là một .icon-btn trên topbar.
+   ⚠ ĐỪNG DỰNG LẠI nút nổi ở góc đó: vỏ app là .main{height:100vh;overflow:hidden} nên
+   .tbl-foot (justify-content:space-between ⇒ cụm .pg-btns dính mép phải) LUÔN nằm đúng
+   góc phải-dưới màn hình ở cả 9 bảng. Nút tròn 52px ở right:22px/bottom:22px chiếm ô
+   22–74px tính từ hai mép ⇒ đè vĩnh viễn lên nút '›' và vài số trang cuối. Eric báo 10/09/2026. */
+#aiTopBtn{display:none;font-size:17px;line-height:1;font-weight:700;color:var(--accent)}
+#aiTopBtn:hover{color:var(--accent);border-color:var(--accent)}
+/* Bảng chat neo TỪ TRÊN xuống (dưới topbar, cao nhất 72px ở breakpoint ≥2400px) thay vì
+   từ dưới lên — để ngay cả khi đang mở bảng chat, thanh phân trang vẫn bấm được. */
+#aiPanel{position:fixed;right:22px;top:80px;bottom:22px;z-index:9991;width:min(400px,calc(100vw - 28px));
+  max-height:600px;display:none;flex-direction:column;overflow:hidden;
   background:var(--card);border:1px solid var(--border);border-radius:16px;
   box-shadow:0 18px 50px rgba(0,0,0,.35)}
 #aiPanel.open{display:flex}
@@ -11469,7 +11480,7 @@ async function showSPIPage(btn){
 #aiSendBtn:disabled{opacity:.5;cursor:default}
 </style>
 
-<button id="aiFab" onclick="aiToggle()" title="AI Assistant — hỏi đáp dữ liệu">✦</button>
+<!-- [r159] Nút mở AI Assistant nay nằm trên topbar (#aiTopBtn, xem .topbar-right). -->
 <div id="aiPanel">
   <div class="ai-head">
     <div class="ai-head-t">✦ AI Assistant<span class="ai-beta">BETA</span></div>
