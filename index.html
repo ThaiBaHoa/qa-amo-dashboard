@@ -860,16 +860,17 @@ body.kiosk .mob-menu{display:none!important}
                 <select class="sel" id="ataYear" onchange="renderATACompare()" style="font-size:11px"></select>
                 <select class="sel" id="ataMonth" onchange="renderATACompare()" style="font-size:11px"></select>
                 <button class="btn-sm admin-only" onclick="exportATAComparePDF()" style="white-space:nowrap;flex-shrink:0;display:none">⬇ PDF</button>
+                <!-- [r162] Headline Ratio TOTAL — Eric: "để con số Ratio to ra để nhìn cho dễ". Cùng khuôn KPI 7 bên dưới. -->
+                <div style="text-align:right;min-width:150px;margin-left:8px">
+                  <div class="kpi-val" id="ataCmp-val" style="font-size:30px;line-height:1.1">—</div>
+                  <div class="kpi-lbl" id="ataCmp-frac">—</div>
+                </div>
               </div>
             </div>
-            <!-- Legend -->
-            <div style="display:flex;gap:16px;margin-bottom:10px;font-size:11px">
-              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#58A6FF;border-radius:2px;display:inline-block"></span>QC (CMR-CAR gán cờ + QC PI Report) · tháng N−1</span>
-              <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#ff6b6b;border-radius:2px;display:inline-block"></span>ECAR (authority) · tháng N</span>
-            </div>
-            <div class="ch-wrap" style="height:380px"><canvas id="cATACompare"></canvas></div>
+            <!-- [r162] Bỏ chart grouped-bar + legend: nó chỉ vẽ lại 15 dòng đầu của bảng bên dưới (cùng số Internal/ECAR),
+                 không mang thêm thông tin nào, và từ 07/2026 ECAR ≈ 0 nên cột đỏ luôn trống. Eric chốt 10/09/2026. -->
             <!-- Detail table -->
-            <div style="overflow-x:auto;margin-top:12px">
+            <div style="overflow-x:auto">
               <table class="stat-tbl" id="ataCompareTable">
                 <thead><tr>
                   <th>ATA Chapter</th>
@@ -2477,7 +2478,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.10-r161';
+const APP_REV = '2026.09.10-r162';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -4753,59 +4754,35 @@ function renderATACompare() {
     .filter(a => a !== 'Other')
     .sort((a,b) => ((numCount[b]||0)+(denCount[b]||0)) - ((numCount[a]||0)+(denCount[a]||0)));
 
-  // Top 15 cho chart (sort theo tổng, reverse cho bar ngang)
-  const topATA = allATAFull.slice().sort((a,b)=>((numCount[b]||0)+(denCount[b]||0))-((numCount[a]||0)+(denCount[a]||0))).slice(0,15).reverse();
-  const numVals = topATA.map(a=>numCount[a]||0);
-  const denVals = topATA.map(a=>denCount[a]||0);
-  const labels  = topATA.map(a=>{ const ch=a.split('-')[0]; return (level===2 && ATA_LABELS[ch]) ? ATA_LABELS[ch] : a; });
-
-  // ── chart (grouped bar ngang: Internal vs ECAR) ──
-  dc('cATACompare');
-  const ctx = g('cATACompare');
-  if(ctx){
-    charts['cATACompare'] = new Chart(ctx, {
-      type:'bar',
-      data:{ labels, datasets:[
-        {label:'QC (CMR gán cờ + QC PI)', data:numVals, backgroundColor:'rgba(88,166,255,0.85)', borderRadius:3, barPercentage:0.6},
-        {label:'ECAR',               data:denVals, backgroundColor:'rgba(255,107,107,0.7)', borderRadius:3, barPercentage:0.6},
-      ]},
-      options:{
-        indexAxis:'y', responsive:true, maintainAspectRatio:false,
-        plugins:{
-          legend:{display:false},
-          tooltip:{callbacks:{
-            title:(items)=>items[0].label,
-            label:(item)=>` ${item.dataset.label}: ${item.raw.toLocaleString('vi-VN')} findings`
-          }}
-        },
-        scales:{
-          x:{ticks:{color:'#8B949E',font:{size:10}},grid:{color:'rgba(255,255,255,0.04)'},beginAtZero:true},
-          y:{ticks:{color:'#C9D1D9',font:{size:11}},grid:{display:false}}
-        }
-      }
-    });
-  }
+  // [r162] Chart grouped-bar đã bỏ (chỉ vẽ lại 15 dòng đầu của bảng; ECAR ≈ 0 từ 07/2026 nên cột đỏ luôn
+  // trống). Bảng là nguồn hiển thị duy nhất; Ratio TOTAL đưa lên headline #ataCmp-val cho to.
 
   // ── bảng: TOTAL + per-ATA + No-ATA ──
   const tbody = g('ataCompareBody');
   if(!tbody) return;
 
   // badge edge case: num=tử(internal), den=mẫu(ECAR). Ratio = số thập phân (num/den).
+  // `label`/`color` dùng cho headline (r162) — cùng phân loại với badge, đừng để lệch.
   const cell = (num, den) => {
     if(den>0){
       const r = (num/den).toFixed(2);
-      if(num>=den)      return {ratio:r,      badge:`<span class="badge b-on"   style="font-size:10px">✅ Effective</span>`, bad:false};
-      if(num>0)         return {ratio:r,      badge:`<span class="badge b-over" style="font-size:10px">⚠ Under</span>`,     bad:true};
-      return                   {ratio:'0.00', badge:`<span class="badge b-over" style="font-size:10px">❌ Missed</span>`,    bad:true};
+      if(num>=den)      return {ratio:r,      badge:`<span class="badge b-on"   style="font-size:10px">✅ Effective</span>`, bad:false, label:'Effective',   color:'var(--green)'};
+      if(num>0)         return {ratio:r,      badge:`<span class="badge b-over" style="font-size:10px">⚠ Under</span>`,     bad:true,  label:'Under',       color:'#ff6b6b'};
+      return                   {ratio:'0.00', badge:`<span class="badge b-over" style="font-size:10px">❌ Missed</span>`,    bad:true,  label:'Missed',      color:'#ff6b6b'};
     }
-    if(num>0) return {ratio:'∞', badge:`<span class="badge b-open" style="font-size:10px">↑ Over-detect</span>`, bad:false};
-    return            {ratio:'0', badge:`<span style="color:var(--muted);font-size:10px">—</span>`, bad:false};
+    if(num>0) return {ratio:'∞', badge:`<span class="badge b-open" style="font-size:10px">↑ Over-detect</span>`, bad:false, label:'Over-detect', color:'var(--blue)'};
+    return            {ratio:'0', badge:`<span style="color:var(--muted);font-size:10px">—</span>`, bad:false, label:'no data',     color:'var(--muted)'};
   };
 
   // dòng TOTAL: CHỈ cộng phần CÓ ATA (khớp đúng tổng các dòng per-ATA hiển thị; No-ATA để riêng dòng dưới) — headline KPI
   const totNum = allATAFull.reduce((s,a)=>s+(numCount[a]||0),0);
   const totDen = allATAFull.reduce((s,a)=>s+(denCount[a]||0),0);
   const tc = cell(totNum, totDen);
+
+  // [r162] headline: cùng con số với dòng TOTAL của bảng (một nguồn, hai chỗ hiện)
+  const hv = g('ataCmp-val');
+  if(hv){ hv.textContent = tc.ratio; hv.style.color = tc.color; }
+  s('ataCmp-frac', `Internal ${totNum} ÷ ECAR ${totDen} · ${tc.label} · ${numYM} ÷ ${denYM}`);
   let html = `<tr style="border-bottom:2px solid var(--border);background:rgba(88,166,255,0.06);font-weight:700">
     <td style="font-size:12px">TOTAL (ATA) · Internal ${numYM} ÷ ECAR ${denYM}</td>
     <td style="text-align:center;color:var(--blue)">${totNum}</td>
@@ -4912,15 +4889,15 @@ async function exportATAComparePDF() {
 
   let y=20;
 
-  // Embed chart at 3× scale for sharp rendering
-  const canvas=g('cATACompare');
-  if(canvas){
-    try{
-      const img=await html2canvas(canvas,{scale:3,backgroundColor:'#161B22',logging:false});
-      const chartH=80;
-      doc.addImage(img.toDataURL('image/png'),'PNG',M,y,W-2*M,chartH);
-      y+=chartH+6;
-    }catch(e){console.warn('Chart capture:',e);}
+  // [r162] Chart đã bỏ khỏi panel → PDF in dòng headline Ratio TOTAL thay cho ảnh chart (ASCII only).
+  {
+    const hvTxt=(g('ataCmp-val')?.textContent||'-').replace(/∞/g,'inf');
+    const frTxt=pdfSafe((g('ataCmp-frac')?.textContent||'').replace(/÷/g,'/').replace(/·/g,'-'));
+    doc.setFontSize(16);doc.setFont(undefined,'bold');doc.setTextColor(30,30,30);
+    doc.text('Ratio TOTAL: '+hvTxt,M,y+6);
+    doc.setFontSize(8);doc.setFont(undefined,'normal');doc.setTextColor(90,90,90);
+    doc.text(frTxt,M,y+11);
+    y+=16;
   }
 
   // Rebuild table rows from DOM — strip emojis, transliterate Vietnamese
