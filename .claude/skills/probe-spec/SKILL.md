@@ -139,6 +139,38 @@ Khi lệch, kiểm theo thứ tự này (từ hay gặp nhất):
 - Thay đổi phải phẫu thuật: chỉ đụng đúng chỗ task yêu cầu. `index.html` ~8.700 dòng —
   không "cải thiện" code lân cận.
 
+### 2.0 BẮT BUỘC — niêm phong danh sách điểm chạm TRƯỚC khi viết spec
+
+Safety gate "abort nếu không tìm thấy anchor" chống chuyện **sửa nhầm chỗ**. Nó không
+chống chuyện **sót chỗ**: sửa một hàm mà quên nơi khác cũng gọi nó, spec vẫn chạy trơn,
+vẫn commit, vẫn deploy. Đây là bản dành cho **code** của mục 1.0 (chốt phạm vi trước khi
+đếm bất cứ thứ gì).
+
+**Bước 1 — liệt kê toàn bộ điểm chạm, trước khi viết dòng spec đầu tiên.**
+`grep -n` mọi tên hàm / biến / chuỗi mà thay đổi này đụng tới. Ghi kết quả vào spec
+dưới dạng bảng, **kèm tổng số**:
+
+| # | Dòng | Điểm chạm | Xử lý |
+|---|------|-----------|--------|
+| 1 | 4821 | `kpi7Rate()` | sửa |
+| 2 | 5104 | nơi gọi trong `renderAll()` | sửa |
+| 3 | 7733 | export PDF | **bỏ** — dùng số đã tính sẵn, không gọi lại |
+
+**Bước 2 — danh sách đóng băng.** Sau khi spec chốt, không thêm không bớt. Mỗi mục kết
+thúc ở đúng một trong hai trạng thái: **đã sửa**, hoặc **bỏ kèm lý do cụ thể**. Không có
+trạng thái thứ ba, không được im lặng bỏ qua.
+
+**Bước 3 — khi implement, đọc lại ĐÚNG bảng đã chốt trong spec, đừng grep lại.**
+Grep chạy sau khi đã sửa cho kết quả khác với grep chạy trước — tự đối chiếu với chính
+mình thì không phát hiện được gì. Mẫu số phải được niêm phong trước khi bắt đầu làm,
+không được đếm lại sau khi làm xong.
+
+> Nguồn: `alibaba/open-code-review` (đọc tại commit `a003b93`, 19/09/2026).
+> `registerCoverage()` đóng băng mẫu số rồi `SealSelected()` niêm phong **trước** mọi
+> dispatch. `selectFiles()` được viết thành hàm thuần để bản xem trước và lần chạy thật
+> đọc **cùng một câu trả lời**; comment trong file ghi rõ họ đã dính bug thật (#782)
+> khi hai bên tự tính riêng.
+
 ## 3. IMPLEMENT
 
 - Áp spec vào `index.html`. (Claude chat không tự sửa `index.html` trực tiếp; áp qua
