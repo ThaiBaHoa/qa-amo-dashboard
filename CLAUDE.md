@@ -131,6 +131,9 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
   refreshes with no overlay (`lov()` instead of `setOv()`), resets the lazy stores only at
   swap time, and **swaps only if all six sources succeeded** — otherwise it keeps the old
   complete data and toasts. The 12h auto-refresh also runs in background; ↻ stays blocking.
+  **Workflow (r148) and Custom fields (r166) are delta-synced** from raw copies in
+  IndexedDB (`wfRaw`, `cfRaw`, not tied to APP_REV): full load once / every 7 days / on ↻,
+  otherwise only reports whose rows changed since the `modified_date` watermark.
   **Never mutate `allData` directly** — use enriched clones only.
   **Never touch `loadData()` or `ORG_UNIT` unless the change is intentionally cross-page.**
 - `startKiosk` / `kioskShow` / `stopKiosk` — **LED wall mode (r137)**, off unless the URL has
@@ -466,7 +469,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.09.21-r165
+Rev current: 2026.09.21-r166
 
 ORG_UNIT_IDS          ← main pages: 'QA AMO' + ALL its sub-units, resolved at load
                          from dwreporting_organisational_unit_hierarchy (r143).

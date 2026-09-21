@@ -2516,7 +2516,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.21-r165';
+const APP_REV = '2026.09.21-r166';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3567,19 +3567,7 @@ async function loadData(forceRefresh=false, opts={}) {
 
       // 4. CUSTOM FIELDS
       par('Custom fields',
-        G_URL + 'dwanalytics_report_form_section_field' +
-        '?$select=report_id,field_name,text_value' +
-        '&$filter=' + encodeURIComponent(
-          "field_name eq 'Target date' or field_name eq 'Issue Date' or " +
-          "field_name eq 'Finding level' or field_name eq 'Repetitive' or " +
-          "field_name eq 'First extension agreed date' or " +
-          "field_name eq 'Second extension agreed date' or field_name eq 'Audit Ref. No' or " +
-          "field_name eq 'Request For Verification' or field_name eq 'Report Reference' or " +
-          "field_name eq 'Verification Result' or field_name eq 'Department' or " +
-          "field_name eq 'Finding description' or field_name eq 'Nature of finding' or " +
-          "field_name eq 'Issued to (person)' or " +
-          "field_name eq 'First extension approved?' or field_name eq 'Second extension agreed?'"
-        ),
+        fetchCustomFieldRows(forceRefresh),   // [r166] delta như Workflow; ↻ Refresh → nạp đầy
         rows => {
           rows.forEach(f => {
             if (!fMap[f.report_id]) fMap[f.report_id]={};
@@ -3999,6 +3987,93 @@ async function fetchWorkflowRows(forceFull){
   catch(e){ console.warn('[wf] không lưu được bản thô sau delta:', e && e.message); }
   console.log('%c[wf] DELTA — ' + ids.length + ' report đổi (' + changed.length + ' dòng), ' +
     Math.ceil(ids.length / WF_CHUNK) + ' request, tổng ' + rows.length + ' dòng trong ' +
+    ((Date.now()-t0)/1000).toFixed(1) + 's', 'color:#3FB950;font-weight:700');
+  return rows;
+}
+
+// ── [r166] CUSTOM FIELDS: ĐỒNG BỘ THEO THAY ĐỔI (delta) ─────
+// dwanalytics_report_form_section_field (16 field, ~10,7 MB) là request hay chết nhất khi
+// Galileo chậm: đo 21/09/2026 hai lượt liền 504 ở đúng 90s, trong khi query delta
+// `modified_date gt <mốc>` cùng lúc chỉ 4s (1,5 ngày = 71 dòng / 8 report). Cùng khuôn r148:
+// nạp đầy MỘT lần, lưu bản thô IndexedDB (không gắn APP_REV), sau đó chỉ kéo report có dòng đổi.
+// Đo 21/09/2026:
+//   · `modified_date` bắt được sửa giá trị (Target date tạo 12/06, modified 21/09) và là
+//     tập cha của `report_field_modified_date` (71 ⊇ 14 dòng) → dùng `modified_date`.
+//   · Lô (15 report_id) AND (16 field_name) → HTTP 400 vượt MaxNodeCount 100, cả lô 10 cũng vậy.
+//     Nên lô tải lại chỉ lọc report_id (15 report = 1.843 dòng ~20 KB) rồi lọc field ở CLIENT.
+//   · Query "phần đổi" GIỮ lọc 16 field (đo: 200, 4s) — bỏ lọc thì sửa field bất kỳ trên toàn
+//     Coruson cũng tính, dễ vượt 150 report và rơi về nạp đầy.
+//   · Mốc `$orderby=modified_date desc&$top=1` tốn 8–25s → chỉ nhánh nạp đầy hỏi, bắn song song.
+// Đơn vị merge là CẢ REPORT (bỏ hết dòng cũ của report đổi rồi kéo lại) → bắt được cả field bị
+// xoá khỏi report còn sống. Report bị xoá hẳn: dòng thừa vô hại (fMap chỉ đọc cho report có trong
+// summary). Thứ tự dòng của report tải lại có thể khác bản nạp đầy → field lặp (repeater) có thể
+// lấy giá trị "đầu tiên" khác; nạp đầy mỗi 7 ngày / ↻ đưa về như cũ.
+const CF_RAW_KEY    = 'cfRaw';
+const CF_MAX_AGE    = 7 * 24 * 60 * 60 * 1000;   // quá 7 ngày → nạp đầy
+const CF_CHUNK      = 15;                         // report_id / request (đo 21/09: 15 chạy, 16 field thêm vào thì 400)
+const CF_MAX_CHUNKS = 10;                         // >150 report đổi thì nạp đầy còn rẻ hơn
+const CF_FIELDS = ['Target date','Issue Date','Finding level','Repetitive','First extension agreed date',
+  'Second extension agreed date','Audit Ref. No','Request For Verification','Report Reference',
+  'Verification Result','Department','Finding description','Nature of finding','Issued to (person)',
+  'First extension approved?','Second extension agreed?'];
+const CF_FIELD_SET = new Set(CF_FIELDS);
+const CF_URL = G_URL + 'dwanalytics_report_form_section_field';
+
+async function fetchCustomFieldRows(forceFull){
+  const t0 = Date.now();
+  let cached = null;
+  if(!forceFull){
+    try{ cached = await idbGet(CF_RAW_KEY); }catch(e){ console.warn('[cf] đọc cache thô lỗi:', e && e.message); }
+  }
+
+  const fullLoad = async (why) => {
+    const wmP = fetchWithRetry(CF_URL + '?$select=modified_date&$orderby=modified_date desc&$top=1')
+      .then(j => { const v = j && j.value && j.value[0] && j.value[0].modified_date; if(!v) throw new Error('không đọc được mốc'); return v; });
+    wmP.catch(()=>{});
+    const rows = await fetchAll(CF_URL + '?$select=report_id,field_name,text_value&$filter=' +
+      encodeURIComponent(CF_FIELDS.map(f => "field_name eq '" + f + "'").join(' or ')), true);
+    try{ await idbSet(CF_RAW_KEY, {syncedAt: await wmP, fetchedAt: Date.now(), rows}); }
+    catch(e){ console.warn('[cf] không lưu được bản thô (' + (e && e.name) + ') — lượt sau lại phải nạp đầy:', e && e.message); }
+    console.log('%c[cf] NẠP ĐẦY (' + why + ') — ' + rows.length + ' dòng trong ' +
+      ((Date.now()-t0)/1000).toFixed(1) + 's', 'color:#D29922');
+    return rows;
+  };
+
+  if(forceFull)                                                  return fullLoad('bấm ↻ Refresh');
+  if(!cached || !Array.isArray(cached.rows) || !cached.syncedAt) return fullLoad('chưa có bản thô');
+  if(Date.now() - (cached.fetchedAt || 0) > CF_MAX_AGE)          return fullLoad('bản thô quá 7 ngày');
+
+  let changed;
+  try{
+    changed = await fetchAll(CF_URL + '?$select=report_id,modified_date&$filter=' +
+      encodeURIComponent('modified_date gt ' + cached.syncedAt + ' and (' + CF_FIELDS.map(f => "field_name eq '" + f + "'").join(' or ') + ')'), true);
+  }catch(e){
+    console.warn('[cf] hỏi phần thay đổi lỗi, lùi về nạp đầy:', e && e.message);
+    return fullLoad('hỏi delta lỗi');
+  }
+
+  const ids = [...new Set(changed.map(r => r.report_id).filter(Boolean))];
+  if(ids.length > CF_MAX_CHUNKS * CF_CHUNK) return fullLoad(ids.length + ' report đổi, nạp đầy rẻ hơn');
+
+  let fresh = [];
+  if(ids.length){
+    const chunks = [];
+    for(let i = 0; i < ids.length; i += CF_CHUNK) chunks.push(ids.slice(i, i + CF_CHUNK));
+    // GUID trong $filter KHÔNG bọc nháy (invariant Galileo). Field lọc ở client (xem đầu khối).
+    const parts = await Promise.all(chunks.map(c => fetchAll(
+      CF_URL + '?$select=report_id,field_name,text_value&$filter=' +
+      encodeURIComponent('(' + c.map(id => 'report_id eq ' + id).join(' or ') + ')'), true)));
+    fresh = parts.flat().filter(r => CF_FIELD_SET.has(r.field_name));
+  }
+
+  const dropIds = new Set(ids);
+  const rows = cached.rows.filter(r => !dropIds.has(r.report_id)).concat(fresh);
+  const newWm = changed.reduce((m, r) =>
+    (r.modified_date && r.modified_date > m) ? r.modified_date : m, cached.syncedAt);
+  try{ await idbSet(CF_RAW_KEY, {syncedAt: newWm, fetchedAt: cached.fetchedAt || Date.now(), rows}); }
+  catch(e){ console.warn('[cf] không lưu được bản thô sau delta:', e && e.message); }
+  console.log('%c[cf] DELTA — ' + ids.length + ' report đổi (' + changed.length + ' dòng), ' +
+    Math.ceil(ids.length / CF_CHUNK) + ' request, tổng ' + rows.length + ' dòng trong ' +
     ((Date.now()-t0)/1000).toFixed(1) + 's', 'color:#3FB950;font-weight:700');
   return rows;
 }
