@@ -10,7 +10,7 @@
 - **r163** All Forms Detail chỉ còn 15 form (`AF_FORMS`/`AF_FORM_SET`), loại PAVOI/MCAR/CAR/CMR CAR/AMO ECAR/1. OSR/MOSR cả ở chế độ All Forms.
 - **r164** page mới `OSR / MOSR` (`page-osrmosr`, `loadOsr`) — 1. OSR + MOSR của **2 nhánh AMO + MQA : QA AMO** (30 UUID từ cây OU, lọc ở client vì `$filter` 30 UUID vượt trần 100 node). Probe 21/09: 1.272 report · Open 57.
 - Kiểm: `node --check` 5/5; chạy thật code trên dữ liệu probe 11/11 PASS. **Chưa xem trên trình duyệt.**
-- **Bị chặn commit:** pre-commit doc-sync đòi header `obsidian-mind/reference/qa-amo-dashboard/QA_AMO_Dashboard.md` = r164 — phải sửa từ phiên mở trong obsidian-mind.
+- ✅ **Hết chặn (21/09):** header `obsidian-mind/reference/qa-amo-dashboard/QA_AMO_Dashboard.md` đã lên `2026.09.21-r164` + §8 có r163/r164. Việc tiếp: tách 2 commit r163 / r164 (index.html, PROJECT_TECH_SPEC.md, CLAUDE.md), hỏi Eric trước khi push.
 - Sau đó: tách 2 commit (r163 = chỉ phần AF_FORMS + APP_REV r163; rồi r164) → hỏi Eric trước khi push → kiểm live.
 - Hỏi Eric: có gộp form cũ `OSR` vào page r164 không (con số 6.277 là toàn công ty, chưa đo trong phạm vi AMO + QA AMO).
 
