@@ -2516,7 +2516,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.21-r164';
+const APP_REV = '2026.09.21-r165';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2982,7 +2982,7 @@ function initApp() {
   }
   // [r145] cacheLoad() là async (IndexedDB). Dùng .then() chứ KHÔNG await: giữ initApp()
   // đồng bộ như cũ để startAutoRefresh()/startKiosk() chạy ngay, không chờ đĩa.
-  cacheLoad().then(ok => { cacheStatsRecord(ok); if(!ok) loadData(); })
+  cacheLoad().then(ok => { cacheStatsRecord(ok); if(ok === 'stale') loadData(false, {background:true}); else if(!ok) loadData(); })
              .catch(() => { cacheStatsRecord(false); loadData(); });
   startAutoRefresh();
   startKiosk();          // [r137] no-op khi URL không có ?kiosk=
@@ -3091,6 +3091,9 @@ const CACHE_STATS_KEY = 'stats';
 let cacheStats      = null;   // {opens, hits, misses, recent:['H'|'M'…], lastReason}
 let cacheMissReason = null;   // vì sao LƯỢT MỞ NÀY không dùng được cache
 let cacheLastTs     = null;   // ts của bản cache đang phục vụ, để vẽ lại tooltip
+// [r165] Lượt loadData đang chạy NGẦM (đang hiện bản cache cũ): không bật overlay, chỉ thay
+// dữ liệu khi đủ 6 nguồn. Xem cacheLoad() nhánh 'stale' và loadData(…, {background:true}).
+let bgLoad = false;
 
 function cacheStatsSuffix(){
   if(!cacheStats || !cacheStats.opens) return '';
@@ -3099,16 +3102,19 @@ function cacheStatsSuffix(){
 
 // Gọi ĐÚNG MỘT LẦN mỗi lượt mở trang (từ initApp), KHÔNG gọi ở mỗi lần Refresh tay:
 // đếm "lượt mở trang" mới trả lời được câu "mở lên có dùng được cache không".
+// [r165] hit = true | 'stale' | false. 'stale' = hiện bản cũ quá 4 giờ + nạp ngầm → ghi 'S',
+// KHÔNG tính là hit (cache không còn tươi) nhưng cũng không phải lượt người xem phải chờ.
 async function cacheStatsRecord(hit){
   try{
     const s = (await idbGet(CACHE_STATS_KEY)) || {opens:0, hits:0, misses:0, recent:[], lastReason:null};
+    const stale = hit === 'stale';
     s.opens++;
-    if(hit) s.hits++; else s.misses++;
-    s.recent     = (s.recent || []).concat(hit ? 'H' : 'M').slice(-20);
-    s.lastReason = hit ? null : cacheMissReason;
+    if(stale) s.stale = (s.stale || 0) + 1; else if(hit) s.hits++; else s.misses++;
+    s.recent     = (s.recent || []).concat(stale ? 'S' : hit ? 'H' : 'M').slice(-20);
+    s.lastReason = (hit && !stale) ? null : cacheMissReason;
     cacheStats = s;
     await idbSet(CACHE_STATS_KEY, s);
-    console.log('%c[cache] ' + (hit ? 'HIT' : 'MISS — ' + (cacheMissReason || 'không rõ')) +
+    console.log('%c[cache] ' + (stale ? 'STALE — ' + cacheMissReason : hit ? 'HIT' : 'MISS — ' + (cacheMissReason || 'không rõ')) +
       ' · ' + s.hits + '/' + s.opens + ' lượt mở dùng được cache · gần đây: ' + s.recent.join(''),
       'color:' + (hit ? '#3FB950' : '#D29922') + ';font-weight:700');
     if(cacheLastTs) updateCacheAge(cacheLastTs);   // gắn tỉ lệ hit vào tooltip
@@ -3185,7 +3191,7 @@ function startAutoRefresh() {
     if (Date.now() < nextAutoRefresh) return;
     console.log('[autoRefresh] đủ 12h → loadData(true)');
     nextAutoRefresh = Date.now() + AUTO_REFRESH_MS;
-    loadData(true);                        // fetch lại từ Galileo, KHÔNG reload, KHÔNG chạm auth
+    loadData(true, {background:true});     // fetch lại từ Galileo, KHÔNG reload, KHÔNG chạm auth; [r165] ngầm, không che màn LED
   }, AUTO_REFRESH_CHECK_MS);
 }
 
@@ -3299,13 +3305,20 @@ async function cacheLoad() {
     // khác hẳn nhau về mức nghiêm trọng, gộp chung thành một chữ "miss" là mất thông tin.
     if (!c) { cacheMissReason = 'chưa có cache nào được ghi'; return false; }
     if (!c.ts || !c.a)                      { cacheMissReason = 'bản cache hỏng cấu trúc'; return false; }
-    if (Date.now() - c.ts > CACHE_TTL)      { cacheMissReason = 'quá hạn 4 giờ'; return false; }
     // Vứt cache khi lên rev mới (deploy đổi logic/field) → tránh phục vụ data cũ
     // tính theo code cũ. Vd r126 nới filter Audit Plan nhưng cache r125 vẫn thiếu audit.
+    // [r165] Xét rev TRƯỚC hạn 4 giờ: bản cũ của rev khác không được phục vụ kể cả kiểu 'stale'.
     if (c.rev !== APP_REV) {
       cacheMissReason = 'lên rev mới (' + c.rev + ' → ' + APP_REV + ')';
       idbDel(CACHE_KEY).catch(()=>{}); return false;
     }
+    // [r165] QUÁ 4 GIỜ → vẫn HIỆN NGAY bản cũ, rồi initApp() nạp mới NGẦM (stale-while-revalidate).
+    // Đo 21/09/2026: Galileo chậm theo đợt — Custom fields 504 ở 90s hai lượt liền, Audit 22–90s,
+    // cùng lúc curl tới Cloudflare 6,8 MB/s. Một lượt nạp nguội khi đó mất ~6 phút rồi còn báo
+    // "Could not load data", trong khi 5/5 lượt mở gần nhất đều trượt cache vì 'quá hạn 4 giờ'.
+    // Người xem thấy ngay số của lần trước (có ghi tuổi) thay vì màn che quay vô hạn.
+    const stale = Date.now() - c.ts > CACHE_TTL;
+    if (stale) cacheMissReason = 'quá hạn 4 giờ — hiện bản cũ, nạp mới ngầm';
     allData   = c.a;
     auditData = c.b || [];
     if (Array.isArray(c.ou) && c.ou.length) ORG_UNIT_IDS = c.ou;   // [r143] phiên mở từ cache không chạy loadData
@@ -3320,6 +3333,10 @@ async function cacheLoad() {
     g('recCount').textContent = allData.length;
     updateCacheAge(c.ts);
     const age = Math.round((Date.now()-c.ts)/60000);
+    if (stale) {
+      toast(`Showing data from ${ageLabel(c.ts)} — refreshing from Galileo in the background…`,'info');
+      return 'stale';
+    }
     toast(`Cache (${age < 60 ? age+'m' : Math.floor(age/60)+'h'} ago) — ${allData.length} reports, ${auditData.length} audits · Press ↻ to refresh`,'ok');
     return true;
   } catch(e) {
@@ -3362,13 +3379,20 @@ async function cacheSave() {
   }
 }
 
+// [r165] Tuổi cache dạng chữ cho toast ("5h 12m ago").
+function ageLabel(ts) {
+  const m = Math.round((Date.now()-ts)/60000);
+  return m < 60 ? m+'m ago' : Math.floor(m/60)+'h'+(m%60 ? ' '+(m%60)+'m' : '')+' ago';
+}
+
 function updateCacheAge(ts) {
   if (ts) cacheLastTs = ts;                      // [r146] nhớ lại để vẽ lại được tooltip
   const el = g('cacheAge');
   if (!el || !cacheLastTs) return;
   const age = Math.round((Date.now()-cacheLastTs)/60000);
   const nextH = Math.ceil((CACHE_TTL - (Date.now()-cacheLastTs)) / 3600000);
-  el.textContent = age < 2 ? 'Just loaded' : age < 60 ? `${age}m ago` : `${Math.floor(age/60)}h${age%60?age%60+'m':''} ago`;
+  el.textContent = (age < 2 ? 'Just loaded' : age < 60 ? `${age}m ago` : `${Math.floor(age/60)}h${age%60?age%60+'m':''} ago`)
+                 + (bgLoad ? ' · refreshing…' : '');   // [r165]
   el.title = `Cache expires in ~${nextH}h — click ↻ Refresh to reload now` + cacheStatsSuffix();
 }
 
@@ -3380,7 +3404,7 @@ function updateCacheAge(ts) {
 // và ghi vào loadFailures để cảnh báo nổi lên UI thay vì âm thầm thiếu.
 async function loadOrgUnitIds(){
   try{
-    setOv(true,'Loading org unit tree...','',8);
+    lov(true,'Loading org unit tree...','',8);
     const h = await fetchAll(G_URL + 'dwreporting_organisational_unit_hierarchy' +
       '?$select=organisational_unit_id,name,parent_id,is_archived', true);
     const byParent = {};
@@ -3404,16 +3428,25 @@ async function loadOrgUnitIds(){
 }
 
 // ── DATA LOADING ─────────────────────────────────────────────
-async function loadData(forceRefresh=false) {
-  if(isLoading){toast('Loading data, please wait...','info');return;}
-  isLoading=true;
-  loadFailures = [];                              // [r141] reset mỗi lượt load
+// [r165] Overlay của loadData: im lặng khi nạp ngầm (bgLoad) — màn hình đang hiện bản cache cũ.
+function lov(show, txt, detail, pct){ if(!bgLoad) setOv(show, txt, detail, pct); }
+// Kho dữ liệu lazy phụ thuộc allData. Nạp thường: reset ngay đầu lượt (như trước r165).
+// Nạp ngầm: reset lúc THAY dữ liệu, để trang đang xem không mất KPI 7/RFI giữa chừng.
+function resetLazyStores(){
   pavoiRfiLoaded = false; pavoiRfiMap = {}; pavoiRfiDone = new Set();   // reset RFI để Refresh kéo lại bản mới
   kpi7Loaded = false; kpi7Cnt = {}; kpi7Ver = {}; kpi7Done = new Set();   // [r142] reset kho KPI 7 (data mới → tính lại)
   try{ localStorage.removeItem(KPI7_CACHE_KEY); }catch{}
   eisLoaded=false; eisCAMap={}; eisDescMap={};   // reset EIS per-CA cache để Refresh kéo lại
   qcsLoaded=false; qcsMap={};                     // reset QC Spot Check cache để Refresh kéo lại
-  setOv(true,'Connecting to Galileo...','',5);
+}
+async function loadData(forceRefresh=false, opts={}) {
+  if(isLoading){toast('Loading data, please wait...','info');return;}
+  isLoading=true;
+  bgLoad = !!opts.background && allData.length > 0;   // [r165] chỉ ngầm khi đã có dữ liệu để hiện
+  loadFailures = [];                              // [r141] reset mỗi lượt load
+  if(!bgLoad) resetLazyStores();
+  else updateCacheAge(cacheLastTs);               // gắn "· refreshing…" vào nhãn tuổi cache
+  lov(true,'Connecting to Galileo...','',5);
   try {
 
     // ── NẠP SONG SONG ───────────────────────────────────
@@ -3431,7 +3464,7 @@ async function loadData(forceRefresh=false) {
     let parDone = 0;
     const parStep = label => {
       parDone++;
-      setOv(true, `[${parDone}/${PAR_N}] ${label}`, `${parDone}/${PAR_N} requests done`,
+      lov(true, `[${parDone}/${PAR_N}] ${label}`, `${parDone}/${PAR_N} requests done`,
             5 + Math.round(parDone / PAR_N * 75));
     };
     // par() dựng map NGAY trong onRows để nhả mảng thô cho GC (workflow 22 MB,
@@ -3571,8 +3604,17 @@ async function loadData(forceRefresh=false) {
     // đúng tên nhóm khi owner là group. Merge vào userMap (user_id/group_id đều UUID, không đụng nhau).
     grpRaw.forEach(gr => { if (gr.group_id && !userMap[gr.group_id]) userMap[gr.group_id] = gr.name || null; });
 
+    // [r165] Nạp ngầm mà thiếu nguồn → GIỮ NGUYÊN bản cũ đầy đủ đang hiện, không thay bằng bản
+    // khuyết (mất Target date/Overdue/KPI 7 như lượt 21/09/2026). Chưa đụng allData/auditData.
+    if (bgLoad && loadFailures.length) {
+      console.warn('[loadData] nạp ngầm thiếu', loadFailures.length, 'nguồn — giữ bản cache cũ:', loadFailures);
+      toast(`Background refresh incomplete (${loadFailures.length} source(s) failed) — still showing data from ${ageLabel(cacheLastTs)}. Press ↻ to retry.`,'err');
+      return;
+    }
+    if (bgLoad) resetLazyStores();
+
     // BUILD FINAL DATASET
-    setOv(true,'Processing data...','',80);
+    lov(true,'Processing data...','',80);
     allData = summary.map(r => {
       const f  = fMap[r.report_id] || {};
       const wf = wfMap[r.report_id] || null;
@@ -3624,7 +3666,7 @@ async function loadData(forceRefresh=false) {
     });
 
     // 4. AUDIT PLAN — auRaw đã nạp song song ở khối trên, đây chỉ còn xử lý
-    setOv(true,'Processing audit plan...','',90);
+    lov(true,'Processing audit plan...','',90);
     try {
       // Lấy danh sách audit_id có trong QA AMO reports
       const auditIdSet = new Set(allData.map(r=>r.audit_id).filter(Boolean));
@@ -3663,7 +3705,7 @@ async function loadData(forceRefresh=false) {
           const auWfRaw = await fetchAll(
             G_URL + 'dwreporting_audit_workflow' +
             '?$select=audit_id,stage_id,stage_title,stage_status,stage_owner,' +
-            'stage_target_date,stage_started_date,stage_completed_date'
+            'stage_target_date,stage_started_date,stage_completed_date', bgLoad   // [r165]
           );
         // Group by audit_id → dedup by stage_id (giữ record mới nhất stage_completed_date)
         // Nếu stage_id null (thường xảy ra với stages NotStarted/chưa assign), dùng stage_title làm key
@@ -3767,13 +3809,14 @@ async function loadData(forceRefresh=false) {
       toast(`Loaded ${allData.length} reports, ${auditData.length} audits`,'ok');
       cacheSave();
     }
-    setOv(false);
+    lov(false);
 
   } catch(e) {
     console.error(e);
-    toast('Error loading data: '+e.message,'err');
-    showLoadError(e.message);
-  } finally { isLoading=false; }
+    // [r165] Nạp ngầm hỏng hẳn (vd Report summary hết 3 lượt) → vẫn giữ bản cũ, không che màn hình.
+    if (bgLoad) toast(`Background refresh failed (${e.message}) — still showing data from ${ageLabel(cacheLastTs)}. Press ↻ to retry.`,'err');
+    else { toast('Error loading data: '+e.message,'err'); showLoadError(e.message); }
+  } finally { isLoading=false; if(bgLoad){ bgLoad=false; updateCacheAge(cacheLastTs); } }
 }
 
 // Thời gian chờ MỘT request. Trần THẬT nằm ở Worker galileo-proxy (worker.js L52) — proxy
@@ -4175,7 +4218,7 @@ function runSelfChecks(){
     //    mà nếu có từ tháng 5 thì đã không mất 3 tháng: hit 0/N là nhìn phát thấy ngay.
     {
       const rc = (cacheStats && cacheStats.recent) ? cacheStats.recent : [];
-      if(rc.length >= 5 && !rc.slice(-5).includes('H'))
+      if(rc.length >= 5 && !rc.slice(-5).some(x => x === 'H' || x === 'S'))   // [r165] 'S' = không phải chờ
         warn.push('Cache has not been hit in the last 5 page opens (' + cacheStats.hits + '/' +
           cacheStats.opens + ' overall · last reason: ' + (cacheStats.lastReason || 'unknown') +
           ') — every open is reloading everything from Galileo instead of using the 4-hour cache');
