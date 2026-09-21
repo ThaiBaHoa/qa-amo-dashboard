@@ -461,7 +461,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.09.21-r163
+Rev current: 2026.09.21-r164
 
 ORG_UNIT_IDS          ← main pages: 'QA AMO' + ALL its sub-units, resolved at load
                          from dwreporting_organisational_unit_hierarchy (r143).

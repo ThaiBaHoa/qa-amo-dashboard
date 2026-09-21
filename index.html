@@ -551,6 +551,7 @@ body.kiosk .mob-menu{display:none!important}
         <button class="nav-item" onclick="showAuditPlanPage(this)"><span class="nav-ic" data-ic="calendar"></span>Audit Plan</button>
         <div class="nav-sec" style="margin-top:6px">Detail</div>
         <button class="nav-item" onclick="showPage('allforms',this)"><span class="nav-ic" data-ic="list"></span>All Forms</button>
+        <button class="nav-item" onclick="showPage('osrmosr',this)"><span class="nav-ic" data-ic="shield"></span>OSR / MOSR</button>
         <button class="nav-item" onclick="showPage('pavoi',this)"><span class="nav-ic" data-ic="doc"></span>PAVOI Detail</button>
         <button class="nav-item" onclick="showPage('cmrcar',this)"><span class="nav-ic" data-ic="shield"></span>CMR-CAR</button>
         <button class="nav-item" onclick="showPage('ecar',this)"><span class="nav-ic" data-ic="shield"></span>ECAR</button>
@@ -687,6 +688,43 @@ body.kiosk .mob-menu{display:none!important}
         <!-- SAFETY — MSAG Report Status -->
         <div class="page" id="page-safety">
           <div id="safetyHost" style="overflow-x:auto;padding:6px 2px"></div>
+        </div>
+
+        <!-- OSR / MOSR — nhánh AMO + MQA : QA AMO (r164) -->
+        <div class="page" id="page-osrmosr">
+          <div class="tbl-card">
+            <div class="tbl-bar">
+              <div><div class="tbl-title">OSR / MOSR — AMO + QA AMO</div><div class="tbl-count" id="osrCnt">—</div></div>
+              <button class="pill on" onclick="setOsr('all',this)">All</button>
+              <button class="pill" onclick="setOsr('Open',this)">Open</button>
+              <button class="pill" onclick="setOsr('Closed',this)">Closed</button>
+              <select class="sel" id="osrFormF" onchange="TS.osr.page=1;renderOsr()">
+                <option value="">1. OSR + MOSR</option>
+                <option value="1. OSR">1. OSR</option>
+                <option value="MOSR">MOSR</option>
+              </select>
+              <select class="sel" id="osrOuF" onchange="TS.osr.page=1;renderOsr()"><option value="">All org units</option></select>
+              <div class="ymulti" id="osrYearF"></div>
+              <div class="srch-wrap"><span class="srch-icon">🔍</span>
+                <input class="srch" id="osrSrch" placeholder="Search..." oninput="dRenderOsr()">
+              </div>
+              <button class="sel" style="cursor:pointer" onclick="osrLoaded=false;loadOsr()" title="Reload from Coruson">↻ Refresh</button>
+            </div>
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr>
+                  <th onclick="osrSort('report_number')">Report No. ↕</th>
+                  <th onclick="osrSort('report_title')">Form ↕</th>
+                  <th onclick="osrSort('report_status')">Status ↕</th>
+                  <th onclick="osrSort('raised_date')">Raised ↕</th>
+                  <th onclick="osrSort('org_unit_name')">Org unit ↕</th>
+                  <th onclick="osrSort('modified_date')">Last modified ↕</th>
+                </tr></thead>
+                <tbody id="osrBody"></tbody>
+              </table>
+            </div>
+            <div class="tbl-foot"><span id="osrInfo">—</span><div class="pg-btns" id="osrPg"></div></div>
+          </div>
         </div>
 
         <!-- CORUSON REPORT STATUS — EIS & F-088 -->
@@ -2478,7 +2516,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.21-r163';
+const APP_REV = '2026.09.21-r164';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2763,6 +2801,7 @@ const TS = {
   ecar:   { page:1, sort:'raised_date', asc:false, sf:'all', ac:'all', yr:'', qrs:[], issuedBy:'', srch:'' },
   amoecar:{ page:1, sort:'raised_date', asc:false },
   mcar:   { page:1, sort:'raised_date', asc:false },
+  osr:    { page:1, sort:'raised_date', asc:false, sf:'all' },
 };
 
 // ── AUTH ─────────────────────────────────────────────────────
@@ -8796,7 +8835,7 @@ async function deleteUser(id,email,role){
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────
-const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',spi:'SPI — Safety Performance Indicators',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',ecar:'ECAR Detail',amoecar:'AMO-ECAR',mcar:'MCAR',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management',querybuilder:'Query Builder',mydashboard:'My Dashboard',kpi2:'KPI 2 — Early Detection',safety:'Safety — MSAG Report Status (OSR / MOSR)',rptstatus:'Report Status on Coruson — EIS & F-088'};
+const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',spi:'SPI — Safety Performance Indicators',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',ecar:'ECAR Detail',amoecar:'AMO-ECAR',mcar:'MCAR',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management',querybuilder:'Query Builder',mydashboard:'My Dashboard',kpi2:'KPI 2 — Early Detection',safety:'Safety — MSAG Report Status (OSR / MOSR)',osrmosr:'OSR / MOSR — AMO + QA AMO',rptstatus:'Report Status on Coruson — EIS & F-088'};
 // ── SAFETY — MSAG Report Status (OSR / MOSR) ─────────────────
 // Owner ∈ nhóm MSAG = report thuộc ban MQA (MOSR mặc nhiên thuộc MQA;
 // OSR là báo cáo chung nên phải lọc theo owner). Mỗi report 1 status →
@@ -8891,6 +8930,86 @@ function buildSafetyTable(d){
       </table>
     </div>
   </div>`;
+}
+
+// ── OSR / MOSR — NHÁNH AMO + MQA : QA AMO (r164) ─────────────
+// Eric chốt 21/09/2026: OSR và MOSR có page riêng, phạm vi = 2 nhánh con của VietjetAir trên
+// Coruson: "MQA : QA AMO" (5 đơn vị) + "AMO" (25 đơn vị: Line/Base Maintenance, Workshop, Store,
+// TPS, AMO Tech Training + trạm/shop con), gồm mọi cấp con chưa archive — rộng hơn orgUnitFilter()
+// (chỉ QA AMO). Nạp riêng, lazy khi mở page, không đụng allData.
+// Coruson có 2 đơn vị tên 'AMO' → khoá bằng UUID gốc nhánh, KHÔNG bằng tên.
+// Lọc OU ở CLIENT: 30 UUID đưa vào $filter → HTTP 400 "node count limit of '100'" (đo 21/09/2026).
+// Server chỉ lọc form: 20.398 dòng ~1,1 MB, ~4s (Galileo đôi lúc 504 rồi lượt sau chạy — fetchWithRetry
+// lo). Probe 21/09/2026 trong phạm vi: 1.272 report (1. OSR 783 · MOSR 489), Open 57 · Closed 1.215;
+// Line Maintenance 1.060 · QA AMO 188 · Workshop 16 · Store 8.
+// Chỉ report_status (Open/Closed), KHÔNG suy Overdue: tính Target date cần custom field + workflow.
+// Page Safety (owner ∈ nhóm MSAG) giữ nguyên.
+const OSR_TITLES = ['1. OSR','MOSR'];
+const OSR_ROOT_IDS = [ORG_UNIT_ID, '31d36b1e-ee23-491e-b0eb-598ab56b4a86'];   // MQA : QA AMO · AMO (con của VietjetAir)
+let osrLoaded=false, osrRows=[];
+const dRenderOsr=debounce(renderOsr,300);
+async function loadOsr(){
+  setOv(true,'Loading OSR / MOSR (AMO + QA AMO)...','');
+  try{
+    // Cây OU → tập UUID của 2 nhánh (cùng cách walk với loadOrgUnitIds). Lỗi ở đây phải NỔI lên,
+    // không lùi về 2 gốc — thiếu hết trạm Line Maintenance mà trông như bình thường.
+    const h=await fetchAll(G_URL+'dwreporting_organisational_unit_hierarchy?$select=organisational_unit_id,parent_id,is_archived', true);
+    const byParent={}; h.forEach(r=>(byParent[r.parent_id] ||= []).push(r));
+    const ouSet=new Set(OSR_ROOT_IDS);
+    const walk=id=>(byParent[id]||[]).forEach(c=>{
+      const cid=c.organisational_unit_id;
+      if(c.is_archived || !cid || ouSet.has(cid)) return;
+      ouSet.add(cid); walk(cid);
+    });
+    OSR_ROOT_IDS.forEach(walk);
+    const flt='valid_to eq null and ('+OSR_TITLES.map(t=>"report_title eq '"+t+"'").join(' or ')+')';
+    const raw=await fetchAll(G_URL+'dwreporting_report_summary?$select=report_id,report_title,report_number,report_status,org_unit_id,org_unit_name,raised_date,modified_date'
+      +'&$filter='+encodeURIComponent(flt), true);
+    // DEDUP như loadData: 1 dòng/report_id, giữ modified_date mới nhất, bỏ dòng không có report_number
+    const m={};
+    raw.forEach(r=>{
+      if(!r.report_id || !(r.report_number||'').trim() || !ouSet.has(r.org_unit_id)) return;
+      const ex=m[r.report_id];
+      if(!ex || new Date(r.modified_date)>new Date(ex.modified_date)) m[r.report_id]=r;
+    });
+    osrRows=Object.values(m).map(r=>({...r, raised_year: r.raised_date ? new Date(r.raised_date).getFullYear() : null}));
+    const years=[...new Set(osrRows.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
+    initYearMulti('osrYearF', years, {onChange:()=>{TS.osr.page=1;renderOsr();}});
+    const ous=[...new Set(osrRows.map(r=>r.org_unit_name).filter(Boolean))].sort();
+    const ouEl=g('osrOuF'), keep=ouEl.value;
+    ouEl.innerHTML='<option value="">All org units</option>'+ous.map(o=>`<option>${esc(o)}</option>`).join('');
+    if(ous.includes(keep)) ouEl.value=keep;
+    osrLoaded=true;
+  }catch(e){ console.error('OSR/MOSR load error:',e); toast('Error loading OSR / MOSR: '+e.message,'err'); }
+  setOv(false);
+  renderOsr();
+}
+function setOsr(sf,btn){
+  TS.osr.sf=sf; TS.osr.page=1;
+  document.querySelectorAll('#page-osrmosr .pill').forEach(p=>p.classList.remove('on'));
+  btn.classList.add('on'); renderOsr();
+}
+function osrSort(c){const t=TS.osr;if(t.sort===c)t.asc=!t.asc;else{t.sort=c;t.asc=true;}t.page=1;renderOsr();}
+function renderOsr(){
+  const ts=TS.osr, ff=g('osrFormF')?.value||'', ou=g('osrOuF')?.value||'', srch=(g('osrSrch')?.value||'').toLowerCase();
+  let data=osrRows.filter(r=>{
+    if(ts.sf!=='all' && r.report_status!==ts.sf) return false;
+    if(ff && r.report_title!==ff) return false;
+    if(ou && r.org_unit_name!==ou) return false;
+    if(!ymHas('osrYearF', r.raised_year)) return false;
+    if(srch && ![r.report_number,r.report_title,r.org_unit_name,r.report_status].join(' ').toLowerCase().includes(srch)) return false;
+    return true;
+  });
+  data=sortD(data,ts.sort,ts.asc);
+  renderPaged('osrBody','osrInfo','osrPg','osrCnt',data,ts,r=>`
+    <tr>
+      <td style="white-space:nowrap"><b>${esc(r.report_number)||'—'}</b></td>
+      <td style="white-space:nowrap">${esc(r.report_title)}</td>
+      <td style="white-space:nowrap">${sBadge(r.report_status)}</td>
+      <td style="font-size:11px;color:var(--muted);white-space:nowrap">${fd(r.raised_date)}</td>
+      <td style="font-size:11px;white-space:nowrap">${esc(r.org_unit_name)||'—'}</td>
+      <td style="font-size:11px;color:var(--muted);white-space:nowrap">${fd(r.modified_date)}</td>
+    </tr>`);
 }
 
 // ── CORUSON REPORT STATUS — EIS & F-088 (r131) ───────────────
@@ -9298,6 +9417,7 @@ function showPage(name,btn){
   if(name==='overdue'){ renderOv(); }
   if(name==='pavoi'){ if(!pavoiRfiLoaded) loadPavoiRfi(); else renderPavoi(); }
   if(name==='safety'){ if(!safetyLoaded) loadSafety(); else renderSafety(); }
+  if(name==='osrmosr'){ if(!osrLoaded) loadOsr(); else renderOsr(); }
   if(name==='rptstatus'){ if(!rsLoaded) loadRptStatus(); else renderRptStatus(); }
   if(name==='overview'){
     // [r150] Người dùng có thể đang đứng ở trang khác lúc loadData xong → cổng ở renderAll()
