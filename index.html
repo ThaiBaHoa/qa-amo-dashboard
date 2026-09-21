@@ -2478,7 +2478,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.10-r162';
+const APP_REV = '2026.09.21-r163';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -4265,7 +4265,9 @@ document.addEventListener('click', ()=>{ document.querySelectorAll('.ym-pop').fo
 function populateFilters() {
   const forms=[...new Set(allData.map(r=>r.report_title).filter(Boolean))].sort();
   const fOpts='<option value="">All Forms</option>'+forms.map(f=>`<option>${f}</option>`).join('');
-  ['openFormF','ovFormF','afFormF'].forEach(id=>{const el=g(id);if(el)el.innerHTML=fOpts;});
+  ['openFormF','ovFormF'].forEach(id=>{const el=g(id);if(el)el.innerHTML=fOpts;});
+  // [r163] All Forms Detail chỉ liệt kê AF_FORMS — PAVOI/MCAR/CAR/CMR CAR/AMO ECAR có page riêng, OSR/MOSR sang page riêng.
+  const afEl=g('afFormF'); if(afEl) afEl.innerHTML='<option value="">All Forms</option>'+AF_FORMS.map(f=>`<option>${f}</option>`).join('');
 
   // Multi-year filters (allData-based). Overview + KPI default to the current year.
   const years=[...new Set(allData.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
@@ -5001,6 +5003,16 @@ function buildOvCharts(base) {
 }
 
 // ── TABLE: ALL FORMS ──────────────────────────────────────────
+// [r163] Danh mục form của trang All Forms Detail (Eric chốt 21/09/2026). Form ngoài danh sách
+// (PAVOI, MCAR, CAR, CMR CAR, AMO ECAR — đã có page riêng; 1. OSR, MOSR — page OSR/MOSR) bị loại
+// khỏi cả dropdown lẫn chế độ "All Forms". Tên phải khớp đúng report_title trên Coruson.
+const AF_FORMS = [
+  'A-CHECK, C-CHECK CHECKLIST FOR BASE MAINTENANCE','AMO - HIRA','AMO - SPI',
+  'Aircraft Inspection/Spot Check','Confidential MOSR','INTERNAL MOR','MCCF','MOR',
+  'MQA Event Investigation Report','MQA Event Investigation Summary','MQA Event Report F-088',
+  'MQA Investigation Report','QC PI Report','QC Spot Check Report','Surveillance Report',
+];
+const AF_FORM_SET = new Set(AF_FORMS);
 function setAF(sf,btn){
   TS.af.sf=sf;TS.af.page=1;
   document.querySelectorAll('#page-allforms .pill').forEach(p=>p.classList.remove('on'));
@@ -5495,6 +5507,7 @@ function renderAF() {
     : allData;
 
   let data=rows.filter(r=>{
+    if(!AF_FORM_SET.has(r.report_title)) return false;   // [r163]
     if(ts.sf!=='all' && r.semantic_status!==ts.sf) return false;
     if(ff && r.report_title!==ff) return false;
     if(!ymHas('afYearF', r.raised_year)) return false;
