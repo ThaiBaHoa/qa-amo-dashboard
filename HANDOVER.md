@@ -5,7 +5,7 @@
 
 ---
 
-## ✅ r163 + r164 ĐÃ PUSH 21/09/2026 — live đã phục vụ r164, CHƯA KIỂM BẰNG MẮT
+## ✅ r163 + r164 ĐÃ PUSH & ĐÃ KIỂM TRÊN LIVE 21/09/2026
 
 ```
 origin/main = main = e1c4663 (r164) · 691ac25 (r163) · trước đó 94a567a (r162)
@@ -16,7 +16,9 @@ vault đã ở r164 nên guard so rev từng commit sẽ chặn; r164 chạy đ�
 - **r163** All Forms Detail chỉ còn 15 form (`AF_FORMS`/`AF_FORM_SET`), loại PAVOI/MCAR/CAR/CMR CAR/AMO ECAR/1. OSR/MOSR cả ở chế độ All Forms.
 - **r164** page `OSR / MOSR` (`page-osrmosr`, `loadOsr`) — 1. OSR + MOSR của **2 nhánh AMO + MQA : QA AMO** (30 UUID từ cây OU, lọc ở client vì `$filter` 30 UUID vượt trần 100 node). Probe 21/09: 1.272 report · Open 57. **Không gộp form cũ `OSR`** (Eric chốt).
 - Kiểm: `node --check` 5/5; chạy thật code trên dữ liệu probe 11/11 PASS; `curl` live thấy `APP_REV r164` + `page-osrmosr`.
-- ⛔ **Chưa ai đăng nhập bản live để nhìn.** Kiểm: All Forms dropdown đúng 15 form, chọn "All Forms" không còn PAVOI/MCAR · menu Detail → OSR / MOSR ra 1.272 records, bộ lọc Org unit có 4 mục, không toast lỗi.
+- ✅ **Kiểm live 21/09 (Claude in Chrome, admin Eric):** All Forms dropdown đúng 15 form, 2.523 records, cả 15 form đều có dữ liệu. OSR / MOSR: 1.272 records (1. OSR 783 · MOSR 489 · Open 57), Org unit = Line Maintenance/QA AMO/Store/Workshop, không toast lỗi.
+- ⚠️ Lượt nạp chính lần đó ~6 phút + 1 lần "Could not load data": Galileo 504 theo đợt (Audit plan, Custom fields, Workflow); curl cùng lúc chỉ 2–3s. Không liên quan r163/r164.
+- ❓ r163 cũng ẩn các form KHÔNG có page riêng: Battery/Wheel Workshop Inspection, Store Inspection, LMD Inspection, MAINTENANCE STATION INSPECTION, Hangar Check Surveillance Checklist, C Check, MQA-Quality Notice, MQA Self Evaluation, Change Control Form, AMO - HAZARD LOG, AMO - Additional Mitigation, Meeting Minutes - MOM (+2 form Test). Đã hỏi Eric có cần thêm vào AF_FORMS không.
 
 ---
 
