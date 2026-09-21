@@ -5,19 +5,23 @@
 
 ---
 
-## ⏳ DỞ 21/09/2026 (chiều) — r165 + r166 (tải chậm) CHƯA COMMIT, đang nằm trong working tree
+## ✅ r165 + r166 (tải chậm) ĐÃ PUSH & ĐÃ KIỂM TRÊN LIVE 21/09/2026
 
-Eric báo dashboard tải rất lâu. Chẩn đoán: cache máy ghi/đọc tốt (28/59 hit) nhưng 5/5 lượt mở gần nhất
-trượt vì quá 4 giờ; Galileo 504 theo đợt (Custom fields 90s nhiều lượt, Audit 22–90s) trong khi mạng
-6,8 MB/s. Eric duyệt làm cả hai:
-- **r165** stale-while-revalidate: cache cùng rev quá 4h vẫn hiện ngay, `loadData(false,{background:true})`
-  nạp ngầm không overlay, thiếu nguồn thì giữ bản cũ. Auto-refresh 12h cũng ngầm. Stats cache ghi `S`.
-- **r166** Custom fields delta (`fetchCustomFieldRows`, IndexedDB `cfRaw`), cùng khuôn r148.
-- Đã kiểm trên live bằng cách nạp đè hàm vào tab (chi tiết `PROJECT_TECH_SPEC.md` §14 r165/r166).
-- **Chặn commit:** header note obsidian-mind `QA_AMO_Dashboard.md` phải lên r166; r165 commit riêng cần
-  `--no-verify` (hỏi Eric). Bản r165-only dựng sẵn bằng cách gỡ khối `[r166] CUSTOM FIELDS` + trả lại
-  URL Custom fields cũ + APP_REV r165.
-- Sau push: lần mở đầu sau deploy vẫn nạp nguội (cache lệch rev bị vứt) — bình thường.
+```
+origin/main = main = de0f565 (r166) · d84a00a (r165) · trước đó e1c4663 (r164)
+```
+Lùi: `git revert de0f565` / `git revert d84a00a`. Commit r165 dùng `--no-verify` (Eric đồng ý; note vault đã ở r166).
+
+Nguyên nhân tải chậm: Galileo 504 theo đợt + cache 4h hết hạn (5/5 lượt mở gần nhất nạp nguội).
+- **r165** stale-while-revalidate (`cacheLoad` → `'stale'`, `loadData(false,{background:true})`, `lov`, `resetLazyStores`).
+- **r166** Custom fields delta (`fetchCustomFieldRows`, IndexedDB `cfRaw`).
+
+✅ **Kiểm live r166 (Claude in Chrome, admin Eric):** lần mở đầu sau deploy (cache r164 bị vứt) xong <47s, đủ 6
+nguồn — `[cf] DELTA 0 report, 3,5s` · `[wf] DELTA 5 report, 6,7s`. Lùi mốc cache 5h rồi reload: Overview hiện ngay,
+không overlay, nhãn `5h ago · refreshing…`, console `[cache] STALE`; nạp ngầm xong ~32s → `Just loaded`, Overdue 39,
+`runSelfChecks()` rỗng, stats ghi `S`.
+
+Còn: lần mở đầu sau mỗi deploy vẫn nạp nguội (bình thường); Audit plan vẫn nạp đầy mỗi lượt (chưa delta).
 
 ---
 
