@@ -5,7 +5,7 @@
 
 ---
 
-## ⏳ r168-i1 — OSR / MOSR ĐỦ 6 FORM (22/09/2026, ĐÃ COMMIT, CHƯA PUSH)
+## ✅ r168-i1 — OSR / MOSR ĐỦ 6 FORM (22/09/2026, ĐÃ PUSH 37e1902 — live, khớp Galileo 1.491 / 2026: 509)
 
 - Galileo ($count + distinct): 1.491 report (2026: 509) trong 5 + 25 đơn vị; trước chỉ 1.277 (thiếu 4 form: OSR cũ,
   4. Confidential OSR, Confidential OSR, Confidential MOSR = 214). Eric chốt tính Confidential ở page này; Safety MSAG không đụng.
