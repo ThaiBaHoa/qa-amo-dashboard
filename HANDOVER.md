@@ -5,7 +5,7 @@
 
 ---
 
-## ⏳ r167-i1 — MỘT NGUỒN ĐỊNH NGHĨA CHỈ SỐ + SỬA SELF-CHECK (22/09/2026, chờ push)
+## ✅ r167-i1 — MỘT NGUỒN ĐỊNH NGHĨA CHỈ SỐ + SỬA SELF-CHECK (22/09/2026, ĐÃ PUSH f9dd939 — live)
 
 - Eric: Overview (65,9%) lệch KPI charts (43%) là lỗi đã nhắc nhiều lần → yêu cầu cơ chế tự đồng bộ mọi chỗ.
 - `index.html`: khối **METRICS** (`M.*`, nguồn `beta-src/metrics.js`) là nơi DUY NHẤT định nghĩa phạm vi, luật kỳ,
