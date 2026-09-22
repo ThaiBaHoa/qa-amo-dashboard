@@ -456,6 +456,14 @@ Do not ask when:
   with `$top=1000` does **not** help (5 chunks × 6–18s each — worse overall); the cost is
   per-request latency, not bytes. Fix = raise both ceilings to 90s (`galileo-proxy`
   `worker.js` L52 **and** `FETCH_TIMEOUT_MS`) **and retry**. Both numbers must stay equal.
+- **Galileo stalls all-or-nothing → hedge, don't wait (r168)**: measured 22/09/2026 the same query
+  returns in 1.8–5s or hangs to the 90s 504 (report_summary QA AMO: 504 · 504 · 200/1.8s). `fetchHedged`
+  fires another identical GET every `HEDGE_MS` (15s), up to `HEDGE_MAX` (3); first success wins, the rest
+  are aborted. Never shorten `FETCH_TIMEOUT_MS` instead: legit big pulls take ~26s (workflow 18 MB).
+- **Second-pass data lives in the main cache (r168)**: key `x` of `qaAmoV5` holds CMR-CAR / ECAR / KPI 7 /
+  PAVOI verification, written only when all four loaded clean. A cache with `x` paints complete with zero
+  Galileo calls; ↻ and the 4-hour refresh reload everything. When adding a lazy source that the Overview
+  needs at first paint, add it to `x` rather than fetching it on every open.
 - **The proxy owns the real ceiling**: `galileo-proxy` aborts the upstream fetch itself and
   returns `504 Gateway Timeout` (`text/plain`, 15 bytes) with CORS headers attached. Raising
   only the client timeout does nothing. Tell the two apart by `Content-Type`: the Worker's

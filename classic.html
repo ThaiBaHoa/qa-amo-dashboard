@@ -2516,7 +2516,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.22-r167-i1';
+const APP_REV = '2026.09.22-r168';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3823,8 +3823,19 @@ const RETRIABLE_RE = /timed out|HTTP 5\d\d|HTTP 429|Failed to fetch|NetworkError
 
 const _sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function fetchOnce(url) {
-  const ctl = new AbortController();
+// [r168] HEDGE: Galileo đôi khi TREO một request tới hết 90s (504) trong khi gọi lại ngay thì
+// trả trong 2–5s. Đo 22/09/2026 trên live: custom field CMR-CAR 94s (504 rồi 2s), ECAR 189s
+// (504 ×2 rồi xong); curl cùng query 13,7 MB: 504/90s rồi 200/5s. Nên: attempt nào quá
+// HEDGE_MS chưa xong thì bắn THÊM một bản giống hệt, song song — cái nào về trước thắng, cái
+// kia bị huỷ. KHÔNG cắt attempt đầu (bảng lớn có lúc hợp lệ 7–26s: workflow 18 MB 25,9s đo
+// 22/09), nên query chậm thật vẫn về như cũ; chỉ request treo là được cứu. GET nên an toàn.
+// Galileo treo kiểu "được ăn cả ngã về không": report_summary QA AMO (6.294 dòng) đo 3 lần liền
+// 22/09 = 504/90s · 504/90s · 200/1,8s — nên cho tới HEDGE_MAX bản so le, mỗi HEDGE_MS một bản.
+const HEDGE_MS  = 15000;
+const HEDGE_MAX = 3;
+
+async function fetchOnce(url, extCtl) {
+  const ctl = extCtl || new AbortController();
   const tid = setTimeout(()=>ctl.abort(), FETCH_TIMEOUT_MS);
   let r;
   try { r = await fetch(url, {signal:ctl.signal}); }
@@ -3836,6 +3847,31 @@ async function fetchOnce(url) {
   return r.json();
 }
 
+// Một attempt = 1 request, +1 bản dự phòng mỗi HEDGE_MS, tối đa HEDGE_MAX bản. Thành công đầu
+// tiên thắng, các bản còn lại bị huỷ. Reject khi MỌI bản đã khởi chạy đều hỏng (lỗi của bản
+// cuối) — vd 504 sớm khi chưa tới lượt dự phòng — để fetchWithRetry thử lại có backoff như cũ.
+function fetchHedged(url) {
+  return new Promise((resolve, reject) => {
+    const ctls = []; let settled = false, started = 0, failed = 0, hid = null;
+    const go = () => {
+      const ctl = new AbortController(), me = ++started; ctls.push(ctl);
+      fetchOnce(url, ctl).then(v => {
+        if(settled) return;
+        settled = true; clearTimeout(hid);
+        ctls.forEach(c => { if(c !== ctl) c.abort(); });
+        if(me > 1) console.log('[fetch] hedge copy ' + me + '/' + started + ' won — ' + url.slice(0,120));
+        resolve(v);
+      }, e => {
+        if(settled) return;
+        failed++;
+        if(failed >= started){ settled = true; clearTimeout(hid); reject(e); }
+      });
+      if(started < HEDGE_MAX) hid = setTimeout(() => { if(!settled) go(); }, HEDGE_MS);
+    };
+    go();
+  });
+}
+
 // Vì sao phải RETRY chứ không chỉ nâng timeout: đo 21/08/2026 trên dwreporting_audit_summary
 // (4.317 dòng, 1,76 MB) — 7 lần gọi liên tiếp ra 17,7s / 7,7s / 19,7s / 7,5s / 16,0s / hỏng /
 // hỏng. Độ trễ Galileo dao động NGẪU NHIÊN chứ không tỉ lệ với số byte, nên chia trang
@@ -3843,7 +3879,7 @@ async function fetchOnce(url) {
 // Với ~30% hỏng mỗi lần, 3 lần thử kéo xác suất trắng tay từ 30% xuống ~2,7%.
 async function fetchWithRetry(url) {
   for (let attempt = 0; ; attempt++) {
-    try { return await fetchOnce(url); }
+    try { return await fetchHedged(url); }
     catch(e) {
       if (attempt >= FETCH_RETRIES || !RETRIABLE_RE.test(e.message)) throw e;
       const wait = RETRY_DELAY_MS[attempt];
@@ -3853,7 +3889,21 @@ async function fetchWithRetry(url) {
   }
 }
 
-async function fetchAll(url, skipOv=false) {
+// [r168] Gộp request TRÙNG ĐANG CHẠY: loadKpi7Tasks và lượt verification của giao diện mới gọi
+// đúng một URL cùng lúc (đo 22/09/2026: 2 request giống hệt mỗi lần mở). Chỉ gộp khi request
+// kia CÒN ĐANG CHẠY — xong là xoá khỏi map, nên KHÔNG phải cache: lượt sau vẫn đọc Galileo mới.
+// Người gọi chỉ đọc mảng kết quả (forEach/filter), không sửa tại chỗ, nên dùng chung được.
+const _fetchAllInflight = new Map();
+function fetchAll(url, skipOv=false) {
+  if(_fetchAllInflight.has(url)) return _fetchAllInflight.get(url);
+  const p = fetchAllPages(url, skipOv);
+  _fetchAllInflight.set(url, p);
+  const clear = () => { if(_fetchAllInflight.get(url) === p) _fetchAllInflight.delete(url); };
+  p.then(clear, clear);
+  return p;
+}
+
+async function fetchAllPages(url, skipOv=false) {
   let res=[],next=url,p=0;
   while(next) {
     p++;

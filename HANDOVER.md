@@ -5,18 +5,21 @@
 
 ---
 
-## ⏳ CHƯA COMMIT — bảng MSAG report status + đo tốc độ tải (22/09/2026)
+## ⏳ r168 — TẢI NHANH KHI GALILEO TREO + CACHE ĐỦ LƯỢT 2 (22/09/2026, ĐÃ COMMIT, CHƯA PUSH)
 
-- Eric: Analytics › Safety (MSAG) tiêu đề cột lệch với số, bảng bị cắt 62vh nên không chụp gọn một ảnh.
-- Đã sửa **chỉ trong nguồn** `Vault-CongViec/.../rebuild UIUX/beta-src/` (repo chưa đụng):
-  `screens.js` — `plainTable(..., opt)`: cột `ac` canh giữa, `opt.full` bỏ trần chiều cao, `opt.compact` dòng gọn; scrSafety dùng cả ba.
-  `beta-template.html` — `.tbl th.ar` canh phải theo cột số (sửa chung mọi bảng), `.ac`, `.tbl-full`, `.tbl-compact`.
-- Kiểm: `node build.mjs` OK; trang thử (CSS thật + plainTable thật, số từ ảnh Eric) → 17 dòng trong ~500px, tiêu đề thẳng số.
-  Chưa kiểm trên dữ liệu thật (Galileo 504 lúc thử). Việc còn lại: `node make-index.mjs` → quy-trinh-chuan (bump rev, commit, push).
-- ⚠️ Đừng chép `beta.html` đã build vào repo để thử: từ r167 `beta.html` trong repo là trang chuyển hướng.
-- Đo tải chậm (Eric yêu cầu kiểm toàn bộ, CHƯA LÀM): curl thẳng proxy — cùng truy vấn 2–5s rồi 504 sau 90s / 520 sau 50s;
-  app thử lại 3×90s ≈ 4,5 phút mới báo lỗi; mỗi lượt tải ~32 MB (workflow ~18 MB), proxy không cache;
-  Chrome đứng >45s ở bước "Custom fields" (nghẽn main thread). Note vault: `reference/qa-amo-dashboard/2026-09-22-msag-report-status-*`.
+- Eric: trang tải rất chậm, nghi không phải lỗi Galileo → đo toàn bộ trên live.
+- Đo: có cache thì dữ liệu sẵn sau 0,9s; nhưng lượt 2 (CMR-CAR / ECAR / KPI 7) gọi LẠI Galileo mỗi lần mở:
+  custom field CMR-CAR 13,7 MB = 94s, ECAR = 189s (504/90s rồi thử lại mới xong). CPU chỉ ~0,2s.
+  curl thẳng proxy: cùng query lúc 504/90s lúc 200/1,8s (report_summary QA AMO: 504 · 504 · 200/1,8s).
+- Sửa: `classic.html` `fetchHedged` (dự phòng mỗi 15s, tối đa 3 bản, bản về trước thắng) + `fetchAll` gộp
+  request trùng đang chạy; `index.html` cache chính thêm khoá `x` (CMR-CAR/ECAR/KPI 7/verification) → mở có
+  cache = 0 request Galileo. UI: bảng MSAG canh giữa + không cắt chiều cao; tiêu đề cột `ar` canh phải.
+- Kiểm: harness 9/9; local dữ liệu thật: hedge cứu workflow + custom fields; mở lại: 0 request, 7.022 report
+  sau 0,7s, KPI 7 2026 = 51/59, `M.consistency()` 0 lệch.
+- ⚠️ Lần mở ĐẦU sau deploy vẫn nạp nguội (cache gắn APP_REV) — Galileo tệ thì vẫn vài phút; hedge chỉ rút ngắn.
+- ⚠️ `beta.html` trong repo là trang chuyển hướng — đừng chép bản build đè lên để thử; thử qua `/?relay=…&write=1`.
+- Chưa làm (đề xuất, cần Eric chốt): cache ở Worker `galileo-proxy` (nguồn Worker không nằm trong repo);
+  cho phép hiện cache rev cũ như "stale" rồi nạp ngầm sau deploy.
 
 ## ✅ r167-i1 — MỘT NGUỒN ĐỊNH NGHĨA CHỈ SỐ + SỬA SELF-CHECK (22/09/2026, ĐÃ PUSH f9dd939 — live)
 

@@ -440,6 +440,11 @@ select.ctl{min-width:168px;cursor:pointer}
 .tbl tbody tr:hover{background:var(--raised);cursor:pointer}
 .tbl tbody tr:last-child td{border-bottom:none}
 .tbl td.ar{text-align:right}
+/* header follows its column: numbers right or centred, not a left header over right-aligned digits */
+.tbl th.ar, .tbl th.ar>button, .tbl th.ar>span{text-align:right;justify-content:flex-end}
+.tbl th.ac, .tbl td.ac, .tbl th.ac>button, .tbl th.ac>span{text-align:center;justify-content:center}
+.tbl-wrap.tbl-full{max-height:none}
+.tbl.tbl-compact td{padding-top:7px;padding-bottom:7px}
 .row-main{display:grid;gap:2px}
 .row-main>*{display:block}
 .row-id{font-family:var(--mono);font-size:13.5px;font-weight:700;color:var(--text)}
@@ -636,7 +641,7 @@ mark{background:var(--accent-34);color:var(--on-wash);border-radius:3px;padding:
   .tbl td::before{content:attr(data-l);font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3);font-weight:650}
   .tbl td.t-main{grid-template-columns:minmax(0,1fr);padding-bottom:var(--s2)}
   .tbl td.t-main::before{display:none}
-  .tbl td.ar{text-align:left}
+  .tbl td.ar, .tbl td.ac{text-align:left}
   .tbl-wrap{overflow:visible}
   .botnav{
     display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:70;
@@ -1343,6 +1348,7 @@ async function idbDel(){}
 `;
 
 const DRIVER = `
+let saveCache = false;
 if(HOOK.cache){
   allData = HOOK.cache.a; auditData = HOOK.cache.b || [];
   if(Array.isArray(HOOK.cache.ou) && HOOK.cache.ou.length) ORG_UNIT_IDS = HOOK.cache.ou;
@@ -1352,12 +1358,9 @@ if(HOOK.cache){
   if(LOAD_ERRORS.length || !allData.length) throw new Error(LOAD_ERRORS.join(' | ') || 'no reports returned');
   /* [r165] a background refresh swaps only when every source succeeded */
   if(HOOK.background && loadFailures.length) throw new Error(loadFailures.length + ' source(s) failed');
-  /* [classic r141/r145] save the cache only when all six sources succeeded; same shape as
-     classic cacheSave(), so the classic backup page can still open from it */
-  if(HOOK.write && !loadFailures.length){
-    try{ await HOOK.writeStore(HOOK.cacheKey, { ts: Date.now(), rev: HOOK.rev, a: allData, b: auditData, ou: ORG_UNIT_IDS }); }
-    catch(e){ console.warn('[cache] save failed:', e && e.name, e && e.message); toast('Cache could not be saved: ' + (e && e.message), 'cache'); }
-  }
+  /* [classic r141/r145] save the cache only when all six sources succeeded — written after the
+     second pass below (r168), so the CMR-CAR / ECAR / KPI 7 part can go into the same entry */
+  saveCache = HOOK.write && !loadFailures.length;
 }
 HOOK.say('Loading CMR-CAR, ECAR and PAVOI verification…', allData.length + ' reports ready');
 const VER_URL = G_URL + 'dwanalytics_report_field' +
@@ -1365,10 +1368,30 @@ const VER_URL = G_URL + 'dwanalytics_report_field' +
   '&$filter=' + encodeURIComponent("section_name eq 'Verification Result' and section_level eq 1");
 /* HOOK.lite: first paint from the cache only — CMR-CAR, ECAR, KPI 7 and verification rounds follow
    in a second pass, so a slow Galileo (90s timeouts measured 22/09) does not hold the whole screen. */
-let verRaw = [];
-if(!HOOK.lite){
+let verRaw = [], secondOk = false;
+/* [r168] The second-pass data is cached WITH the reports (cache key "x", same ts, same rev), so an
+   open with a cache no longer re-reads CMR-CAR / ECAR / KPI 7 from Galileo: measured 22/09 on live
+   with a fresh cache, that pass took 94s (CMR-CAR custom fields, 13.7 MB) and 189s (ECAR) when
+   Galileo stalled. Everything on screen now has ONE age; ↻ and the 4-hour refresh reload all of it. */
+const X2 = HOOK.cache && HOOK.cache.x;
+if(!HOOK.lite && X2 && X2.v === 1){
+  cmrData = X2.cmr; cmrLoaded = true; ecarData = X2.ecar; ecarLoaded = true;
+  kpi7Cnt = X2.k7c; kpi7Ver = X2.k7v; kpi7Done = new Set(Object.keys(X2.k7c)); kpi7Loaded = true;
+  verRaw = X2.ver;
+} else if(!HOOK.lite){
+  const err0 = TOASTS.filter(t => t.kind === 'err').length;
   const got = await Promise.all([loadCmr(), loadEcar(), loadKpi7Tasks(), fetchAll(VER_URL, true).catch(e => { toast('PAVOI verification rounds: ' + e.message, 'err'); return []; })]);
   verRaw = got[3];
+  /* cached only when all four came back clean — a partial CMR-CAR must not be frozen for 4 hours */
+  secondOk = cmrLoaded && ecarLoaded && kpi7Loaded && TOASTS.filter(t => t.kind === 'err').length === err0;
+}
+if(saveCache){
+  const pv = new Set(allData.filter(r => r.report_title === 'PAVOI').map(r => r.report_id));
+  const entry = { ts: Date.now(), rev: HOOK.rev, a: allData, b: auditData, ou: ORG_UNIT_IDS };
+  if(secondOk) entry.x = { v: 1, cmr: cmrData, ecar: ecarData, k7c: kpi7Cnt, k7v: kpi7Ver,
+    ver: verRaw.filter(f => f.section_id && pv.has(f.report_id)) };
+  try{ await HOOK.writeStore(HOOK.cacheKey, entry); }
+  catch(e){ console.warn('[cache] save failed:', e && e.name, e && e.message); toast('Cache could not be saved: ' + (e && e.message), 'cache'); }
 }
 
 const pavIds = new Set(allData.filter(r => r.report_title === 'PAVOI').map(r => r.report_id));
@@ -1619,8 +1642,10 @@ async function run(){
   /* With a cache: paint at once from it (lite pass), then complete CMR-CAR / ECAR / KPI 7 /
      verification rounds in a second pass — from Galileo when the cache is stale (r165), else from
      the same cache. Without a cache: one full load before the first paint, as before. */
+  /* [r168] a cache that already holds the second-pass data (x) paints everything at once */
+  const whole = !!cache && !!(cache.x && cache.x.v === 1);
   let res;
-  try{ res = await load({ cache, lite: !!cache }); }
+  try{ res = await load({ cache, lite: !!cache && !whole }); }
   catch(e){ console.error('[beta] load failed', e); return fail('Could not load data from Galileo.', e.message); }
   done(res, cache ? (stale ? 'first paint from STALE cache' : 'first paint from cache') : 'from Galileo');
 
@@ -1635,7 +1660,7 @@ async function run(){
   const tag = document.querySelector('.demo-tag');
   /* official page: "Live"; beta.html: "Beta" — plus the state of the data */
   const tagText = s => WRITE ? (s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Live') : 'Beta' + (s ? ' · ' + s : '');
-  if(tag) tag.textContent = tagText(cache ? (stale ? 'refreshing…' : 'loading more…') : '');
+  if(tag) tag.textContent = tagText(cache ? (stale ? 'refreshing…' : whole ? '' : 'loading more…') : '');
   /* ↻ and the 12-hour timer: a full load from Galileo in a fresh scope, swapped only when every
      source succeeded (r165) — the screen keeps the current data meanwhile */
   let refreshing = false;
@@ -1661,6 +1686,10 @@ async function run(){
     refreshing = false;
   };
   if(!cache) return;
+  if(whole && !stale){
+    if(tag) tag.title = 'Live Galileo data via classic.html ' + REV + ' · complete from cache · ' + new Date(cache.ts).toLocaleString();
+    return;
+  }
   const hours = Math.round((Date.now() - cache.ts) / 3600e3);
   if(stale) toast('Showing data from ' + hours + 'h ago', 'Refreshing from Galileo in the background.');
   let full = null, how = stale ? 'background refresh' : 'completed from cache', note = '';
@@ -3435,14 +3464,17 @@ function searchBox(key, cur, ph){
   return '<input class="ctl" type="search" data-bset="'+key+'" value="'+esc(cur||'')+'" placeholder="'+esc(ph||'Search')+'" style="min-width:min(220px,100%)">';
 }
 /* A plain table: cols = [{l, ar?}], rows = arrays of cell HTML. Paged like the design's lanes. */
-function plainTable(key, cols, rows, size, minW){
+/* opt.full: no height cap (whole table in one view) · opt.compact: tighter rows · col.ac: centred column */
+function plainTable(key, cols, rows, size, minW, opt){
+  opt = opt || {};
+  const al = c => c.ac ? 'ac' : c.ar ? 'ar' : '';
   size = size || 25;
   if(!rows.length) return '<div class="empty"><h3>No records</h3><p class="t-sub">Nothing matches the current filters.</p></div>';
   const pages = Math.max(1, Math.ceil(rows.length/size));
   const p = Math.min(BS.pg[key] || 1, pages);
-  const head = cols.map(c => '<th scope="col"'+(c.ar?' class="ar"':'')+'>'+esc(c.l)+'</th>').join('');
+  const head = cols.map(c => '<th scope="col"'+(al(c)?' class="'+al(c)+'"':'')+'>'+esc(c.l)+'</th>').join('');
   const body = rows.slice((p-1)*size, p*size).map(r => '<tr>'+r.map((cell,i) =>
-    '<td data-l="'+esc(cols[i].l)+'"'+(i===0?' class="t-main"':(cols[i].ar?' class="ar"':''))+'>'+cell+'</td>').join('')+'</tr>').join('');
+    '<td data-l="'+esc(cols[i].l)+'"'+(i===0?' class="t-main"':(al(cols[i])?' class="'+al(cols[i])+'"':''))+'>'+cell+'</td>').join('')+'</tr>').join('');
   let pager = '';
   if(pages > 1){
     pager = '<div class="pg">'
@@ -3451,7 +3483,7 @@ function plainTable(key, cols, rows, size, minW){
       + '<button type="button" data-act="bpage" data-k="'+key+'" data-p="'+(p+1)+'"'+(p===pages?' disabled':'')+' aria-label="Next page">'+ic('chevron',14,'')+'</button></div>';
   }
   /* many columns: keep a readable minimum and scroll inside the card (phones reflow to cards) */
-  return '<div class="tbl-wrap"><table class="tbl'+(minW ? ' beta-minw' : '')+'"'+(minW ? ' style="--beta-minw:'+minW+'px"' : '')+'><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>'
+  return '<div class="tbl-wrap'+(opt.full ? ' tbl-full' : '')+'"><table class="tbl'+(minW ? ' beta-minw' : '')+(opt.compact ? ' tbl-compact' : '')+'"'+(minW ? ' style="--beta-minw:'+minW+'px"' : '')+'><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>'
     + '<div class="tbl-foot"><span class="t-small dim">Showing '+((p-1)*size+1)+'–'+Math.min(p*size, rows.length)+' of '+rows.length+'</span>'+pager+'</div>';
 }
 function barList(items, hotKey){
@@ -3638,7 +3670,7 @@ function scrSafety(){
       stat('Open reports', String(t.osrO + t.mosrO), 'awaiting action', (t.osrO + t.mosrO) > 0)
     ])
     + '<section class="sec">' + card('MSAG report status', 'OSR / MOSR owned by an MSAG group · loaded '+esc(d.updated),
-      plainTable('safety', [{l:'Group on Coruson'},{l:'OSR closed',ar:true},{l:'OSR open',ar:true},{l:'OSR total',ar:true},{l:'MOSR closed',ar:true},{l:'MOSR open',ar:true},{l:'MOSR total',ar:true}], rows, 40))
+      plainTable('safety', [{l:'Group on Coruson'},{l:'OSR closed',ac:true},{l:'OSR open',ac:true},{l:'OSR total',ac:true},{l:'MOSR closed',ac:true},{l:'MOSR open',ac:true},{l:'MOSR total',ac:true}], rows, 40, 0, {full:true, compact:true}))
     + '</section>';
 }
 
