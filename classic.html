@@ -2516,7 +2516,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.22-r167';
+const APP_REV = '2026.09.22-r167-i1';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -4262,10 +4262,12 @@ function runSelfChecks(){
             warn.push(`KPI 7 open/closed mismatch (${nm}): open ${r.open} + closed ${r.closed} does not equal total ${r.total}`);
           if(r.notList.length !== r.notAssessed)
             warn.push(`KPI 7 drill-down mismatch (${nm}): the modal would list ${r.notList.length} PAVOI but the cell says ${r.notAssessed}`);
-          // [r149] Từ r149 PAVOI đã đóng ĐƯỢC tính vào tử số, nên phép kiểm này không còn nói
-          // về tử số nữa — nó canh danh sách drill-down: notList CHỈ được chứa PAVOI đang Open.
-          if(r.notList.some(x=>x.report_status!=='Open'))
-            warn.push(`KPI 7 drill-down contamination (${nm}): a CLOSED PAVOI landed in the "open & not assessed" list — that list may only ever contain Open reports`);
+          // [r167-i1] Từ r155 "chưa đánh giá" = CHƯA CÓ LƯỢT XÁC MINH, Open hay Closed như nhau
+          // (modal ghi "open or closed alike"; 6 hồ sơ 2026 đã Final Conclusion vẫn thuộc nhóm này
+          // để các ban bổ sung hồi tố). Kiểm cũ của r149 ("notList chỉ chứa Open") vì thế báo SAI
+          // cho admin. Bất biến đúng: mọi hồ sơ trong notList đã tải xong, có 0 lượt, không Withdrawn.
+          if(r.notList.some(x=>!kpi7Done.has(x.report_id) || (kpi7Cnt[x.report_id]||0) > 0 || kpi7Withdrawn(x)))
+            warn.push(`KPI 7 drill-down contamination (${nm}): the "no verification round" list holds a PAVOI that has a round, is withdrawn, or is not loaded yet`);
           // [r152] Hồ sơ bị loại vì Withdrawn không được lọt vào bất kỳ ô đếm nào của KPI.
           if(r.wdList.some(x=>!kpi7Withdrawn(x)))
             warn.push(`KPI 7 exclusion mismatch (${nm}): a report in the withdrawn list is not actually withdrawn any more — the list and the filter disagree`);

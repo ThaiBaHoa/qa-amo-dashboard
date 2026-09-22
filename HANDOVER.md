@@ -5,6 +5,18 @@
 
 ---
 
+## ⏳ r167-i1 — MỘT NGUỒN ĐỊNH NGHĨA CHỈ SỐ + SỬA SELF-CHECK (22/09/2026, chờ push)
+
+- Eric: Overview (65,9%) lệch KPI charts (43%) là lỗi đã nhắc nhiều lần → yêu cầu cơ chế tự đồng bộ mọi chỗ.
+- `index.html`: khối **METRICS** (`M.*`, nguồn `beta-src/metrics.js`) là nơi DUY NHẤT định nghĩa phạm vi, luật kỳ,
+  nhóm trạng thái, open / in-target / overdue / CAT / on-time / closure time / KPI 2 / KPI 7 / audit. Overview
+  (`overviewStats`), Work Queue (`LANES`), KPI charts (`kpiChartStats`), Export (`exportRowsFor`), chi tiết audit,
+  7 ô Audit Plan đều gọi `M`. Guard: lint build "metrics-only" + `M.consistency()` sau mỗi lượt nạp (lệch → chip ⚠ admin).
+- Kiểm local 2026: Overview/Work Queue/KPI charts/Export cùng số (open 77, in-target 40, overdue 37, on-time
+  222/520 = 42,7%, tổng 640), `M.consistency()` 0 lệch; cố ý phá → bắt được `9 ≠ 37` và `43 ≠ 298`.
+- `classic.html` r167-i1: self-check 6 (KPI 7 drill-down) sửa theo r155 → hết 3 cảnh báo sai.
+- Manual song ngữ Việt–Anh (15 trang) thay bản chỉ tiếng Việt.
+
 ## ✅ r167 — GIAO DIỆN MỚI THÀNH BẢN CHÍNH (22/09/2026, ĐÃ PUSH d6f8670 — live)
 
 ```

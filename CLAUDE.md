@@ -69,6 +69,22 @@ used only for developer conversation and code comments, never in what the user s
 >   pages pick it up. Renaming a loader or a field used by the new UI breaks `index.html` loudly (boot
 >   error screen) — check both pages after any logic change.
 > - `beta.html` only redirects to `./`.
+>
+> **METRICS rule (Eric, 22/09/2026 — repeated request: numbers must never differ between screens).**
+> In `index.html` every definition of report scope, the period rule, status groups and every indicator
+> (open, in-target, overdue, CAT, on-time rate, closure time, KPI 2, KPI 7, audit summary) lives in ONE
+> block, `METRICS` (`beta-src/metrics.js`). Screens call `M.*`; they never compare a status string or
+> compute a rate themselves. Two guards enforce it:
+> 1. **Build lint "metrics-only"** (`build.mjs`): a UI line outside METRICS that compares
+>    `status/semantic_status/report_status` with a report status, or `overdue_cat`, stops the build. A
+>    different domain (Coruson report_status, EIS corrective-action status, mock data) must say so with
+>    a `metrics-ok: <reason>` comment.
+> 2. **Runtime `M.consistency()`** after every load/refresh: recomputes each indicator through every
+>    screen path (Overview `overviewStats`, Work Queue `LANES`, KPI charts `kpiChartStats`, exports
+>    `exportRowsFor`, KPI 7 `kpi7Stats`, KPI 2, Audit Plan) and against the classic formulas on raw
+>    `allData`; any difference shows in the admin ⚠ chip and `console.error`.
+> A new screen or a new indicator = add its calculation to METRICS and one line to `M.consistency()`
+> first, then the screen. Changing a definition = change METRICS only; the check proves every screen moved.
 
 The **classic app is one file: `classic.html`** (~12,000 lines). HTML + CSS + JS inline.
 There is no build step, no `package.json`, no `node_modules`, no framework.
@@ -485,7 +501,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.09.22-r167
+Rev current: 2026.09.22-r167-i1
 
 ORG_UNIT_IDS          ← main pages: 'QA AMO' + ALL its sub-units, resolved at load
                          from dwreporting_organisational_unit_hierarchy (r143).

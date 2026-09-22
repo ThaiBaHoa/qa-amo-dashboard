@@ -1397,7 +1397,7 @@ function base(r, form){
     raised: day(r.raised_date), target: day(r.Target_date), closed: day(r.close_date),
     status: r.semantic_status, cat: CAT[r.overdue_cat] || null, dtd: r.report_ageing,
     isClosed: CLOSED.has(r.semantic_status),
-    progress: false, level: orDash(r.finding_level), repetitive: false,
+    progress: false, level: orDash(r.finding_level), repetitive: false, auditId: r.audit_id || null,
     acReg: null, acType: null, rounds: [],
   };
 }
@@ -1994,6 +1994,154 @@ function fromReal(r){
     rounds: (r.rounds || []).map(v => Object.assign({}, v, { date: realDay(v.date) }))
   });
 }
+/* METRICS-SRC:BEGIN */
+/* METRICS:BEGIN ==============================================================
+   METRICS — the ONE place where report scope, the period rule, status groups and every
+   indicator are defined. Every screen (Overview, Work Queue, Findings, Analytics, Audit
+   Plan, exports, detail views) calls these; none compares a status string or computes a
+   rate on its own. Change a definition here and every screen follows.
+     · build.mjs refuses to build when UI code outside this block compares a report status
+       or computes a rate itself (lint "metrics-only").
+     · M.consistency() recomputes each indicator through every screen's path and against the
+       classic formulas after every data load; any difference is shown to admins.
+   Definitions (classic.html):
+     scope qa     = allData (QA AMO + sub-units). TQA CMR-CAR / ECAR only on their own tabs.
+     period       = calendar day of raised_date by classic dDay (4085), Year × Month filter.
+     open         = not closed = Open + Overdue (classic Open Reports, renderOpen 4995).
+     inTarget     = status Open only (classic KPI charts tile kk-open, 4760).
+     overdue      = status Overdue; CAT from overdue_cat (catCalc 4124).
+     on-time rate = On-time Closed ÷ (On-time Closed + Lately Closed) (User Guide 1627, 4767).
+     closure time = mean days raised → close, closed reports with both dates.
+     KPI 2 volume = MCAR count ÷ AMO-ECAR count (buildKPI2 5257–5259).
+     KPI 7        = kpi7Stats (6191) with the same period rule; % withheld while pending.
+     audits       = MNT scope; year = scheduled year, month = scheduled start month;
+                    open = InProgress / Performed / Scheduled (renderAuditKpi 7676).
+   ========================================================================== */
+const M = {
+  CLOSED: new Set(['On-time Closed', 'Lately Closed', 'Closed']),
+  st: x => x.status !== undefined ? x.status : x.semantic_status,
+  isClosed: x => M.CLOSED.has(M.st(x)),
+  isOpen: x => !M.isClosed(x),
+  isInTarget: x => M.st(x) === 'Open',
+  isOverdue: x => M.st(x) === 'Overdue',
+  isOnTime: x => M.st(x) === 'On-time Closed',
+  isLate: x => M.st(x) === 'Lately Closed',
+  isUngraded: x => M.st(x) === 'Closed',
+  hasStatus: (x, s) => M.st(x) === s,
+  catOf: x => x.cat !== undefined ? x.cat : ({ 'CAT I':'I', 'CAT II':'II', 'CAT III':'III' }[x.overdue_cat] || null),
+
+  /* scope */
+  qa: rows => REAL ? rows.filter(r => r.form !== 'cmrcar' && r.form !== 'ecar') : rows,
+
+  /* period: one rule for every screen */
+  dayOf(v){
+    if(!v) return null;
+    if(v instanceof Date) return v;
+    const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+    const d = new Date(v); if(isNaN(d)) return null;
+    return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  },
+  inPeriodDay(d, f){
+    f = f || state.filters;
+    if(!f.years.length && !f.months.length) return true;
+    if(!d) return false;
+    if(f.years.length && !f.years.includes(d.getFullYear())) return false;
+    if(f.months.length && !f.months.includes(d.getMonth())) return false;
+    return true;
+  },
+  raisedDay: x => x.raised !== undefined ? x.raised : M.dayOf(x.raised_date),
+  inPeriod: (x, f) => M.inPeriodDay(M.raisedDay(x), f),
+  period: (rows, f) => rows.filter(x => M.inPeriod(x, f)),
+
+  pct: (a, b) => b ? Math.round(a / b * 1000) / 10 : 0,
+
+  /* the report summary every screen shows */
+  summary(rows){
+    const n = p => rows.filter(p).length;
+    const onTime = n(M.isOnTime), late = n(M.isLate);
+    const closedDated = rows.filter(r => r.closed && r.raised);
+    const cat = { I:0, II:0, III:0 };
+    rows.forEach(r => { if(M.isOverdue(r)){ const c = M.catOf(r); if(c) cat[c]++; } });
+    return {
+      total: rows.length, open: n(M.isOpen), inTarget: n(M.isInTarget), overdue: n(M.isOverdue),
+      onTime, late, ungraded: n(M.isUngraded), graded: onTime + late, onTimeRate: M.pct(onTime, onTime + late),
+      avgCloseDays: closedDated.length ? Math.round(closedDated.reduce((t, r) => t + dayDiff(r.closed, r.raised), 0) / closedDated.length) : 0,
+      closedDated: closedDated.length, cat, repetitive: n(r => r.repetitive),
+      audits: new Set(rows.map(r => r.auditId).filter(Boolean)).size
+    };
+  },
+  /* reports closed inside a window — the monthly trend of rate and closure time */
+  closedIn: (rows, from, to) => rows.filter(r => r.closed && r.closed >= from && r.closed <= to),
+
+  kpi2: rows => { const mcar = rows.filter(r => r.form === 'mcar').length, amo = rows.filter(r => r.form === 'amoecar').length;
+                  return { mcar, amo, pct: M.pct(mcar, amo) }; },
+
+  /* KPI 7 = the classic function itself, fed the same period rule */
+  kpi7(f){
+    const st = API().kpi7Stats(r => M.inPeriodDay(M.dayOf(r.raised_date), f));
+    const t = st.tot;
+    return { stats: st, total: t.total, assessed: t.assessed, notAssessed: t.notAssessed, pending: t.pending, withdrawn: t.withdrawn,
+             rate: (t.total && !t.pending) ? M.pct(t.assessed, t.total) : null };
+  },
+  kpi7In(pass){ const t = API().kpi7Stats(pass).tot; return (t.total && !t.pending) ? M.pct(t.assessed, t.total) : 0; },
+
+  /* audits (MNT) — same period rule shape for both raw auditData and the mapped AUDITS */
+  auditYear: a => a.year !== undefined ? a.year : +a.sched_year,
+  auditMonth: a => a.start !== undefined ? a.start : Number(String(a.scheduled_start_date).slice(5,7)) - 1,
+  auditInPeriod(a, f){
+    f = f || state.filters;
+    return (!f.years.length || f.years.includes(M.auditYear(a))) && (!f.months.length || f.months.includes(M.auditMonth(a)));
+  },
+  AUDIT_OPEN: new Set(['InProgress', 'In Progress', 'Performed', 'Scheduled']),
+  auditSummary(list){
+    const closed = list.filter(a => a.status === 'Closed').length, open = list.filter(a => M.AUDIT_OPEN.has(a.status)).length;
+    return { total: list.length, closed, open, inProgress: list.filter(a => a.status === 'InProgress' || a.status === 'In Progress').length,
+             scheduled: list.filter(a => a.status === 'Scheduled').length, rate: list.length ? Math.round(closed / list.length * 100) : 0 };
+  },
+
+  /* classic records behind a set of reports (exports hand raw allData to the classic functions) */
+  raw(rows){ const by = new Map(API().allData().map(r => [r.report_id, r])); return rows.map(r => by.get(r.id)).filter(Boolean); }
+};
+
+/* Consistency check — every screen path must give the classic numbers for the same period.
+   Runs after each load and swap; differences go to the admin chip and the console. */
+M.consistency = function(){
+  if(!REAL || REAL.partial) return [];
+  const A = API(), out = [];
+  const f = { years: [TODAY.getFullYear()], months: [] };
+  const say = (what, a, b) => { if(a !== b) out.push('Consistency: ' + what + ' — ' + a + ' ≠ ' + b); };
+  const raw = A.allData().filter(r => M.inPeriod(r, f));
+  const cls = s => raw.filter(r => r.semantic_status === s).length;   /* metrics-ok: the classic formula being checked against */
+  const qa = M.period(M.qa(REPORTS), f);
+  const s = M.summary(qa);
+  say('QA scope size vs allData', M.qa(REPORTS).length, A.allData().length);
+  say('open (Overview) vs classic Open Reports', s.open, cls('Open') + cls('Overdue'));
+  say('overdue (Overview) vs classic Overdue', s.overdue, cls('Overdue'));
+  say('on-time closed vs classic', s.onTime, cls('On-time Closed'));
+  say('lately closed vs classic', s.late, cls('Lately Closed'));
+  say('in-target open (KPI charts) vs classic kk-open', s.inTarget, cls('Open'));
+  say('CAT III vs classic', s.cat.III, raw.filter(r => r.overdue_cat === 'CAT III').length);
+  say('Work Queue › Open lane vs open', LANES['work/open'].rows(qa).length, s.open);
+  say('Work Queue › Overdue lane vs overdue', LANES['work/overdue'].rows(qa).length, s.overdue);
+  if(typeof overviewStats === 'function'){ const o = overviewStats(qa); say('Overview on-time vs summary', o.s.onTimeRate, s.onTimeRate); say('Overview open vs summary', o.s.open, s.open); }
+  if(typeof kpiChartStats === 'function'){ const k = kpiChartStats(f); say('KPI charts on-time vs Overview', k.s.onTimeRate, s.onTimeRate); say('KPI charts total vs Overview', k.s.total, s.total); }
+  if(typeof exportRowsFor === 'function') say('Export rows vs QA period', exportRowsFor(f, '', '').length, qa.length);
+  const k7 = M.kpi7(f), pav = qa.filter(r => r.form === 'pavoi' && !r.withdrawn);
+  say('KPI 7 total (kpi7Stats) vs PAVOI in period', k7.total, pav.length);
+  say('KPI 7 assessed (kpi7Stats) vs verification rounds', k7.assessed, pav.filter(r => r.rounds.length > 0).length);
+  const k2 = M.kpi2(qa);
+  say('KPI 2 MCAR vs classic', k2.mcar, raw.filter(r => r.report_title === 'MCAR').length);
+  say('KPI 2 AMO-ECAR vs classic', k2.amo, raw.filter(r => r.report_title === 'AMO ECAR').length);
+  const aud = A.auditData().filter(a => a.is_qa_amo_scope && M.auditInPeriod(a, f));
+  say('Audit Plan rows vs audit KPI total', AUDITS.filter(a => M.auditInPeriod(a, f)).length, aud.length);
+  if(out.length) console.error('[metrics] consistency check failed:', out);
+  else console.log('[metrics] consistency OK — every screen path matches the classic formulas (' + f.years[0] + ')');
+  return out;
+};
+/* METRICS:END */
+
+/* METRICS-SRC:END */
 const REPORTS = REAL ? REAL.reports.map(fromReal) : buildReports();
 /* reference lists follow the data, not the mock seed */
 function refLists(depts){
@@ -2019,7 +2167,7 @@ function catOf(r){
   return d <= 30 ? 'I' : d <= 60 ? 'II' : 'III';
 }
 /* Real records carry isClosed from the live status: a Closed report may have no close date. */
-function isOpen(r){ return r.isClosed === undefined ? !r.closed : !r.isClosed; }
+function isOpen(r){ return M.isOpen(r); }   /* definition lives in METRICS */
 function assessed(r){ return r.rounds.length > 0; }
 /* First verification date. Real data: the live kpi7Ver (earliest Date verified); a round
    can exist without a date, which is null here and must not be graded. */
@@ -2042,7 +2190,7 @@ function buildAudits(){
     else if(start <= 8 && end >= 8) status = weighted([['In Progress',66],['Performed',34]]);
     else status = 'Scheduled';
     const findings = status === 'Scheduled' ? 0 : ri(0, 11);
-    const open     = status === 'Closed' ? 0 : Math.min(findings, ri(0, 5));
+    const open     = status === 'Closed' ? 0 : Math.min(findings, ri(0, 5));   /* metrics-ok: mock prototype audits (never used with live data) */
     const overdue  = Math.min(open, rnd() < 0.34 ? ri(1,2) : 0);
     return {
       id:'aud-'+i,
@@ -2059,8 +2207,7 @@ const AUDITS = REAL ? REAL.audits : buildAudits();
    start month (Galileo has no planned end date, so a bar is one month). Mock audits carry no year. */
 function auditsScoped(){
   const f = state.filters;
-  return AUDITS.filter(a => (a.year === undefined || !f.years.length || f.years.includes(a.year))
-                         && (!f.months.length || f.months.includes(a.start)));
+  return AUDITS.filter(a => a.year === undefined ? (!f.months.length || f.months.includes(a.start)) : M.auditInPeriod(a, f));
 }
 
 /* ---- 12-month series, computed from the register (never invented) ---- */
@@ -2170,9 +2317,7 @@ function applyFilters(rows){
   const f = state.filters;
   return rows.filter(r=>{
     /* a report with no raised date cannot be placed in a period: it only shows with no period filter */
-    if((f.years.length || f.months.length) && !r.raised) return false;
-    if(f.years.length && !f.years.includes(r.raised.getFullYear())) return false;
-    if(f.months.length && !f.months.includes(r.raised.getMonth())) return false;
+    if(!M.inPeriodDay(r.raised, f)) return false;   /* period rule lives in METRICS */
     if(f.dept && r.dept !== f.dept) return false;
     return true;
   });
@@ -2185,7 +2330,7 @@ function applyQuery(rows){
 const scoped = () => applyQuery(applyFilters(REPORTS));
 /* QA AMO scope — what classic Open Reports / Overdue / KPI charts count (allData). CMR-CAR and ECAR
    belong to TQA and have their own Findings tabs, as they had their own classic pages. */
-const qaScope = rows => REAL ? rows.filter(r => r.form !== 'cmrcar' && r.form !== 'ecar') : rows;
+const qaScope = rows => M.qa(rows);   /* definition lives in METRICS */
 
 /* ---- routing: real hash routes, so Back and deep links behave ---- */
 let pendingId = null;
@@ -2380,63 +2525,48 @@ function kpiTile(o){
     + '<span class="kpi-foot">'+(o.trend||'')+'<span class="kpi-note">'+esc(o.note)+'</span></span>'
     + spark(o.series, !!o.alarm) + '</button>';
 }
+/* Every number of the Overview, computed only through METRICS (M.consistency checks it). */
+function overviewStats(rows){
+  const s = M.summary(rows);
+  const monthly = fn => SERIES_MONTHS.map(mo => fn(new Date(mo.y, mo.m, 1), mo.end));
+  return {
+    s,
+    series: seriesFor(rows),
+    rateSeries: monthly((a, b) => M.summary(M.closedIn(rows, a, b)).onTimeRate),
+    closeSeries: monthly((a, b) => M.summary(M.closedIn(rows, a, b)).avgCloseDays),
+    k2: M.kpi2(rows),
+    k2Series: monthly((a, b) => M.kpi2(rows.filter(r => r.raised && r.raised >= a && r.raised <= b)).pct),
+    k7: REAL ? (REAL.partial ? null : M.kpi7()) : null,
+    k7Series: REAL && !REAL.partial ? monthly((a, b) => M.kpi7In(r => { const d = M.dayOf(r.raised_date); return d && d >= a && d <= b; })) : []
+  };
+}
 function renderOverview(){
   const rows = qaScope(scoped());
-  const s = seriesFor(rows);
-  const open = rows.filter(isOpen);
-  const overdue = rows.filter(r=>r.status==='Overdue');
-  const closedRows = rows.filter(r=>r.closed && r.raised);
-  const onTime = closedRows.filter(r=>r.status==='On-time Closed').length;
-  /* On-time Closed ÷ (On-time Closed + Lately Closed) — main dashboard User Guide; 'Closed'
-     without a target date cannot be graded and stays out of the denominator */
-  const graded = rows.filter(r=>r.status==='On-time Closed' || r.status==='Lately Closed').length;
-  const rate = pct(onTime, graded);
-  const avgClose = closedRows.length ? Math.round(closedRows.reduce((t,r)=>t+dayDiff(r.closed,r.raised),0)/closedRows.length) : 0;
-  const mcar = rows.filter(r=>r.form==='mcar').length;
-  const amo  = rows.filter(r=>r.form==='amoecar').length;
-  /* KPI 7 excludes PAVOI currently Withdrawn from both numerator and denominator (live r152). */
-  const pav  = rows.filter(r=>r.form==='pavoi' && !r.withdrawn);
-  const pavAssessed = pav.filter(assessed).length;
-
-  /* monthly series for the rate-style KPIs, computed the same way as the headline */
-  const rateSeries = SERIES_MONTHS.map(mo=>{
-    const st = new Date(mo.y,mo.m,1);
-    const c = rows.filter(r=>r.closed && r.closed>=st && r.closed<=mo.end);
-    const gr = c.filter(r=>r.status==='On-time Closed' || r.status==='Lately Closed').length;
-    return gr ? pct(c.filter(r=>r.status==='On-time Closed').length, gr) : 0;
-  });
-  const closeSeries = SERIES_MONTHS.map(mo=>{
-    const st = new Date(mo.y,mo.m,1);
-    const c = rows.filter(r=>r.closed && r.closed>=st && r.closed<=mo.end);
-    return c.length ? Math.round(c.reduce((t,r)=>t+dayDiff(r.closed,r.raised),0)/c.length) : 0;
-  });
-  const k2Series = SERIES_MONTHS.map(mo=>{
-    const a = rows.filter(r=>r.form==='mcar' && r.raised && r.raised<=mo.end).length;
-    const b = rows.filter(r=>r.form==='amoecar' && r.raised && r.raised<=mo.end).length;
-    return pct(a,b);
-  });
-  const k7Series = SERIES_MONTHS.map(mo=>{
-    const p = rows.filter(r=>r.form==='pavoi' && !r.withdrawn && r.raised && r.raised<=mo.end);
-    return pct(p.filter(assessed).length, p.length);
-  });
+  const O = overviewStats(rows), S = O.s, s = O.series;
+  const open = rows.filter(M.isOpen), overdue = rows.filter(M.isOverdue);
+  const rate = S.onTimeRate, avgClose = S.avgCloseDays, rateSeries = O.rateSeries, closeSeries = O.closeSeries;
+  const k2Series = O.k2Series, k7Series = O.k7Series;
+  /* mock prototype (no live data) keeps its own KPI 7 source */
+  const pav = rows.filter(r=>r.form==='pavoi' && !r.withdrawn), pavAssessed = pav.filter(assessed).length;
+  const k7 = O.k7 || { rate: M.pct(pavAssessed, pav.length), assessed: pavAssessed, total: pav.length };
 
   const tiles = [
     kpiTile({label:'Open reports', value:String(open.length), note:REAL ? 'QA AMO reports (TQA CMR-CAR / ECAR on their own tabs)' : 'across all five forms', go:'work', tab:'open',
              series:s.open, trend:trendTag(s.open[11], s.open[10], 'down','')}),
     kpiTile({label:'Overdue', value:String(overdue.length), note:'past target date', go:'work', tab:'overdue',
              series:s.overdue, alarm:overdue.length>0, trend:trendTag(s.overdue[11], s.overdue[10], 'down','')}),
-    kpiTile({label:'On-time closure rate', value:rate+'%', note:'target ≥ 70% · '+onTime+' of '+graded, go:'analytics', tab:'kpi',
+    kpiTile({label:'On-time closure rate', value:rate+'%', note:'target ≥ 70% · '+S.onTime+' of '+S.graded, go:'analytics', tab:'kpi',
              series:rateSeries, alarm:rate<70, trend:trendTag(rateSeries[11], rateSeries[10], 'up','pt')}),
     kpiTile({label:'Average closure time', value:avgClose+' d', note:'raised date to close date', go:'analytics', tab:'kpi',
              series:closeSeries, trend:trendTag(closeSeries[11], closeSeries[10], 'down','d')}),
     /* Same formula as the main dashboard's KPI 2 card on KPI Charts (buildKPI2 5257–5259):
        MCAR count ÷ AMO-ECAR count in the period. The early-detection rate is its own screen. */
-    kpiTile({label:'KPI 2 · MCAR ÷ AMO-ECAR', value:pct(mcar,amo)+'%', note:mcar+' MCAR ÷ '+amo+' AMO-ECAR', go:'analytics', tab:'kpi',
+    kpiTile({label:'KPI 2 · MCAR ÷ AMO-ECAR', value:O.k2.pct+'%', note:O.k2.mcar+' MCAR ÷ '+O.k2.amo+' AMO-ECAR', go:'analytics', tab:'kpi',
              series:k2Series, trend:trendTag(k2Series[11], k2Series[10], 'up','pt')}),
     (REAL && REAL.partial)
       ? kpiTile({label:'KPI 7 · PAVOI assessed', value:'—', note:REAL.partialError ? 'verification rounds not loaded' : 'loading verification rounds…', go:'findings', tab:'pavoi', series:[]}) :
-    kpiTile({label:'KPI 7 · PAVOI assessed', value:pct(pavAssessed, pav.length)+'%', note:pavAssessed+' of '+pav.length+' assessed (verification round recorded)', go:'findings', tab:'pavoi',
-             series:k7Series, alarm:pct(pavAssessed,pav.length)<50, trend:trendTag(k7Series[11], k7Series[10], 'up','pt')})
+    kpiTile({label:'KPI 7 · PAVOI assessed', value:(k7.rate === null ? '—' : k7.rate+'%'), note:k7.assessed+' of '+k7.total+' assessed (verification round recorded)', go:'findings', tab:'pavoi',
+             series:k7Series, alarm:k7.rate !== null && k7.rate<50, trend:trendTag(k7Series[11], k7Series[10], 'up','pt')})
   ].join('');
 
   /* ---- overdue at a glance ---- */
@@ -2470,28 +2600,27 @@ function renderOverview(){
     ['Open','var(--data-1)'], ['In Progress','var(--data-2)'], ['Overdue','var(--accent)'],
     ['On-time Closed','var(--text-3)'], ['Lately Closed','var(--data-3)'], ['Closed','var(--hairline)']
   ].filter(m => m[0] !== 'In Progress' || !REAL);   /* live status has no In Progress */
-  const mix = mixDefs.map(m=>({ k:m[0], c:m[1], v:rows.filter(r=>r.status===m[0]).length }));
+  const mix = mixDefs.map(m=>({ k:m[0], c:m[1], v:rows.filter(r=>M.hasStatus(r, m[0])).length }));
 
   /* ---- recent activity, derived from the register ---- */
   const acts = [];
   rows.forEach(r=>{
     acts.push({ t:r.raised, hot:false, txt:'raised', r });
-    if(r.closed) acts.push({ t:r.closed, hot:false, txt:'closed '+(r.status==='On-time Closed'?'on time':'late'), r });
+    if(r.closed) acts.push({ t:r.closed, hot:false, txt:'closed '+(M.isOnTime(r)?'on time':M.isLate(r)?'late':'(no target)'), r });
     r.rounds.forEach(v=> { if(v.date) acts.push({ t:v.date, hot:v.result!=='Satisfactory', txt:'verification — '+v.result.toLowerCase(), r }); });
   });
   overdue.forEach(r=> { if(r.target) acts.push({ t:r.target, hot:true, txt:'passed its target date', r }); });
   const feed = acts.filter(a=>a.t<=TODAY).sort((a,b)=>b.t-a.t).slice(0,9).map(a=>{
     const d = dayDiff(TODAY, a.t);
     const when = d === 0 ? 'today' : d === 1 ? 'yesterday' : d < 30 ? d+'d ago' : fmtShort(a.t);
-    return '<button class="act-i" type="button" data-go="findings" data-tab="'+a.r.form+'" data-id="'+a.r.id+'">'
+    return '<button class="act-i" type="button" data-go="findings" data-tab="'+(a.r.form==='other'?'all':a.r.form)+'" data-id="'+a.r.id+'">'
       + '<span class="act-dot'+(a.hot?' hot':'')+'"></span>'
       + '<span class="act-body"><span class="row-id">'+esc(a.r.number)+' <span class="dim" style="font-weight:400">'+esc(a.txt)+'</span></span>'
       + '<span class="row-sub od-truncate">'+esc(a.r.auditTitle)+'</span></span>'
       + '<span class="num dim od-nowrap">'+when+'</span></button>';
   }).join('');
 
-  const liveAudits = auditsScoped().filter(a=>a.status==='In Progress').length;
-  const sched = auditsScoped().filter(a=>a.status==='Scheduled').length;
+  const AS = M.auditSummary(auditsScoped()), liveAudits = AS.inProgress, sched = AS.scheduled;
 
   return '<section class="sec">'
     + '<div class="sec-head"><h2>Key indicators</h2><span class="t-small dim">'+esc(periodLabel())
@@ -2559,7 +2688,7 @@ const LANES = {
   'work/open':    { cols:['number','form','status','owner','raised','target','dtd','level'],
                     rows:rs=>rs.filter(isOpen), title:'Open reports', lead:'Open and overdue reports, nearest target date first.' },
   'work/overdue': { cols:['number','form','cat','dtd','owner','dept','target','level'],
-                    rows:rs=>rs.filter(r=>r.status==='Overdue'), title:'Overdue', lead:'Reports past their target date. CAT I ≤ 30 days, CAT II 31–60 days, CAT III > 60 days overdue.' },
+                    rows:rs=>rs.filter(M.isOverdue), title:'Overdue', lead:'Reports past their target date. CAT I ≤ 30 days, CAT II 31–60 days, CAT III > 60 days overdue.' },
   'work/verify':  { cols:['number','status','owner','raised','verified','dtd'],
                     rows:rs=>rs.filter(r=>r.form==='pavoi' && isOpen(r) && !assessed(r)),
                     title:'Awaiting verification', lead:'Open PAVOI with no verification round recorded — not yet counted as assessed in KPI 7.' },
@@ -2764,7 +2893,7 @@ function renderAudit(tab){
       + cells + '</div>';
   }).join('');
 
-  const counts = ['Closed','Performed','In Progress','Scheduled','Cancelled'].map(s=>({s, n:AUD.filter(a=>a.status===s).length})).filter(c=>c.n || c.s!=='Cancelled');
+  const counts = ['Closed','Performed','In Progress','Scheduled','Cancelled'].map(s=>({s, n:AUD.filter(a=>a.status===s).length})).filter(c=>c.n || c.s!=='Cancelled');   /* metrics-ok: audit status legend counts */
 
   return kpis + '<section class="sec"><div class="card">'
     + '<div class="card-head"><h2>'+(REAL ? 'Programme · '+esc(periodLabel()) : 'Annual programme 2026')+'</h2>'
@@ -3340,17 +3469,8 @@ function fdx(v){
   return fmtDate(new Date(+d.slice(0,4), +d.slice(5,7)-1, +d.slice(8,10)));
 }
 /* The global Year × Month filter, applied to a raw date string (raised_date) */
-function inPeriod(v){
-  const f = state.filters;
-  if(!f.years.length && !f.months.length) return true;
-  if(!v) return false;
-  /* local calendar, like raised_year = new Date(raised_date).getFullYear() in loadData */
-  const d = new Date(v); if(isNaN(d)) return false;
-  const y = d.getFullYear(), m = d.getMonth();
-  if(f.years.length && !f.years.includes(y)) return false;
-  if(f.months.length && !f.months.includes(m)) return false;
-  return true;
-}
+/* the global Year × Month filter on a raw date — the rule lives in METRICS */
+function inPeriod(v){ return M.inPeriodDay(M.dayOf(v)); }
 const statusChip = s => chip(s || '—');
 /* Second pass not finished (or failed): screens that need CMR-CAR / ECAR / KPI 7 say so
    instead of showing zeros — "not loaded is not zero" (classic.html 6272–6277). */
@@ -3364,25 +3484,18 @@ const whenFull = (what, fn) => () => REAL.partial ? partialMsg(what) : fn();
 /* ==========================================================================
    ANALYTICS · KPI CHARTS  (classic.html page-kpi)
    ========================================================================== */
+/* KPI charts numbers — the QA scope in the period, through METRICS only (checked by M.consistency) */
+function kpiChartStats(f){ const data = M.period(M.qa(REPORTS), f); return { data, s: M.summary(data), k2: M.kpi2(data) }; }
 function scrKpi(){
   const A = API();
-  const data = A.allData().filter(r => inPeriod(r.raised_date));
-  /* buildKPICharts, classic.html 4754–4768 */
-  const CLOSED_S = ['On-time Closed','Lately Closed'];
-  const tot = data.length;
-  const open = data.filter(r => r.semantic_status === 'Open').length;
-  const over = data.filter(r => r.semantic_status === 'Overdue').length;
-  const onTime = data.filter(r => r.semantic_status === 'On-time Closed').length;
-  const closed = data.filter(r => CLOSED_S.includes(r.semantic_status)).length;
-  const cat3 = data.filter(r => r.overdue_cat === 'CAT III').length;
-  const audits = new Set(data.map(r => r.audit_id).filter(Boolean)).size;
+  const K = kpiChartStats(), S = K.s;
   let html = tiles([
-    stat('Total records', String(tot), periodLabel()),
-    stat('Open', String(open), 'semantic status Open'),
-    stat('Overdue', String(over), 'past target date', over > 0),
-    stat('On-time rate', closed > 0 ? Math.round(onTime/closed*100)+'%' : '—', onTime+' of '+closed+' closed'),
-    stat('CAT III', String(cat3), 'overdue > 60 days', cat3 > 0),
-    stat('Audits', String(audits), 'distinct audits behind these records')
+    stat('Total reports', String(S.total), periodLabel()),
+    stat('Open (within target)', String(S.inTarget), 'not closed, target not yet passed'),
+    stat('Overdue', String(S.overdue), 'past target date', S.overdue > 0),
+    stat('On-time closure rate', S.graded ? S.onTimeRate+'%' : '—', S.onTime+' of '+S.graded+' closed with a target'),
+    stat('CAT III', String(S.cat.III), 'overdue > 60 days', S.cat.III > 0),
+    stat('Audits', String(S.audits), 'distinct audits behind these reports')
   ]);
 
   /* KPI 2 volume card, buildKPI2 5227–5277 (kpi2Rows = MCAR + AMO ECAR of allData) */
@@ -3396,19 +3509,19 @@ function scrKpi(){
       (grp[g] ||= { mcar:0, amo:0 })[r.type]++; }));
     const keys = Object.keys(grp).filter(g => g !== '(none)')
       .sort((a,b) => (grp[b].amo+grp[b].mcar) - (grp[a].amo+grp[a].mcar)).slice(0,12);
-    const totM = rows.filter(r => r.type === 'mcar').length, totA = rows.filter(r => r.type === 'amo').length;
+    /* headline = the same METRICS figure as the Overview tile; the table breaks it down by nature */
     k2body = '<div class="od-row" style="--od-gap:16px;align-items:baseline"><span class="kpi-val">'
-      + (totA > 0 ? Math.round(totM/totA*100)+'%' : 'N/A') + '</span><span class="t-small dim">MCAR '+totM+' ÷ AMO-ECAR '+totA+'</span></div>'
+      + (K.k2.amo > 0 ? K.k2.pct+'%' : 'N/A') + '</span><span class="t-small dim">MCAR '+K.k2.mcar+' ÷ AMO-ECAR '+K.k2.amo+'</span></div>'
       + plainTable('k2vol', [{l:'Nature group'},{l:'MCAR',ar:true},{l:'AMO-ECAR',ar:true},{l:'Rate',ar:true}],
           keys.map(g => ['<span class="t-small">'+esc(g)+'</span>', '<span class="num">'+grp[g].mcar+'</span>',
-            '<span class="num">'+grp[g].amo+'</span>', '<span class="num strong">'+(grp[g].amo > 0 ? Math.round(grp[g].mcar/grp[g].amo*100)+'%' : '—')+'</span>']), 12);
+            '<span class="num">'+grp[g].amo+'</span>', '<span class="num strong">'+(grp[g].amo > 0 ? M.pct(grp[g].mcar, grp[g].amo)+'%' : '—')+'</span>']), 12);
   }
 
   /* KPI 7 by section, kpi7Stats 6191 + renderKpi7 6267 (rate withheld while any row is pending) */
   if(REAL.partial) return html + '<section class="sec cols cols-2">'
     + card('KPI 2 · MCAR ÷ AMO-ECAR', 'volume ratio by Nature of finding · '+esc(periodLabel()), k2body) + '</section>'
     + partialMsg('KPI 7 and the ATA comparison');
-  const st = A.kpi7Stats(r => inPeriod(r.raised_date));
+  const st = M.kpi7().stats;
   const rowRate = r => (r.total && !r.pending) ? A.kpi7Rate(r) : null;
   const k7rows = st.order.map(k => st.rows[k]).map(r => [
     '<span class="t-small">'+esc(r.key === '__unassigned__' ? 'Unassigned owner' : r.key)+'</span>',
@@ -3608,7 +3721,7 @@ function scrStatus(){
     const files = A.rsOkH(r) ? 'Uploaded<br><span class="t-small dim">'+r.files.length+' file(s)</span>' : '<span class="red strong">Miss final report</span>';
     const cells = ['<span class="row-main"><span class="row-id">'+esc(r.num)+'</span><span class="row-sub od-clamp-2">'+esc(r.subject)+'</span></span>',
       '<span class="t-small">'+esc(r.owner || '—')+'</span>', gaps, wf,
-      '<span class="t-small">'+(r.links.length ? r.links.map(esc).join('<br>') : '—')+'</span>', files, statusChip(r.status === 'Closed' ? 'Closed' : 'Open')];
+      '<span class="t-small">'+(r.links.length ? r.links.map(esc).join('<br>') : '—')+'</span>', files, statusChip(r.status === 'Closed' ? 'Closed' : 'Open')];   /* metrics-ok: Coruson report_status of EIS/F-088 (Report status screen) */
     if(isEis) cells.push('<span class="t-small">'+esc(r.links.filter(x => /^PAVOI/i.test(x)).join(', ') || '—')+'</span>');
     return cells;
   });
@@ -3679,11 +3792,11 @@ function scrOsr(){
   const q = (state.rowQuery || '').toLowerCase();
   const rows = all.filter(r => inPeriod(r.raised_date))
     .filter(r => !BS.osrForm || r.report_title === BS.osrForm)
-    .filter(r => BS.osrSF === 'all' || r.report_status === BS.osrSF)
+    .filter(r => BS.osrSF === 'all' || r.report_status === BS.osrSF)   /* metrics-ok: OSR/MOSR Coruson status */
     .filter(r => !BS.osrOu || r.org_unit_name === BS.osrOu)
     .filter(r => !q || [r.report_number, r.report_title, r.org_unit_name, r.report_status].join(' ').toLowerCase().includes(q))
     .sort((a,b) => String(b.raised_date).localeCompare(String(a.raised_date)));
-  const open = rows.filter(r => r.report_status === 'Open').length;
+  const open = rows.filter(r => r.report_status === 'Open').length;   /* metrics-ok: OSR/MOSR Coruson status (classic loadOsr) */
   return tiles([
       stat('OSR / MOSR', String(rows.length), periodLabel()),
       stat('OSR', String(rows.filter(r => r.report_title === '1. OSR').length), 'form 1. OSR'),
@@ -3697,7 +3810,7 @@ function scrOsr(){
       + sel('osrOu', [['','All org units']].concat(ous.map(o => [o, o])), BS.osrOu) + '</div>'
       + plainTable('osr', [{l:'Report'},{l:'Form'},{l:'Status'},{l:'Raised'},{l:'Org unit'},{l:'Last modified'}],
           rows.map(r => ['<span class="row-id">'+esc(r.report_number)+'</span>', '<span class="tag">'+esc(r.report_title)+'</span>',
-            statusChip(r.report_status === 'Closed' ? 'Closed' : r.report_status), '<span class="num">'+fdx(r.raised_date)+'</span>',
+            statusChip(r.report_status === 'Closed' ? 'Closed' : r.report_status),   /* metrics-ok: OSR/MOSR Coruson status */ '<span class="num">'+fdx(r.raised_date)+'</span>',
             '<span class="t-small">'+esc(r.org_unit_name || '—')+'</span>', '<span class="num dim">'+fdx(r.modified_date)+'</span>']), 25, 720)) + '</section>';
 }
 
@@ -3843,53 +3956,6 @@ async function userAction(el){
   }catch(e){ toast('Could not update user', e.message || String(e)); }
 }
 
-function scrExports(){
-  if(!IS_ADMIN()) return adminOnly();
-  const titles = [...new Set(REPORTS.map(r => r.code))].sort();
-  const rows = scoped().filter(r => !BS.afForm || r.code === BS.afForm);
-  return '<section class="sec cols cols-2">'
-    + card('Excel export', rows.length+' records · '+esc(periodLabel())+(BS.afForm ? ' · '+esc(BS.afForm) : ''),
-        '<p class="t-sub">The records on screen, with the same filters: year, month, department and form. One sheet per summary, one with every row.</p>'
-        + sel('afForm', [['','All forms']].concat(titles.map(t => [t, t])), BS.afForm, 'Form')
-        + '<span><button class="btn primary" type="button" data-act="bexport">Download .xlsx</button></span>')
-    + card('PDF and weekly overdue report', 'letterhead layouts', '<p class="t-sub">The PDF report and the weekly Overdue workbook keep their VietJet letterhead layout in the main dashboard. Open Export Reports there; your session carries over in this tab.</p>'
-        + '<span><a class="btn" href="./">Open the main dashboard</a></span>')
-    + '</section>';
-}
-function loadXlsx(){
-  if(window.XLSX) return Promise.resolve(window.XLSX);
-  return new Promise((res, rej) => {
-    const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-    s.onload = () => res(window.XLSX); s.onerror = () => rej(new Error('could not load the Excel library'));
-    document.head.appendChild(s);
-  });
-}
-async function doExport(){
-  if(!IS_ADMIN()) return toast('Only admins can export', '');
-  try{
-    const XLSX = await loadXlsx();
-    const rows = scoped().filter(r => !BS.afForm || r.code === BS.afForm);
-    const d = v => v ? fmtDate(v) : '';
-    const cnt = s => rows.filter(r => r.status === s).length;
-    const kpi = [['Metric','Value'],['Total',rows.length],['Open',cnt('Open')],['Overdue',cnt('Overdue')],['On-time Closed',cnt('On-time Closed')],
-      ['Lately Closed',cnt('Lately Closed')],['Closed (no target)',cnt('Closed')],['Repetitive',rows.filter(r => r.repetitive).length],
-      ['CAT I',rows.filter(r => r.cat === 'I').length],['CAT II',rows.filter(r => r.cat === 'II').length],['CAT III',rows.filter(r => r.cat === 'III').length]];
-    const forms = [...new Set(rows.map(r => r.code))].sort();
-    const fs = [['Form','Open','Overdue','On-time','Lately','Closed','Total']].concat(forms.map(f => {
-      const x = rows.filter(r => r.code === f), c = s => x.filter(r => r.status === s).length;
-      return [f, c('Open'), c('Overdue'), c('On-time Closed'), c('Lately Closed'), c('Closed'), x.length]; }));
-    const det = [['Report No','Form','Status','Raised','Target','Days to due','CAT','Finding level','Repetitive','Owner','Department','Audit']]
-      .concat(rows.slice().sort((a,b) => a.code.localeCompare(b.code) || (a.raised||0) - (b.raised||0)).map(r =>
-        [r.number, r.code, r.status, d(r.raised), d(r.target), r.dtd ?? '', r.cat ? 'CAT '+r.cat : '', r.level, r.repetitive ? 'Yes' : 'No', r.owner, r.dept, r.auditTitle]));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kpi), 'KPI Summary');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(fs), 'Form Summary');
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(det), 'Detail Data');
-    XLSX.writeFile(wb, 'QA_AMO_'+periodLabel().replace(/[^\w-]+/g,'_')+'_'+REAL.asOf+'.xlsx');
-  }catch(e){ console.warn('[beta] export failed', e); toast('Export failed', e.message || String(e)); }
-}
-
 function scrMyDash(){
   if(!IS_ADMIN()) return adminOnly();
   let widgets = [];
@@ -3959,14 +4025,13 @@ const BETA_SCREENS = REAL ? {
   'analytics/early': scrEarly, 'analytics/status': scrStatus,
   'audit/bottleneck': scrBottleneck,
   'library/documents': scrDocs, 'library/guide': scrGuide,
-  'admin/users': scrUsers, 'admin/exports': (typeof scrExportsFull === 'function' ? scrExportsFull : scrExports), 'admin/mydash': scrMyDash, 'admin/feedback': scrFeedback
+  'admin/users': scrUsers, 'admin/exports': () => scrExportsFull(), 'admin/mydash': scrMyDash, 'admin/feedback': scrFeedback
 } : {};
 const BETA_ACT = {
   bset: el => { BS[el.dataset.k] = el.dataset.v === '' ? (el.dataset.k === 'docType' ? null : '') : el.dataset.v; BS.pg = {}; render(); },
   bpage: el => { BS.pg[el.dataset.k] = Number(el.dataset.p); render(); },
   bretry: el => { delete LAZY[el.dataset.k]; render(); },
   buser: el => { userAction(el); },
-  bexport: () => { doExport(); },
   bfeedback: () => { sendFeedback(); }
 };
 document.addEventListener('change', e => {
@@ -4011,7 +4076,7 @@ function showEis(id){
     + (d.MEDA && d.MEDA.length ? '<div class="beta-block"><span class="t-micro">Contributing factors (MEDA)</span><span class="od-row" style="--od-gap:6px;flex-wrap:wrap">'
         + d.MEDA.map(m => '<span class="tag">'+esc(m)+'</span>').join('') + '</span></div>' : '')
     + '<div style="display:grid;gap:8px"><span class="t-micro">Corrective actions ('+cas.length+')</span>'
-    + (cas.length ? cas.map((c,i) => '<div class="beta-block'+(c.status==='Overdue'?' hot':'')+'">'
+    + (cas.length ? cas.map((c,i) => '<div class="beta-block'+(c.status==='Overdue'?' hot':'')+'">'   /* metrics-ok: EIS corrective-action status (classic loadEisDetail) */
         + '<span class="od-row" style="--od-gap:8px;flex-wrap:wrap"><span class="strong">CA '+(i+1)+'</span><span class="t-small dim">'+esc([c.dept, c.classification].filter(Boolean).join(' · '))+'</span>'+chip(c.status)+'</span>'
         + '<span class="t-sub">'+esc(c.action || '—')+'</span>'
         + '<span class="t-small dim">Target '+fdx(c.target)+' · Completed '+fdx(c.completed)+(c.voi ? ' · VOI: '+esc(c.voi) : '')+'</span></div>').join('')
@@ -4122,17 +4187,17 @@ function showAudit(id){
       '<span class="t-small">'+esc(s.stage_owner_name || '—')+'</span>', '<span class="num">'+fdx(start)+'</span>', '<span class="num">'+fdx(s.stage_target_date)+'</span>',
       '<span class="num">'+fdx(s.stage_completed_date)+'</span>', '<span class="num">'+(dur == null ? '—' : dur+' d')+'</span>'];
   });
-  const f = A.allData().filter(r => r.audit_id === id).sort((x,y) => String(x.report_number).localeCompare(String(y.report_number)));
-  const cnt = s => f.filter(r => r.semantic_status === s).length;
-  const body = '<div class="kpi-grid">' + stat('Findings', String(f.length), 'reports raised under this audit') + stat('Open', String(cnt('Open')), 'inside target')
-      + stat('Overdue', String(cnt('Overdue')), 'past target', cnt('Overdue') > 0) + stat('Closed', String(f.length - cnt('Open') - cnt('Overdue')), 'on time, late or no target') + '</div>'
+  const f = M.qa(REPORTS).filter(r => r.auditId === id).sort((x,y) => String(x.number).localeCompare(String(y.number)));
+  const S = M.summary(f);
+  const body = '<div class="kpi-grid">' + stat('Findings', String(S.total), 'reports raised under this audit') + stat('Open', String(S.inTarget), 'inside target')
+      + stat('Overdue', String(S.overdue), 'past target', S.overdue > 0) + stat('Closed', String(S.total - S.open), 'on time, late or no target') + '</div>'
     + '<div style="display:grid;gap:8px"><span class="t-micro">Workflow stages</span>'
     + (stageRows.length ? plainTable('aud-st-'+id, [{l:'Stage'},{l:'Status'},{l:'Owner'},{l:'Start'},{l:'Due'},{l:'Completed'},{l:'Duration',ar:true}], stageRows, 30, 760)
                         : '<p class="t-sub dim">No workflow stages recorded for this audit.</p>') + '</div>'
     + '<div style="display:grid;gap:8px"><span class="t-micro">Findings</span>'
     + (f.length ? plainTable('aud-f-'+id, [{l:'Report'},{l:'Form'},{l:'Status'},{l:'Raised'},{l:'Target'},{l:'Owner'}], f.map(r =>
-        ['<span class="row-id">'+esc(r.report_number)+'</span>', '<span class="tag">'+esc(r.report_title)+'</span>', chip(r.semantic_status),
-         '<span class="num">'+fdx(r.raised_date)+'</span>', '<span class="num">'+fdx(r.Target_date)+'</span>', '<span class="t-small">'+esc(r.owner_name || '—')+'</span>']), 30, 720)
+        ['<span class="row-id">'+esc(r.number)+'</span>', '<span class="tag">'+esc(r.code)+'</span>', chip(r.status),
+         '<span class="num">'+fmtDate(r.raised)+'</span>', '<span class="num">'+fmtDate(r.target)+'</span>', '<span class="t-small">'+esc(r.owner)+'</span>']), 30, 720)
       : '<p class="t-sub dim">No findings raised under this audit.</p>') + '</div>';
   openModal(a.number+' — '+a.title, sub, body);
 }
@@ -4169,20 +4234,19 @@ async function savePassword(){
 }
 
 /* ---- Admin › Export reports: the main dashboard's own export functions ---- */
-function exportRows(){
-  const A = API(), f = state.filters;
-  return A.allData().filter(r => inPeriod(r.raised_date))
-    .filter(r => !BS.afForm || r.report_title === BS.afForm)
-    .filter(r => !BS.expSt || r.semantic_status === BS.expSt);
+/* rows of an export = QA scope, period, form, status — through METRICS; classic functions get the raw records */
+function exportRowsFor(f, form, status){
+  return M.period(M.qa(REPORTS), f).filter(r => !form || r.code === form).filter(r => !status || M.hasStatus(r, status));
 }
+const exportRows = () => exportRowsFor(state.filters, BS.afForm, BS.expSt);
 function scrExportsFull(){
   if(!IS_ADMIN()) return adminOnly();
-  const titles = [...new Set(API().allData().map(r => r.report_title))].sort();
-  const rows = exportRows(), n = s => rows.filter(r => r.semantic_status === s).length;
+  const titles = [...new Set(M.qa(REPORTS).map(r => r.code))].sort();
+  const rows = exportRows(), S = M.summary(rows);
   const busy = BS.expBusy ? ' disabled' : '';
-  return tiles([stat('Records', String(rows.length), periodLabel()), stat('Open', String(n('Open')), 'inside target'),
-      stat('Overdue', String(n('Overdue')), 'past target', n('Overdue') > 0), stat('On-time closed', String(n('On-time Closed')), 'closed by target'),
-      stat('Lately closed', String(n('Lately Closed')), 'closed after target')])
+  return tiles([stat('Records', String(S.total), periodLabel()), stat('Open (within target)', String(S.inTarget), 'target not yet passed'),
+      stat('Overdue', String(S.overdue), 'past target', S.overdue > 0), stat('On-time closed', String(S.onTime), 'closed by target'),
+      stat('Lately closed', String(S.late), 'closed after target')])
     + '<section class="sec cols cols-2">'
     + card('Report export', 'PDF on the VietJet letterhead, or Excel (KPI summary, form summary, detail)',
         '<div class="od-row" style="--od-gap:12px;flex-wrap:wrap">'
@@ -4202,7 +4266,7 @@ async function runExport(kind){
   BS.expBusy = true; render();
   try{
     await window.betaLoadExportLibs();
-    const A = API(), rows = exportRows();
+    const A = API(), rows = M.raw(exportRows());
     if((kind === 'pdf' || kind === 'xlsx') && !rows.length) throw new Error('No records match the filters.');
     A.setExport(REAL.user, rows, BS.afForm ? [BS.afForm] : [], state.filters.years, state.filters.months);
     if(kind === 'pdf') await A.exportPDF();
@@ -4260,6 +4324,8 @@ async function aiSend(){
 function selfCheckChip(){
   if(!IS_ADMIN() || REAL.partial) return '';
   let w = []; try{ w = API().selfChecks(); }catch(e){ w = ['Self-check failed: ' + e.message]; }
+  /* plus the cross-screen consistency check of METRICS */
+  try{ w = w.concat(M.consistency()); }catch(e){ w.push('Consistency check failed to run: ' + e.message); }
   BS.selfWarn = w;
   return w.length ? '<button class="cat c3" type="button" data-act="bselfcheck" title="'+esc(w.join('\n'))+'">⚠ '+w.length+'</button>' : '';
 }
@@ -4334,20 +4400,16 @@ function topExtras(){
 
 /* Audit Plan KPI tiles — renderAuditKpi 7672–7712, on the MNT audits inside the Year × Month filter */
 function auditKpiTiles(){
-  const A = API(), f = state.filters;
-  const data = A.auditData().filter(a => a.is_qa_amo_scope
-    && (!f.years.length || f.years.includes(+a.sched_year))
-    && (!f.months.length || f.months.includes(Number(String(a.scheduled_start_date).slice(5,7)) - 1)));
-  const total = data.length, closed = data.filter(a => a.status === 'Closed').length;
-  const open = data.filter(a => ['InProgress','Performed','Scheduled'].includes(a.status)).length;
-  const rate = total ? Math.round(closed / total * 100) : 0;
+  const A = API();
+  const data = A.auditData().filter(a => a.is_qa_amo_scope && M.auditInPeriod(a));
+  const S = M.auditSummary(data);
   const stageT = s => A.normalizeStageTitle(s.stage_type);
   const inCar = data.filter(a => (a.audit_stages || []).some(s => ['Follow up CAR','Finding follow up'].includes(stageT(s)) && s.stage_status === 'InProgress')).length;
   const sc = {}; data.forEach(a => (a.audit_stages || []).forEach(s => { if(s.stage_status === 'InProgress'){ const t = stageT(s); sc[t] = (sc[t] || 0) + 1; } }));
   const top = Object.entries(sc).sort((a,b) => b[1] - a[1])[0];
   const years = [...new Set(data.map(a => a.sched_year).filter(Boolean))].sort();
-  return tiles([stat('Total audits', String(total), 'MNT · '+periodLabel()), stat('Closed', String(closed), 'status Closed'),
-    stat('Open', String(open), 'in progress, performed or scheduled'), stat('Closure rate', rate+'%', closed+' of '+total, total > 0 && rate < 50),
+  return tiles([stat('Total audits', String(S.total), 'MNT · '+periodLabel()), stat('Closed', String(S.closed), 'status Closed'),
+    stat('Open', String(S.open), 'in progress, performed or scheduled'), stat('Closure rate', S.rate+'%', S.closed+' of '+S.total, S.total > 0 && S.rate < 50),
     stat('CAR follow-up', String(inCar), 'stage in progress'), stat('Bottleneck', top ? top[0] : '—', top ? top[1]+' audits in progress' : 'no stage in progress', false, true),
     stat('Years', years.length ? (years.length <= 3 ? years.join(', ') : years[0]+'–'+years[years.length-1]) : '—', years.length+' year(s)', false, true)]);
 }
