@@ -5,6 +5,31 @@
 
 ---
 
+## ⏳ r167 — GIAO DIỆN MỚI THÀNH BẢN CHÍNH (22/09/2026, commit chờ Eric cho push)
+
+```
+index.html   = giao diện mới (không chứa logic; tải classic.html, trích hàm, tự ghi cache)
+classic.html = bản cũ, BACKUP + nơi DUY NHẤT chứa logic dữ liệu và APP_REV (2026.09.22-r167)
+beta.html    = chuyển hướng về ./
+```
+- Sửa giao diện: nguồn ở `Vault-CongViec/.../rebuild UIUX/beta-src/` (`loader.js`, `screens.js`, `screens2.js`, `guide.js`)
+  → `node build.mjs` → `node make-index.mjs` (ghi `index.html` vào repo). Sửa logic: sửa `classic.html` (cả 2 trang dùng).
+- Hook/guard đã theo dõi cả 2 file; `check-doc-sync.sh` đọc APP_REV từ `classic.html`; `test-r155-kpi7.mjs` + `snapshot.mjs` đọc `classic.html`.
+- Đã có trên bản mới: đăng nhập/đăng ký/quên & đổi mật khẩu, ghi cache + delta, 2 lượt nạp, ↻ + tự nạp 12h, LED `?kiosk=`,
+  37 form + CMR-CAR + ECAR, OSR/MOSR, Analytics (KPI charts, SPI, Safety, Early detection, Event/IR status), Audit Plan
+  (Year×Month, 7 ô KPI, chi tiết audit, Bottleneck), Documents (+copyholders/workflow), chi tiết EIS/QCS, PAVOI RFI/Task
+  (+ rfv/report_ref/dept), export PDF/Excel/Overdue bằng hàm của classic, AI Assistant, chip self-check, User guide mới.
+- Overview + Work Queue theo phạm vi QA AMO (allData) như classic; CMR-CAR/ECAR (TQA) ở tab riêng.
+- Kiểm local (relay dữ liệu thật): 25 màn không lỗi JS, số khớp classic (2026: open 77, overdue 37, on-time 222/520,
+  KPI 7 51/59), 4 export ra file đúng, LED 5 bước, 18 màn không tràn 375px. **Chưa kiểm được local:** đăng nhập thật,
+  User management, Feedback, AI (worker chỉ nhận origin site) → kiểm ngay sau push.
+- ⚠ Self-check "KPI 7 drill-down contamination" (3 cảnh báo) là kiểm tra cũ của classic, lệch công thức r155 — classic cũng báo; chờ Eric quyết.
+- Tài liệu: `MQA dashboard website/HuongDan_SuDung_QA_AMO_Dashboard_r167.docx` (13 trang), email nháp song ngữ
+  `MQA dashboard website/mail/Email-thong-bao-giao-dien-moi-QA-AMO-Dashboard-2026-09-22.md`.
+- Lùi: `git revert <commit r167>` (đưa classic.html về index.html).
+
+---
+
 ## ⏳ beta.html — giao diện Open Design trên logic dữ liệu live (22/09/2026, push theo yêu cầu Eric)
 
 `vjc-qa-amo.com/beta.html`. Không đổi `index.html` ⇒ không bump `APP_REV`, bản chính không bị ảnh hưởng.

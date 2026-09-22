@@ -8,7 +8,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const BODY = path.join(HERE, '.test-r155-body.mjs');   // file tam, .gitignore bo qua
 
-const SRC = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+const SRC = fs.readFileSync(path.join(ROOT, 'classic.html'), 'utf8');   // [r167] logic lives in classic.html
 
 function grab(name) {
   let i = SRC.indexOf('async function ' + name + '(');

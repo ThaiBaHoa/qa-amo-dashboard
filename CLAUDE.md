@@ -54,7 +54,23 @@ used only for developer conversation and code comments, never in what the user s
 
 ## Architecture — read this first
 
-The **entire app is one file: `index.html`** (~8,700 lines). HTML + CSS + JS inline.
+> **Since r167 (22/09/2026) there are two pages.**
+> - **`index.html` — the dashboard users open** (redesigned UI from the Open Design prototype). It holds
+>   NO business logic of its own: at load it fetches `classic.html`, extracts the data functions it needs
+>   (`loadData`, `loadCmr`, `loadEcar`, `loadKpi7Tasks`, `kpi7*`, `loadSafety`, `loadSPI`, `loadRptStatus`,
+>   `loadOsr`, `loadDocuments`, exports, AI tools… and everything they reference, found automatically by
+>   `extractClosure`), runs them in their own scope with DOM stubs, and draws its own screens. It owns the
+>   caches (writes `qaAmoV5`, `wfRaw`, `cfRaw` in the same shape as classic). Sources to edit it live in the
+>   vault: `Vault-CongViec/.../MQA dashboard website/rebuild UIUX/beta-src/` (`loader.js`, `screens.js`,
+>   `screens2.js`, `guide.js`, `build.mjs` + README) — build, then copy the result here as `index.html`.
+> - **`classic.html` — the previous dashboard, kept as backup and as the single source of the data
+>   logic and of `APP_REV`.** Everything below that says `index.html` about logic, invariants, loaders
+>   and line numbers now applies to `classic.html`. A logic change is made in `classic.html` and both
+>   pages pick it up. Renaming a loader or a field used by the new UI breaks `index.html` loudly (boot
+>   error screen) — check both pages after any logic change.
+> - `beta.html` only redirects to `./`.
+
+The **classic app is one file: `classic.html`** (~12,000 lines). HTML + CSS + JS inline.
 There is no build step, no `package.json`, no `node_modules`, no framework.
 
 - `CNAME` — GitHub Pages custom domain (`vjc-qa-amo.com`). Deploy = push to `main`.
@@ -469,7 +485,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.09.21-r166
+Rev current: 2026.09.22-r167
 
 ORG_UNIT_IDS          ← main pages: 'QA AMO' + ALL its sub-units, resolved at load
                          from dwreporting_organisational_unit_hierarchy (r143).

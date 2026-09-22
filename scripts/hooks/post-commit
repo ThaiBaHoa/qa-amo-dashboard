@@ -30,10 +30,12 @@ if [ -z "$WORKSPACE" ]; then
   exit 0
 fi
 
-if [ -f "$ROOT/index.html" ]; then
-  cp "$ROOT/index.html" "$WORKSPACE/index.html" && \
-    echo "[post-commit] Da backup index.html -> $WORKSPACE"
-fi
+# [r167] index.html = giao dien moi, classic.html = ban cu (logic + APP_REV). Backup ca hai.
+for F in index.html classic.html; do
+  if [ -f "$ROOT/$F" ]; then
+    cp "$ROOT/$F" "$WORKSPACE/$F" && echo "[post-commit] Da backup $F -> $WORKSPACE"
+  fi
+done
 
 if [ -f "$ROOT/scripts/gen-changelog.sh" ]; then
   ( cd "$ROOT" && sh scripts/gen-changelog.sh "$WORKSPACE/NHAT_KY_CAP_NHAT_APP.md" )

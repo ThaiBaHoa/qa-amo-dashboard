@@ -1,13 +1,14 @@
 #!/bin/sh
-# Guard doc<->code: chan commit khi tai lieu tut rev so voi APP_REV trong index.html.
-# Chi chay khi commit co dung toi index.html.
+# Guard doc<->code: chan commit khi tai lieu tut rev so voi APP_REV trong classic.html.
+# Chi chay khi commit co dung toi index.html (giao dien) hoac classic.html (logic + APP_REV).
+# [r167] Tu 22/09/2026 giao dien moi la index.html; ban cu (logic, APP_REV) la classic.html.
 #
 # Hook KHONG duoc version hoa. Cai lai sau moi lan clone:
 #   sh scripts/install-hooks.sh
 #
 # Bo qua mot lan:  git commit --no-verify
 
-if git diff --cached --name-only | grep -qx 'index.html'; then
+if git diff --cached --name-only | grep -qxE 'index.html|classic.html'; then
   ROOT="$(git rev-parse --show-toplevel)"
   if [ -f "$ROOT/scripts/check-doc-sync.sh" ]; then
     sh "$ROOT/scripts/check-doc-sync.sh" || {

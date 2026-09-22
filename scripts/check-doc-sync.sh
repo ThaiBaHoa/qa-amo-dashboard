@@ -22,11 +22,12 @@ cd "$ROOT" || exit 0
 # (KHÁC resolve-workspace.sh — cái đó lo việc mirror index.html, không đổi).
 CTX="$(sh "$ROOT/scripts/resolve-vault-note.sh" 2>/dev/null)"
 
-REV_FULL="$(grep -oE "APP_REV[^;]*" index.html | head -1 | grep -oE "r[0-9]+(-i[0-9]+)?")"
+# [r167] APP_REV nam trong classic.html (logic); index.html la giao dien moi, doc logic tu classic.html.
+REV_FULL="$(grep -oE "APP_REV[^;]*" classic.html | head -1 | grep -oE "r[0-9]+(-i[0-9]+)?")"
 REV_MAJOR="$(printf '%s' "$REV_FULL" | grep -oE 'r[0-9]+')"
 
 if [ -z "$REV_MAJOR" ]; then
-  echo "[doc-sync] Không đọc được APP_REV trong index.html — bỏ qua." >&2
+  echo "[doc-sync] Không đọc được APP_REV trong classic.html — bỏ qua." >&2
   exit 0
 fi
 
