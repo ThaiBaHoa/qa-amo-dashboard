@@ -5,18 +5,20 @@
 
 ---
 
-## ⏳ beta.html — giao diện Open Design trên logic dữ liệu live (22/09/2026, CHƯA COMMIT)
+## ⏳ beta.html — giao diện Open Design trên logic dữ liệu live (22/09/2026, push theo yêu cầu Eric)
 
-`beta.html` nằm **untracked** trên máy EricThai (`F:\App Build\GitHub\qa-amo-dashboard\beta.html`), chưa commit
-và chưa push, vì push đồng nghĩa với việc đăng công khai ở `vjc-qa-amo.com/beta.html`, cần Eric đồng ý. Máy khác
-**không có file này**.
+`vjc-qa-amo.com/beta.html`. Không đổi `index.html` ⇒ không bump `APP_REV`, bản chính không bị ảnh hưởng.
+Mở: đăng nhập ở `/` rồi mở `/beta.html` trong **cùng tab**. Lùi: `git rm beta.html` + push.
 - Giao diện = thiết kế OD 15/09 11:51 (`Documents\GitHub\od-imports\qa-amo-ia-redesign\index.html`) + adapter dữ liệu thật.
 - Loader: tải `index.html` cùng domain → `extractClosure()` lần theo tên từ `loadData/loadCmr/loadEcar/loadKpi7Tasks/kpi7*`
   → đọc cache `qaAmoCache/blobs/qaAmoV5` (chỉ đọc, cùng rev) hoặc `loadData(true)` → ánh xạ REPORTS/AUDITS → đối chiếu.
 - Chạy thử local: `preview beta-local` (Vault-CongViec `.claude/launch.json`, relay `rebuild UIUX/beta-devserver.mjs`).
   Đo 22/09: 4.117 report, KPI 7 2026 = 51/59, mọi phép đối chiếu khớp; có cache thì 15s, không có cache thì 20–137s.
-- ⚠️ **Chưa có hành vi r165/r166 trong beta**: stub `idbGet/idbSet/wfWatermark` ⇒ không nạp delta `wfRaw/cfRaw`, không có
-  stale-while-revalidate (cache cũ đọc được nhưng không nạp mới ngầm). Việc tiếp theo.
+- ✅ **Đã có hành vi r148/r165/r166:** `idbGet` đọc thật `wfRaw`/`cfRaw` (chỉ đọc; `idbSet` rỗng ⇒ mốc delta của bản
+  chính giữ nguyên), gọi `loadData(false)`. Cache cùng rev quá `CACHE_TTL` (đọc từ index.html) ⇒ hiện ngay, nạp ngầm trong
+  scope riêng, **chỉ thay khi đủ nguồn + đối chiếu sạch** (`betaSwap()` thay nội dung REPORTS/AUDITS/INDEX, không reload).
+  Đo local 22/09: cache 5h → UI 6,7s, `[wf] DELTA 126 report 4,1s`, `[cf] DELTA 11 report 4,3s`, nạp ngầm xong 16,5s;
+  sau đó `wfRaw`/`cfRaw`/`qaAmoV5` không đổi byte nào về mốc/số dòng.
 - Còn: KPI 2 đang để "—" (chưa nối `loadKpi2`); bước kiểm đăng nhập chưa thử trên live; Analytics/Library/Admin vẫn là placeholder.
 - Hồ sơ: note `om` `inbox/2026-09-22-qa-amo-dashboard-betahtml-open-design-ui-on-live-data-logic.md`.
 

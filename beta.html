@@ -1,0 +1,2736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>QA AMO Dashboard — Beta · VietJet Air</title>
+<meta name="description" content="Beta of the redesigned QA AMO dashboard, running on the live dashboard's Galileo data logic.">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* OD-LAYOUT-PRIMITIVES v1 — structure only: display, flex/grid, overflow, wrapping, ratio.
+   Put this @layer first; product CSS outside the layer always wins. */
+@layer od-layout {
+  :where(.od-stack,.od-row,.od-row-top,.od-cluster,.od-grid,.od-field,.od-stat,.od-cell,.od-tile) > :where(*) { min-width: 0; }
+
+  /* containers */
+  .od-stack   { display: flex; flex-direction: column; gap: var(--od-gap, 8px); }
+  .od-row     { display: flex; align-items: center; gap: var(--od-gap, 8px); }
+  .od-row-top { display: flex; align-items: flex-start; gap: var(--od-gap, 8px); }
+  .od-cluster { display: flex; flex-wrap: wrap; align-items: center; gap: var(--od-gap, 8px); }
+  .od-fill    { flex: 1 1 0; min-width: 0; }
+  .od-fixed   { flex: none; }
+  .od-grid    { display: grid; gap: var(--od-gap, 12px); grid-template-columns: repeat(var(--od-cols, 3), minmax(0, 1fr)); }
+
+  /* stacked information: each piece is its own line — never sibling inline spans */
+  .od-stat, .od-field, .od-cell { display: grid; gap: var(--od-gap, 2px); }
+  :where(.od-stat,.od-field,.od-cell) > :where(*) { display: block; }
+  .od-tile { display: grid; grid-template-rows: auto 1fr; }
+  :where(.od-tile) > :where(*) { display: block; }
+
+  /* media keeps its intrinsic ratio by default; never a distorted or cropped
+     cover by accident. height:auto lets the ratio win over an <img height="…">
+     attribute. Cropping to a uniform box is an explicit opt-in: set --od-ratio
+     AND add .od-media-cover together (per the core rule, only where a crop is
+     deliberate — tile thumbs, decorative fills — never on full-frame content). */
+  .od-media { display: block; width: 100%; height: auto; aspect-ratio: var(--od-ratio, auto); }
+  .od-media-cover { object-fit: cover; }
+
+  /* data text only — authored copy is rewritten to its budget instead */
+  .od-truncate { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .od-clamp-2, .od-clamp-3 { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .od-clamp-2 { -webkit-line-clamp: 2; }
+  .od-clamp-3 { -webkit-line-clamp: 3; }
+  .od-lines-2 { min-height: calc(2 * 1.4em); }   /* block-level reservation for a shared baseline */
+  .od-nowrap  { white-space: nowrap; }           /* 数字+单位 · 价格+起 · 日期+星期 */
+  .od-keep    { word-break: keep-all; overflow-wrap: anywhere; } /* CJK labels break at spaces / <wbr> first */
+
+  /* screen skeleton (optional): bars take their own space, the middle scrolls — no padding guessed for chrome */
+  .od-screen { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; }
+  .od-scroll { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
+
+  /* horizontal rail: the next item peeks at the edge; trailing room survives overflow */
+  .od-rail { display: flex; gap: var(--od-gap, 8px); overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none;
+             padding-inline: var(--od-rail-pad, 16px); scroll-padding-inline: var(--od-rail-pad, 16px); }
+  .od-rail::-webkit-scrollbar { display: none; }
+  :where(.od-rail) > :where(*) { flex: none; scroll-snap-align: start; }
+  :where(.od-rail) > :where(:last-child) { margin-inline-end: var(--od-rail-pad, 16px); }
+
+  .od-spacer { flex: none; visibility: hidden; pointer-events: none; }
+  .od-touch  { min-width: 44px; min-height: 44px; }
+}
+/* /OD-LAYOUT-PRIMITIVES v1 */
+
+/* ============================================================
+   DESIGN TOKENS — one place. Dark neutral ground, VietJet red as
+   the only accent hue. Every colour, size, spacing step, radius
+   and duration used anywhere in this document resolves here.
+   ============================================================ */
+:root{
+  /* ground + surfaces */
+  --bg:#0B0D10;
+  --sunken:#101317;
+  --surface:#14171C;
+  --raised:#1A1E24;
+  --raised-2:#22272F;
+  --border:#262B33;
+  --border-strong:#39414E;
+  --hairline:#1B1F25;
+
+  /* text ramp — all three clear 4.5:1 on --bg */
+  --text:#E8EBF0;
+  --text-2:#9BA5B4;
+  --text-3:#7D8797;
+
+  /* the single accent: VietJet red.
+     --accent is the brand value, used for fills, bars, rules and marks.
+     --accent-fg / --accent-fg-2 are the same hue lightened so small text
+     on the dark ground clears 4.5:1 (#E30613 itself reaches only 3.99:1). */
+  --accent:#E30613;
+  --accent-fg:#FF6B6F;
+  --accent-fg-2:#FFB3B5;
+  --accent-08:rgba(227,6,19,.08);
+  --accent-12:rgba(227,6,19,.12);
+  --accent-20:rgba(227,6,19,.20);
+  --accent-28:rgba(227,6,19,.28);
+  --accent-34:rgba(227,6,19,.34);
+  --accent-62:rgba(227,6,19,.62);
+
+  /* spacing rhythm — multiples of 4 only */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; --s8:64px;
+
+  /* radii */
+  --r-card:10px; --r-ctl:8px; --r-chip:999px;
+
+  /* motion */
+  --dur-in:180ms; --dur-out:120ms;
+  --ease-out:cubic-bezier(0,0,.2,1);
+  --ease-in:cubic-bezier(.4,0,1,1);
+
+  /* type */
+  --font:system-ui,"Segoe UI Variable Text","Segoe UI",-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;
+  --mono:ui-monospace,"Cascadia Mono","Cascadia Code",Consolas,"SFMono-Regular",Menlo,monospace;
+
+  /* chrome */
+  --nav-w:248px;
+  --topbar-h:60px;
+
+  /* ---- theme-dependent semantics ----------------------------------------
+     Everything below flips wholesale in the light theme. Kept apart from the
+     ground and text ramps above so a theme is one block, never a hunt through
+     rules. --on-* is always the foreground that belongs to the fill named
+     after it; the pair is declared together so a state can never invert into
+     light-on-light or dark-on-dark. */
+  color-scheme:dark;
+
+  --accent-press:#C00511;      /* solid accent, hovered / pressed */
+  --on-accent:#FFFFFF;         /* text on a solid --accent fill */
+  --on-wash:#FFFFFF;           /* text on the --accent-34 wash: mark, selection */
+
+  /* neutral data ramp: four steps that stay mutually legible on --surface */
+  --data-1:#39414E;  --on-data-1:#FFFFFF;
+  --data-2:#2B313B;  --on-data-2:#E8EBF0;
+  --data-3:#4C5563;
+  --hatch:#1A1E24;             /* diagonal hatch for "scheduled" */
+
+  /* depth */
+  --scrim:rgba(4,6,9,.74);
+  --shadow-1:0 24px 64px rgba(0,0,0,.6);
+  --shadow-2:0 12px 32px rgba(0,0,0,.5);
+}
+
+/* ============================================================
+   LIGHT THEME — the same structure on a cool paper ground.
+   Not an inversion: the surfaces re-stack (cards go white, the
+   page and filter bar recede to grey) and the accent darkens to
+   #AA040F, because #E30613 only just clears 4.5:1 on white and
+   fails it over its own tinted washes.
+   ============================================================ */
+html[data-theme="light"]{
+  color-scheme:light;
+
+  --bg:#F6F7F9;
+  --sunken:#ECEFF3;
+  --surface:#FFFFFF;
+  --raised:#F1F3F6;
+  --raised-2:#E4E8EE;
+  --border:#DDE2E9;
+  --border-strong:#B3BCC9;
+  --hairline:#E8ECF1;
+
+  --text:#12161C;
+  --text-2:#4C5663;
+  --text-3:#5E6875;
+
+  --accent:#E30613;
+  --accent-fg:#AA040F;
+  --accent-fg-2:#8C0209;
+
+  --on-wash:#8C0209;
+
+  --data-1:#A4AFBE;  --on-data-1:#12161C;
+  --data-2:#CBD3DE;  --on-data-2:#12161C;
+  --data-3:#8593A4;
+  --hatch:#D3DAE3;
+
+  --scrim:rgba(18,22,28,.46);
+  --shadow-1:0 24px 64px rgba(16,22,34,.20);
+  --shadow-2:0 12px 32px rgba(16,22,34,.16);
+}
+
+/* Colour-only crossfade while switching, so the flip reads as one move
+   rather than a flash. Removed again 220ms later; the reduced-motion rule
+   at the foot of this sheet cancels it outright. */
+html.theming,html.theming *,html.theming *::before,html.theming *::after{
+  transition:background-color 180ms var(--ease-out),border-color 180ms var(--ease-out),
+             color 180ms var(--ease-out),fill 180ms var(--ease-out),stroke 180ms var(--ease-out) !important;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+html,body{height:100%}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:var(--font);font-size:16px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+}
+h1,h2,h3,h4{margin:0;line-height:1.25;font-weight:650;letter-spacing:-.01em}
+h1{font-size:20px}
+h2{font-size:18px}
+h3{font-size:16px}
+p{margin:0}
+button{font:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer}
+a{color:var(--accent-fg);text-decoration:none}
+a:hover{text-decoration:underline}
+ul{margin:0;padding:0;list-style:none}
+:focus-visible{outline:2px solid var(--accent-fg);outline-offset:2px;border-radius:4px}
+::selection{background:var(--accent-34);color:var(--on-wash)}
+svg{display:block;flex:none}
+
+/* scrollbars */
+*{scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent}
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:99px;border:3px solid var(--bg)}
+
+/* ---------- type helpers ---------- */
+.t-micro{font-size:13px;line-height:1.45;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);font-weight:650}
+.t-sub{font-size:15px;line-height:1.6;color:var(--text-2)}
+.t-small{font-size:14px;line-height:1.5;color:var(--text-2)}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.mono{font-family:var(--mono);font-size:.94em;letter-spacing:-.01em}
+.strong{color:var(--text);font-weight:650}
+.dim{color:var(--text-3)}
+.red{color:var(--accent-fg)}
+
+.skip{position:fixed;top:8px;left:8px;z-index:200;padding:10px 14px;background:var(--raised);border:1px solid var(--accent);border-radius:var(--r-ctl);transform:translateY(-300%)}
+.skip:focus{transform:none}
+
+/* ============================================================
+   APP SHELL
+   ============================================================ */
+.app{display:grid;grid-template-columns:var(--nav-w) minmax(0,1fr);height:100dvh}
+.main{display:grid;grid-template-rows:auto auto minmax(0,1fr);min-width:0;min-height:0}
+
+/* ---------- sidebar ---------- */
+.sidebar{
+  background:var(--surface);border-right:1px solid var(--border);
+  display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-height:0;
+}
+.brand{display:flex;align-items:center;gap:10px;padding:var(--s4);border-bottom:1px solid var(--border)}
+.brand-mark{width:34px;height:34px;flex:none;border-radius:7px;background:var(--accent);display:grid;place-items:center;font-weight:800;font-size:15px;color:var(--on-accent);letter-spacing:-.03em}
+.brand-text{display:grid;gap:1px;min-width:0}
+.brand-name{font-size:15px;font-weight:700;letter-spacing:-.01em;display:block}
+.brand-sub{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);font-weight:650;display:block}
+.sb-nav{padding:var(--s3) var(--s3) var(--s4);overflow-y:auto;min-height:0}
+.sb-foot{border-top:1px solid var(--border);padding:var(--s3)}
+
+.nav-b{
+  position:relative;display:flex;align-items:center;gap:12px;width:100%;
+  padding:10px 12px;border-radius:var(--r-ctl);min-height:44px;
+  color:var(--text-2);font-size:15px;font-weight:550;text-align:left;
+  transition:background var(--dur-in) var(--ease-out),color var(--dur-in) var(--ease-out);
+}
+.nav-b:hover{background:var(--raised);color:var(--text)}
+.nav-b[aria-current="page"]{background:var(--accent-12);color:var(--text);font-weight:700}
+.nav-b[aria-current="page"]::before{
+  content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:3px;height:22px;border-radius:0 3px 3px 0;background:var(--accent);
+}
+.nav-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-count{margin-left:auto;font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent-fg);background:var(--accent-20);border-radius:var(--r-chip);padding:2px 7px;flex:none}
+.nav-sep{height:1px;background:var(--border);margin:var(--s3) 12px}
+
+.user{display:flex;align-items:center;gap:10px;padding:6px 6px 10px}
+.avatar{width:32px;height:32px;flex:none;border-radius:50%;background:var(--raised-2);border:1px solid var(--border-strong);display:grid;place-items:center;font-size:13px;font-weight:700;color:var(--text-2)}
+.user-name{font-size:14px;font-weight:650;display:block}
+.user-role{font-size:12px;color:var(--text-3);display:block}
+
+/* ---------- icon-rail mode (manual toggle) ---------- */
+body.rail{--nav-w:72px}
+body.rail .nav-label,body.rail .brand-text,body.rail .nav-count,body.rail .user-meta{display:none}
+body.rail .nav-b{justify-content:center;padding:10px 0}
+body.rail .brand,body.rail .user{justify-content:center}
+body.rail .sb-nav{padding-inline:10px}
+body.rail .nav-b::after{
+  content:attr(data-label);position:absolute;left:calc(100% + 10px);top:50%;transform:translateY(-50%);
+  background:var(--raised-2);border:1px solid var(--border-strong);color:var(--text);
+  font-size:14px;font-weight:600;white-space:nowrap;padding:6px 10px;border-radius:6px;
+  opacity:0;pointer-events:none;z-index:60;transition:opacity var(--dur-out) var(--ease-out);
+}
+body.rail .nav-b:hover::after,body.rail .nav-b:focus-visible::after{opacity:1}
+
+/* ---------- topbar ---------- */
+.topbar{
+  display:flex;align-items:center;gap:var(--s3);
+  padding:var(--s3) var(--s5);min-height:var(--topbar-h);
+  border-bottom:1px solid var(--border);background:var(--bg);
+}
+.icon-b{
+  width:40px;height:40px;flex:none;display:grid;place-items:center;border-radius:var(--r-ctl);
+  border:1px solid var(--border);color:var(--text-2);
+  transition:background var(--dur-in) var(--ease-out),color var(--dur-in) var(--ease-out),border-color var(--dur-in) var(--ease-out);
+}
+.icon-b:hover{background:var(--raised);color:var(--text);border-color:var(--border-strong)}
+.search-b{
+  display:flex;align-items:center;gap:var(--s2);min-height:40px;flex:1 1 240px;max-width:420px;
+  padding:0 var(--s3);border:1px solid var(--border);border-radius:var(--r-ctl);
+  background:var(--sunken);color:var(--text-3);font-size:15px;
+  transition:border-color var(--dur-in) var(--ease-out),color var(--dur-in) var(--ease-out);
+}
+.search-b:hover{border-color:var(--border-strong);color:var(--text-2)}
+.search-b .od-fill{text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kbd{font-family:var(--mono);font-size:12px;border:1px solid var(--border-strong);border-radius:5px;padding:1px 5px;color:var(--text-3);flex:none}
+.stamp{font-family:var(--mono);font-size:13px;color:var(--text-3);white-space:nowrap}
+.demo-tag{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-fg);border:1px solid var(--accent-34);background:var(--accent-08);border-radius:var(--r-chip);padding:3px 9px;white-space:nowrap}
+
+/* ---------- persistent filter bar ---------- */
+.filterbar{
+  display:flex;flex-wrap:wrap;align-items:flex-end;gap:var(--s4);
+  padding:var(--s3) var(--s5);border-bottom:1px solid var(--border);background:var(--sunken);
+}
+.fb-field{display:grid;gap:var(--s1)}
+/* the bar sets its own display, which outranks the UA's [hidden] rule;
+   restate it so renderFilterBar() can actually hide it */
+.filterbar[hidden]{display:none}
+.fb-field>label{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);font-weight:650}
+.ctl{
+  background:var(--raised);border:1px solid var(--border);color:var(--text);
+  border-radius:var(--r-ctl);padding:8px 10px;font-size:15px;min-height:40px;font-family:inherit;
+}
+.ctl:hover{border-color:var(--border-strong)}
+select.ctl{min-width:168px;cursor:pointer}
+/* ---------- month / year multi-select ----------
+   Replaces the single "Date range" select: QA reports are read by calendar
+   month and year, and people compare several at once (Jul-Sep, or 2025 vs 2026). */
+.msel{position:relative}
+.msel-b{display:inline-flex;align-items:center;justify-content:space-between;gap:var(--s2);min-width:168px;text-align:left;cursor:pointer}
+.msel-b .ic{transform:rotate(90deg);color:var(--text-3);flex:none;transition:transform .15s}
+.msel-b[aria-expanded="true"]{border-color:var(--border-strong)}
+.msel-b[aria-expanded="true"] .ic{transform:rotate(-90deg)}
+.msel-v{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}
+.msel-pop{
+  position:absolute;top:calc(100% + 6px);left:0;z-index:60;min-width:100%;
+  background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-card);
+  box-shadow:var(--shadow-2);padding:var(--s2);
+}
+.msel-pop[hidden]{display:none}
+.msel-list{display:grid;gap:2px}
+.msel-months{grid-template-columns:repeat(3,minmax(0,1fr));min-width:276px}
+.msel-opt{display:flex;align-items:center;gap:var(--s2);min-height:36px;padding:0 var(--s2);border-radius:6px;cursor:pointer;font-size:15px;white-space:nowrap;color:var(--text)}
+.msel-opt:hover{background:var(--raised)}
+.msel-opt input{accent-color:var(--accent);width:16px;height:16px;margin:0;flex:none;cursor:pointer}
+.msel-q{display:flex;gap:var(--s1);padding:0 0 var(--s2);margin-bottom:var(--s2);border-bottom:1px solid var(--border)}
+.msel-qb{flex:1;min-height:32px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-weight:650;color:var(--text-2)}
+.msel-qb:hover{border-color:var(--border-strong);color:var(--text)}
+.msel-qb[aria-pressed="true"]{background:var(--accent-08);border-color:var(--accent-34);color:var(--accent-fg)}
+.msel-ft{display:flex;justify-content:space-between;align-items:center;gap:var(--s3);margin-top:var(--s2);padding-top:var(--s2);border-top:1px solid var(--border)}
+.fb-chips{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s2);margin-left:auto}
+.fchip{
+  display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 6px 0 10px;
+  border:1px solid var(--accent-34);background:var(--accent-08);border-radius:var(--r-chip);
+  font-size:13px;font-weight:600;color:var(--accent-fg-2);
+}
+.fchip button{width:22px;height:22px;display:grid;place-items:center;border-radius:50%;color:var(--accent-fg)}
+.fchip button:hover{background:var(--accent-20)}
+.link-b{font-size:14px;font-weight:650;color:var(--accent-fg);padding:6px 4px;border-radius:6px}
+.link-b:hover{text-decoration:underline}
+
+/* ---------- content ---------- */
+.content{overflow-y:auto;min-height:0;padding:var(--s5)}
+.wrap{max-width:1560px;margin:0 auto}
+.page-head{margin-bottom:var(--s5)}
+.page-head h1{font-size:22px}
+.page-head .t-sub{margin-top:var(--s1);max-width:76ch}
+.tabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--border);margin-top:var(--s4);scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{
+  padding:10px 14px;min-height:44px;font-size:15px;font-weight:550;color:var(--text-2);
+  border-bottom:2px solid transparent;white-space:nowrap;
+  transition:color var(--dur-in) var(--ease-out),border-color var(--dur-in) var(--ease-out);
+}
+.tab:hover{color:var(--text)}
+.tab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--accent);font-weight:700}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card)}
+.card-pad{padding:var(--s4)}
+.card-head{display:flex;align-items:baseline;gap:var(--s3);flex-wrap:wrap;padding:var(--s4);border-bottom:1px solid var(--hairline)}
+.card-head h2{font-size:16px}
+.sec{margin-bottom:var(--s6)}
+.sec-head{display:flex;align-items:baseline;gap:var(--s3);flex-wrap:wrap;margin-bottom:var(--s3)}
+.cols{display:grid;gap:var(--s3)}
+@media (min-width:1024px){
+  .cols-2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .cols-32{grid-template-columns:minmax(0,1.45fr) minmax(0,1fr)}
+}
+
+/* ---------- KPI tile ---------- */
+.kpi-grid{display:grid;gap:var(--s3);grid-template-columns:repeat(auto-fit,minmax(228px,1fr))}
+.kpi{
+  display:grid;gap:var(--s2);align-content:start;width:100%;text-align:left;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card);padding:var(--s4);
+  transition:background var(--dur-in) var(--ease-out),border-color var(--dur-in) var(--ease-out);
+}
+.kpi:hover{background:var(--raised);border-color:var(--border-strong)}
+.kpi>*{display:block}
+.kpi-lbl{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);font-weight:650}
+.kpi-val{font-family:var(--mono);font-size:clamp(28px,3vw,38px);font-weight:700;line-height:1.05;letter-spacing:-.03em;color:var(--text)}
+.kpi.alarm .kpi-val{color:var(--accent-fg)}
+.kpi-foot{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap}
+.trend{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:13px;font-weight:700;white-space:nowrap}
+.trend.bad{color:var(--accent-fg)}
+.trend.good{color:var(--text)}
+.trend.flat{color:var(--text-3)}
+.kpi-note{font-size:13px;color:var(--text-3)}
+.spark{width:100%;height:32px;overflow:visible}
+
+/* ---------- status chips: hue-free, red reserved for breach ---------- */
+.chip{
+  display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+  border-radius:var(--r-chip);padding:3px 10px 3px 8px;font-size:13px;font-weight:650;
+  border:1px solid transparent;
+}
+.chip.s-open    {border-color:var(--border-strong);color:var(--text-2);background:transparent}
+.chip.s-progress{border-color:var(--raised-2);color:var(--text);background:var(--raised-2)}
+.chip.s-ontime  {border-color:transparent;color:var(--text-3);background:var(--sunken)}
+.chip.s-late    {border-style:dashed;border-color:var(--border-strong);color:var(--text-3);background:transparent}
+.chip.s-overdue {border-color:var(--accent);color:var(--on-accent);background:var(--accent);font-weight:700}
+.chip.s-neutral {border-color:var(--border);color:var(--text-2);background:var(--sunken)}
+
+/* CAT severity: one red at three strengths, plus the numeral itself */
+.cat{display:inline-flex;align-items:center;border-radius:var(--r-chip);padding:2px 9px;font-family:var(--mono);font-size:12px;font-weight:700;white-space:nowrap;border:1px solid}
+.cat.c1{background:var(--accent-12);border-color:var(--accent-28);color:var(--accent-fg)}
+.cat.c2{background:var(--accent-34);border-color:var(--accent-62);color:var(--accent-fg-2)}
+.cat.c3{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.tag{display:inline-flex;align-items:center;border:1px solid var(--border);background:var(--sunken);color:var(--text-2);border-radius:6px;padding:2px 7px;font-size:12px;font-weight:650;white-space:nowrap}
+
+/* ---------- tables ---------- */
+.tbl-wrap{overflow:auto;max-height:min(62vh,740px)}
+.tbl{width:100%;border-collapse:collapse;font-size:15px}
+.tbl th{
+  position:sticky;top:0;z-index:2;text-align:left;background:var(--surface);
+  font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3);font-weight:700;
+  padding:0;border-bottom:1px solid var(--border);white-space:nowrap;
+}
+.tbl th>button,.tbl th>span{display:flex;align-items:center;gap:5px;width:100%;padding:11px 12px;color:inherit;font:inherit;letter-spacing:inherit;text-transform:inherit;text-align:left}
+.tbl th>button:hover{color:var(--text)}
+.tbl th[aria-sort]>button{color:var(--text)}
+.sort-ic{opacity:.4}
+.tbl th[aria-sort] .sort-ic{opacity:1;color:var(--accent-fg)}
+.tbl td{padding:11px 12px;border-bottom:1px solid var(--hairline);vertical-align:middle}
+.tbl tbody tr{transition:background var(--dur-out) var(--ease-out)}
+.tbl tbody tr:hover{background:var(--raised);cursor:pointer}
+.tbl tbody tr:last-child td{border-bottom:none}
+.tbl td.ar{text-align:right}
+.row-main{display:grid;gap:2px}
+.row-main>*{display:block}
+.row-id{font-family:var(--mono);font-size:13.5px;font-weight:700;color:var(--text)}
+.row-sub{font-size:13.5px;color:var(--text-3)}
+.tbl-foot{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);padding:var(--s3) var(--s4);border-top:1px solid var(--border)}
+.pg{display:flex;gap:4px;margin-left:auto}
+.pg button{min-width:36px;min-height:36px;padding:0 8px;border:1px solid var(--border);border-radius:6px;font-family:var(--mono);font-size:13px;color:var(--text-2)}
+.pg button:hover:not(:disabled){background:var(--raised);color:var(--text)}
+.pg button[aria-current="true"]{background:var(--accent-12);border-color:var(--accent-34);color:var(--accent-fg);font-weight:700}
+.pg button:disabled{opacity:.35;cursor:not-allowed}
+
+/* ---------- empty state ---------- */
+.empty{display:grid;gap:var(--s3);justify-items:center;text-align:center;padding:var(--s8) var(--s5);max-width:54ch;margin:0 auto}
+.empty h3{font-size:17px}
+
+/* ---------- bars / charts ---------- */
+.bars{display:grid;gap:var(--s2)}
+.bar-row{display:grid;grid-template-columns:minmax(96px,128px) minmax(0,1fr) auto;gap:var(--s3);align-items:center;width:100%;text-align:left;padding:6px var(--s2);border-radius:6px}
+.bar-row:hover{background:var(--raised)}
+.bar-track{height:12px;border-radius:var(--r-chip);background:var(--sunken);border:1px solid var(--hairline);overflow:hidden}
+.bar-fill{height:100%;border-radius:var(--r-chip);background:var(--data-1)}
+.bar-fill.hot{background:var(--accent)}
+.stack{display:flex;height:16px;border-radius:var(--r-chip);overflow:hidden;background:var(--sunken);border:1px solid var(--hairline)}
+.stack>span{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:var(--s2) var(--s4)}
+.legend-i{display:inline-flex;align-items:center;gap:var(--s2);font-size:13.5px;color:var(--text-2)}
+.swatch{width:12px;height:12px;border-radius:3px;flex:none;border:1px solid var(--border-strong)}
+.chart{width:100%;height:auto}
+
+/* ---------- activity ---------- */
+.act{display:grid;gap:2px}
+.act-i{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--s3);align-items:start;width:100%;text-align:left;padding:var(--s3);border-radius:var(--r-ctl)}
+.act-i:hover{background:var(--raised)}
+.act-dot{width:8px;height:8px;border-radius:50%;background:var(--data-1);margin-top:8px}
+.act-dot.hot{background:var(--accent)}
+.act-body{display:grid;gap:2px}
+.act-body>*{display:block}
+
+/* ---------- audit timeline ---------- */
+.tl-wrap{overflow-x:auto}
+.tl{min-width:960px}
+.tl-row{display:grid;grid-template-columns:minmax(230px,1.5fr) repeat(12,minmax(46px,1fr));align-items:stretch}
+.tl-head{position:sticky;top:0;z-index:2;background:var(--surface);border-bottom:1px solid var(--border)}
+.tl-head>div{padding:9px 6px;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3);font-weight:700;text-align:center;border-left:1px solid var(--hairline)}
+.tl-head>div:first-child{text-align:left;padding-left:var(--s4);border-left:none}
+.tl-head>div.now{color:var(--accent-fg);box-shadow:inset 0 -2px 0 0 var(--accent)}
+.tl-body .tl-row{border-bottom:1px solid var(--hairline)}
+.tl-body .tl-row:last-child{border-bottom:none}
+.tl-body .tl-row:hover{background:var(--raised)}
+.tl-lbl{display:grid;gap:2px;padding:10px var(--s3) 10px var(--s4);min-width:0}
+.tl-lbl>*{display:block}
+.tl-cell{border-left:1px solid var(--hairline);margin:9px 0;display:flex;align-items:center}
+.tl-cell.now{border-left:1px dashed var(--accent-62)}
+.tl-cell.on{border-left-color:transparent}
+.tl-bar{height:26px;width:100%;display:flex;align-items:center;padding-inline:8px;font-family:var(--mono);font-size:12px;font-weight:700;overflow:hidden;white-space:nowrap}
+.tl-cell.start .tl-bar{border-radius:6px 0 0 6px}
+.tl-cell.end .tl-bar{border-radius:0 6px 6px 0}
+.tl-bar.k-closed{background:var(--sunken);border-top:1px solid var(--border);border-bottom:1px solid var(--border);color:var(--text-3)}
+.tl-cell.start .tl-bar.k-closed{border-left:1px solid var(--border)}
+.tl-cell.end .tl-bar.k-closed{border-right:1px solid var(--border)}
+.tl-bar.k-performed{background:var(--data-2);color:var(--on-data-2)}
+.tl-bar.k-progress{background:var(--data-1);color:var(--on-data-1)}
+.tl-bar.k-scheduled{background:repeating-linear-gradient(135deg,var(--hatch) 0 6px,transparent 6px 12px);border:1px dashed var(--border-strong);color:var(--text-2)}
+.tl-bar.k-overdue{background:var(--accent);color:var(--on-accent)}
+
+/* ---------- split view (PAVOI) ---------- */
+.split{display:grid;grid-template-columns:minmax(300px,356px) minmax(0,1fr);gap:var(--s3);align-items:start}
+.rec-list{display:grid;gap:2px;max-height:min(68vh,840px);overflow-y:auto;padding:var(--s2)}
+.rec{display:grid;gap:var(--s2);width:100%;text-align:left;padding:var(--s3);border-radius:var(--r-ctl);border:1px solid transparent}
+.rec:hover{background:var(--raised)}
+.rec[aria-current="true"]{background:var(--accent-08);border-color:var(--accent-34)}
+.rec-top{display:flex;align-items:center;justify-content:space-between;gap:var(--s2)}
+.meta{display:grid;gap:var(--s4);grid-template-columns:repeat(auto-fit,minmax(146px,1fr))}
+.meta-i{display:grid;gap:2px}
+.meta-i>*{display:block}
+.meta-k{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3);font-weight:650}
+.meta-v{font-size:15px;color:var(--text)}
+.note{display:grid;gap:var(--s2);padding:var(--s3);border-radius:var(--r-ctl);border:1px solid var(--border);background:var(--sunken)}
+.note.warn{border-color:var(--accent-34);background:var(--accent-08)}
+.note-hd{display:flex;align-items:center;gap:var(--s2);font-size:14px;font-weight:700}
+.vt{display:grid}
+.vt-i{display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--s3)}
+.vt-rail{display:grid;grid-template-rows:auto 1fr;justify-items:center}
+.vt-pip{width:11px;height:11px;border-radius:50%;border:2px solid var(--border-strong);background:var(--bg);margin-top:7px}
+.vt-pip.done{background:var(--text-2);border-color:var(--text-2)}
+.vt-pip.hot{background:var(--accent);border-color:var(--accent)}
+.vt-line{width:1px;background:var(--border);min-height:14px;margin-top:4px}
+.vt-i:last-child .vt-line{background:transparent}
+.vt-body{display:grid;gap:2px;padding-bottom:var(--s4)}
+.vt-body>*{display:block}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--s2);min-height:44px;padding:0 var(--s4);border-radius:var(--r-ctl);font-size:15px;font-weight:650;border:1px solid var(--border-strong);color:var(--text);transition:background var(--dur-in) var(--ease-out),border-color var(--dur-in) var(--ease-out)}
+.btn:hover{background:var(--raised);border-color:var(--text-3)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.primary:hover{background:var(--accent-press);border-color:var(--accent-press)}
+
+/* ---------- search overlay ---------- */
+.scrim{position:fixed;inset:0;background:var(--scrim);z-index:80;opacity:0;pointer-events:none;transition:opacity var(--dur-out) var(--ease-out)}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{
+  position:fixed;left:50%;top:9vh;transform:translate(-50%,-8px);width:min(680px,calc(100vw - 32px));
+  z-index:90;background:var(--surface);border:1px solid var(--border-strong);border-radius:12px;
+  box-shadow:var(--shadow-1);overflow:hidden;
+  opacity:0;pointer-events:none;transition:opacity var(--dur-out) var(--ease-out),transform var(--dur-in) var(--ease-out);
+}
+.sheet.on{opacity:1;pointer-events:auto;transform:translate(-50%,0)}
+.sheet-top{display:flex;align-items:center;gap:var(--s3);padding:var(--s3) var(--s4);border-bottom:1px solid var(--border)}
+#q{flex:1 1 auto;min-width:0;background:none;border:none;color:var(--text);font-size:17px;font-family:inherit;min-height:40px}
+#q::placeholder{color:var(--text-3)}
+#q:focus{outline:none}
+.res{max-height:min(56vh,520px);overflow-y:auto;padding:var(--s2)}
+.res-grp{padding:var(--s3) var(--s3) var(--s1)}
+.res-i{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--s3);align-items:center;width:100%;text-align:left;padding:var(--s3);border-radius:var(--r-ctl)}
+.res-i:hover,.res-i.cursor{background:var(--raised)}
+.res-i.cursor{box-shadow:inset 0 0 0 1px var(--accent-34)}
+.res-body{display:grid;gap:2px;min-width:0}
+.res-body>*{display:block}
+mark{background:var(--accent-34);color:var(--on-wash);border-radius:3px;padding:0 1px}
+
+/* ---------- mobile nav ---------- */
+.botnav{display:none}
+.drawer{position:fixed;left:0;right:0;bottom:0;z-index:90;background:var(--surface);border-top:1px solid var(--border-strong);border-radius:14px 14px 0 0;padding:var(--s4) var(--s4) calc(var(--s4) + env(safe-area-inset-bottom));transform:translateY(101%);transition:transform var(--dur-in) var(--ease-out);max-height:80vh;overflow-y:auto}
+.drawer.on{transform:none}
+.drawer-hd{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);margin-bottom:var(--s3)}
+
+/* ---------- toast ---------- */
+.toast{position:fixed;right:var(--s5);bottom:var(--s5);z-index:120;max-width:min(380px,calc(100vw - 32px));display:grid;gap:4px;padding:var(--s3) var(--s4);background:var(--raised-2);border:1px solid var(--border-strong);border-left:3px solid var(--accent);border-radius:var(--r-ctl);box-shadow:var(--shadow-2);opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity var(--dur-out) var(--ease-out),transform var(--dur-in) var(--ease-out)}
+.toast.on{opacity:1;transform:none}
+.toast>*{display:block}
+
+/* ---------- rationale page ---------- */
+.prose{max-width:84ch;display:grid;gap:var(--s4)}
+.prose p{font-size:16px;color:var(--text-2)}
+.prose h2{margin-top:var(--s4)}
+.prose ul{display:grid;gap:var(--s2)}
+.prose li{position:relative;padding-left:18px;font-size:16px;color:var(--text-2)}
+.prose li::before{content:"";position:absolute;left:0;top:11px;width:6px;height:6px;border-radius:50%;background:var(--accent-62)}
+.map{width:100%;border-collapse:collapse;font-size:15px}
+.map th{text-align:left;font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3);font-weight:700;padding:10px 12px;border-bottom:1px solid var(--border)}
+.map td{padding:10px 12px;border-bottom:1px solid var(--hairline);vertical-align:top}
+.map tr:last-child td{border-bottom:none}
+.map td:first-child{white-space:nowrap}
+
+/* ============================================================
+   RESPONSIVE — 1440 / 1024 / 768 / 375.
+   Content reorganises; the page never scales down, never
+   scrolls sideways, and zoom is never disabled.
+   ============================================================ */
+@media (max-width:1279px){
+  body:not(.rail-off){--nav-w:72px}
+  body:not(.rail-off) .nav-label,
+  body:not(.rail-off) .brand-text,
+  body:not(.rail-off) .nav-count,
+  body:not(.rail-off) .user-meta{display:none}
+  body:not(.rail-off) .nav-b{justify-content:center;padding:10px 0}
+  body:not(.rail-off) .brand,body:not(.rail-off) .user{justify-content:center}
+  body:not(.rail-off) .sb-nav{padding-inline:10px}
+  body:not(.rail-off) .nav-b::after{
+    content:attr(data-label);position:absolute;left:calc(100% + 10px);top:50%;transform:translateY(-50%);
+    background:var(--raised-2);border:1px solid var(--border-strong);color:var(--text);
+    font-size:14px;font-weight:600;white-space:nowrap;padding:6px 10px;border-radius:6px;
+    opacity:0;pointer-events:none;z-index:60;transition:opacity var(--dur-out) var(--ease-out);
+  }
+  body:not(.rail-off) .nav-b:hover::after,body:not(.rail-off) .nav-b:focus-visible::after{opacity:1}
+  .split{grid-template-columns:minmax(0,1fr)}
+  .rec-list{max-height:360px}
+}
+@media (max-width:1023px){
+  .content{padding:var(--s4)}
+  .topbar,.filterbar{padding-inline:var(--s4)}
+  .tbl-wrap{max-height:none}
+}
+@media (max-width:767px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .sidebar{display:none}
+  .content{padding:var(--s4) var(--s4) calc(76px + env(safe-area-inset-bottom))}
+  .topbar{flex-wrap:wrap;gap:var(--s2);padding-block:var(--s2)}
+  .topbar h1{order:3;flex:1 1 100%;font-size:19px}
+  .search-b{flex:1 1 auto;max-width:none}
+  .stamp,.demo-tag,.rail-toggle{display:none}
+  .filterbar{gap:var(--s3)}
+  .filterbar select.ctl,.filterbar .msel-b{min-width:0;width:100%}
+  .msel-months{min-width:0;width:min(276px,calc(100vw - 2 * var(--s4)))}
+  .fb-field{flex:1 1 140px}
+  .fb-chips{margin-left:0;flex:1 1 100%}
+  .kpi-grid{grid-template-columns:repeat(auto-fit,minmax(148px,1fr))}
+  .kpi-val{font-size:clamp(24px,7vw,30px)}
+
+  /* tables reflow into cards — same DOM, no horizontal scroll */
+  .tbl thead{display:none}
+  .tbl,.tbl tbody,.tbl tr,.tbl td{display:block}
+  .tbl tr{border:1px solid var(--border);border-radius:var(--r-card);background:var(--surface);padding:var(--s3);margin-bottom:var(--s3)}
+  .tbl td{border-bottom:none;padding:5px 0;display:grid;grid-template-columns:112px minmax(0,1fr);gap:var(--s3);align-items:center;text-align:left}
+  .tbl td::before{content:attr(data-l);font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3);font-weight:650}
+  .tbl td.t-main{grid-template-columns:minmax(0,1fr);padding-bottom:var(--s2)}
+  .tbl td.t-main::before{display:none}
+  .tbl td.ar{text-align:left}
+  .tbl-wrap{overflow:visible}
+  .botnav{
+    display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:70;
+    background:var(--surface);border-top:1px solid var(--border);padding-bottom:env(safe-area-inset-bottom);
+  }
+  .bn-b{display:grid;justify-items:center;align-content:center;gap:3px;min-height:60px;padding:6px 2px;color:var(--text-3);font-size:11px;font-weight:650}
+  .bn-b[aria-current="page"]{color:var(--accent-fg)}
+  .bn-b span{display:block;text-align:center;line-height:1.2}
+  .toast{left:var(--s4);right:var(--s4);bottom:calc(76px + env(safe-area-inset-bottom));max-width:none}
+  .sheet{top:0;left:0;transform:none;width:100vw;border-radius:0;border:none;height:100dvh;display:grid;grid-template-rows:auto minmax(0,1fr)}
+  .sheet.on{transform:none}
+  .res{max-height:none}
+  .bar-row{grid-template-columns:minmax(84px,1fr) minmax(0,1.3fr) auto}
+  .meta{grid-template-columns:repeat(auto-fit,minmax(132px,1fr))}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important}
+}
+/* ---------- beta boot screen (shown until data is ready) ---------- */
+.beta-boot{position:fixed;inset:0;z-index:200;display:grid;place-items:center;background:var(--bg);padding:var(--s4)}
+.beta-boot[hidden]{display:none}
+.beta-boot-card{max-width:440px;display:grid;gap:var(--s3);text-align:center}
+.beta-boot-spin{width:28px;height:28px;margin:0 auto;border-radius:50%;border:3px solid var(--border);border-top-color:var(--accent);animation:betaspin 1s linear infinite}
+.beta-boot.is-error .beta-boot-spin{display:none}
+.beta-boot-msg{font-size:18px;font-weight:650;color:var(--text)}
+.beta-boot-sub{font-size:14px;color:var(--text-2)}
+.beta-boot-link{color:var(--accent-fg);font-weight:650}
+@keyframes betaspin{to{transform:rotate(360deg)}}
+</style>
+<script>
+/* Resolve the theme before first paint: a stored choice wins, otherwise the
+   operating system's. Runs ahead of <body> so the page never flashes the
+   wrong ground. */
+(function(){
+  var t = 'dark';
+  try{
+    var saved = localStorage.getItem('qa-amo-theme');
+    if(saved === 'light' || saved === 'dark') t = saved;
+    else if(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) t = 'light';
+  }catch(e){}
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+</head>
+<body>
+<a class="skip" href="#main-content">Skip to content</a>
+
+<div class="app">
+
+  <!-- ============ PRIMARY NAV — 7 entries, grouped by task ============ -->
+  <nav class="sidebar" aria-label="Primary">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">VJ</span>
+      <span class="brand-text">
+        <span class="brand-name">Quality Assurance</span>
+        <span class="brand-sub">AMO · VietJet Air</span>
+      </span>
+    </div>
+    <div class="sb-nav" id="sbNav"></div>
+    <div class="sb-foot">
+      <div class="user">
+        <span class="avatar" aria-hidden="true">NH</span>
+        <span class="user-meta">
+          <span class="user-name">Nguyen Van Hung</span>
+          <span class="user-role">Quality engineer · MQA</span>
+        </span>
+      </div>
+      <button class="nav-b" id="rationaleNav" data-label="Design rationale" type="button"></button>
+    </div>
+  </nav>
+
+  <div class="main">
+
+    <!-- ============ TOP BAR ============ -->
+    <header class="topbar">
+      <button class="icon-b rail-toggle" id="railBtn" type="button" aria-pressed="false" aria-label="Collapse navigation to icon rail"></button>
+      <h1 id="pageTitle">Overview</h1>
+      <button class="search-b" id="searchBtn" type="button" aria-label="Search reports, audits, aircraft and people">
+        <span class="ic" id="searchBtnIc" aria-hidden="true"></span>
+        <span class="od-fill">Search reports, audits, aircraft…</span>
+        <span class="kbd" aria-hidden="true">Ctrl K</span>
+      </button>
+      <span class="od-fill" aria-hidden="true"></span>
+      <button class="icon-b" id="themeBtn" type="button"></button>
+      <span class="demo-tag">Mock data</span>
+      <span class="stamp" id="stamp"></span>
+    </header>
+
+    <!-- ============ PERSISTENT FILTER BAR ============ -->
+    <div class="filterbar" id="filterbar">
+      <div class="fb-field">
+        <label for="fYearBtn">Year</label>
+        <div class="msel" id="fYear">
+          <button class="ctl msel-b" id="fYearBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="fYearPop"><span class="msel-v" id="fYearVal"></span></button>
+          <div class="msel-pop" id="fYearPop" role="group" aria-label="Choose one or more years" hidden>
+            <div class="msel-list" id="fYearList"></div>
+            <div class="msel-ft"><button class="link-b" type="button" data-msel-all="year">All years</button><span class="t-small dim">Pick several</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="fb-field">
+        <label for="fMonthBtn">Month</label>
+        <div class="msel" id="fMonth">
+          <button class="ctl msel-b" id="fMonthBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="fMonthPop"><span class="msel-v" id="fMonthVal"></span></button>
+          <div class="msel-pop" id="fMonthPop" role="group" aria-label="Choose one or more months" hidden>
+            <div class="msel-q" id="fQuarters"></div>
+            <div class="msel-list msel-months" id="fMonthList"></div>
+            <div class="msel-ft"><button class="link-b" type="button" data-msel-all="month">All months</button><span class="t-small dim">Pick several</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="fb-field">
+        <label for="fDept">Department</label>
+        <select class="ctl" id="fDept"></select>
+      </div>
+      <div class="fb-chips" id="fbChips" aria-live="polite"></div>
+    </div>
+
+    <!-- ============ SCREEN HOST ============ -->
+    <main class="content" id="main-content" tabindex="-1">
+      <div class="wrap" id="screen"></div>
+    </main>
+  </div>
+</div>
+
+<!-- ============ MOBILE BOTTOM NAV ============ -->
+<nav class="botnav" id="botNav" aria-label="Primary, compact"></nav>
+
+<!-- ============ MOBILE OVERFLOW DRAWER ============ -->
+<div class="scrim" id="drawerScrim" hidden></div>
+<div class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle" hidden>
+  <div class="drawer-hd">
+    <h2 id="drawerTitle">More</h2>
+    <button class="icon-b" id="drawerClose" type="button" aria-label="Close menu"></button>
+  </div>
+  <div id="drawerBody"></div>
+</div>
+
+<!-- ============ GLOBAL SEARCH ============ -->
+<div class="scrim" id="searchScrim" hidden></div>
+<div class="sheet" id="searchSheet" role="dialog" aria-modal="true" aria-label="Global search" hidden>
+  <div class="sheet-top">
+    <span class="ic dim" id="searchSheetIc" aria-hidden="true"></span>
+    <input id="q" type="text" autocomplete="off" spellcheck="false" placeholder="Report number, audit, aircraft, person…" aria-label="Search" aria-describedby="searchHint">
+    <span class="kbd" aria-hidden="true">Esc</span>
+  </div>
+  <div class="res" id="res" role="listbox" aria-label="Search results"></div>
+</div>
+<span id="searchHint" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap">Use the arrow keys to move through results and Enter to open.</span>
+
+<!-- ============ TOAST ============ -->
+<div class="toast" id="toast" role="status" aria-live="polite" hidden>
+  <span class="strong" id="toastTitle"></span>
+  <span class="t-small" id="toastBody"></span>
+</div>
+
+<!-- ============ BETA BOOT ============ -->
+<div class="beta-boot" id="betaBoot" role="status" aria-live="polite">
+  <div class="beta-boot-card">
+    <div class="beta-boot-spin" aria-hidden="true"></div>
+    <div class="beta-boot-msg" id="betaBootMsg">Loading…</div>
+    <div class="beta-boot-sub" id="betaBootSub"></div>
+    <a class="beta-boot-link" id="betaBootLink" href="./" hidden>Open the main dashboard</a>
+  </div>
+</div>
+
+<script>
+/* ============================================================================
+   BETA LOADER — the new UI on the live dashboard's own data logic.
+   Nguyên tắc (giống scripts/test-r155-kpi7.mjs và rebuild UIUX/snapshot.mjs): KHÔNG viết
+   lại logic nghiệp vụ. Tải index.html cùng domain, trích NGUYÊN các hàm loadData / loadCmr /
+   loadEcar / loadKpi7Tasks / semCalc / catCalc / kpi7* rồi chạy chúng với stub DOM. Phần duy
+   nhất viết mới là ánh xạ sang khuôn REPORTS/AUDITS của giao diện mới (khối "mapping" trong DRIVER).
+   Beta KHÔNG ghi gì vào kho của app chính: IndexedDB chỉ đọc, localStorage bị stub.
+   ========================================================================== */
+(function(){
+"use strict";
+const DEV = location.hostname === '127.0.0.1' || location.hostname === 'localhost';
+const qs  = new URLSearchParams(location.search);
+const bootEl = document.getElementById('betaBoot');
+const say = (t, sub) => {
+  document.getElementById('betaBootMsg').textContent = t;
+  document.getElementById('betaBootSub').textContent = sub || '';
+};
+function fail(title, detail, withLink){
+  bootEl.classList.add('is-error');
+  say(title, detail);
+  document.getElementById('betaBootLink').hidden = !withLink;
+}
+
+/* ── 1. Sign-in: the same Supabase session as the main dashboard (sessionStorage, per tab) ── */
+async function signedInUser(SRC){
+  if(DEV) return { full_name:'Local preview', email:'', role:'viewer' };
+  const url = grabStr(SRC, 'SUPA_URL'), key = grabStr(SRC, 'SUPA_KEY');
+  const sb = supabase.createClient(url, key,
+    { auth:{ storage:sessionStorage, persistSession:true, autoRefreshToken:true } });
+  const { data } = await sb.auth.getSession();
+  if(!data || !data.session) return null;
+  try{ return JSON.parse(sessionStorage.getItem('qaUser') || 'null') || { full_name:data.session.user.email, role:'viewer' }; }
+  catch(e){ return { full_name:data.session.user.email, role:'viewer' }; }
+}
+
+/* ── 2. Extraction — same brace scanner as snapshot.mjs (skips strings and comments) ── */
+function scanTo(SRC, i, open, close, stopAtSemicolon){
+  let d = 0, q = null;
+  for(let k = i; k < SRC.length; k++){
+    const c = SRC[k], n = SRC[k+1];
+    if(q){ if(c === '\\'){ k++; continue; } if(c === q) q = null; continue; }
+    if(c === '/' && n === '/'){ k = SRC.indexOf('\n', k); continue; }
+    if(c === '/' && n === '*'){ k = SRC.indexOf('*/', k) + 1; continue; }
+    if(c === "'" || c === '"' || c === '`'){ q = c; continue; }
+    if(open.includes(c)) d++;
+    else if(close.includes(c)){ d--; if(!stopAtSemicolon && d === 0) return k + 1; }
+    else if(stopAtSemicolon && c === ';' && d === 0) return k + 1;
+  }
+  throw new Error('unbalanced source from ' + i);
+}
+function grabFn(SRC, name){
+  const m = SRC.match(new RegExp('^(async )?function ' + name + '\\(', 'm'));
+  if(!m) throw new Error('function not found in index.html: ' + name);
+  /* skip the parameter list first: a default like `opts={}` (loadData since r165) is not the body */
+  const paramsEnd = scanTo(SRC, SRC.indexOf('(', m.index), '(', ')', false);
+  return SRC.slice(m.index, scanTo(SRC, SRC.indexOf('{', paramsEnd), '{', '}', false));
+}
+function grabDecl(SRC, name){
+  const m = SRC.match(new RegExp('^(const|let)\\s+' + name + '\\s*=', 'm'));
+  if(!m) throw new Error('declaration not found in index.html: ' + name);
+  return SRC.slice(m.index, scanTo(SRC, m.index, '([{', ')]}', true));
+}
+function grabStr(SRC, name){
+  const m = SRC.match(new RegExp('^const\\s+' + name + "\\s*=\\s*'([^']*)'", 'm'));
+  if(!m) throw new Error('constant not found in index.html: ' + name);
+  return m[1];
+}
+/* Code without comments, so words inside comments do not pull in unrelated names. */
+function stripComments(t){
+  let out = '', q = null;
+  for(let k = 0; k < t.length; k++){
+    const c = t[k], n = t[k+1];
+    if(q){ out += c; if(c === '\\'){ out += t[++k] || ''; continue; } if(c === q) q = null; continue; }
+    if(c === '/' && n === '/'){ const e = t.indexOf('\n', k); k = e < 0 ? t.length : e - 1; continue; }
+    if(c === '/' && n === '*'){ const e = t.indexOf('*/', k + 2); k = e < 0 ? t.length : e + 1; out += ' '; continue; }
+    if(c === "'" || c === '"' || c === '`') q = c;
+    out += c;
+  }
+  return out;
+}
+/* Entry points the beta calls. Everything they need is found by following names, so a helper
+   added to loadData in a later rev is picked up without editing this file. (A fixed list broke
+   at r165, which gave loadData resetLazyStores / lov / bgLoad / fetchCustomFieldRows.) */
+const ROOTS = ['loadData','loadCmr','loadEcar','loadKpi7Tasks','kpi7Withdrawn','kpi7Stats','kpi7Rate','kpi7Fmt',
+               'dDay','ymd','fetchAll','G_URL','ORG_UNIT_IDS'];
+/* Names the beta provides itself (PRELUDE): state it owns, UI it does not draw, and every write
+   into the main dashboard's storage. Never extracted, even when referenced. */
+const STUBS = new Set(['g','s','setOv','toast','showLoadError','renderAll','cacheSave','renderCmr','renderEcar',
+  'kpi7RenderAll','renderPavoi','runSelfChecks','kpi7CacheSave','kpi7CacheLoad','ymHas',
+  'idbGet','idbSet','idbDel','idbTx','idbOpen','wfWatermark','cfWatermark','resetLazyStores','updateCacheAge','ageLabel',
+  'allData','auditData','cmrData','ecarData','loadFailures','isLoading','cmrLoaded','ecarLoaded',
+  'kpi7Loaded','kpi7Busy','kpi7Cnt','kpi7Ver','kpi7Done','pavoiRfiLoaded','pavoiRfiMap','pavoiRfiDone',
+  'eisLoaded','eisCAMap','eisDescMap','qcsLoaded','qcsMap','localStorage','sessionStorage']);
+function extractClosure(SRC){
+  const index = {};
+  const re = /^(?:(async )?function\s+([A-Za-z_$][\w$]*)\s*\(|(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=)/gm;
+  let m;
+  while((m = re.exec(SRC))){ const n = m[2] || m[3]; if(!(n in index)) index[n] = { pos:m.index, fn:!!m[2] }; }
+  const take = {}, todo = ROOTS.slice();
+  while(todo.length){
+    const n = todo.pop();
+    if(take[n] || STUBS.has(n)) continue;
+    if(!index[n]) throw new Error('not found in index.html: ' + n);
+    const code = index[n].fn ? grabFn(SRC, n) : grabDecl(SRC, n);
+    take[n] = { pos:index[n].pos, code };
+    (stripComments(code).match(/(?<![\w.$])[A-Za-z_$][\w$]*/g) || []).forEach(id => {
+      if(index[id] && !take[id] && !STUBS.has(id)) todo.push(id);
+    });
+  }
+  /* source order: a const initialiser may read an earlier const (TDZ otherwise) */
+  const names = Object.keys(take).sort((a, b) => take[a].pos - take[b].pos);
+  return { code: names.map(n => take[n].code).join('\n\n'), names };
+}
+
+/* ── 3. Read the main dashboard's IndexedDB cache — READ ONLY ── */
+function readMainStore(SRC, KEY){
+  const DB = grabStr(SRC, 'CACHE_DB'), STORE = grabStr(SRC, 'CACHE_STORE');
+  return new Promise(res => {
+    if(!self.indexedDB) return res(null);
+    const rq = indexedDB.open(DB, 1);
+    /* DB does not exist yet: create it exactly as idbOpen() in index.html does, so the
+       main dashboard's own open(…, 1) later finds the store it expects. */
+    rq.onupgradeneeded = () => { if(!rq.result.objectStoreNames.contains(STORE)) rq.result.createObjectStore(STORE); };
+    rq.onerror = rq.onblocked = () => res(null);
+    rq.onsuccess = () => {
+      const db = rq.result;
+      try{
+        const g = db.transaction(STORE, 'readonly').objectStore(STORE).get(KEY);
+        g.onsuccess = () => { db.close(); res(g.result || null); };
+        g.onerror   = () => { db.close(); res(null); };
+      }catch(e){ db.close(); res(null); }
+    };
+  });
+}
+
+/* ── 4. Stubs: only DOM / overlay / writes are replaced, never logic ── */
+const PRELUDE = `
+let loadFailures = [], allData = [], auditData = [], cmrData = [], ecarData = [], isLoading = false;
+let cmrLoaded = false, ecarLoaded = false;
+let pavoiRfiLoaded = false, pavoiRfiMap = {}, pavoiRfiDone = new Set();
+let kpi7Loaded = false, kpi7Busy = false, kpi7Cnt = {}, kpi7Ver = {}, kpi7Done = new Set();
+let eisLoaded = false, eisCAMap = {}, eisDescMap = {}, qcsLoaded = false, qcsMap = {};
+const TOASTS = [], LOAD_ERRORS = [];
+const localStorage = { getItem(){ return null; }, setItem(){}, removeItem(){} };
+const _el = { textContent: '', style: {}, innerHTML: '', classList: { contains(){ return false; }, add(){}, remove(){} } };
+function g(){ return _el; }
+function setOv(on, t, d){ if(on && typeof t === 'string' && t) HOOK.say(t, typeof d === 'string' ? d : ''); }
+function resetLazyStores(){} function updateCacheAge(){} function ageLabel(){ return 'earlier'; }
+function toast(m, kind){ TOASTS.push({ m, kind }); }
+function showLoadError(m){ LOAD_ERRORS.push(m); }
+function renderAll(){} function cacheSave(){} function renderCmr(){} function renderEcar(){}
+function kpi7RenderAll(){} function renderPavoi(){} function runSelfChecks(){}
+function kpi7CacheSave(){} function kpi7CacheLoad(){ return false; }
+function ymHas(){ return true; }
+/* [r148/r166 delta] READ the main dashboard's raw workflow / custom-field copies so loadData takes
+   its delta branch; NEVER write them. The watermark therefore stays where the main dashboard
+   left it: a later beta open re-fetches a slightly larger delta, the main dashboard's is intact. */
+async function idbGet(k){ return (k === WF_RAW_KEY || k === CF_RAW_KEY) ? HOOK.readStore(k) : null; }
+async function idbSet(){} async function idbDel(){}
+async function wfWatermark(){ return null; }   /* only feeds idbSet on the full-load branch */
+`;
+
+const DRIVER = `
+if(HOOK.cache){
+  allData = HOOK.cache.a; auditData = HOOK.cache.b || [];
+  if(Array.isArray(HOOK.cache.ou) && HOOK.cache.ou.length) ORG_UNIT_IDS = HOOK.cache.ou;
+} else {
+  HOOK.say('Loading reports from Galileo…', 'First open without a cache can take a minute or two.');
+  await loadData(false);   /* false: take the delta branches, exactly as the main dashboard's own open does */
+  if(LOAD_ERRORS.length || !allData.length) throw new Error(LOAD_ERRORS.join(' | ') || 'no reports returned');
+  /* [r165] a background refresh swaps only when every source succeeded */
+  if(HOOK.background && loadFailures.length) throw new Error(loadFailures.length + ' source(s) failed');
+}
+HOOK.say('Loading CMR-CAR, ECAR and PAVOI verification…', allData.length + ' reports ready');
+const VER_URL = G_URL + 'dwanalytics_report_field' +
+  '?$select=report_id,section_id,field_name,value_text' +
+  '&$filter=' + encodeURIComponent("section_name eq 'Verification Result' and section_level eq 1");
+const [, , , verRaw] = await Promise.all([loadCmr(), loadEcar(), loadKpi7Tasks(), fetchAll(VER_URL, true).catch(e => { toast('PAVOI verification rounds: ' + e.message, 'err'); return []; })]);
+
+const pavIds = new Set(allData.filter(r => r.report_title === 'PAVOI').map(r => r.report_id));
+const secMap = {};
+verRaw.forEach(f => {
+  if(!f.section_id || !pavIds.has(f.report_id)) return;
+  const s = ((secMap[f.report_id] ||= {})[f.section_id] ||= { date: null, by: null, result: null });
+  if(f.field_name === 'Date verified' && f.value_text) s.date = String(f.value_text).slice(0, 10);
+  if(f.field_name === 'Verified by (auditor)' && f.value_text) s.by = f.value_text;
+  if(f.field_name === 'Verification Result' && f.value_text) s.result = f.value_text;
+});
+
+/* ---- mapping to the new UI's REPORTS / AUDITS shape (ported 1:1 from snapshot.mjs) ---- */
+const day = s => { const d = dDay(s); return d ? ymd(d) : null; };
+const orDash = v => (v === null || v === undefined || String(v).trim() === '') ? '—' : String(v);
+const CAT = { 'CAT I': 'I', 'CAT II': 'II', 'CAT III': 'III' };
+const CLOSED = new Set(['On-time Closed', 'Lately Closed', 'Closed']);
+const FORM_OF = { 'PAVOI': 'pavoi', 'MCAR': 'mcar', 'AMO ECAR': 'amoecar' };
+const CODE = { pavoi: 'PAVOI', mcar: 'MCAR', amoecar: 'AMO-ECAR', ecar: 'ECAR', cmrcar: 'CMR-CAR' };
+const auById = {}; auditData.forEach(a => { auById[a.audit_id] = a; });
+function base(r, form){
+  return {
+    id: r.report_id, form, code: CODE[form], number: r.report_number,
+    auditTitle: orDash(r.audit_title),
+    location: orDash(auById[r.audit_id] && auById[r.audit_id].location_name),
+    raised: day(r.raised_date), target: day(r.Target_date), closed: day(r.close_date),
+    status: r.semantic_status, cat: CAT[r.overdue_cat] || null, dtd: r.report_ageing,
+    isClosed: CLOSED.has(r.semantic_status),
+    progress: false, level: orDash(r.finding_level), repetitive: false,
+    acReg: null, acType: null, rounds: [],
+  };
+}
+const reports = [];
+allData.forEach(r => {
+  const form = FORM_OF[r.report_title];
+  if(!form) return;
+  const o = base(r, form);
+  o.finding = orDash(r.finding_desc);
+  o.owner = orDash(r.issued_person || r.owner_name);
+  o.dept = orDash(form === 'pavoi' ? r.owner_name : r.dept);
+  o.repetitive = !!r.is_rep;
+  if(form === 'pavoi'){
+    o.withdrawn = kpi7Withdrawn(r);
+    o.firstVerified = kpi7Ver[r.report_id] || null;
+    o.rounds = Object.values(secMap[r.report_id] || {})
+      .sort((a, b) => (a.date || '9999') < (b.date || '9999') ? -1 : 1)
+      .map(v => ({ date: v.date, by: orDash(v.by), result: orDash(v.result) }));
+  }
+  reports.push(o);
+});
+function aircraft(o, v){
+  const m = String(v || '').match(/\\b(A\\d{3})\\s+MSN\\s+(\\d+)(\\s+NEO)?/i);
+  if(!m) return;
+  o.acReg = 'MSN ' + m[2];
+  o.acType = m[1].toUpperCase() + (m[3] ? 'neo' : '');
+}
+cmrData.forEach(r => { const o = base(r, 'cmrcar'); o.finding = orDash(r.finding_desc); o.owner = orDash(r.issued_to); o.dept = orDash(r.dept); aircraft(o, r.aircraft_reg); reports.push(o); });
+ecarData.forEach(r => { const o = base(r, 'ecar'); o.finding = orDash(r.finding_desc); o.owner = orDash(r.issued_by); o.dept = '—'; aircraft(o, r.aircraft_reg); reports.push(o); });
+
+const YEAR = String(new Date().getFullYear());
+const AUD_STATUS = { InProgress: 'In Progress' };
+const audits = auditData
+  .filter(a => a.is_qa_amo_scope && a.sched_year === YEAR)
+  .map(a => {
+    const m = Number(String(a.scheduled_start_date).slice(5, 7)) - 1;
+    return { id: a.audit_id, number: a.number, title: orDash(a.title), location: orDash(a.location_name),
+      type: a.workflow_category, status: AUD_STATUS[a.status] || a.status, start: m, end: m,
+      findings: a.finding_count, open: a.open_count, overdue: a.overdue_count, lead: orDash(a.lead_auditor_name) };
+  })
+  .filter(a => a.start >= 0 && a.start <= 11)
+  .sort((a, b) => a.start - b.start || String(a.number).localeCompare(String(b.number)));
+const cnt = {}; reports.forEach(r => { if(r.dept !== '—') cnt[r.dept] = (cnt[r.dept] || 0) + 1; });
+const depts = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a] || a.localeCompare(b));
+
+/* ---- cross-check against the app's own functions (same asserts as snapshot.mjs) ---- */
+const checks = [];
+const ok = (c, m) => { if(!c) checks.push(m); };
+const byForm = f => reports.filter(r => r.form === f);
+ok(byForm('pavoi').length === allData.filter(r => r.report_title === 'PAVOI').length, 'PAVOI count differs from allData');
+ok(byForm('cmrcar').length === cmrData.length && byForm('ecar').length === ecarData.length, 'CMR-CAR / ECAR count differs');
+if(kpi7Loaded) ok(byForm('pavoi').every(r => r.rounds.length === (kpi7Cnt[r.id] || 0)), 'PAVOI verification rounds differ from kpi7Cnt');
+const st = kpi7Stats(r => r.raised_year === Number(YEAR)).tot;
+const mine = byForm('pavoi').filter(r => r.raised && r.raised.startsWith(YEAR) && !r.withdrawn);
+if(kpi7Loaded) ok(mine.length === st.total && mine.filter(r => r.rounds.length > 0).length === st.assessed, 'KPI 7 differs from kpi7Stats()');
+ok(reports.every(r => r.status && r.number), 'a report is missing status or number');
+
+return { reports, audits, depts, checks,
+  raw: HOOK.dev ? { a: allData, b: auditData, ou: ORG_UNIT_IDS } : null,
+  loadWarnings: TOASTS.filter(t => t.kind === 'err').map(t => t.m).concat(loadFailures),
+  kpi7: { year: YEAR, assessed: st.assessed, total: st.total, withdrawn: st.withdrawn } };
+`;
+
+function localDay(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+
+async function run(){
+  const t0 = Date.now();
+  say('Loading the dashboard code…');
+  let SRC;
+  try{
+    const r = await fetch('index.html', { cache:'no-cache' });
+    if(!r.ok) throw new Error('HTTP ' + r.status);
+    SRC = await r.text();
+  }catch(e){ return fail('Could not load the dashboard.', 'index.html: ' + e.message); }
+  const REV = grabStr(SRC, 'APP_REV');
+
+  say('Checking your sign-in…');
+  let user;
+  try{ user = await signedInUser(SRC); }
+  catch(e){ return fail('Could not check your sign-in.', e.message, true); }
+  if(!user) return fail('Sign in first.', 'Open the main dashboard in this tab, sign in, then come back to /beta.html. The beta uses the same session.', true);
+
+  let EXTRACTED;
+  try{
+    const ex = extractClosure(SRC);
+    EXTRACTED = ex.code;
+    console.log('[beta] extracted ' + ex.names.length + ' names from index.html ' + REV + ':', ex.names.join(', '));
+    /* Local preview only: the proxy accepts the site's Origin, so a local relay stands in. */
+    if(DEV && qs.get('relay')) EXTRACTED = EXTRACTED.replace(/^const G_URL\s*=\s*'[^']*'/m, "const G_URL = '" + qs.get('relay').replace(/'/g,'') + "'");
+  }catch(e){ return fail('The beta does not match this dashboard build.', e.message + ' (index.html ' + REV + ')'); }
+
+  say('Reading cached data…');
+  const c = await readMainStore(SRC, grabStr(SRC, 'CACHE_KEY'));
+  const cache = c && c.rev === REV && Array.isArray(c.a) && c.a.length ? c : null;
+  /* [r165] same rule as cacheLoad(): a same-rev cache older than CACHE_TTL is still shown at
+     once, then refreshed in the background. TTL is read from index.html, not copied. */
+  let TTL = 4 * 3600e3;
+  try{ TTL = new Function(grabDecl(SRC, 'CACHE_TTL') + '\nreturn CACHE_TTL;')(); }catch(e){ console.warn('[beta] CACHE_TTL not read, using 4h:', e.message); }
+  const stale = !!cache && Date.now() - cache.ts > TTL;
+
+  /* One extraction, one fresh scope per load: a background refresh cannot see or disturb the
+     state of the load that is on screen. */
+  const body = PRELUDE + EXTRACTED + '\nreturn (async () => {\n' + DRIVER + '\n})();';
+  const load = opts => (new Function('HOOK', body))(Object.assign({
+    say, dev: DEV, readStore: k => readMainStore(SRC, k) }, opts));
+  const payload = (res, src, ts) => {
+    const now = new Date();
+    return { asOf: localDay(now), generatedAt: now.toISOString(), appRev: REV, source: src, cacheTs: ts,
+      user, loadWarnings: res.loadWarnings.concat(res.checks), kpi7: res.kpi7,
+      depts: res.depts, reports: res.reports, audits: res.audits };
+  };
+  const done = (res, how) => {
+    if(res.checks.length) console.warn('[beta] cross-check failed:', res.checks);
+    if(DEV) window.__betaRaw = Object.assign({ rev: REV }, res.raw);   /* local preview: lets a test seed the cache path */
+    console.log('[beta] ' + res.reports.length + ' reports · ' + res.audits.length + ' audits · ' + how +
+                ' · ' + ((Date.now() - t0) / 1000).toFixed(1) + 's');
+  };
+
+  let res;
+  try{ res = await load({ cache }); }
+  catch(e){ console.error('[beta] load failed', e); return fail('Could not load data from Galileo.', e.message); }
+  done(res, cache ? (stale ? 'from STALE cache' : 'from cache') : 'from Galileo');
+
+  window.QA_REAL_DATA = payload(res, cache ? 'cache' : 'galileo', cache ? cache.ts : null);
+  const app = document.createElement('script');
+  app.textContent = document.getElementById('beta-app').textContent;
+  bootEl.hidden = true;
+  document.body.appendChild(app);
+  if(!stale) return;
+
+  /* ── background refresh (r165) ── */
+  const tag = document.querySelector('.demo-tag');
+  const hours = Math.round((Date.now() - cache.ts) / 3600e3);
+  if(tag) tag.textContent = 'Beta · refreshing…';
+  toast('Showing data from ' + hours + 'h ago', 'Refreshing from Galileo in the background.');
+  let fresh;
+  try{
+    fresh = await load({ cache: null, background: true });
+    if(fresh.loadWarnings.length || fresh.checks.length) throw new Error(fresh.loadWarnings.concat(fresh.checks).join(' · '));
+  }catch(e){
+    console.warn('[beta] background refresh failed — keeping cached data:', e);
+    if(tag){ tag.textContent = 'Beta · ' + hours + 'h old'; }
+    toast('Background refresh incomplete', 'Still showing data from ' + hours + 'h ago. Reload to retry. (' + e.message + ')');
+    return;
+  }
+  done(fresh, 'background refresh');
+  window.QA_REAL_DATA = payload(fresh, 'galileo', null);
+  betaSwap(window.QA_REAL_DATA);
+  if(tag){ tag.textContent = 'Beta'; tag.title = 'Live Galileo data via index.html ' + REV + ' · loaded ' + new Date().toLocaleString(); }
+  toast('Data refreshed', fresh.reports.length + ' reports from Galileo.');
+}
+run();
+})();
+</script>
+
+<!-- The UI script runs only after the loader has put real data in window.QA_REAL_DATA.
+     It never falls back to mock data in the beta. -->
+<script type="text/plain" id="beta-app">
+"use strict";
+/* ============================================================================
+   QA AMO — information-architecture redesign prototype
+   Single file, no dependencies, no network calls. Every chart is hand-drawn
+   SVG or CSS. All figures below are MOCK DATA for design review only.
+   ========================================================================== */
+
+/* ---------------------------------------------------------------- icons ---
+   One outlined family: 20px grid, 1.6 stroke, round caps, no fills, no emoji. */
+const P = {
+  grid:'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
+  inbox:'M3 13h4l1.5 3h7L17 13h4M3 13l2.5-8h13L21 13v6H3z',
+  file:'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h4',
+  chart:'M4 20V10M10 20V4M16 20v-7M22 20H2',
+  calendar:'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4M8 14h3',
+  book:'M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM17 7h2v13h-2',
+  cog:'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1v.3a2 2 0 1 1-4 0v-.2a1.6 1.6 0 0 0-2.7-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3.5 15a2 2 0 0 1-1.5.4 2 2 0 1 1 0-4 1.6 1.6 0 0 0 1.5-2.6l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 9 4.6a2 2 0 0 1 1.4-1.9 2 2 0 0 1 2.6 1.9 1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0 1.1 2.7h.3a2 2 0 1 1 0 4h-.2a1.6 1.6 0 0 0-1.3.8',
+  search:'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16M21 21l-4.3-4.3',
+  x:'M6 6l12 12M18 6L6 18',
+  check:'M4 12.5l5 5L20 6.5',
+  alert:'M12 3L2 20h20zM12 9v5M12 17.5h.01',
+  rail:'M4 5h16M4 5v14M4 19h16M9 5v14',
+  more:'M5 12h.01M12 12h.01M19 12h.01',
+  sun:'M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5',
+  moon:'M20.5 14.9A8.6 8.6 0 0 1 9.1 3.5a8.6 8.6 0 1 0 11.4 11.4',
+  arrowUp:'M12 19V5M6 11l6-6 6 6',
+  arrowDown:'M12 5v14M18 13l-6 6-6-6',
+  arrowRight:'M5 12h14M13 5l7 7-7 7',
+  sortUp:'M7 14l5-5 5 5',
+  sortDown:'M7 10l5 5 5-5',
+  sortNone:'M7 10l5-4 5 4M7 14l5 4 5-4',
+  chevron:'M9 6l6 6-6 6',
+  clock:'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18M12 7v5l3.5 2',
+  users:'M16 20v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M9.5 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M21 20v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
+  plane:'M12 3c1 0 1.6 1 1.6 2.3v3.3l6.4 3.8v2l-6.4-2v3.9l2.4 1.7v1.6L12 18.6l-4 1v-1.6l2.4-1.7v-3.9l-6.4 2v-2l6.4-3.8V5.3C10.4 4 11 3 12 3z',
+  shield:'M12 3l8 3v6c0 4.5-3.2 7.9-8 9-4.8-1.1-8-4.5-8-9V6zM9 12l2 2 4-4',
+  layers:'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5M3 17l9 5 9-5',
+  download:'M12 3v12M7 11l5 5 5-5M4 21h16'
+};
+function ic(name,size,cls){
+  const d = P[name] || '';
+  return '<svg class="ic '+(cls||'')+'" width="'+(size||20)+'" height="'+(size||20)+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="'+d+'"/></svg>';
+}
+
+/* ------------------------------------------------------- navigation model ---
+   Seven top-level entries, each answering one question the QA team actually
+   arrives with. The 22 flat items of the current dashboard live underneath as
+   secondary tabs — see the Design rationale screen for the full mapping. */
+const NAV = [
+  { id:'overview',  label:'Overview',   icon:'grid',     task:'monitor', title:'Overview',
+    lead:'Where the department stands right now, and what needs attention today.' },
+  { id:'work',      label:'Work Queue', icon:'inbox',    task:'act',     title:'Work Queue',
+    lead:'Findings that need an action from someone. One list, four lanes.',
+    tabs:[
+      {id:'open',   label:'Open reports'},
+      {id:'overdue',label:'Overdue'},
+      {id:'verify', label:'Awaiting verification'}
+    ]},
+  { id:'findings',  label:'Findings',   icon:'file',     task:'act',     title:'Findings',
+    lead:'The full register, by form type. Every form keeps its own columns and its own rules.',
+    tabs:[
+      {id:'all',    label:'All forms'},
+      {id:'pavoi',  label:'PAVOI'},
+      {id:'cmrcar', label:'CMR-CAR'},
+      {id:'ecar',   label:'ECAR'},
+      {id:'amoecar',label:'AMO-ECAR'},
+      {id:'mcar',   label:'MCAR'}
+    ]},
+  { id:'analytics', label:'Analytics',  icon:'chart',    task:'analyse', title:'Analytics',
+    lead:'Trends and indicators over time, not the day-to-day queue.',
+    tabs:[
+      {id:'kpi',    label:'KPI charts'},
+      {id:'spi',    label:'SPI'},
+      {id:'safety', label:'Safety (MSAG)'},
+      {id:'early',  label:'Early detection'},
+      {id:'status', label:'Event/IR report status'}
+    ]},
+  { id:'audit',     label:'Audit Plan', icon:'calendar', task:'audit',   title:'Audit Plan',
+    lead:'The annual programme: what is scheduled, what is running, what produced findings.',
+    tabs:[
+      {id:'timeline',  label:'Timeline'},
+      {id:'list',      label:'Schedule list'},
+      {id:'bottleneck',label:'Bottleneck analysis'}
+    ]},
+  { id:'library',   label:'Library',    icon:'book',     task:'reference', title:'Library',
+    lead:'Controlled documents and guidance. Read, not acted on.',
+    tabs:[
+      {id:'documents',label:'Documents'},
+      {id:'guide',    label:'User guide'}
+    ]},
+  { id:'admin',     label:'Admin',      icon:'cog',      task:'admin',   title:'Admin',
+    lead:'Access, exports and personal configuration.',
+    tabs:[
+      {id:'users',   label:'User management'},
+      {id:'exports', label:'Export reports'},
+      {id:'mydash',  label:'My dashboard'},
+      {id:'feedback',label:'Feedback'}
+    ]}
+];
+const TASK_LABEL = { monitor:'Monitor', act:'Act', analyse:'Analyse', audit:'Audit', reference:'Reference', admin:'Administer' };
+const NAV_BY_ID = Object.fromEntries(NAV.map(n=>[n.id,n]));
+
+/* ==========================================================================
+   MOCK DATA
+   Seeded so every reload shows the same figures — a prototype that reshuffles
+   its numbers cannot be reviewed. Nothing here is a real QA record.
+   The vocabulary (statuses, CAT bands, form types, owner sections, KPI 2 and
+   KPI 7) follows the current dashboard so the redesign can be compared to it.
+   ========================================================================== */
+const DAY = 86400000;
+/* REAL DATA mode: window.QA_REAL_DATA comes from real-data.js (snapshot.mjs).
+   TODAY is pinned to the snapshot day, because status, CAT and days-to-due were
+   computed by the live dashboard's own functions on that day. */
+const REAL = window.QA_REAL_DATA || null;
+const realDay = s => s ? new Date(+s.slice(0,4), +s.slice(5,7)-1, +s.slice(8,10)) : null;
+const TODAY = REAL ? realDay(REAL.asOf) : new Date(2026, 8, 13);
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rnd  = mulberry32(20260913);
+const pick = a => a[Math.floor(rnd()*a.length)];
+const ri   = (a,b) => a + Math.floor(rnd()*(b-a+1));
+function weighted(pairs){
+  const total = pairs.reduce((s,p)=>s+p[1],0); let r = rnd()*total;
+  for(const [v,w] of pairs){ if((r-=w) <= 0) return v; } return pairs[pairs.length-1][0];
+}
+const addDays = (d,n) => new Date(d.getTime() + n*DAY);
+const dayDiff = (a,b) => Math.round((a.getTime()-b.getTime())/DAY);
+const fmtDate = d => d ? (String(d.getDate()).padStart(2,'0')+' '+MONTHS[d.getMonth()]+' '+d.getFullYear()) : '—';
+const fmtShort = d => d ? (String(d.getDate()).padStart(2,'0')+' '+MONTHS[d.getMonth()]) : '—';
+
+/* ---- reference lists ---- */
+const DEPTS = [
+  'MQA — Licensing & Authorization',
+  'MQA — Quality Control',
+  'MQA — Standard & Compliance',
+  'AMO — Safety',
+  'AMO — Line Maintenance',
+  'Engineering'
+];
+const PEOPLE = [
+  {n:'Nguyen Van Hung',  d:'MQA — Quality Control'},
+  {n:'Tran Thi Mai',     d:'MQA — Standard & Compliance'},
+  {n:'Pham Anh Duc',     d:'MQA — Licensing & Authorization'},
+  {n:'Le Quoc Bao',      d:'AMO — Line Maintenance'},
+  {n:'Do Minh Khoa',     d:'AMO — Safety'},
+  {n:'Vu Thanh Ha',      d:'MQA — Quality Control'},
+  {n:'Hoang Nam Son',    d:'Engineering'},
+  {n:'Bui Thu Trang',    d:'MQA — Standard & Compliance'},
+  {n:'Dang Hai Long',    d:'AMO — Line Maintenance'},
+  {n:'Ngo Kim Chi',      d:'AMO — Safety'}
+];
+const FLEET = [
+  {reg:'VN-A650',t:'A320'},{reg:'VN-A657',t:'A320'},{reg:'VN-A662',t:'A320'},
+  {reg:'VN-A673',t:'A321'},{reg:'VN-A688',t:'A321'},{reg:'VN-A691',t:'A321'},
+  {reg:'VN-A696',t:'A321'},{reg:'VN-A812',t:'A330'},{reg:'VN-A814',t:'A330'}
+];
+
+/* Descriptors are only shown where the current dashboard actually states one.
+   PAVOI, ECAR and CMR-CAR carry none there, so none is invented here. */
+const FORMS = [
+  {id:'pavoi',  code:'PAVOI',    desc:'',                           n:24},
+  {id:'mcar',   code:'MCAR',     desc:'Internal audit findings',    n:20},
+  {id:'amoecar',code:'AMO-ECAR', desc:'Authority findings issued to AMO', n:13},
+  {id:'ecar',   code:'ECAR',     desc:'',                           n:12},
+  {id:'cmrcar', code:'CMR-CAR',  desc:'',                           n:11}
+];
+const FORM_BY_ID = Object.fromEntries(FORMS.map(f=>[f.id,f]));
+
+const AUDIT_TITLES = [
+  ['Line maintenance station audit','TSN'],
+  ['Base maintenance hangar audit','HAN'],
+  ['Tooling & calibration inspection','TSN'],
+  ['Stores & quarantine area audit','TSN'],
+  ['MEL application compliance inspection','SGN'],
+  ['EDTO programme audit','HAN'],
+  ['Fuel tank safety programme audit','TSN'],
+  ['Contractor & subcontractor audit','DAD'],
+  ['Battery shop inspection','TSN'],
+  ['Wheel & brake shop inspection','HAN'],
+  ['A321 maintenance programme compliance audit','SGN'],
+  ['Records & CAMO interface audit','SGN'],
+  ['De-icing / anti-icing programme audit','HAN'],
+  ['Human factors training audit','SGN'],
+  ['CAAV surveillance follow-up','TSN'],
+  ['Workshop certification audit','CXR'],
+  ['Ramp handling damage prevention inspection','DAD'],
+  ['Technical records sampling audit','TSN']
+];
+const FINDINGS_TEXT = [
+  'Calibration label expired on torque wrench TQ-114; tool remained in the serviceable rack.',
+  'MEL item deferred beyond the category B interval without a recorded extension approval.',
+  'FOD control walk not evidenced for hangar bay 2 on three consecutive shifts.',
+  'Stage sheet 4 of the work pack closed without the independent inspection signature.',
+  'Quarantine area contained two components with no rejection tag attached.',
+  'Shelf-life expired sealant found in the consumables cabinet, batch 22-118.',
+  'Task card revision in use did not match the current AMM revision level.',
+  'Certifying staff authorisation scope did not cover the ATA 32 task signed for.',
+  'Aircraft technical log entry corrected without the required single-line strike and initials.',
+  'Hangar lighting level below the standard required for the inspection performed.',
+  'Contractor release document filed without the approved-supplier reference.',
+  'ESD-sensitive component handled outside a protected workstation.',
+  'Battery capacity check record missing the electrolyte temperature reading.',
+  'Fire extinguisher inspection tag in the paint store was two months overdue.',
+  'Training record for the de-icing procedure not updated after the revision.',
+  'Borescope inspection report filed without the associated image evidence.',
+  'Spare part received with a certificate of conformity that had no traceability back to the manufacturer.',
+  'Deviation raised during the C-check was closed without a root-cause statement.',
+  'Access panel torque values not recorded on the completed work package.',
+  'Oxygen bottle pressure check interval exceeded on two line-maintained aircraft.',
+  'Hangar door interlock test record could not be produced for the current quarter.',
+  'Repetitive defect on ATA 27 not escalated to the reliability programme.',
+  'Personnel authorisation matrix not reviewed after the organisational change in March.',
+  'Control of the maintenance data terminal left logged in and unattended.'
+];
+const VERIFY_RESULT = ['Satisfactory','Evidence requested','Not satisfactory — re-verify'];
+
+/* ---- report register ---- */
+let SEQ = {};
+function reportNumber(code){
+  SEQ[code] = (SEQ[code]||0) + 1;
+  return code + '-26-' + String(SEQ[code]*7 + 21).padStart(4,'0');
+}
+function buildReports(){
+  const out = [];
+  FORMS.forEach(f=>{
+    for(let i=0;i<f.n;i++){
+      const targetDays = pick([30,45,60,90]);
+      const state = weighted([['ontime',32],['late',11],['open',22],['progress',16],['overdue',19]]);
+      let raisedOff, closedOff = null;
+      if(state==='open' || state==='progress'){ raisedOff = ri(1, targetDays-2); }
+      else if(state==='overdue'){ raisedOff = targetDays + ri(2, 110); }
+      else if(state==='ontime'){ const c = ri(6, targetDays); raisedOff = c + ri(2, 300); closedOff = raisedOff - c; }
+      else { const c = targetDays + ri(2, 70); raisedOff = c + ri(2, 230); closedOff = raisedOff - c; }
+
+      const raised = addDays(TODAY, -raisedOff);
+      const target = addDays(raised, targetDays);
+      const closed = closedOff === null ? null : addDays(TODAY, -closedOff);
+      const owner  = pick(PEOPLE);
+      const ac     = rnd() < 0.66 ? pick(FLEET) : null;
+      const audit  = pick(AUDIT_TITLES);
+
+      const r = {
+        id: f.id + '-' + i,
+        form: f.id,
+        code: f.code,
+        number: reportNumber(f.code),
+        auditTitle: audit[0],
+        location: audit[1],
+        finding: pick(FINDINGS_TEXT),
+        owner: owner.n,
+        dept: owner.d,
+        acReg: ac ? ac.reg : null,
+        acType: ac ? ac.t : null,
+        raised, target, closed,
+        targetDays,
+        progress: state === 'progress',
+        level: weighted([['Level 1',18],['Level 2',49],['Observation',33]]),
+        repetitive: rnd() < 0.16,
+        rounds: []
+      };
+
+      /* PAVOI records carry verification rounds. KPI 7 in the current
+         dashboard counts a PAVOI as assessed once it has at least one. */
+      if(f.id === 'pavoi' && rnd() < 0.64){
+        const nRounds = weighted([[1,58],[2,29],[3,13]]);
+        let cursor = addDays(raised, ri(8, 52));
+        for(let k=0;k<nRounds;k++){
+          if(cursor > TODAY) break;
+          r.rounds.push({
+            date: cursor,
+            by: pick(PEOPLE).n,
+            result: k === nRounds-1 ? weighted([['Satisfactory',62],['Evidence requested',22],['Not satisfactory — re-verify',16]])
+                                    : pick(['Evidence requested','Not satisfactory — re-verify'])
+          });
+          cursor = addDays(cursor, ri(12, 40));
+        }
+      }
+      out.push(r);
+    }
+  });
+  return out;
+}
+function fromReal(r){
+  return Object.assign({}, r, {
+    raised: realDay(r.raised), target: realDay(r.target), closed: realDay(r.closed),
+    firstVerified: r.form === 'pavoi' ? realDay(r.firstVerified) : undefined,
+    rounds: (r.rounds || []).map(v => Object.assign({}, v, { date: realDay(v.date) }))
+  });
+}
+const REPORTS = REAL ? REAL.reports.map(fromReal) : buildReports();
+/* reference lists follow the data, not the mock seed */
+function refLists(depts){
+  DEPTS.length = 0; depts.forEach(d => DEPTS.push(d));
+  const people = {};
+  REPORTS.forEach(r => { if(r.owner !== '—' && !people[r.owner]) people[r.owner] = r.dept; });
+  PEOPLE.length = 0; Object.keys(people).sort().forEach(n => PEOPLE.push({ n, d: people[n] }));
+  const regs = new Set(REPORTS.map(r => r.acReg).filter(Boolean));
+  FLEET.length = 0; [...regs].sort().forEach(reg => FLEET.push({ reg, t: '' }));
+}
+if(REAL) refLists(REAL.depts);
+
+/* ---- derived report facts ---- */
+function semantic(r){
+  if(r.closed) return r.closed <= r.target ? 'On-time Closed' : 'Lately Closed';
+  if(TODAY > r.target) return 'Overdue';
+  return r.progress ? 'In Progress' : 'Open';
+}
+function daysToDue(r){ return dayDiff(r.target, TODAY); }
+function catOf(r){
+  if(semantic(r) !== 'Overdue') return null;
+  const d = -daysToDue(r);
+  return d <= 30 ? 'I' : d <= 60 ? 'II' : 'III';
+}
+/* Real records carry isClosed from the live status: a Closed report may have no close date. */
+function isOpen(r){ return r.isClosed === undefined ? !r.closed : !r.isClosed; }
+function assessed(r){ return r.rounds.length > 0; }
+/* First verification date. Real data: the live kpi7Ver (earliest Date verified); a round
+   can exist without a date, which is null here and must not be graded. */
+function firstVerDate(r){ return r.firstVerified !== undefined ? r.firstVerified : (r.rounds[0] ? r.rounds[0].date : null); }
+function verifiedIn30(r){
+  const f = firstVerDate(r);
+  if(!r.rounds.length || !f || !r.raised) return false;
+  return dayDiff(f, r.raised) <= 30;
+}
+if(!REAL) REPORTS.forEach(r=>{ r.status = semantic(r); r.cat = catOf(r); r.dtd = daysToDue(r); });
+
+/* ---- audit programme ---- */
+function buildAudits(){
+  return AUDIT_TITLES.map((a,i)=>{
+    const start = i < 15 ? Math.min(11, Math.floor(i*0.78)) : ri(8,11);
+    const span  = weighted([[1,64],[2,28],[3,8]]);
+    const end   = Math.min(11, start + span - 1);
+    let status;
+    if(end < 8) status = weighted([['Closed',72],['Performed',28]]);
+    else if(start <= 8 && end >= 8) status = weighted([['In Progress',66],['Performed',34]]);
+    else status = 'Scheduled';
+    const findings = status === 'Scheduled' ? 0 : ri(0, 11);
+    const open     = status === 'Closed' ? 0 : Math.min(findings, ri(0, 5));
+    const overdue  = Math.min(open, rnd() < 0.34 ? ri(1,2) : 0);
+    return {
+      id:'aud-'+i,
+      number:'QA-AMO-26-'+String(i*3+7).padStart(3,'0'),
+      title:a[0], location:a[1],
+      type: /inspection/i.test(a[0]) ? 'Inspection' : 'Audit',
+      status, start, end, findings, open, overdue,
+      lead: pick(PEOPLE).n
+    };
+  });
+}
+const AUDITS = REAL ? REAL.audits : buildAudits();
+
+/* ---- 12-month series, computed from the register (never invented) ---- */
+function monthsBack(n){
+  const out = [];
+  for(let i=n-1;i>=0;i--){
+    const d = new Date(TODAY.getFullYear(), TODAY.getMonth()-i, 1);
+    out.push({ y:d.getFullYear(), m:d.getMonth(), label:MONTHS[d.getMonth()], end:new Date(d.getFullYear(), d.getMonth()+1, 0, 23, 59) });
+  }
+  return out;
+}
+const SERIES_MONTHS = monthsBack(12);
+function seriesFor(rows){
+  const raised = [], closed = [], open = [], overdue = [];
+  SERIES_MONTHS.forEach(mo=>{
+    const start = new Date(mo.y, mo.m, 1);
+    raised.push(rows.filter(r=> r.raised >= start && r.raised <= mo.end).length);
+    closed.push(rows.filter(r=> r.closed && r.closed >= start && r.closed <= mo.end).length);
+    const live = rows.filter(r=> r.raised && r.raised <= mo.end && (r.closed ? r.closed > mo.end : isOpen(r)));
+    open.push(live.length);
+    overdue.push(live.filter(r=> r.target && r.target < mo.end).length);
+  });
+  return { raised, closed, open, overdue };
+}
+
+/* ---- search index ---- */
+function buildIndex(){
+  const idx = [];
+  REPORTS.forEach(r=> idx.push({
+    kind:'Report', key:r.number, sub:r.code+' · '+r.auditTitle,
+    hay:(r.number+' '+r.auditTitle+' '+r.finding+' '+r.owner+' '+(r.acReg||'')+' '+r.dept).toLowerCase(),
+    go:{screen:'findings', tab:r.form, id:r.id}, meta:r.status
+  }));
+  AUDITS.forEach(a=> idx.push({
+    kind:'Audit', key:a.number, sub:a.title+' · '+a.location,
+    hay:(a.number+' '+a.title+' '+a.lead+' '+a.location).toLowerCase(),
+    go:{screen:'audit', tab:'timeline', id:a.id}, meta:a.status
+  }));
+  FLEET.forEach(f=>{
+    const n = REPORTS.filter(r=>r.acReg===f.reg).length;
+    idx.push({ kind:'Aircraft', key:f.reg, sub:(f.t ? f.t+' · ' : '')+n+' findings on record',
+      hay:(f.reg+' '+f.t).toLowerCase(), go:{screen:'findings', tab:'all', q:f.reg}, meta:f.t });
+  });
+  PEOPLE.forEach(p=>{
+    const n = REPORTS.filter(r=>r.owner===p.n && isOpen(r)).length;
+    idx.push({ kind:'Person', key:p.n, sub:p.d+' · '+n+' open',
+      hay:(p.n+' '+p.d).toLowerCase(), go:{screen:'work', tab:'open', q:p.n}, meta:n+' open' });
+  });
+  return idx;
+}
+const INDEX = buildIndex();
+
+/* Beta: swap in data from a background refresh (the r165 stale-while-revalidate rule) without
+   reloading the page. REPORTS / AUDITS / INDEX are const bindings, so their CONTENTS are replaced. */
+function betaSwap(D){
+  REPORTS.splice(0, REPORTS.length, ...D.reports.map(fromReal));
+  AUDITS.splice(0, AUDITS.length, ...D.audits);
+  refLists(D.depts);
+  INDEX.splice(0, INDEX.length, ...buildIndex());
+  const keep = state.filters.dept;
+  $('#fDept').innerHTML = '<option value="">All departments</option>'
+    + DEPTS.map(d=>'<option value="'+esc(d)+'">'+esc(d)+'</option>').join('');
+  if(DEPTS.includes(keep)) $('#fDept').value = keep; else state.filters.dept = '';
+  render();
+}
+
+/* ==========================================================================
+   STATE · ROUTER · FILTERS
+   ========================================================================== */
+const state = {
+  screen:'overview',
+  tab:{ work:'open', findings:'all', analytics:'kpi', audit:'timeline', library:'documents', admin:'users' },
+  filters:{ years:[TODAY.getFullYear()], months:[], dept:'' },
+  cat:'',
+  rowQuery:'',
+  sort:{},
+  page:{},
+  sel:{ pavoi:null }
+};
+const $  = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* Period filter = calendar years x calendar months, both multi-select.
+   Empty list means "all". Default: the current year, every month. */
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const defaultFilters = () => ({ years:[TODAY.getFullYear()], months:[], dept:'' });
+const dataYears = () => [...new Set(REPORTS.filter(r=>r.raised).map(r=>r.raised.getFullYear()))].sort((a,b)=>b-a);
+const isDefaultYears = ys => ys.length === 1 && ys[0] === TODAY.getFullYear();
+function monthsLabel(ms){
+  if(!ms.length) return 'All months';
+  const m = [...ms].sort((a,b)=>a-b);
+  const run = m.length > 2 && m[m.length-1] - m[0] === m.length - 1;   /* contiguous: Jul–Sep */
+  if(run) return MONTHS_SHORT[m[0]]+'–'+MONTHS_SHORT[m[m.length-1]];
+  return m.length <= 3 ? m.map(k=>MONTHS_SHORT[k]).join(', ') : m.length+' months';
+}
+function yearsLabel(ys){
+  if(!ys.length) return 'All years';
+  return [...ys].sort((a,b)=>a-b).join(', ');
+}
+function periodLabel(){
+  const f = state.filters;
+  return (f.months.length ? monthsLabel(f.months)+' · ' : '') + yearsLabel(f.years);
+}
+
+function applyFilters(rows){
+  const f = state.filters;
+  return rows.filter(r=>{
+    /* a report with no raised date cannot be placed in a period: it only shows with no period filter */
+    if((f.years.length || f.months.length) && !r.raised) return false;
+    if(f.years.length && !f.years.includes(r.raised.getFullYear())) return false;
+    if(f.months.length && !f.months.includes(r.raised.getMonth())) return false;
+    if(f.dept && r.dept !== f.dept) return false;
+    return true;
+  });
+}
+function applyQuery(rows){
+  const q = state.rowQuery.trim().toLowerCase();
+  if(!q) return rows;
+  return rows.filter(r => (r.number+' '+r.auditTitle+' '+r.finding+' '+r.owner+' '+(r.acReg||'')+' '+r.dept+' '+r.status).toLowerCase().includes(q));
+}
+const scoped = () => applyQuery(applyFilters(REPORTS));
+
+/* ---- routing: real hash routes, so Back and deep links behave ---- */
+let pendingId = null;
+function go(screen, tab, opts){
+  opts = opts || {};
+  if(opts.dept !== undefined) state.filters.dept = opts.dept;
+  if(opts.years !== undefined)  state.filters.years  = opts.years;
+  if(opts.months !== undefined) state.filters.months = opts.months;
+  state.rowQuery = opts.q !== undefined ? opts.q : (opts.keepQuery ? state.rowQuery : '');
+  if(opts.id) pendingId = opts.id;
+  const t = tab || state.tab[screen];
+  const next = '#/' + screen + (t ? '/' + t : '');
+  if(location.hash === next) route();   /* same route, filters changed */
+  else location.hash = next;            /* hashchange drives the render */
+}
+function route(){
+  const parts = location.hash.replace(/^#\/?/,'').split('/').filter(Boolean);
+  let screen = parts[0] || 'overview';
+  if(screen !== 'rationale' && !NAV_BY_ID[screen]) screen = 'overview';
+  const nav = NAV_BY_ID[screen];
+  let tab = parts[1];
+  if(nav && nav.tabs){
+    if(!nav.tabs.some(t=>t.id===tab)) tab = state.tab[screen] || nav.tabs[0].id;
+    state.tab[screen] = tab;
+  }
+  state.screen = screen;
+  render();
+}
+window.addEventListener('hashchange', route);
+
+/* ==========================================================================
+   SHARED VIEW PIECES
+   ========================================================================== */
+/* 'Closed' = live semCalc's verdict for a closed report with no target or no close date,
+   so timeliness cannot be graded. It is real, so it gets a chip rather than vanishing. */
+const SCLASS = {'Open':'s-open','In Progress':'s-progress','On-time Closed':'s-ontime','Lately Closed':'s-late','Overdue':'s-overdue','Closed':'s-ontime'};
+/* Status is carried by shape + label + luminance — never by hue alone.
+   Red is spent only on breach (Overdue) and on CAT severity. */
+const MARK = {
+  'Open':'<circle cx="6" cy="6" r="4.2"/>',
+  'In Progress':'<circle cx="6" cy="6" r="4.2"/><path d="M6 1.8a4.2 4.2 0 0 1 0 8.4z" fill="currentColor" stroke="none"/>',
+  'On-time Closed':'<path d="M2.1 6.3l2.7 2.7L10 3.3"/>',
+  'Closed':'<path d="M2.1 6.3l2.7 2.7L10 3.3"/><path d="M1.5 10.5h9"/>',
+  'Lately Closed':'<circle cx="6" cy="6" r="4.2"/><path d="M6 3.5V6l1.9 1.2"/>',
+  'Overdue':'<path d="M6 1.5L11.2 10.5H0.8z"/><path d="M6 5.1v2"/><path d="M6 8.7h.01"/>'
+};
+function mark(s){
+  return '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(MARK[s]||'')+'</svg>';
+}
+function chip(s){ return '<span class="chip '+(SCLASS[s]||'s-neutral')+'">'+mark(s)+esc(s)+'</span>'; }
+function catChip(c){ return c ? '<span class="cat c'+({'I':1,'II':2,'III':3}[c])+'">CAT '+c+'</span>' : '<span class="dim">—</span>'; }
+function dueCell(r){
+  if(r.closed) return '<span class="num dim">'+fmtShort(r.closed)+'</span>';
+  if(!isOpen(r)) return '<span class="dim od-nowrap">closed · no date</span>';
+  const d = r.dtd;
+  if(d === null || d === undefined) return '<span class="dim od-nowrap">no target</span>';
+  if(d < 0)  return '<span class="num red strong od-nowrap">'+Math.abs(d)+'d over</span>';
+  if(d <= 7) return '<span class="num strong od-nowrap">'+d+'d left</span>';
+  return '<span class="num dim od-nowrap">'+d+'d left</span>';
+}
+
+/* ---- hand-drawn charts: sparkline, line pair, donut, stacked bar ---- */
+function spark(vals, hot){
+  if(!vals.length) return '';
+  const w = 120, h = 30, min = Math.min(...vals), max = Math.max(...vals), rng = (max-min) || 1;
+  const pts = vals.map((v,i)=>[ (i/(vals.length-1))*w, h - ((v-min)/rng)*(h-6) - 3 ]);
+  const line = 'M' + pts.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L ');
+  const area = line + ' L '+w+' '+h+' L 0 '+h+' Z';
+  const col  = hot ? 'var(--accent)' : 'var(--text-2)';
+  const last = pts[pts.length-1];
+  return '<svg class="spark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none" role="img" aria-label="12-month trend">'
+    + '<path d="'+area+'" fill="'+col+'" opacity=".13"/>'
+    + '<path d="'+line+'" fill="none" stroke="'+col+'" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>'
+    + '<circle cx="'+last[0].toFixed(1)+'" cy="'+last[1].toFixed(1)+'" r="2.4" fill="'+col+'"/></svg>';
+}
+function trendTag(now, prev, goodDir, unit){
+  if(prev === null || prev === undefined) return '';
+  const d = now - prev;
+  if(Math.abs(d) < 0.5) return '<span class="trend flat">'+ic('more',13)+' no change</span>';
+  const up  = d > 0;
+  const good = goodDir === 'up' ? up : !up;
+  const val = (up?'+':'−') + Math.abs(Math.round(d*10)/10) + (unit||'');
+  return '<span class="trend '+(good?'good':'bad')+'">'+ic(up?'arrowUp':'arrowDown',13)+val+'</span>';
+}
+function linePair(a, b, labels){
+  const W = 640, H = 210, L = 34, R = 10, T = 14, B = 30;
+  const max = Math.max(4, ...a, ...b), iw = W-L-R, ih = H-T-B;
+  const x = i => L + (i/(labels.length-1))*iw;
+  const y = v => T + ih - (v/max)*ih;
+  const path = arr => 'M' + arr.map((v,i)=>x(i).toFixed(1)+' '+y(v).toFixed(1)).join(' L ');
+  let grid = '', ticks = '';
+  for(let g=0; g<=3; g++){
+    const gv = Math.round(max*g/3), gy = y(gv);
+    grid  += '<line x1="'+L+'" y1="'+gy.toFixed(1)+'" x2="'+(W-R)+'" y2="'+gy.toFixed(1)+'" stroke="var(--hairline)" stroke-width="1"/>';
+    ticks += '<text x="'+(L-8)+'" y="'+(gy+4).toFixed(1)+'" text-anchor="end" font-size="11" font-family="ui-monospace,monospace" fill="var(--text-3)">'+gv+'</text>';
+  }
+  const xlab = labels.map((l,i)=> '<text x="'+x(i).toFixed(1)+'" y="'+(H-10)+'" text-anchor="middle" font-size="11" font-family="ui-monospace,monospace" fill="var(--text-3)">'+l+'</text>').join('');
+  return '<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Findings raised versus closed over the last twelve months">'
+    + grid + ticks + xlab
+    + '<path d="'+path(b)+'" fill="none" stroke="var(--text-2)" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round" stroke-linecap="round"/>'
+    + '<path d="'+path(a)+'" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>'
+    + a.map((v,i)=>'<circle cx="'+x(i).toFixed(1)+'" cy="'+y(v).toFixed(1)+'" r="2.6" fill="var(--accent)"/>').join('')
+    + '</svg>';
+}
+function donut(parts){
+  const total = parts.reduce((s,p)=>s+p.v,0) || 1;
+  const R = 54, C = 2*Math.PI*R;
+  let off = 0;
+  const segs = parts.map(p=>{
+    const len = (p.v/total)*C;
+    const s = '<circle cx="70" cy="70" r="'+R+'" fill="none" stroke="'+p.c+'" stroke-width="18" stroke-dasharray="'+len.toFixed(2)+' '+(C-len).toFixed(2)+'" stroke-dashoffset="'+(-off).toFixed(2)+'" transform="rotate(-90 70 70)"/>';
+    off += len; return s;
+  }).join('');
+  return '<svg viewBox="0 0 140 140" width="140" height="140" role="img" aria-label="Status mix"><circle cx="70" cy="70" r="'+R+'" fill="none" stroke="var(--hairline)" stroke-width="18"/>'+segs
+    + '<text x="70" y="66" text-anchor="middle" font-size="26" font-weight="700" font-family="ui-monospace,monospace" fill="var(--text)">'+total+'</text>'
+    + '<text x="70" y="86" text-anchor="middle" font-size="11" letter-spacing="1.2" fill="var(--text-3)">IN SCOPE</text></svg>';
+}
+
+/* ==========================================================================
+   CHROME
+   ========================================================================== */
+function navButton(n, current, extra){
+  const openCount = n.id === 'work' ? scoped().filter(isOpen).length : 0;
+  return '<button class="nav-b" type="button" data-go="'+n.id+'" data-label="'+esc(n.label)+'"'
+    + (current ? ' aria-current="page"' : '') + '>'
+    + ic(n.icon, 20) + '<span class="nav-label">'+esc(n.label)+'</span>'
+    + (openCount ? '<span class="nav-count">'+openCount+'</span>' : '') + (extra||'') + '</button>';
+}
+function renderChrome(){
+  $('#sbNav').innerHTML = NAV.map(n => navButton(n, state.screen===n.id)).join('');
+  $('#rationaleNav').innerHTML = ic('layers',20)+'<span class="nav-label">Design rationale</span>';
+  $('#rationaleNav').setAttribute('data-go','rationale');
+  if(state.screen === 'rationale') $('#rationaleNav').setAttribute('aria-current','page');
+  else $('#rationaleNav').removeAttribute('aria-current');
+
+  const bottom = ['overview','work','findings','audit'];
+  $('#botNav').innerHTML = bottom.map(id=>{
+    const n = NAV_BY_ID[id];
+    return '<button class="bn-b" type="button" data-go="'+id+'"'+(state.screen===id?' aria-current="page"':'')+'>'
+      + ic(n.icon,22) + '<span>'+esc(n.label)+'</span></button>';
+  }).join('') + '<button class="bn-b" type="button" data-act="drawer"'
+      + (['analytics','library','admin','rationale'].includes(state.screen)?' aria-current="page"':'')
+      + ' aria-haspopup="dialog">'+ic('more',22)+'<span>More</span></button>';
+
+  $('#drawerBody').innerHTML = ['analytics','library','admin'].map(id=>{
+    const n = NAV_BY_ID[id];
+    return '<button class="nav-b" type="button" data-go="'+id+'"'+(state.screen===id?' aria-current="page"':'')+'>'
+      + ic(n.icon,20)+'<span class="nav-label">'+esc(n.label)+'</span></button>';
+  }).join('') + '<div class="nav-sep"></div><button class="nav-b" type="button" data-go="rationale">'
+    + ic('layers',20)+'<span class="nav-label">Design rationale</span></button>';
+
+  const title = state.screen === 'rationale' ? 'Design rationale' : NAV_BY_ID[state.screen].title;
+  $('#pageTitle').textContent = title;
+  document.title = title + ' — QA AMO beta';
+}
+/* The filter bar is persistent across every data screen; reference and
+   admin screens have nothing to filter, so it steps out of the way. */
+const FILTERED_SCREENS = ['overview','work','findings','audit'];
+function renderFilterBar(){
+  const on = FILTERED_SCREENS.includes(state.screen);
+  $('#filterbar').hidden = !on;
+  if(!on) return;
+  const f = state.filters, chips = [];
+  if(!isDefaultYears(f.years)) chips.push(['years', 'Year: '+yearsLabel(f.years)]);
+  if(f.months.length) chips.push(['months', 'Month: '+monthsLabel(f.months)]);
+  if(f.dept)  chips.push(['dept', f.dept]);
+  if(state.rowQuery) chips.push(['q', 'matching “'+state.rowQuery+'”']);
+  $('#fbChips').innerHTML = chips.length
+    ? chips.map(c=>'<span class="fchip">'+esc(c[1])+'<button type="button" data-act="clearone" data-k="'+c[0]+'" aria-label="Remove filter: '+esc(c[1])+'">'+ic('x',14)+'</button></span>').join('')
+      + '<button class="link-b" type="button" data-act="clearall">Clear all</button>'
+    : '<span class="t-small dim">No filters beyond the current year.</span>';
+  syncPeriodPicker();
+  $('#fDept').value  = f.dept;
+}
+
+/* ==========================================================================
+   SCREEN · OVERVIEW
+   ========================================================================== */
+function pct(a,b){ return b ? Math.round(a/b*1000)/10 : 0; }
+function kpiTile(o){
+  return '<button class="kpi'+(o.alarm?' alarm':'')+'" type="button" data-go="'+o.go+'" data-tab="'+(o.tab||'')+'"'
+    + ' aria-label="'+esc(o.label+': '+o.value+'. '+o.note)+'">'
+    + '<span class="kpi-lbl">'+esc(o.label)+'</span>'
+    + '<span class="kpi-val od-nowrap">'+esc(o.value)+'</span>'
+    + '<span class="kpi-foot">'+(o.trend||'')+'<span class="kpi-note">'+esc(o.note)+'</span></span>'
+    + spark(o.series, !!o.alarm) + '</button>';
+}
+function renderOverview(){
+  const rows = scoped();
+  const s = seriesFor(rows);
+  const open = rows.filter(isOpen);
+  const overdue = rows.filter(r=>r.status==='Overdue');
+  const closedRows = rows.filter(r=>r.closed && r.raised);
+  const onTime = closedRows.filter(r=>r.status==='On-time Closed').length;
+  const rate = pct(onTime, closedRows.length);
+  const avgClose = closedRows.length ? Math.round(closedRows.reduce((t,r)=>t+dayDiff(r.closed,r.raised),0)/closedRows.length) : 0;
+  const mcar = rows.filter(r=>r.form==='mcar').length;
+  const amo  = rows.filter(r=>r.form==='amoecar').length;
+  /* KPI 7 excludes PAVOI currently Withdrawn from both numerator and denominator (live r152). */
+  const pav  = rows.filter(r=>r.form==='pavoi' && !r.withdrawn);
+  const pavAssessed = pav.filter(assessed).length;
+
+  /* monthly series for the rate-style KPIs, computed the same way as the headline */
+  const rateSeries = SERIES_MONTHS.map(mo=>{
+    const st = new Date(mo.y,mo.m,1);
+    const c = rows.filter(r=>r.closed && r.closed>=st && r.closed<=mo.end);
+    return c.length ? pct(c.filter(r=>r.status==='On-time Closed').length, c.length) : 0;
+  });
+  const closeSeries = SERIES_MONTHS.map(mo=>{
+    const st = new Date(mo.y,mo.m,1);
+    const c = rows.filter(r=>r.closed && r.closed>=st && r.closed<=mo.end);
+    return c.length ? Math.round(c.reduce((t,r)=>t+dayDiff(r.closed,r.raised),0)/c.length) : 0;
+  });
+  const k2Series = SERIES_MONTHS.map(mo=>{
+    const a = rows.filter(r=>r.form==='mcar' && r.raised && r.raised<=mo.end).length;
+    const b = rows.filter(r=>r.form==='amoecar' && r.raised && r.raised<=mo.end).length;
+    return pct(a,b);
+  });
+  const k7Series = SERIES_MONTHS.map(mo=>{
+    const p = rows.filter(r=>r.form==='pavoi' && !r.withdrawn && r.raised && r.raised<=mo.end);
+    return pct(p.filter(assessed).length, p.length);
+  });
+
+  const tiles = [
+    kpiTile({label:'Open findings', value:String(open.length), note:'across all five forms', go:'work', tab:'open',
+             series:s.open, trend:trendTag(s.open[11], s.open[10], 'down','')}),
+    kpiTile({label:'Overdue', value:String(overdue.length), note:'past target date', go:'work', tab:'overdue',
+             series:s.overdue, alarm:overdue.length>0, trend:trendTag(s.overdue[11], s.overdue[10], 'down','')}),
+    kpiTile({label:'On-time closure', value:rate+'%', note:'target ≥ 70%', go:'analytics', tab:'kpi',
+             series:rateSeries, alarm:rate<70, trend:trendTag(rateSeries[11], rateSeries[10], 'up','pt')}),
+    kpiTile({label:'Avg days to close', value:String(avgClose), note:'raised to closed', go:'analytics', tab:'kpi',
+             series:closeSeries, trend:trendTag(closeSeries[11], closeSeries[10], 'down','d')}),
+    /* Beta: the tile formula is a prototype simplification, not loadKpi2 — show no number
+       rather than a wrong one (it read 328.6% on live data, 22/09/2026). */
+    REAL
+      ? kpiTile({label:'KPI 2 · early detection', value:'—', note:'Not yet in the beta · see the main dashboard', go:'analytics', tab:'early', series:[]})
+      : kpiTile({label:'KPI 2 · early detection', value:pct(mcar,amo)+'%', note:'MCAR ÷ AMO-ECAR', go:'analytics', tab:'early',
+             series:k2Series, trend:trendTag(k2Series[11], k2Series[10], 'up','pt')}),
+    kpiTile({label:'KPI 7 · PAVOI assessed', value:pct(pavAssessed, pav.length)+'%', note:pavAssessed+' of '+pav.length+' verified', go:'findings', tab:'pavoi',
+             series:k7Series, alarm:pct(pavAssessed,pav.length)<70, trend:trendTag(k7Series[11], k7Series[10], 'up','pt')})
+  ].join('');
+
+  /* ---- overdue at a glance ---- */
+  const cats = ['I','II','III'].map(c=>({ c, n:overdue.filter(r=>r.cat===c).length }));
+  const catTotal = overdue.length || 1;
+  const stack = cats.map((x,i)=>'<span style="width:'+(x.n/catTotal*100)+'%;background:'+['var(--accent-28)','var(--accent-62)','var(--accent)'][i]+'"></span>').join('');
+  const catRows = cats.map((x,i)=>
+    '<button class="bar-row" type="button" data-go="work" data-tab="overdue" data-cat="'+x.c+'">'
+    + '<span class="od-row" style="--od-gap:8px">'+catChip(x.c)+'</span>'
+    + '<span class="bar-track"><span class="bar-fill'+(i===2?' hot':'')+'" style="width:'+(catTotal?x.n/catTotal*100:0)+'%;background:'+['var(--accent-28)','var(--accent-62)','var(--accent)'][i]+'"></span></span>'
+    + '<span class="num strong od-nowrap">'+x.n+'</span></button>').join('');
+  const oldest = overdue.slice().sort((a,b)=>a.dtd-b.dtd).slice(0,3).map(r=>
+    '<button class="act-i" type="button" data-go="findings" data-tab="'+r.form+'" data-id="'+r.id+'">'
+    + '<span class="act-dot hot"></span>'
+    + '<span class="act-body"><span class="row-id">'+esc(r.number)+'</span>'
+    + '<span class="row-sub od-truncate">'+esc(r.auditTitle)+' · '+esc(r.owner)+'</span></span>'
+    + '<span class="num red strong od-nowrap">'+Math.abs(r.dtd)+'d</span></button>').join('');
+
+  /* ---- open by form type ---- */
+  const byForm = FORMS.map(f=>({ f, n: open.filter(r=>r.form===f.id).length }));
+  const maxForm = Math.max(1, ...byForm.map(x=>x.n));
+  const formBars = byForm.map(x=>
+    '<button class="bar-row" type="button" data-go="findings" data-tab="'+x.f.id+'">'
+    + '<span class="mono strong">'+esc(x.f.code)+'</span>'
+    + '<span class="bar-track"><span class="bar-fill" style="width:'+(x.n/maxForm*100)+'%"></span></span>'
+    + '<span class="num strong od-nowrap">'+x.n+'</span></button>').join('');
+
+  /* ---- status mix ---- */
+  const mixDefs = [
+    ['Open','var(--data-1)'], ['In Progress','var(--data-2)'], ['Overdue','var(--accent)'],
+    ['On-time Closed','var(--text-3)'], ['Lately Closed','var(--data-3)'], ['Closed','var(--hairline)']
+  ].filter(m => m[0] !== 'In Progress' || !REAL);   /* live status has no In Progress */
+  const mix = mixDefs.map(m=>({ k:m[0], c:m[1], v:rows.filter(r=>r.status===m[0]).length }));
+
+  /* ---- recent activity, derived from the register ---- */
+  const acts = [];
+  rows.forEach(r=>{
+    acts.push({ t:r.raised, hot:false, txt:'raised', r });
+    if(r.closed) acts.push({ t:r.closed, hot:false, txt:'closed '+(r.status==='On-time Closed'?'on time':'late'), r });
+    r.rounds.forEach(v=> { if(v.date) acts.push({ t:v.date, hot:v.result!=='Satisfactory', txt:'verification — '+v.result.toLowerCase(), r }); });
+  });
+  overdue.forEach(r=> { if(r.target) acts.push({ t:r.target, hot:true, txt:'passed its target date', r }); });
+  const feed = acts.filter(a=>a.t<=TODAY).sort((a,b)=>b.t-a.t).slice(0,9).map(a=>{
+    const d = dayDiff(TODAY, a.t);
+    const when = d === 0 ? 'today' : d === 1 ? 'yesterday' : d < 30 ? d+'d ago' : fmtShort(a.t);
+    return '<button class="act-i" type="button" data-go="findings" data-tab="'+a.r.form+'" data-id="'+a.r.id+'">'
+      + '<span class="act-dot'+(a.hot?' hot':'')+'"></span>'
+      + '<span class="act-body"><span class="row-id">'+esc(a.r.number)+' <span class="dim" style="font-weight:400">'+esc(a.txt)+'</span></span>'
+      + '<span class="row-sub od-truncate">'+esc(a.r.auditTitle)+'</span></span>'
+      + '<span class="num dim od-nowrap">'+when+'</span></button>';
+  }).join('');
+
+  const liveAudits = AUDITS.filter(a=>a.status==='In Progress').length;
+  const sched = AUDITS.filter(a=>a.status==='Scheduled').length;
+
+  return '<section class="sec">'
+    + '<div class="sec-head"><h2>Right now</h2><span class="t-small dim">'+esc(periodLabel())
+    + (state.filters.dept?' · '+esc(state.filters.dept):'')
+    + ' · every tile opens the list behind it</span></div>'
+    + '<div class="kpi-grid">'+tiles+'</div></section>'
+
+    + '<section class="sec cols cols-32">'
+    + '<div class="card"><div class="card-head"><h2>Overdue at a glance</h2>'
+    + '<span class="t-small dim od-fill">'+overdue.length+' past target · CAT follows the current 30 / 60-day bands</span></div>'
+    + '<div class="card-pad" style="display:grid;gap:16px">'
+    + (overdue.length ? '<div class="stack" role="img" aria-label="Overdue split by CAT band">'+stack+'</div><div class="bars">'+catRows+'</div>'
+        + '<div style="display:grid;gap:6px"><span class="t-micro">Longest running</span>'+oldest+'</div>'
+        : '<div class="empty"><h3>Nothing overdue in this range</h3><p class="t-sub">Every finding raised in the selected period is still inside its target date.</p></div>')
+    + '</div></div>'
+    + '<div class="card"><div class="card-head"><h2>Open by form type</h2></div>'
+    + '<div class="card-pad" style="display:grid;gap:16px">'
+    + '<div class="bars">'+formBars+'</div>'
+    + '<div class="od-row" style="--od-gap:20px;flex-wrap:wrap">'+donut(mix)
+    + '<div class="legend" style="flex-direction:column;gap:8px">'
+    + mix.map(m=>'<span class="legend-i"><span class="swatch" style="background:'+m.c+'"></span>'+esc(m.k)+' <span class="num strong">'+m.v+'</span></span>').join('')
+    + '</div></div></div></div></section>'
+
+    + '<section class="sec cols cols-2">'
+    + '<div class="card"><div class="card-head"><h2>Raised vs closed</h2><span class="t-small dim">last 12 months</span></div>'
+    + '<div class="card-pad" style="display:grid;gap:12px">'+linePair(s.raised, s.closed, SERIES_MONTHS.map(m=>m.label))
+    + '<div class="legend"><span class="legend-i"><span class="swatch" style="background:var(--accent);border-color:var(--accent)"></span>Raised</span>'
+    + '<span class="legend-i"><span class="swatch" style="background:repeating-linear-gradient(90deg,var(--text-2) 0 4px,transparent 4px 7px)"></span>Closed</span>'
+    + '<span class="legend-i dim">'+liveAudits+' audits running · '+sched+' scheduled</span></div></div></div>'
+    + '<div class="card"><div class="card-head"><h2>Recent activity</h2><span class="t-small dim">newest first</span></div>'
+    + '<div class="card-pad"><div class="act">'+(feed || '<p class="t-sub dim">No activity in this range.</p>')+'</div></div></div>'
+    + '</section>';
+}
+
+/* ==========================================================================
+   SCREEN · WORK QUEUE + FINDINGS (one table engine, several column sets)
+   ========================================================================== */
+const PAGE_SIZE = 12;
+
+const COL = {
+  number:{ l:'Report', main:true, v:r=>r.number,
+    c:r=>'<span class="row-main"><span class="row-id">'+esc(r.number)+'</span><span class="row-sub od-truncate">'+esc(r.auditTitle)+'</span></span>' },
+  form:{ l:'Form', v:r=>r.code, c:r=>'<span class="tag">'+esc(r.code)+'</span>' },
+  status:{ l:'Status', v:r=>r.status, c:r=>chip(r.status) },
+  cat:{ l:'CAT', v:r=>({'I':1,'II':2,'III':3}[r.cat]||0), c:r=>catChip(r.cat) },
+  owner:{ l:'Owner', v:r=>r.owner, c:r=>'<span class="od-truncate">'+esc(r.owner)+'</span>' },
+  dept:{ l:'Department', v:r=>r.dept, c:r=>'<span class="od-truncate t-small">'+esc(r.dept)+'</span>' },
+  aircraft:{ l:'Aircraft', v:r=>r.acReg||'zzz',
+    c:r=> r.acReg ? '<span class="od-row" style="--od-gap:6px"><span class="mono strong">'+esc(r.acReg)+'</span>'+(r.acType?'<span class="tag">'+esc(r.acType)+'</span>':'')+'</span>'
+                  : '<span class="dim">'+(REAL ? '—' : 'Fleet-wide')+'</span>' },
+  raised:{ l:'Raised', v:r=>r.raised ? r.raised.getTime() : 0, c:r=>'<span class="num dim od-nowrap">'+fmtShort(r.raised)+'</span>' },
+  target:{ l:'Target', v:r=>r.target ? r.target.getTime() : 0, c:r=>'<span class="num od-nowrap">'+fmtShort(r.target)+'</span>' },
+  dtd:{ l:'Days to due', ar:true, v:r=>r.closed?99999:r.dtd, c:dueCell },
+  level:{ l:'Finding level', v:r=>r.level, c:r=>'<span class="tag">'+esc(r.level)+'</span>' },
+  repetitive:{ l:'Repetitive', v:r=>r.repetitive?1:0, c:r=> r.repetitive ? '<span class="cat c1">Repeat</span>' : '<span class="dim">—</span>' },
+  finding:{ l:'Finding', v:r=>r.finding, c:r=>'<span class="t-small od-clamp-2">'+esc(r.finding)+'</span>' },
+  verified:{ l:'Verified', v:r=>r.rounds.length, c:r=>{
+      if(!r.rounds.length) return '<span class="chip s-open">'+mark('Open')+'Not assessed</span>';
+      return '<span class="od-row" style="--od-gap:6px"><span class="num">'+fmtShort(firstVerDate(r))+'</span>'
+        + (verifiedIn30(r) || !firstVerDate(r) ?'':'<span class="cat c1">&gt;30d</span>')+'</span>'; } },
+  audit:{ l:'Audit', v:r=>r.auditTitle, c:r=>'<span class="t-small od-truncate">'+esc(r.auditTitle)+' · '+esc(r.location)+'</span>' }
+};
+
+const LANES = {
+  'work/open':    { cols:['number','form','status','owner','raised','target','dtd','level'],
+                    rows:rs=>rs.filter(isOpen), title:'Open reports', lead:'Everything still to be actioned, newest target first.' },
+  'work/overdue': { cols:['number','form','cat','dtd','owner','dept','target','level'],
+                    rows:rs=>rs.filter(r=>r.status==='Overdue'), title:'Overdue', lead:'Past the target date. CAT bands follow the existing 30 and 60-day rule.' },
+  'work/verify':  { cols:['number','status','owner','raised','verified','dtd'],
+                    rows:rs=>rs.filter(r=>r.form==='pavoi' && isOpen(r) && !assessed(r)),
+                    title:'Awaiting verification', lead:'Open PAVOI with no verification round yet — the numerator KPI 7 is missing.' },
+  'findings/all':     { cols:['number','form','status','owner','aircraft','raised','dtd','cat'], rows:rs=>rs },
+  'findings/cmrcar':  { cols:['number','aircraft','status','dept','raised','target','dtd'], rows:rs=>rs.filter(r=>r.form==='cmrcar') },
+  'findings/ecar':    { cols:['number','aircraft','status','finding','raised','dtd'], rows:rs=>rs.filter(r=>r.form==='ecar') },
+  'findings/amoecar': { cols:['number','status','raised','target','dtd','cat','audit'], rows:rs=>rs.filter(r=>r.form==='amoecar') },
+  'findings/mcar':    { cols:['number','status','raised','owner','target','dtd','cat','repetitive'], rows:rs=>rs.filter(r=>r.form==='mcar') }
+};
+
+function sortRows(rows, key){
+  const st = state.sort[key];
+  if(!st) return rows.slice().sort((a,b)=>{
+    const ao = isOpen(a)?0:1, bo = isOpen(b)?0:1;
+    if(ao!==bo) return ao-bo;
+    return a.dtd - b.dtd;
+  });
+  const col = COL[st.k];
+  return rows.slice().sort((a,b)=>{
+    const av = col.v(a), bv = col.v(b);
+    const r = av < bv ? -1 : av > bv ? 1 : 0;
+    return st.dir === 'asc' ? r : -r;
+  });
+}
+function tableHTML(key, cfg, rows){
+  const st = state.sort[key];
+  const head = cfg.cols.map(c=>{
+    const col = COL[c], on = st && st.k === c;
+    const icName = on ? (st.dir==='asc'?'sortUp':'sortDown') : 'sortNone';
+    return '<th scope="col"'+(on?' aria-sort="'+(st.dir==='asc'?'ascending':'descending')+'"':'')+(col.ar?' class="ar"':'')+'>'
+      + '<button type="button" data-act="sort" data-key="'+key+'" data-col="'+c+'">'+esc(col.l)+ic(icName,13,'sort-ic')+'</button></th>';
+  }).join('');
+
+  const sorted = sortRows(rows, key);
+  const pages = Math.max(1, Math.ceil(sorted.length/PAGE_SIZE));
+  let p = Math.min(state.page[key]||1, pages);
+  const slice = sorted.slice((p-1)*PAGE_SIZE, p*PAGE_SIZE);
+
+  const body = slice.map(r=>'<tr tabindex="0" data-go="findings" data-tab="'+r.form+'" data-id="'+r.id+'">'
+    + cfg.cols.map(c=>{
+        const col = COL[c];
+        return '<td data-l="'+esc(col.l)+'"'+(col.main?' class="t-main"':(col.ar?' class="ar"':''))+'>'+col.c(r)+'</td>';
+      }).join('') + '</tr>').join('');
+
+  let pager = '';
+  if(pages > 1){
+    const btns = [];
+    btns.push('<button type="button" data-act="page" data-key="'+key+'" data-p="'+(p-1)+'"'+(p===1?' disabled':'')+' aria-label="Previous page">'+ic('chevron',14,'')+'</button>');
+    for(let i=1;i<=pages;i++){
+      if(pages > 7 && i>2 && i<pages-1 && Math.abs(i-p)>1){ if(i===3) btns.push('<button type="button" disabled>…</button>'); continue; }
+      btns.push('<button type="button" data-act="page" data-key="'+key+'" data-p="'+i+'"'+(i===p?' aria-current="true"':'')+'>'+i+'</button>');
+    }
+    btns.push('<button type="button" data-act="page" data-key="'+key+'" data-p="'+(p+1)+'"'+(p===pages?' disabled':'')+' aria-label="Next page">'+ic('chevron',14,'')+'</button>');
+    pager = '<div class="pg">'+btns.join('')+'</div>';
+  }
+
+  if(!sorted.length) return emptyState();
+
+  return '<div class="tbl-wrap"><table class="tbl"><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>'
+    + '<div class="tbl-foot"><span class="t-small dim">Showing '+((p-1)*PAGE_SIZE+1)+'–'+Math.min(p*PAGE_SIZE, sorted.length)+' of '+sorted.length+'</span>'+pager+'</div>';
+}
+function emptyState(){
+  return '<div class="empty">'+ic('search',28,'dim')+'<h3>Nothing matches the current filters</h3>'
+    + '<p class="t-sub">The year, month, department or search term is excluding every record. Widen one of them to see results.</p>'
+    + '<button class="btn" type="button" data-act="clearall">Clear all filters</button></div>';
+}
+function renderLane(screen, tab){
+  const key = screen+'/'+tab;
+  const cfg = LANES[key];
+  const nav = NAV_BY_ID[screen];
+  const tabDef = nav.tabs.find(t=>t.id===tab);
+
+  if(screen === 'findings' && tab === 'pavoi') return renderPavoi();
+  if(!cfg) return placeholder(nav, tabDef);
+
+  let rows = cfg.rows(scoped());
+  if(state.cat) rows = rows.filter(r=>r.cat === state.cat);
+
+  const form = FORM_BY_ID[tab];
+  const title = cfg.title || (form ? form.code : 'All forms');
+  const lead  = cfg.lead || (form
+    ? (form.desc ? form.desc + '.' : 'Register of ' + form.code + ' records.') + ' Columns follow what this form actually carries.'
+    : 'Every form type in one register. Use the tabs above for a single form.');
+
+  const catNote = state.cat
+    ? '<span class="fchip">CAT '+state.cat+'<button type="button" data-act="clearcat" aria-label="Remove CAT filter">'+ic('x',14)+'</button></span>'
+    : '';
+
+  return '<section class="sec"><div class="card">'
+    + '<div class="card-head"><h2>'+esc(title)+'</h2>'
+    + '<span class="t-small dim od-fill">'+esc(lead)+'</span>'+catNote+'</div>'
+    + tableHTML(key, cfg, rows) + '</div></section>';
+}
+
+/* ==========================================================================
+   SCREEN · PAVOI DETAIL (list + record)
+   ========================================================================== */
+function renderPavoi(){
+  const rows = scoped().filter(r=>r.form==='pavoi')
+    .sort((a,b)=>{ const ao=isOpen(a)?0:1, bo=isOpen(b)?0:1; return ao-bo || a.dtd-b.dtd; });
+  if(!rows.length) return '<section class="sec"><div class="card">'+emptyState()+'</div></section>';
+
+  if(!state.sel.pavoi || !rows.some(r=>r.id===state.sel.pavoi)) state.sel.pavoi = rows[0].id;
+  const r = rows.find(x=>x.id===state.sel.pavoi);
+
+  const kpiRows = rows.filter(x=>!x.withdrawn);
+  const total = kpiRows.length, done = kpiRows.filter(assessed).length, wd = rows.length - kpiRows.length;
+  const list = rows.map(x=>
+    '<button class="rec" type="button" data-act="selpavoi" data-id="'+x.id+'"'+(x.id===r.id?' aria-current="true"':'')+'>'
+    + '<span class="rec-top"><span class="row-id">'+esc(x.number)+'</span>'+(x.withdrawn?'<span class="tag">Withdrawn</span>':'')+chip(x.status)+'</span>'
+    + '<span class="row-sub od-truncate">'+esc(x.auditTitle)+'</span>'
+    + '<span class="od-row" style="--od-gap:8px">'
+      + (assessed(x) ? '<span class="tag">'+x.rounds.length+' round'+(x.rounds.length>1?'s':'')+'</span>'
+                     : '<span class="cat c1">Not assessed</span>')
+      + (x.closed ? '' : '<span class="t-small dim od-nowrap">'+(x.dtd<0 ? Math.abs(x.dtd)+'d over' : x.dtd+'d left')+'</span>')
+    + '</span></button>').join('');
+
+  const fv = firstVerDate(r);
+  const sinceIssue = dayDiff(TODAY, r.raised);
+  const flag = r.withdrawn
+    ? { cls:'warn', t:'Withdrawn — outside KPI 7',
+        b:'This PAVOI has a Withdrawn stage and no completed accept/reject stage, so it is excluded from both the numerator and the denominator until it is closed properly.' }
+    : !assessed(r)
+    ? { cls:'warn', t:'No verification round recorded',
+        b: sinceIssue > 30
+          ? 'This PAVOI counts against KPI 7. The 30-day rule agreed on 07 Sep 2026 expired '+(sinceIssue-30)+' days ago.'
+          : 'This PAVOI counts against KPI 7 until a round is recorded. '+(30-sinceIssue)+' days remain inside the 30-day window.' }
+    : !fv
+      ? { cls:'warn', t:'Verification round recorded without a date',
+          b:'A round exists, so the record counts as assessed for KPI 7, but Date verified is empty — the 30-day window cannot be checked.' }
+    : verifiedIn30(r)
+      ? { cls:'', t:'First verification inside 30 days',
+          b:'Verified '+dayDiff(fv, r.raised)+' days after issue, within the agreed window.' }
+      : { cls:'warn', t:'First verification after the 30-day window',
+          b:'Verified '+dayDiff(fv, r.raised)+' days after issue. The record still counts as assessed for KPI 7 — the flag is advisory only.' };
+
+  const rounds = r.rounds.length ? r.rounds.map((v,i)=>
+    '<div class="vt-i"><div class="vt-rail"><span class="vt-pip '+(v.result==='Satisfactory'?'done':'hot')+'"></span><span class="vt-line"></span></div>'
+    + '<div class="vt-body"><span class="strong">Round '+(i+1)+' · '+esc(v.result)+'</span>'
+    + '<span class="t-small dim">'+fmtDate(v.date)+' · '+esc(v.by)+'</span></div></div>').join('')
+    : '<p class="t-sub dim">No verification round has been recorded against this report yet.</p>';
+
+  const meta = [
+    ['Form','PAVOI'], ['Status', null], ['Owner section', r.dept], ['Owner', r.owner],
+    ['Raised', fmtDate(r.raised)], ['Target', fmtDate(r.target)],
+    ['Days to due', r.closed ? 'closed '+fmtDate(r.closed) : (r.dtd<0 ? Math.abs(r.dtd)+' days over' : r.dtd+' days left')],
+    ['Aircraft', r.acReg ? r.acReg+(r.acType?' · '+r.acType:'') : (REAL ? '—' : 'Fleet-wide')],
+    ['Finding level', r.level], ['Audit', r.auditTitle+' · '+r.location]
+  ].map(m=>'<div class="meta-i"><span class="meta-k">'+esc(m[0])+'</span>'
+    + (m[1]===null ? '<span class="meta-v">'+chip(r.status)+'</span>' : '<span class="meta-v od-truncate">'+esc(m[1])+'</span>')+'</div>').join('');
+
+  return '<section class="sec"><div class="split">'
+    + '<div class="card"><div class="card-head"><h2>PAVOI register</h2>'
+      + '<span class="t-small dim od-fill">'+done+' of '+total+' assessed'+(wd?' · '+wd+' withdrawn excluded':'')+'</span></div>'
+      + '<div class="rec-list">'+list+'</div></div>'
+    + '<div class="card"><div class="card-head">'
+      + '<h2 class="mono">'+esc(r.number)+'</h2>'+chip(r.status)
+      + (r.repetitive?'<span class="cat c1">Repeat finding</span>':'')
+      + '<span class="od-fill"></span>'
+      + '<button class="btn" type="button" data-act="toast" data-t="Verification requested" data-b="A request for verification would be raised against '+esc(r.number)+' in Coruson. This prototype records the intent only.">Request verification</button>'
+      + '<button class="btn primary" type="button" data-act="toast" data-t="Opens in Coruson" data-b="The live dashboard deep-links to the source record. Nothing is sent from this prototype.">Open source record</button>'
+      + '</div>'
+      + '<div class="card-pad" style="display:grid;gap:24px">'
+      + '<div class="meta">'+meta+'</div>'
+      + '<div class="note '+flag.cls+'"><span class="note-hd">'+(flag.cls?ic('alert',16):ic('check',16))+esc(flag.t)+'</span>'
+        + '<span class="t-small">'+esc(flag.b)+'</span></div>'
+      + '<div style="display:grid;gap:8px"><span class="t-micro">Finding</span><p class="t-sub">'+esc(r.finding)+'</p></div>'
+      + '<div style="display:grid;gap:12px"><span class="t-micro">Verification history</span><div class="vt">'+rounds+'</div></div>'
+      + '</div></div></div></section>';
+}
+
+/* ==========================================================================
+   SCREEN · AUDIT PLAN
+   ========================================================================== */
+const AUD_KIND = {'Closed':'k-closed','Performed':'k-performed','In Progress':'k-progress','Scheduled':'k-scheduled','Cancelled':'k-closed'};
+function renderAudit(tab){
+  if(tab === 'list') return renderAuditList();
+  if(tab === 'bottleneck') return placeholder(NAV_BY_ID.audit, NAV_BY_ID.audit.tabs.find(t=>t.id==='bottleneck'));
+
+  const now = TODAY.getMonth();
+  const head = '<div class="tl-row tl-head"><div>Audit · lead · location</div>'
+    + MONTHS.map((m,i)=>'<div'+(i===now?' class="now"':'')+'>'+m+'</div>').join('') + '</div>';
+
+  const body = AUDITS.map(a=>{
+    const cells = MONTHS.map((m,i)=>{
+      const on = i>=a.start && i<=a.end;
+      const cls = ['tl-cell', i===now?'now':'', on?'on':'', i===a.start?'start':'', i===a.end?'end':''].filter(Boolean).join(' ');
+      const kind = (a.overdue>0 && on && a.status!=='Scheduled') ? 'k-overdue' : AUD_KIND[a.status];
+      const label = (on && i===a.start) ? (a.findings ? a.findings+' findings' : a.status) : '';
+      return '<div class="'+cls+'">'+(on ? '<span class="tl-bar '+kind+'"><span class="od-truncate">'+esc(label)+'</span></span>' : '')+'</div>';
+    }).join('');
+    return '<div class="tl-row" tabindex="0" role="button" data-act="toast" data-t="'+esc(a.number)+'" '
+      + 'data-b="'+esc(a.title+' · '+a.type+' · lead '+a.lead+' · '+a.location+' · '+a.status+' · '+a.findings+' findings, '+a.open+' still open'+(a.overdue?', '+a.overdue+' overdue':'')+'.')+'">'
+      + '<div class="tl-lbl"><span class="od-row" style="--od-gap:8px"><span class="row-id">'+esc(a.number)+'</span>'
+        + (a.overdue ? '<span class="cat c3">'+a.overdue+' overdue</span>' : '')+'</span>'
+      + '<span class="row-sub od-truncate">'+esc(a.title)+'</span>'
+      + '<span class="t-small dim od-truncate">'+esc(a.type)+' · '+esc(a.lead)+' · '+esc(a.location)+'</span></div>'
+      + cells + '</div>';
+  }).join('');
+
+  const counts = ['Closed','Performed','In Progress','Scheduled','Cancelled'].map(s=>({s, n:AUDITS.filter(a=>a.status===s).length})).filter(c=>c.n || c.s!=='Cancelled');
+
+  return '<section class="sec"><div class="card">'
+    + '<div class="card-head"><h2>Annual programme 2026</h2>'
+    + '<span class="t-small dim od-fill">'+AUDITS.length+' audits and inspections · bar spans the scheduled window · select a row for detail</span></div>'
+    + '<div class="card-pad" style="padding-bottom:0"><div class="legend">'
+    + '<span class="legend-i"><span class="swatch" style="background:repeating-linear-gradient(135deg,var(--hatch) 0 4px,transparent 4px 8px);border-style:dashed"></span>Scheduled</span>'
+    + '<span class="legend-i"><span class="swatch" style="background:var(--data-1)"></span>In progress</span>'
+    + '<span class="legend-i"><span class="swatch" style="background:var(--data-2)"></span>Performed</span>'
+    + '<span class="legend-i"><span class="swatch" style="background:var(--sunken)"></span>Closed</span>'
+    + '<span class="legend-i"><span class="swatch" style="background:var(--accent);border-color:var(--accent)"></span>Has overdue findings</span>'
+    + '<span class="legend-i dim">'+MONTHS[now]+' is the current month</span></div></div>'
+    + '<div class="tl-wrap"><div class="tl">'+head+'<div class="tl-body">'+body+'</div></div></div>'
+    + '<div class="tbl-foot">'+counts.map(c=>'<span class="t-small dim">'+c.s+' <span class="num strong">'+c.n+'</span></span>').join('')+'</div>'
+    + '</div></section>';
+}
+function renderAuditList(){
+  const rows = AUDITS.slice().sort((a,b)=>a.start-b.start).map(a=>
+    '<tr tabindex="0" data-act="toast" data-t="'+esc(a.number)+'" data-b="'+esc(a.title+' — '+a.status+', '+a.findings+' findings.')+'">'
+    + '<td class="t-main" data-l="Audit"><span class="row-main"><span class="row-id">'+esc(a.number)+'</span>'
+      + '<span class="row-sub od-truncate">'+esc(a.title)+'</span></span></td>'
+    + '<td data-l="Type"><span class="tag">'+esc(a.type)+'</span></td>'
+    + '<td data-l="Status">'+chipAs(AUD_CHIP[a.status], a.status)+'</td>'
+    + '<td data-l="Window"><span class="num od-nowrap">'+MONTHS[a.start]+(a.end!==a.start?' – '+MONTHS[a.end]:'')+'</span></td>'
+    + '<td data-l="Lead"><span class="od-truncate">'+esc(a.lead)+'</span></td>'
+    + '<td data-l="Location"><span class="tag">'+esc(a.location)+'</span></td>'
+    + '<td class="ar" data-l="Findings"><span class="num">'+a.findings+'</span></td>'
+    + '<td class="ar" data-l="Open"><span class="num'+(a.open?' strong':' dim')+'">'+a.open+'</span></td>'
+    + '<td class="ar" data-l="Overdue">'+(a.overdue?'<span class="cat c3">'+a.overdue+'</span>':'<span class="dim">—</span>')+'</td></tr>').join('');
+  return '<section class="sec"><div class="card">'
+    + '<div class="card-head"><h2>Schedule list</h2><span class="t-small dim od-fill">The same programme as a flat list, for reading and export.</span></div>'
+    + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
+    + ['Audit','Type','Status','Window','Lead','Location','Findings','Open','Overdue']
+        .map((h,i)=>'<th scope="col"'+(i>5?' class="ar"':'')+'><span>'+h+'</span></th>').join('')
+    + '</tr></thead><tbody>'+rows+'</tbody></table></div></div></section>';
+}
+
+/* ==========================================================================
+   PLACEHOLDER SCREENS — honest about being placeholders, and specific about
+   what would live there, so the IA can still be judged.
+   ========================================================================== */
+function chipAs(statusKey, label){
+  return '<span class="chip '+(SCLASS[statusKey]||'s-neutral')+'">'+mark(statusKey)+esc(label)+'</span>';
+}
+const AUD_CHIP = {'Closed':'On-time Closed','Performed':'In Progress','In Progress':'In Progress','Scheduled':'Open'};
+
+const PH = {
+  'analytics/kpi':    ['The seven departmental KPIs over time, each with its target line and the records behind it.',
+                       ['KPI 1–7 as small multiples, one card each','Target line and breach months marked','Every point opens the matching filtered register','Year and month comparison against the same period last year']],
+  'analytics/spi':    ['Safety performance indicators against the SPT (ALOS) approved by CAAV.',
+                       ['One row per SPI with its alert and target level','Rolling 12-month view with breach months called out','Link from a breach straight to the contributing occurrences']],
+  'analytics/safety': ['MSAG report status — OSR and MOSR progress.',
+                       ['Status of each safety report through the MSAG workflow','Ageing of reports still awaiting a decision','Owner and next action for anything stalled']],
+  'analytics/early':  ['KPI 2 — how much the organisation finds before the authority does.',
+                       ['MCAR ÷ AMO-ECAR as a rate over time','Split by ATA chapter and by department','The internal and authority findings side by side for the same scope']],
+  'analytics/status': ['Event and IR report status — the EIS and F-088 extracts from Coruson.',
+                       ['F-088 and EIS as two tabs of the same table','Open and closed split, with the year filter','The standing caveat that WORKFLOW-tab evidence is not exposed by Coruson reporting and must be checked by hand']],
+  'audit/bottleneck': ['Where audits are getting stuck, aggregated by workflow stage.',
+                       ['Count and average age of audits sitting at each stage','The stages that most often exceed their expected duration','Drill from a stage into the audits held there']],
+  'library/documents':['The controlled document tree, read-only.',
+                       ['Group tree on the left, document list on the right','Filter by group, revision state and review date','Nothing here is actioned — Library is for reading']],
+  'library/guide':    ['How the dashboard works, written for the people who use it.',
+                       ['One page per screen, matching this navigation','Definitions for every KPI and every status term','Change log for each release']],
+  'admin/users':      ['Accounts, roles and approvals.',
+                       ['Pending approvals first, because that is the blocking task','Role per user and the sections each role can reach','Last sign-in and deactivation']],
+  'admin/exports':    ['Scheduled and one-off exports.',
+                       ['Excel and PDF exports of any register or KPI','A named scope saved with the export','Delivery to a person or a group on a schedule']],
+  'admin/mydash':     ['A personal arrangement of the tiles and lists used most.',
+                       ['Pin any KPI tile, saved query or register view','Set a personal default landing screen','Nothing here changes what anyone else sees']],
+  'admin/feedback':   ['Report a bug or ask for a change, from inside the tool.',
+                       ['A short form with an automatic screenshot of the current screen','The current screen, filters and release captured with the report','Status of everything previously raised']]
+};
+function placeholder(nav, tabDef){
+  const key = nav.id + '/' + (tabDef ? tabDef.id : '');
+  const copy = PH[key] || ['This screen is not designed in this prototype.', []];
+  return '<section class="sec"><div class="card"><div class="card-pad" style="display:grid;gap:20px;padding:32px">'
+    + '<div style="display:grid;gap:8px">'
+      + '<span class="t-micro">Placeholder · '+esc(TASK_LABEL[nav.task])+'</span>'
+      + '<h2>'+esc(tabDef ? tabDef.label : nav.label)+'</h2>'
+      + '<p class="t-sub" style="max-width:70ch">'+esc(copy[0])+'</p></div>'
+    + (copy[1].length ? '<div class="prose"><ul>'+copy[1].map(b=>'<li>'+esc(b)+'</li>').join('')+'</ul></div>' : '')
+    + '<div class="note"><span class="note-hd">'+ic('layers',16)+'Not built in this prototype</span>'
+      + '<span class="t-small">Four screens are fully designed — Overview, Open Reports, PAVOI and the Audit Plan timeline. '
+      + 'This entry exists so the navigation model can be judged whole. The reasoning behind where it sits is on the Design rationale page.</span>'
+      + '<span><button class="btn" type="button" data-go="rationale" style="margin-top:8px">Read the rationale</button></span></div>'
+    + '</div></div></section>';
+}
+
+/* ==========================================================================
+   SCREEN · DESIGN RATIONALE
+   ========================================================================== */
+const IA_MAP = [
+  ['Main','Overview','Overview','Kept as the landing screen, rebuilt from four chart cards into a decision surface: what is open, what is late, what moved.'],
+  ['Main','Open Reports','Work Queue › Open reports','"Open" is a state of a finding, not a category of report. It belongs in the queue of things to action.'],
+  ['Main','Overdue','Work Queue › Overdue','Was a separate destination; overdue is the same list with one more condition. It also surfaces on Overview, so it no longer needs to be hunted for.'],
+  ['Main','KPI Charts','Analytics › KPI charts','Trends over time are a different job from clearing a queue. Grouping them stops the two modes competing in one sidebar.'],
+  ['Main','SPI','Analytics › SPI','Same reason. SPI is read monthly, not daily.'],
+  ['Main','Safety','Analytics › Safety (MSAG)','MSAG report status is a monitoring view, not an action list for the QA team.'],
+  ['Main','Report Status','Analytics › Event/IR report status','An extract view of a source system. It belongs with the other read-and-compare screens.'],
+  ['Main','Audit Plan','Audit Plan › Timeline','Promoted to its own top-level entry: the annual programme is its own planning job, and it now opens on a timeline rather than a table.'],
+  ['Detail','All Forms','Findings › All forms','The register, unfiltered.'],
+  ['Detail','PAVOI Detail','Findings › PAVOI','Becomes a tab, not a peer of Overview. The detail panel and verification history are what make PAVOI different, so those get the space.'],
+  ['Detail','CMR-CAR','Findings › CMR-CAR','Same tab row. Each form keeps its own columns.'],
+  ['Detail','ECAR','Findings › ECAR','Same tab row.'],
+  ['Detail','AMO-ECAR','Findings › AMO-ECAR','Same tab row.'],
+  ['Detail','MCAR','Findings › MCAR','Same tab row. Five sidebar entries become one entry plus five tabs.'],
+  ['Detail','Documents','Library › Documents','Reading material, not work. Moving it out of the working navigation stops it competing with the queue.'],
+  ['Detail','User Guide','Library › User guide','Same reason.'],
+  ['Detail','Feedback','Admin › Feedback','Raised occasionally, from anywhere. It does not need a permanent seat in the main list.'],
+  ['Admin','User Management','Admin › User management','Unchanged in purpose, grouped with the other administrative tasks.'],
+  ['Admin','Export Reports','Admin › Export reports','Unchanged in purpose.'],
+  ['Admin','Early Detection','Analytics › Early detection','Was filed under Admin, but KPI 2 is an analysis screen that managers read. Filed by what it is, not by who could see it first.'],
+  ['Admin','Query Builder','Removed','Not carried into the redesign.'],
+  ['Admin','My Dashboard','Admin › My dashboard','Personal configuration, so it sits with the other settings.']
+];
+function renderRationale(){
+  const rows = IA_MAP.map(m=>'<tr><td><span class="tag">'+esc(m[0])+'</span></td>'
+    + '<td><span class="strong">'+esc(m[1])+'</span></td>'
+    + '<td><span class="od-row" style="--od-gap:6px">'+ic('arrowRight',14,'dim')+'<span class="strong">'+esc(m[2])+'</span></span></td>'
+    + '<td><span class="t-small">'+esc(m[3])+'</span></td></tr>').join('');
+
+  return '<section class="sec"><div class="prose">'
+    + '<p class="t-sub" style="font-size:17px">The current dashboard puts 22 destinations in one flat sidebar, split into Main, Detail and Admin — three groups named after the software, not after anything a person came to do. '
+    + 'This prototype regroups those destinations under seven entries named after the task: monitor, act, analyse, audit, reference, administer.</p>'
+
+    + '<h2>What changed, and why</h2><ul>'
+    + '<li><span class="strong">Seven entries instead of twenty-two.</span> One original destination, Query Builder, was dropped. Every other one still exists, most of them moved from the sidebar into a secondary tab row, where they cost nothing until you are on that screen.</li>'
+    + '<li><span class="strong">The five form types became tabs.</span> PAVOI, CMR-CAR, ECAR, AMO-ECAR and MCAR are five views of one register. As five sidebar items they competed with Overview for attention; as a tab row they read as what they are — a choice within Findings.</li>'
+    + '<li><span class="strong">Overdue stopped being a place.</span> It was a destination in the old model and a state in the data. Now it is a lane in the Work Queue and a block on Overview, so nobody has to remember to go and look.</li>'
+    + '<li><span class="strong">One filter bar instead of a year picker per page.</span> Year and month (each multi-select, so Jul–Sep or 2025 against 2026 is one pick) and department sit above every data screen and survive navigation, so a question asked on Overview stays asked when you drill into the list behind it.</li>'
+    + '<li><span class="strong">Early Detection was filed by what it is, not by who could open it.</span> It sat under Admin because of permissions. It is an analysis screen, and it now sits with the other analysis screens.</li>'
+    + '<li><span class="strong">Global search.</span> With 22 flat entries, finding one report number meant knowing which of five form pages it lived on. Ctrl-K searches report numbers, audits, aircraft registrations and people at once.</li>'
+    + '</ul>'
+
+    + '<h2>Where every original entry went</h2></div>'
+    + '<div class="card" style="margin-top:16px;overflow:auto"><table class="map"><thead><tr>'
+    + '<th scope="col">Old group</th><th scope="col">Old entry</th><th scope="col">New location</th><th scope="col">Why</th>'
+    + '</tr></thead><tbody>'+rows+'</tbody></table></div>'
+
+    + '<div class="prose" style="margin-top:32px">'
+    + '<h2>Status without colour</h2>'
+    + '<p>The brief keeps VietJet red as the only accent, and a QA register needs five statuses to be told apart at a glance. Those two pull against each other, so status is carried by <span class="strong">shape, label and luminance</span> instead of hue, and red is spent only where something has actually breached.</p>'
+    + '<div class="od-cluster" style="--od-gap:12px;margin:4px 0">'
+    + ['Open','In Progress','On-time Closed','Lately Closed','Overdue'].map(chip).join('')
+    + '</div>'
+    + '<p>Severity uses the same red at three strengths, and the roman numeral is always present, so the band survives a greyscale print and a colour-vision difference alike:</p>'
+    + '<div class="od-cluster" style="--od-gap:12px;margin:4px 0">'+['I','II','III'].map(catChip).join('')+'</div>'
+    + '<p class="t-small dim">One deliberate exception: <span class="mono">#E30613</span> on the page ground reaches 3.99:1, which is fine for fills, bars and large numerals but not for 13–15px text. Small red text therefore uses the same hue lightened (<span class="mono">#FF6B6F</span>, 7.3:1). It is still one accent, not two.</p>'
+
+    + '<h2>Responsive model</h2><ul>'
+    + '<li><span class="strong">1280px and up</span> — full sidebar with labels, collapsible to a 64px icon rail from the topbar. The rail keeps tooltips, so nothing becomes a guess.</li>'
+    + '<li><span class="strong">768–1279px</span> — the rail is the default; the toggle expands it when there is room to spare.</li>'
+    + '<li><span class="strong">Below 768px</span> — the sidebar is replaced by a bottom bar of five: Overview, Work Queue, Findings, Audit Plan and More. The remaining three entries live in the More drawer. Tables reflow into cards, so nothing scrolls sideways.</li>'
+    + '<li>Every breakpoint keeps the same seven entries in the same order. The navigation does not reshuffle as the window changes size.</li>'
+    + '</ul>'
+
+    + '<h2>What this prototype deliberately does not do</h2><ul>'
+    + (REAL ? '<li>Figures are live Galileo data, computed by the functions of the main dashboard. KPI 2 is not computed in the beta yet; its tile shows a dash until the main dashboard formula is wired in.</li>' : '<li>All figures are mock data, generated from a fixed seed so the numbers are stable between reloads. Nothing here is a real QA record and no number should be quoted.</li>')
+    + '<li>Four screens are fully designed. Analytics, Library and Admin are placeholders that state what would live there.</li>'
+    + '<li>Descriptors are shown only where the current dashboard states one. MCAR and AMO-ECAR carry theirs; PAVOI, ECAR and CMR-CAR are shown as codes alone rather than given an invented expansion.</li>'
+    + '<li>The status vocabulary, CAT bands, KPI 2 and KPI 7 definitions and the four owner sections are taken from the current dashboard so the two can be compared directly.</li>'
+    + '<li>Charts are hand-drawn SVG and CSS. There is no chart library, no font CDN and no network request of any kind — the file runs offline.</li>'
+    + '</ul></div></section>';
+}
+
+/* ==========================================================================
+   GLOBAL SEARCH
+   ========================================================================== */
+let searchCursor = -1, searchHits = [];
+function openSearch(){
+  $('#searchScrim').hidden = false; $('#searchSheet').hidden = false;
+  requestAnimationFrame(()=>{ $('#searchScrim').classList.add('on'); $('#searchSheet').classList.add('on'); $('#q').focus(); $('#q').select(); });
+  runSearch();
+}
+function closeSearch(){
+  $('#searchScrim').classList.remove('on'); $('#searchSheet').classList.remove('on');
+  setTimeout(()=>{ $('#searchScrim').hidden = true; $('#searchSheet').hidden = true; }, 140);
+  $('#searchBtn').focus();
+}
+function hl(text, q){
+  if(!q) return esc(text);
+  const i = text.toLowerCase().indexOf(q);
+  if(i < 0) return esc(text);
+  return esc(text.slice(0,i)) + '<mark>' + esc(text.slice(i,i+q.length)) + '</mark>' + esc(text.slice(i+q.length));
+}
+function runSearch(){
+  const q = $('#q').value.trim().toLowerCase();
+  searchCursor = -1;
+  if(!q){
+    searchHits = [];
+    $('#res').innerHTML = '<div class="res-grp"><span class="t-micro">Try</span></div>'
+      + ['PAVOI','VN-A812','overdue','Tran Thi Mai','tooling'].map(s=>
+        '<button class="res-i" type="button" data-act="seed" data-s="'+esc(s)+'"><span class="res-body">'
+        + '<span class="strong">'+esc(s)+'</span><span class="t-small dim">example search</span></span>'
+        + ic('arrowRight',16,'dim')+'</button>').join('');
+    return;
+  }
+  const hits = INDEX.filter(x=>x.hay.includes(q));
+  searchHits = [];
+  let html = '';
+  ['Report','Audit','Aircraft','Person'].forEach(kind=>{
+    const g = hits.filter(h=>h.kind===kind).slice(0,6);
+    if(!g.length) return;
+    html += '<div class="res-grp"><span class="t-micro">'+kind+(hits.filter(h=>h.kind===kind).length>6?' · first 6':'')+'</span></div>';
+    g.forEach(h=>{
+      const i = searchHits.length; searchHits.push(h);
+      html += '<button class="res-i" type="button" role="option" data-act="hit" data-i="'+i+'">'
+        + '<span class="res-body"><span class="strong mono">'+hl(h.key,q)+'</span>'
+        + '<span class="t-small dim od-truncate">'+esc(h.sub)+'</span></span>'
+        + '<span class="tag">'+esc(h.meta)+'</span></button>';
+    });
+  });
+  $('#res').innerHTML = html || '<div class="empty" style="padding:40px 24px"><h3>No match for “'+esc($('#q').value.trim())+'”</h3>'
+    + '<p class="t-sub">Search covers report numbers, audit titles and numbers, aircraft registrations and people.</p></div>';
+  moveCursor(0);
+}
+function moveCursor(d){
+  const items = Array.from(document.querySelectorAll('.res-i[data-act="hit"]'));
+  if(!items.length) return;
+  searchCursor = Math.max(0, Math.min(items.length-1, searchCursor + d));
+  items.forEach((el,i)=> el.classList.toggle('cursor', i === searchCursor));
+  items[searchCursor].scrollIntoView({block:'nearest'});
+}
+function openHit(h){
+  closeSearch();
+  go(h.go.screen, h.go.tab, { id:h.go.id, q:h.go.q });
+}
+
+/* ==========================================================================
+   RENDER + EVENTS
+   ========================================================================== */
+function render(){
+  renderChrome();
+  renderFilterBar();
+
+  if(pendingId){
+    const r = REPORTS.find(x=>x.id === pendingId);
+    if(r){ if(r.form === 'pavoi') state.sel.pavoi = r.id; else state.rowQuery = r.number; }
+    pendingId = null;
+    renderFilterBar();
+  }
+
+  const s = state.screen;
+  let html = '';
+  if(s === 'rationale'){
+    html = '<div class="page-head"><h1>Design rationale</h1>'
+      + '<p class="t-sub">What changed against the current information architecture, and the reasoning for each move.</p></div>'
+      + renderRationale();
+  } else {
+    const nav = NAV_BY_ID[s], tab = state.tab[s];
+    html = '<div class="page-head"><span class="t-micro">'+esc(TASK_LABEL[nav.task])+'</span>'
+      + '<h1>'+esc(nav.title)+'</h1><p class="t-sub">'+esc(nav.lead)+'</p>'
+      + (nav.tabs ? '<div class="tabs" role="tablist" aria-label="'+esc(nav.title)+' sections">'
+          + nav.tabs.map(t=>'<button class="tab" type="button" role="tab" data-go="'+s+'" data-tab="'+t.id+'"'
+              + ' aria-selected="'+(t.id===tab)+'">'+esc(t.label)+'</button>').join('')
+          + '</div>' : '')
+      + '</div>';
+    if(s === 'overview') html += renderOverview();
+    else if(s === 'work' || s === 'findings') html += renderLane(s, tab);
+    else if(s === 'audit') html += renderAudit(tab);
+    else html += placeholder(nav, nav.tabs.find(t=>t.id===tab));
+  }
+  $('#screen').innerHTML = html;
+  $('#main-content').scrollTop = 0;
+}
+
+/* ---- toast ---- */
+let toastTimer = null;
+function toast(t, b){
+  $('#toastTitle').textContent = t;
+  $('#toastBody').textContent = b;
+  $('#toast').hidden = false;
+  requestAnimationFrame(()=> $('#toast').classList.add('on'));
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{
+    $('#toast').classList.remove('on');
+    setTimeout(()=>{ $('#toast').hidden = true; }, 200);
+  }, 4200);
+}
+
+/* ---- icon rail ---- */
+let railPref = null;
+const effRail = () => railPref === 'rail' ? true : railPref === 'wide' ? false : window.innerWidth < 1280;
+function applyRail(){
+  document.body.classList.toggle('rail', railPref === 'rail');
+  document.body.classList.toggle('rail-off', railPref === 'wide');
+  const b = $('#railBtn'), on = effRail();
+  b.setAttribute('aria-pressed', String(on));
+  b.setAttribute('aria-label', on ? 'Expand navigation' : 'Collapse navigation to icon rail');
+}
+
+/* ---- theme ----
+   Two values only. The choice is remembered, and an untouched toggle keeps
+   following the operating system. The pre-paint script in <head> has already
+   put the right value on <html>, so this only handles the flip. */
+function currentTheme(){ return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark'; }
+function paintThemeBtn(){
+  const t = currentTheme(), b = $('#themeBtn');
+  /* the icon names the destination, not the current state */
+  b.innerHTML = ic(t === 'light' ? 'moon' : 'sun', 20);
+  b.setAttribute('aria-label', t === 'light' ? 'Switch to dark theme' : 'Switch to light theme');
+  b.setAttribute('title', t === 'light' ? 'Dark theme' : 'Light theme');
+}
+let themeTimer = null;
+function setTheme(t){
+  const root = document.documentElement;
+  root.classList.add('theming');
+  root.setAttribute('data-theme', t);
+  try{ localStorage.setItem('qa-amo-theme', t); }catch(e){}
+  paintThemeBtn();
+  clearTimeout(themeTimer);
+  themeTimer = setTimeout(()=> root.classList.remove('theming'), 220);
+}
+
+/* ---- drawer ---- */
+function openDrawer(){
+  $('#drawerScrim').hidden = false; $('#drawer').hidden = false;
+  requestAnimationFrame(()=>{ $('#drawerScrim').classList.add('on'); $('#drawer').classList.add('on'); $('#drawerClose').focus(); });
+}
+function closeDrawer(){
+  $('#drawerScrim').classList.remove('on'); $('#drawer').classList.remove('on');
+  setTimeout(()=>{ $('#drawerScrim').hidden = true; $('#drawer').hidden = true; }, 200);
+}
+
+/* ---- one delegated handler for the whole document ---- */
+function handle(el, e){
+  const act = el.getAttribute('data-act');
+  if(act){
+    if(act === 'sort'){
+      const k = el.dataset.key, c = el.dataset.col, cur = state.sort[k];
+      state.sort[k] = (cur && cur.k === c && cur.dir === 'asc') ? {k:c, dir:'desc'} : {k:c, dir:'asc'};
+      state.page[k] = 1; render(); return true;
+    }
+    if(act === 'page'){ state.page[el.dataset.key] = Number(el.dataset.p); render(); return true; }
+    if(act === 'selpavoi'){ state.sel.pavoi = el.dataset.id; render(); return true; }
+    if(act === 'clearone'){
+      const k = el.dataset.k;
+      if(k === 'years')  state.filters.years  = [TODAY.getFullYear()];
+      if(k === 'months') state.filters.months = [];
+      if(k === 'dept')  state.filters.dept = '';
+      if(k === 'q')     state.rowQuery = '';
+      state.page = {}; render(); return true;
+    }
+    if(act === 'clearall'){
+      state.filters = defaultFilters(); state.rowQuery = ''; state.cat = ''; state.page = {}; render(); return true;
+    }
+    if(act === 'clearcat'){ state.cat = ''; state.page = {}; render(); return true; }
+    if(act === 'toast'){ toast(el.dataset.t, el.dataset.b); return true; }
+    if(act === 'drawer'){ openDrawer(); return true; }
+    if(act === 'seed'){ $('#q').value = el.dataset.s; runSearch(); $('#q').focus(); return true; }
+    if(act === 'hit'){ openHit(searchHits[Number(el.dataset.i)]); return true; }
+  }
+  const screen = el.getAttribute('data-go');
+  if(screen){
+    closeDrawer();
+    if(el.dataset.cat !== undefined) state.cat = el.dataset.cat; else state.cat = '';
+    state.page = {};
+    go(screen, el.dataset.tab || null, {
+      id: el.dataset.id || null,
+      q:  el.dataset.q  !== undefined ? el.dataset.q  : undefined
+    });
+    return true;
+  }
+  return false;
+}
+/* ---- month / year multi-select ---- */
+function buildPeriodPicker(){
+  $('#fYearList').innerHTML = dataYears().map(y=>
+    '<label class="msel-opt"><input type="checkbox" data-msel="year" value="'+y+'"><span class="num">'+y+'</span></label>').join('');
+  $('#fMonthList').innerHTML = MONTHS_SHORT.map((m,k)=>
+    '<label class="msel-opt"><input type="checkbox" data-msel="month" value="'+k+'"><span>'+m+'</span></label>').join('');
+  $('#fQuarters').innerHTML = [0,1,2,3].map(q=>
+    '<button class="msel-qb" type="button" data-msel-q="'+q+'" aria-pressed="false">Q'+(q+1)+'</button>').join('');
+  $('#fYearBtn').insertAdjacentHTML('beforeend', ic('chevron',16));
+  $('#fMonthBtn').insertAdjacentHTML('beforeend', ic('chevron',16));
+}
+function syncPeriodPicker(){
+  const f = state.filters;
+  document.querySelectorAll('input[data-msel="year"]').forEach(c=>{ c.checked = f.years.includes(Number(c.value)); });
+  document.querySelectorAll('input[data-msel="month"]').forEach(c=>{ c.checked = f.months.includes(Number(c.value)); });
+  document.querySelectorAll('[data-msel-q]').forEach(b=>{
+    const q = Number(b.dataset.mselQ), full = [0,1,2].every(k=>f.months.includes(q*3+k));
+    b.setAttribute('aria-pressed', full ? 'true' : 'false');
+  });
+  $('#fYearVal').textContent  = yearsLabel(f.years);
+  $('#fMonthVal').textContent = monthsLabel(f.months);
+  $('#fYearBtn').setAttribute('aria-label',  'Year: '+yearsLabel(f.years));
+  $('#fMonthBtn').setAttribute('aria-label', 'Month: '+monthsLabel(f.months));
+}
+function closePickers(except){
+  document.querySelectorAll('.msel').forEach(m=>{
+    if(m === except) return;
+    m.querySelector('.msel-pop').hidden = true;
+    m.querySelector('.msel-b').setAttribute('aria-expanded','false');
+  });
+}
+function openPicker(){ return document.querySelector('.msel-b[aria-expanded="true"]'); }
+/* keep the popover inside the viewport: on a phone the Month field sits in the
+   right-hand column, so a left-anchored panel would run off the screen edge */
+function placePop(pop){
+  pop.style.left = '0px';
+  const r = pop.getBoundingClientRect(), gap = 12, vw = document.documentElement.clientWidth;
+  let shift = 0;
+  if(r.right > vw - gap) shift = (vw - gap) - r.right;
+  if(r.left + shift < gap) shift = gap - r.left;
+  pop.style.left = shift + 'px';
+}
+function periodChanged(){ state.page = {}; render(); }
+
+document.addEventListener('click', e=>{
+  const mb = e.target.closest('.msel-b');
+  if(mb){
+    const m = mb.closest('.msel'), pop = m.querySelector('.msel-pop'), willOpen = pop.hidden;
+    closePickers(m);
+    pop.hidden = !willOpen;
+    mb.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    if(willOpen) placePop(pop);
+    if(willOpen){ const first = pop.querySelector('input,button'); if(first) first.focus(); }
+    return;
+  }
+  const qb = e.target.closest('[data-msel-q]');
+  if(qb){
+    const q = Number(qb.dataset.mselQ), trio = [q*3, q*3+1, q*3+2], ms = state.filters.months;
+    const full = trio.every(k=>ms.includes(k));
+    state.filters.months = full ? ms.filter(k=>!trio.includes(k)) : [...new Set([...ms, ...trio])];
+    periodChanged(); return;
+  }
+  const all = e.target.closest('[data-msel-all]');
+  if(all){
+    if(all.dataset.mselAll === 'year') state.filters.years = []; else state.filters.months = [];
+    periodChanged(); return;
+  }
+  if(!e.target.closest('.msel')) closePickers();
+  const el = e.target.closest('[data-act],[data-go]');
+  if(el && handle(el, e)) e.preventDefault();
+});
+document.addEventListener('keydown', e=>{
+  /* rows and timeline bars are focusable; Enter and Space activate them */
+  if((e.key === 'Enter' || e.key === ' ') && document.activeElement){
+    const el = document.activeElement.closest && document.activeElement.closest('[data-act],[data-go]');
+    if(el && el.tagName !== 'BUTTON' && el.tabIndex === 0){ if(handle(el, e)) e.preventDefault(); return; }
+  }
+  const searchOpen = !$('#searchSheet').hidden;
+  if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'){ e.preventDefault(); searchOpen ? closeSearch() : openSearch(); return; }
+  if(e.key === 'Escape' && openPicker()){
+    const b = openPicker(); closePickers(); b.focus(); return;
+  }
+  if(e.key === 'Escape'){
+    if(searchOpen) closeSearch();
+    else if(!$('#drawer').hidden) closeDrawer();
+    return;
+  }
+  if(searchOpen){
+    if(e.key === 'ArrowDown'){ e.preventDefault(); moveCursor(1); }
+    else if(e.key === 'ArrowUp'){ e.preventDefault(); moveCursor(-1); }
+    else if(e.key === 'Enter' && searchHits[searchCursor]){ e.preventDefault(); openHit(searchHits[searchCursor]); }
+  }
+});
+
+/* ==========================================================================
+   BOOT
+   ========================================================================== */
+(function boot(){
+  $('#railBtn').innerHTML = ic('rail',20);
+  paintThemeBtn();
+  $('#searchBtnIc').innerHTML = ic('search',18);
+  $('#searchSheetIc').innerHTML = ic('search',18);
+  $('#drawerClose').innerHTML = ic('x',20);
+  $('#stamp').textContent = fmtDate(TODAY);
+  if(REAL){
+    const tag = document.querySelector('.demo-tag');
+    if(tag){
+      tag.textContent = 'Beta';
+      tag.title = 'Live Galileo data via index.html '+REAL.appRev+(REAL.source === 'cache'
+        ? ' · from the main dashboard cache, saved '+new Date(REAL.cacheTs).toLocaleString()
+        : ' · loaded from Galileo '+new Date(REAL.generatedAt).toLocaleString());
+    }
+    /* the mock sidebar profile is an invented person — never show it next to real records */
+    const un = document.querySelector('.user-name'), ur = document.querySelector('.user-role'), av = document.querySelector('.user .avatar');
+    const nm = (REAL.user && (REAL.user.full_name || REAL.user.email)) || 'Signed in';
+    if(un) un.textContent = nm;
+    if(ur) ur.textContent = (REAL.user && REAL.user.role === 'admin' ? 'Admin' : 'Viewer')+' · '+REAL.appRev;
+    if(av) av.textContent = nm.split(/\s+/).filter(Boolean).slice(-2).map(w=>w[0]).join('').toUpperCase() || '·';
+    if(REAL.loadWarnings && REAL.loadWarnings.length)
+      setTimeout(()=> toast('Some data did not load', REAL.loadWarnings.join(' · ')), 400);
+  }
+
+  $('#fDept').innerHTML = '<option value="">All departments</option>'
+    + DEPTS.map(d=>'<option value="'+esc(d)+'">'+esc(d)+'</option>').join('');
+
+  $('#themeBtn').addEventListener('click', ()=> setTheme(currentTheme() === 'light' ? 'dark' : 'light'));
+  if(window.matchMedia){
+    const mq = window.matchMedia('(prefers-color-scheme: light)');
+    const onOS = e=>{
+      let saved = null;
+      try{ saved = localStorage.getItem('qa-amo-theme'); }catch(err){}
+      if(saved !== 'light' && saved !== 'dark'){
+        document.documentElement.setAttribute('data-theme', e.matches ? 'light' : 'dark');
+        paintThemeBtn();
+      }
+    };
+    mq.addEventListener ? mq.addEventListener('change', onOS) : mq.addListener(onOS);
+  }
+
+  $('#railBtn').addEventListener('click', ()=>{ railPref = effRail() ? 'wide' : 'rail'; applyRail(); });
+  window.addEventListener('resize', applyRail);
+  applyRail();
+
+  buildPeriodPicker();
+  document.addEventListener('change', e=>{
+    const c = e.target.closest && e.target.closest('input[data-msel]');
+    if(!c) return;
+    const key = c.dataset.msel === 'year' ? 'years' : 'months', v = Number(c.value);
+    const cur = state.filters[key];
+    state.filters[key] = c.checked ? [...new Set([...cur, v])] : cur.filter(x=>x !== v);
+    periodChanged();
+  });
+  $('#fDept').addEventListener('change',  e=>{ state.filters.dept  = e.target.value; state.page = {}; render(); });
+
+  $('#searchBtn').addEventListener('click', openSearch);
+  $('#searchScrim').addEventListener('click', closeSearch);
+  $('#drawerScrim').addEventListener('click', closeDrawer);
+  $('#drawerClose').addEventListener('click', closeDrawer);
+  $('#q').addEventListener('input', runSearch);
+
+  state.cat = '';
+  if(!location.hash) location.hash = '#/overview';
+  route();
+})();
+</script>
+</body>
+</html>
