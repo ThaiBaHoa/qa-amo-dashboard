@@ -5,7 +5,15 @@
 
 ---
 
-## ⏳ r168 — TẢI NHANH KHI GALILEO TREO + CACHE ĐỦ LƯỢT 2 (22/09/2026, ĐÃ COMMIT, CHƯA PUSH)
+## ✅ r168 — TẢI NHANH KHI GALILEO TREO + CACHE ĐỦ LƯỢT 2 (22/09/2026, ĐÃ PUSH a0581bc — live)
+
+- Kiểm live 22/09: lần nguội đầu sau deploy xong 7.022 report / 0 cảnh báo ở 253s (~33s là màn đăng nhập của tab mới;
+  `dwreporting_users` treo cả 3 bản 90s, lượt thử lại bản 3 về 6,3s; custom field CMR-CAR bản 3 thắng).
+  Tải lại có cache: 1,2s, 0 request Galileo, KPI 7 51/59, `M.consistency()` 0 lệch.
+- Tách chặng (Eric hỏi Supabase / Cloudflare): Worker tự trả (403) 0,2s 6/6 · cổng Galileo gọi thẳng (401) 0,8s 6/6 ·
+  Worker→Galileo truy vấn thật 1–1,8s nhưng có lần 27s dù `$top=1`. Supabase log 24h: 45 request đều 2xx, token TB 0,5s
+  (max 1,0s), `users` TB 0,3s (max 0,7s). ⇒ chậm nằm ở Galileo CHẠY TRUY VẤN (kẹt từng query vài phút), không ở Cloudflare/Supabase.
+- Ứng viên tiếp: cache `dwreporting_users` riêng (ít đổi, không gắn rev) như wfRaw — lần nguội vừa rồi chờ nó 2,5 phút.
 
 - Eric: trang tải rất chậm, nghi không phải lỗi Galileo → đo toàn bộ trên live.
 - Đo: có cache thì dữ liệu sẵn sau 0,9s; nhưng lượt 2 (CMR-CAR / ECAR / KPI 7) gọi LẠI Galileo mỗi lần mở:
