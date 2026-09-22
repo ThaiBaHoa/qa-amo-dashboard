@@ -1132,15 +1132,16 @@ ecarData.forEach(r => { const o = base(r, 'ecar'); o.finding = orDash(r.finding_
 const YEAR = String(new Date().getFullYear());
 const AUD_STATUS = { InProgress: 'In Progress' };
 const audits = auditData
-  .filter(a => a.is_qa_amo_scope && a.sched_year === YEAR)
+  /* every year: the Audit Plan follows the Year × Month filter like every other screen */
+  .filter(a => a.is_qa_amo_scope && /^\\d{4}$/.test(String(a.sched_year)))
   .map(a => {
     const m = Number(String(a.scheduled_start_date).slice(5, 7)) - 1;
     return { id: a.audit_id, number: a.number, title: orDash(a.title), location: orDash(a.location_name),
-      type: a.workflow_category, status: AUD_STATUS[a.status] || a.status, start: m, end: m,
+      type: a.workflow_category, status: AUD_STATUS[a.status] || a.status, start: m, end: m, year: +a.sched_year,
       findings: a.finding_count, open: a.open_count, overdue: a.overdue_count, lead: orDash(a.lead_auditor_name) };
   })
   .filter(a => a.start >= 0 && a.start <= 11)
-  .sort((a, b) => a.start - b.start || String(a.number).localeCompare(String(b.number)));
+  .sort((a, b) => a.year - b.year || a.start - b.start || String(a.number).localeCompare(String(b.number)));
 const cnt = {}; reports.forEach(r => { if(r.dept !== '—') cnt[r.dept] = (cnt[r.dept] || 0) + 1; });
 const depts = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a] || a.localeCompare(b));
 
@@ -1677,6 +1678,13 @@ function buildAudits(){
   });
 }
 const AUDITS = REAL ? REAL.audits : buildAudits();
+/* Audit Plan follows the shared Year × Month filter: year = scheduled year, month = scheduled
+   start month (Galileo has no planned end date, so a bar is one month). Mock audits carry no year. */
+function auditsScoped(){
+  const f = state.filters;
+  return AUDITS.filter(a => (a.year === undefined || !f.years.length || f.years.includes(a.year))
+                         && (!f.months.length || f.months.includes(a.start)));
+}
 
 /* ---- 12-month series, computed from the register (never invented) ---- */
 function monthsBack(n){
@@ -1955,7 +1963,9 @@ function renderChrome(){
 }
 /* The filter bar is persistent across every data screen; reference and
    admin screens have nothing to filter, so it steps out of the way. */
-const FILTERED_SCREENS = ['overview','work','findings','audit'];
+const FILTERED_SCREENS = ['overview','work','findings','audit','analytics'];
+/* Department exists on findings only — audits, analytics and OSR/MOSR carry no such field */
+const deptApplies = () => ['overview','work','findings'].includes(state.screen) && !(state.screen === 'findings' && state.tab.findings === 'osr');
 function renderFilterBar(){
   const on = FILTERED_SCREENS.includes(state.screen);
   $('#filterbar').hidden = !on;
@@ -1971,6 +1981,8 @@ function renderFilterBar(){
     : '<span class="t-small dim">No filters beyond the current year.</span>';
   syncPeriodPicker();
   $('#fDept').value  = f.dept;
+  /* style, not [hidden]: .fb-field sets display and would override the attribute */
+  const df = $('#fDept').closest('.fb-field'); if(df) df.style.display = deptApplies() ? '' : 'none';
 }
 
 /* ==========================================================================
@@ -2091,8 +2103,8 @@ function renderOverview(){
       + '<span class="num dim od-nowrap">'+when+'</span></button>';
   }).join('');
 
-  const liveAudits = AUDITS.filter(a=>a.status==='In Progress').length;
-  const sched = AUDITS.filter(a=>a.status==='Scheduled').length;
+  const liveAudits = auditsScoped().filter(a=>a.status==='In Progress').length;
+  const sched = auditsScoped().filter(a=>a.status==='Scheduled').length;
 
   return '<section class="sec">'
     + '<div class="sec-head"><h2>Right now</h2><span class="t-small dim">'+esc(periodLabel())
@@ -2344,7 +2356,10 @@ function renderAudit(tab){
   const head = '<div class="tl-row tl-head"><div>Audit · lead · location</div>'
     + MONTHS.map((m,i)=>'<div'+(i===now?' class="now"':'')+'>'+m+'</div>').join('') + '</div>';
 
-  const body = AUDITS.map(a=>{
+  const AUD = auditsScoped();
+  if(!AUD.length) return '<section class="sec"><div class="card">'+emptyState()+'</div></section>';
+  const multiYear = new Set(AUD.map(a=>a.year)).size > 1;
+  const body = AUD.map(a=>{
     const cells = MONTHS.map((m,i)=>{
       const on = i>=a.start && i<=a.end;
       const cls = ['tl-cell', i===now?'now':'', on?'on':'', i===a.start?'start':'', i===a.end?'end':''].filter(Boolean).join(' ');
@@ -2355,17 +2370,18 @@ function renderAudit(tab){
     return '<div class="tl-row" tabindex="0" role="button" data-act="toast" data-t="'+esc(a.number)+'" '
       + 'data-b="'+esc(a.title+' · '+a.type+' · lead '+a.lead+' · '+a.location+' · '+a.status+' · '+a.findings+' findings, '+a.open+' still open'+(a.overdue?', '+a.overdue+' overdue':'')+'.')+'">'
       + '<div class="tl-lbl"><span class="od-row" style="--od-gap:8px"><span class="row-id">'+esc(a.number)+'</span>'
+        + (multiYear && a.year ? '<span class="tag">'+a.year+'</span>' : '')
         + (a.overdue ? '<span class="cat c3">'+a.overdue+' overdue</span>' : '')+'</span>'
       + '<span class="row-sub od-truncate">'+esc(a.title)+'</span>'
       + '<span class="t-small dim od-truncate">'+esc(a.type)+' · '+esc(a.lead)+' · '+esc(a.location)+'</span></div>'
       + cells + '</div>';
   }).join('');
 
-  const counts = ['Closed','Performed','In Progress','Scheduled','Cancelled'].map(s=>({s, n:AUDITS.filter(a=>a.status===s).length})).filter(c=>c.n || c.s!=='Cancelled');
+  const counts = ['Closed','Performed','In Progress','Scheduled','Cancelled'].map(s=>({s, n:AUD.filter(a=>a.status===s).length})).filter(c=>c.n || c.s!=='Cancelled');
 
   return '<section class="sec"><div class="card">'
-    + '<div class="card-head"><h2>Annual programme 2026</h2>'
-    + '<span class="t-small dim od-fill">'+AUDITS.length+' audits and inspections · bar spans the scheduled window · select a row for detail</span></div>'
+    + '<div class="card-head"><h2>'+(REAL ? 'Programme · '+esc(periodLabel()) : 'Annual programme 2026')+'</h2>'
+    + '<span class="t-small dim od-fill">'+AUD.length+' audits and inspections · bar spans the scheduled window · select a row for detail</span></div>'
     + '<div class="card-pad" style="padding-bottom:0"><div class="legend">'
     + '<span class="legend-i"><span class="swatch" style="background:repeating-linear-gradient(135deg,var(--hatch) 0 4px,transparent 4px 8px);border-style:dashed"></span>Scheduled</span>'
     + '<span class="legend-i"><span class="swatch" style="background:var(--data-1)"></span>In progress</span>'
@@ -2378,20 +2394,22 @@ function renderAudit(tab){
     + '</div></section>';
 }
 function renderAuditList(){
-  const rows = AUDITS.slice().sort((a,b)=>a.start-b.start).map(a=>
+  const AUD = auditsScoped();
+  if(!AUD.length) return '<section class="sec"><div class="card">'+emptyState()+'</div></section>';
+  const rows = AUD.slice().sort((a,b)=>(a.year||0)-(b.year||0) || a.start-b.start).map(a=>
     '<tr tabindex="0" data-act="toast" data-t="'+esc(a.number)+'" data-b="'+esc(a.title+' — '+a.status+', '+a.findings+' findings.')+'">'
     + '<td class="t-main" data-l="Audit"><span class="row-main"><span class="row-id">'+esc(a.number)+'</span>'
       + '<span class="row-sub od-truncate">'+esc(a.title)+'</span></span></td>'
     + '<td data-l="Type"><span class="tag">'+esc(a.type)+'</span></td>'
     + '<td data-l="Status">'+chipAs(AUD_CHIP[a.status], a.status)+'</td>'
-    + '<td data-l="Window"><span class="num od-nowrap">'+MONTHS[a.start]+(a.end!==a.start?' – '+MONTHS[a.end]:'')+'</span></td>'
+    + '<td data-l="Window"><span class="num od-nowrap">'+MONTHS[a.start]+(a.end!==a.start?' – '+MONTHS[a.end]:'')+(a.year?' '+a.year:'')+'</span></td>'
     + '<td data-l="Lead"><span class="od-truncate">'+esc(a.lead)+'</span></td>'
     + '<td data-l="Location"><span class="tag">'+esc(a.location)+'</span></td>'
     + '<td class="ar" data-l="Findings"><span class="num">'+a.findings+'</span></td>'
     + '<td class="ar" data-l="Open"><span class="num'+(a.open?' strong':' dim')+'">'+a.open+'</span></td>'
     + '<td class="ar" data-l="Overdue">'+(a.overdue?'<span class="cat c3">'+a.overdue+'</span>':'<span class="dim">—</span>')+'</td></tr>').join('');
   return '<section class="sec"><div class="card">'
-    + '<div class="card-head"><h2>Schedule list</h2><span class="t-small dim od-fill">The same programme as a flat list, for reading and export.</span></div>'
+    + '<div class="card-head"><h2>Schedule list</h2><span class="t-small dim od-fill">'+AUD.length+' audits · '+esc(periodLabel())+' · the same programme as a flat list.</span></div>'
     + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
     + ['Audit','Type','Status','Window','Lead','Location','Findings','Open','Overdue']
         .map((h,i)=>'<th scope="col"'+(i>5?' class="ar"':'')+'><span>'+h+'</span></th>').join('')

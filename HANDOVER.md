@@ -26,6 +26,9 @@ Mở: đăng nhập ở `/` rồi mở `/beta.html` trong **cùng tab**. Lùi: `
   đã chặn phương án eval). Loader tự dò phụ thuộc (`extractClosure`: gốc + mọi tên DRIVER nhắc tới; tự tắt `render*/show*/…Chart`;
   hiểu regex literal; khai báo gộp `let a=…, b=…` không bị khai báo lại). Có cache ⇒ vẽ ngay (lite), CMR-CAR/ECAR/KPI 7 nạp lượt 2.
   Kiểm local: 25 màn không lỗi JS, 18 màn không tràn ngang ở 375px. Chưa thử trên live: Users, Feedback (cần phiên Supabase thật).
+- 22/09 (Eric báo): Audit Plan không theo bộ lọc → nay nạp audit MNT **mọi năm** (1.052: 2020–2026), Timeline /
+  Schedule list / số audit trên Overview lọc theo Year × tháng bắt đầu dự kiến (2026 = 191, May–Sep = 101). Thanh lọc
+  hiện cả trên Analytics; ô Department chỉ hiện ở Overview / Work Queue / Findings (audit, analytics, OSR không có trường này).
 - Nguồn dựng: `Vault-CongViec/.../rebuild UIUX/beta-src/` (`loader.js`, `screens.js`, `build.mjs`, README).
 - Còn: bước kiểm đăng nhập chưa thử trên live; Export PDF / Overdue weekly vẫn ở bản chính; chi tiết tài liệu (copyholders) và
   modal EIS/QCS chưa port; chờ Eric duyệt mã hoá status không màu.
