@@ -19,7 +19,7 @@ Mở: đăng nhập ở `/` rồi mở `/beta.html` trong **cùng tab**. Lùi: `
   scope riêng, **chỉ thay khi đủ nguồn + đối chiếu sạch** (`betaSwap()` thay nội dung REPORTS/AUDITS/INDEX, không reload).
   Đo local 22/09: cache 5h → UI 6,7s, `[wf] DELTA 126 report 4,1s`, `[cf] DELTA 11 report 4,3s`, nạp ngầm xong 16,5s;
   sau đó `wfRaw`/`cfRaw`/`qaAmoV5` không đổi byte nào về mốc/số dòng.
-- ✅ **22/09 tối — đủ màn, đủ dữ liệu** (commit sau fe97a4d): mọi loại report của `allData` (37 form, `form:'other'`) +
+- ✅ **22/09 tối — đủ màn, đủ dữ liệu** (864b490 + edfb323, ĐÃ PUSH 22/09): mọi loại report của `allData` (37 form, `form:'other'`) +
   CMR-CAR + ECAR = 7.021 report; tab mới Findings › OSR/MOSR; Analytics › KPI charts / SPI / Safety / Early detection /
   Event-IR status; Audit › Bottleneck; Library › Documents / User guide; Admin › Users / Exports (.xlsx) / My dashboard / Feedback.
   Mỗi màn gọi **loader của chính index.html** qua `window.BETA_API` (danh sách hàm cố định, KHÔNG eval — bộ phân loại quyền
