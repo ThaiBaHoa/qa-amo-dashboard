@@ -5,7 +5,7 @@
 
 ---
 
-## ⏳ r167 — GIAO DIỆN MỚI THÀNH BẢN CHÍNH (22/09/2026, commit chờ Eric cho push)
+## ✅ r167 — GIAO DIỆN MỚI THÀNH BẢN CHÍNH (22/09/2026, ĐÃ PUSH d6f8670 — live)
 
 ```
 index.html   = giao diện mới (không chứa logic; tải classic.html, trích hàm, tự ghi cache)
