@@ -666,6 +666,22 @@ mark{background:var(--accent-34);color:var(--on-wash);border-radius:3px;padding:
 .beta-boot-sub{font-size:14px;color:var(--text-2)}
 .beta-boot-link{color:var(--accent-fg);font-weight:650}
 @keyframes betaspin{to{transform:rotate(360deg)}}
+.beta-guide{max-width:96ch}
+.beta-sel{min-width:0;max-width:100%}
+.beta-sel select.ctl{min-width:0;width:min(280px,100%);text-overflow:ellipsis}
+.tbl.beta-minw{min-width:var(--beta-minw)}
+@media (max-width:767px){.tbl.beta-minw{min-width:0}}
+.beta-cards{display:grid;gap:var(--s4);grid-template-columns:repeat(auto-fit,minmax(min(380px,100%),1fr))}
+.beta-cards > .card, .cols > .card{min-width:0}
+.kpi-val.beta-wrap{white-space:normal;font-size:clamp(18px,4.5vw,28px)}
+.beta-docs{grid-template-columns:minmax(0,1fr) minmax(0,2.2fr)}
+@media (max-width:1100px){.beta-docs{grid-template-columns:minmax(0,1fr)}}
+.beta-guide h1,.beta-guide h2,.beta-guide h3{margin:var(--s4) 0 var(--s2)}
+.beta-guide p,.beta-guide li{color:var(--text-2);font-size:15px;line-height:1.6}
+.beta-guide table{border-collapse:collapse;width:100%;font-size:14px}
+.beta-guide th,.beta-guide td{border-bottom:1px solid var(--border);padding:6px 8px;text-align:left;vertical-align:top}
+.beta-guide a{color:var(--accent-fg)}
+.beta-guide [style*="background"]{background:transparent !important}
 </style>
 <script>
 /* Resolve the theme before first paint: a stored choice wins, otherwise the
@@ -830,25 +846,43 @@ function fail(title, detail, withLink){
 
 /* ── 1. Sign-in: the same Supabase session as the main dashboard (sessionStorage, per tab) ── */
 async function signedInUser(SRC){
-  if(DEV) return { full_name:'Local preview', email:'', role:'viewer' };
+  /* local preview only: no Supabase session; ?role=admin shows the admin screens' layout */
+  if(DEV) return { full_name:'Local preview', email:'', role: qs.get('role') === 'admin' ? 'admin' : 'viewer' };
   const url = grabStr(SRC, 'SUPA_URL'), key = grabStr(SRC, 'SUPA_KEY');
   const sb = supabase.createClient(url, key,
     { auth:{ storage:sessionStorage, persistSession:true, autoRefreshToken:true } });
   const { data } = await sb.auth.getSession();
   if(!data || !data.session) return null;
+  window.BETA_SB = sb;   /* User management and Feedback use the same signed-in client */
   try{ return JSON.parse(sessionStorage.getItem('qaUser') || 'null') || { full_name:data.session.user.email, role:'viewer' }; }
   catch(e){ return { full_name:data.session.user.email, role:'viewer' }; }
 }
 
 /* ── 2. Extraction — same brace scanner as snapshot.mjs (skips strings and comments) ── */
+/* A '/' starts a regex literal (not a division) when the last significant character is one of
+   these, e.g. `.replace(/'/g, …)` — without this, the quote inside the regex opens a "string". */
+const RE_BEFORE = '(,=:[!&|?{};+-*%<>~^';
+function skipRegex(t, k){          /* k at the opening '/'; returns index of the closing '/' */
+  let cls = false;
+  for(let j = k + 1; j < t.length; j++){
+    const c = t[j];
+    if(c === '\\'){ j++; continue; }
+    if(c === '\n') return k;       /* not a regex after all */
+    if(cls){ if(c === ']') cls = false; continue; }
+    if(c === '[') cls = true; else if(c === '/') return j;
+  }
+  return k;
+}
 function scanTo(SRC, i, open, close, stopAtSemicolon){
-  let d = 0, q = null;
+  let d = 0, q = null, prev = '';
   for(let k = i; k < SRC.length; k++){
     const c = SRC[k], n = SRC[k+1];
     if(q){ if(c === '\\'){ k++; continue; } if(c === q) q = null; continue; }
     if(c === '/' && n === '/'){ k = SRC.indexOf('\n', k); continue; }
     if(c === '/' && n === '*'){ k = SRC.indexOf('*/', k) + 1; continue; }
-    if(c === "'" || c === '"' || c === '`'){ q = c; continue; }
+    if(c === '/' && (prev === '' || RE_BEFORE.includes(prev))){ k = skipRegex(SRC, k); prev = '/'; continue; }
+    if(c === "'" || c === '"' || c === '`'){ q = c; prev = c; continue; }
+    if(!/\s/.test(c)) prev = c;
     if(open.includes(c)) d++;
     else if(close.includes(c)){ d--; if(!stopAtSemicolon && d === 0) return k + 1; }
     else if(stopAtSemicolon && c === ';' && d === 0) return k + 1;
@@ -874,13 +908,15 @@ function grabStr(SRC, name){
 }
 /* Code without comments, so words inside comments do not pull in unrelated names. */
 function stripComments(t){
-  let out = '', q = null;
+  let out = '', q = null, prev = '';
   for(let k = 0; k < t.length; k++){
     const c = t[k], n = t[k+1];
     if(q){ out += c; if(c === '\\'){ out += t[++k] || ''; continue; } if(c === q) q = null; continue; }
     if(c === '/' && n === '/'){ const e = t.indexOf('\n', k); k = e < 0 ? t.length : e - 1; continue; }
     if(c === '/' && n === '*'){ const e = t.indexOf('*/', k + 2); k = e < 0 ? t.length : e + 1; out += ' '; continue; }
+    if(c === '/' && (prev === '' || RE_BEFORE.includes(prev))){ const e = skipRegex(t, k); out += ' '; k = e; prev = '/'; continue; }
     if(c === "'" || c === '"' || c === '`') q = c;
+    if(!/\s/.test(c)) prev = c;
     out += c;
   }
   return out;
@@ -898,26 +934,75 @@ const STUBS = new Set(['g','s','setOv','toast','showLoadError','renderAll','cach
   'allData','auditData','cmrData','ecarData','loadFailures','isLoading','cmrLoaded','ecarLoaded',
   'kpi7Loaded','kpi7Busy','kpi7Cnt','kpi7Ver','kpi7Done','pavoiRfiLoaded','pavoiRfiMap','pavoiRfiDone',
   'eisLoaded','eisCAMap','eisDescMap','qcsLoaded','qcsMap','localStorage','sessionStorage']);
-function extractClosure(SRC){
+/* Main-dashboard functions that draw its own DOM (render*, show*, *Chart…). A loader reached
+   through the closure often ends by calling one of them; in the beta that call becomes a no-op,
+   because the beta draws its own screens. A name listed in ROOTS is always extracted for real. */
+const AUTO_STUB = /^(render|show|open|close|draw|paint|populate|init|toggle|update|set)[A-Z]|Charts?$|Modal$|Panel$/;
+/* Every top-level declaration, including the 2nd+ names of `let a = 1, b = 2;` */
+function indexSource(SRC){
   const index = {};
-  const re = /^(?:(async )?function\s+([A-Za-z_$][\w$]*)\s*\(|(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=)/gm;
+  const re = /^(?:(async )?function\s+([A-Za-z_$][\w$]*)\s*\(|(const|let|var)\s+([A-Za-z_$][\w$]*)\s*=)/gm;
   let m;
-  while((m = re.exec(SRC))){ const n = m[2] || m[3]; if(!(n in index)) index[n] = { pos:m.index, fn:!!m[2] }; }
-  const take = {}, todo = ROOTS.slice();
+  while((m = re.exec(SRC))){
+    if(m[2]){ if(!(m[2] in index)) index[m[2]] = { pos:m.index, fn:true }; continue; }
+    /* A statement the scanner cannot close (e.g. a regex literal holding a quote) is indexed
+       under its first name only and grabbed on demand — it fails loudly only if it is needed. */
+    let end;
+    try{ end = scanTo(SRC, m.index, '([{', ')]}', true); }
+    catch(e){ if(!(m[4] in index)) index[m[4]] = { pos:m.index, fn:false, stmt:null }; continue; }
+    const stmt = SRC.slice(m.index, end);
+    /* names at depth 0 after a comma: `, name =` */
+    let d = 0, q = null;
+    const names = [m[4]];
+    for(let k = 0; k < stmt.length; k++){
+      const c = stmt[k], n = stmt[k+1];
+      if(q){ if(c === '\\'){ k++; continue; } if(c === q) q = null; continue; }
+      if(c === '/' && n === '/'){ const e = stmt.indexOf('\n', k); k = e < 0 ? stmt.length : e; continue; }
+      if(c === '/' && n === '*'){ const e = stmt.indexOf('*/', k + 2); k = e < 0 ? stmt.length : e + 1; continue; }
+      if(c === "'" || c === '"' || c === '`'){ q = c; continue; }
+      if('([{'.includes(c)) d++; else if(')]}'.includes(c)) d--;
+      else if(c === ',' && d === 0){ const mm = stmt.slice(k + 1).match(/^\s*([A-Za-z_$][\w$]*)\s*=/); if(mm) names.push(mm[1]); }
+    }
+    names.forEach(nm => { if(!(nm in index)) index[nm] = { pos:m.index, fn:false, stmt }; });
+  }
+  return index;
+}
+function extractClosure(SRC, extraRoots){
+  const index = indexSource(SRC);
+  /* anything the DRIVER names that exists in index.html is a root too (the screen API) */
+  const extra = [...new Set((extraRoots || []).filter(n => index[n]))];
+  const take = {}, autoStubs = new Set(), todo = ROOTS.concat(extra);
   while(todo.length){
     const n = todo.pop();
-    if(take[n] || STUBS.has(n)) continue;
+    if(take[n] || STUBS.has(n) || autoStubs.has(n)) continue;
     if(!index[n]) throw new Error('not found in index.html: ' + n);
-    const code = index[n].fn ? grabFn(SRC, n) : grabDecl(SRC, n);
+    if(index[n].fn && AUTO_STUB.test(n) && !ROOTS.includes(n)){ autoStubs.add(n); continue; }
+    const code = index[n].fn ? grabFn(SRC, n) : (index[n].stmt || grabDecl(SRC, n));
     take[n] = { pos:index[n].pos, code };
     (stripComments(code).match(/(?<![\w.$])[A-Za-z_$][\w$]*/g) || []).forEach(id => {
-      if(index[id] && !take[id] && !STUBS.has(id)) todo.push(id);
+      if(index[id] && !take[id] && !STUBS.has(id) && !autoStubs.has(id)) todo.push(id);
     });
   }
-  /* source order: a const initialiser may read an earlier const (TDZ otherwise) */
+  /* source order: a const initialiser may read an earlier const (TDZ otherwise). One
+     multi-name statement is emitted once, however many of its names were needed. */
   const names = Object.keys(take).sort((a, b) => take[a].pos - take[b].pos);
-  return { code: names.map(n => take[n].code).join('\n\n'), names };
+  const seen = new Set(), parts = [];
+  names.forEach(n => { if(!seen.has(take[n].pos)){ seen.add(take[n].pos); parts.push(take[n].code); } });
+  parts.push([...autoStubs].map(n => 'function ' + n + '(){}').join('\n'));
+  /* every name the emitted statements declare, so the PRELUDE does not declare it twice */
+  const declared = new Set(Object.keys(index).filter(n => !index[n].fn && seen.has(index[n].pos)));
+  return { code: parts.join('\n\n'), names, autoStubs: [...autoStubs], declared };
 }
+/* State the beta owns. Declared in the PRELUDE unless an extracted statement already declares it
+   (a `let a = …, b = …` pulled in for `a` also declares `b` — declaring it again is a SyntaxError). */
+const STATE = {
+  loadFailures:'[]', allData:'[]', auditData:'[]', cmrData:'[]', ecarData:'[]', isLoading:'false',
+  cmrLoaded:'false', ecarLoaded:'false', pavoiRfiLoaded:'false', pavoiRfiMap:'{}', pavoiRfiDone:'new Set()',
+  kpi7Loaded:'false', kpi7Busy:'false', kpi7Cnt:'{}', kpi7Ver:'{}', kpi7Done:'new Set()',
+  eisLoaded:'false', eisCAMap:'{}', eisDescMap:'{}', qcsLoaded:'false', qcsMap:'{}'
+};
+const stateDecls = declared => Object.keys(STATE).filter(n => !declared.has(n)).map(n => 'let ' + n + ' = ' + STATE[n] + ';').join('\n');
+const idents = t => stripComments(t).match(/(?<![\w.$])[A-Za-z_$][\w$]*/g) || [];
 
 /* ── 3. Read the main dashboard's IndexedDB cache — READ ONLY ── */
 function readMainStore(SRC, KEY){
@@ -942,11 +1027,6 @@ function readMainStore(SRC, KEY){
 
 /* ── 4. Stubs: only DOM / overlay / writes are replaced, never logic ── */
 const PRELUDE = `
-let loadFailures = [], allData = [], auditData = [], cmrData = [], ecarData = [], isLoading = false;
-let cmrLoaded = false, ecarLoaded = false;
-let pavoiRfiLoaded = false, pavoiRfiMap = {}, pavoiRfiDone = new Set();
-let kpi7Loaded = false, kpi7Busy = false, kpi7Cnt = {}, kpi7Ver = {}, kpi7Done = new Set();
-let eisLoaded = false, eisCAMap = {}, eisDescMap = {}, qcsLoaded = false, qcsMap = {};
 const TOASTS = [], LOAD_ERRORS = [];
 const localStorage = { getItem(){ return null; }, setItem(){}, removeItem(){} };
 const _el = { textContent: '', style: {}, innerHTML: '', classList: { contains(){ return false; }, add(){}, remove(){} } };
@@ -982,7 +1062,13 @@ HOOK.say('Loading CMR-CAR, ECAR and PAVOI verification…', allData.length + ' r
 const VER_URL = G_URL + 'dwanalytics_report_field' +
   '?$select=report_id,section_id,field_name,value_text' +
   '&$filter=' + encodeURIComponent("section_name eq 'Verification Result' and section_level eq 1");
-const [, , , verRaw] = await Promise.all([loadCmr(), loadEcar(), loadKpi7Tasks(), fetchAll(VER_URL, true).catch(e => { toast('PAVOI verification rounds: ' + e.message, 'err'); return []; })]);
+/* HOOK.lite: first paint from the cache only — CMR-CAR, ECAR, KPI 7 and verification rounds follow
+   in a second pass, so a slow Galileo (90s timeouts measured 22/09) does not hold the whole screen. */
+let verRaw = [];
+if(!HOOK.lite){
+  const got = await Promise.all([loadCmr(), loadEcar(), loadKpi7Tasks(), fetchAll(VER_URL, true).catch(e => { toast('PAVOI verification rounds: ' + e.message, 'err'); return []; })]);
+  verRaw = got[3];
+}
 
 const pavIds = new Set(allData.filter(r => r.report_title === 'PAVOI').map(r => r.report_id));
 const secMap = {};
@@ -1016,9 +1102,11 @@ function base(r, form){
 }
 const reports = [];
 allData.forEach(r => {
-  const form = FORM_OF[r.report_title];
-  if(!form) return;
+  /* Every report type the main dashboard loads (Open Reports / Overdue / All Forms cover them all):
+     the five finding forms keep their own lanes, everything else is 'other' under its real title. */
+  const form = FORM_OF[r.report_title] || 'other';
   const o = base(r, form);
+  if(form === 'other') o.code = r.report_title;
   o.finding = orDash(r.finding_desc);
   o.owner = orDash(r.issued_person || r.owner_name);
   o.dept = orDash(form === 'pavoi' ? r.owner_name : r.dept);
@@ -1061,6 +1149,7 @@ const checks = [];
 const ok = (c, m) => { if(!c) checks.push(m); };
 const byForm = f => reports.filter(r => r.form === f);
 ok(byForm('pavoi').length === allData.filter(r => r.report_title === 'PAVOI').length, 'PAVOI count differs from allData');
+ok(reports.length === allData.length + cmrData.length + ecarData.length, 'report count differs from allData + CMR-CAR + ECAR');
 ok(byForm('cmrcar').length === cmrData.length && byForm('ecar').length === ecarData.length, 'CMR-CAR / ECAR count differs');
 if(kpi7Loaded) ok(byForm('pavoi').every(r => r.rounds.length === (kpi7Cnt[r.id] || 0)), 'PAVOI verification rounds differ from kpi7Cnt');
 const st = kpi7Stats(r => r.raised_year === Number(YEAR)).tot;
@@ -1068,8 +1157,45 @@ const mine = byForm('pavoi').filter(r => r.raised && r.raised.startsWith(YEAR) &
 if(kpi7Loaded) ok(mine.length === st.total && mine.filter(r => r.rounds.length > 0).length === st.assessed, 'KPI 7 differs from kpi7Stats()');
 ok(reports.every(r => r.status && r.number), 'a report is missing status or number');
 
-return { reports, audits, depts, checks,
+/* Named entry points for lazy screens: each loader is the main dashboard's own function, each
+   getter returns what that loader stored. Filled in per screen. */
+const SCREEN_API = {
+  /* stores filled by loadData / loadCmr / loadEcar — read, never mutate */
+  allData: () => allData, auditData: () => auditData, cmrData: () => cmrData, ecarData: () => ecarData,
+  toasts: () => TOASTS.slice(),
+  /* KPI 7 (loadKpi7Tasks already ran) */
+  kpi7Stats, kpi7Rate, kpi7Fmt,
+  /* KPI 2: volume ratio (KPI charts card) and early detection (its own page) */
+  loadKpi2: () => loadKpi2(), kpi2: () => ({ loaded: kpi2Loaded, rows: kpi2Rows }),
+  isEarlyDetected, k2quarter, natureGroups,
+  /* KPI QC ATA comparison */
+  loadQcs: () => loadQcsDetail(), qcs: () => ({ loaded: qcsLoaded, map: qcsMap }),
+  qcsFindingList, normalizeATA, ATA_LABELS, QC_CAT_UUID, QCPI_TITLE,
+  /* Safety (MSAG) and SPI */
+  loadSafety: () => loadSafety(), safety: () => ({ loaded: safetyLoaded, data: safetyData }),
+  loadSPI: () => loadSPI(), spiEvaluate,
+  /* Event/IR report status (EIS, F-088) */
+  loadRptStatus: () => loadRptStatus(), rptStatus: () => ({ loaded: rsLoaded, rows: rsRows }),
+  rsOkE, rsOkF, rsOkH, rsDone, rsGaps, rsMissNames, RS_FORMS,
+  /* OSR / MOSR (AMO + QA AMO) */
+  loadOsr: () => loadOsr(), osr: () => ({ loaded: osrLoaded, rows: osrRows }),
+  /* All forms (15 AF_FORMS) with EIS / QC Spot Check detail */
+  AF_FORMS, EIS_TITLE, QCS_TITLE,
+  loadEis: () => loadEisDetail(), eis: () => ({ loaded: eisLoaded, desc: eisDescMap, ca: eisCAMap }), enrichEis, enrichQcs,
+  /* Audit Plan bottleneck (system-wide $apply aggregate, invariant I7) */
+  loadStages: () => loadStageAggregate(), stages: () => stageAggregate,
+  /* Documents (type tree by type_id UUID, invariant I8) */
+  loadDocs: () => loadDocuments(), docs: () => ({ data: docData, index: docTypeIndex, tree: docTypeTree }),
+  getDocsInBranch, reviewDueCategory, lastTwoLevels,
+  /* My dashboard widgets fetch through the same proxy */
+  fetchAll: u => fetchAll(u, true), G_URL,
+};
+
+return { reports, audits, depts, checks, partial: !!HOOK.lite,
   raw: HOOK.dev ? { a: allData, b: auditData, ou: ORG_UNIT_IDS } : null,
+  /* The scope stays alive for lazy screens (Safety, SPI, Report Status…). They get a fixed list
+     of named loaders and read-only getters (SCREEN_API below), never a way to run arbitrary code. */
+  api: SCREEN_API,
   loadWarnings: TOASTS.filter(t => t.kind === 'err').map(t => t.m).concat(loadFailures),
   kpi7: { year: YEAR, assessed: st.assessed, total: st.total, withdrawn: st.withdrawn } };
 `;
@@ -1086,6 +1212,13 @@ async function run(){
     SRC = await r.text();
   }catch(e){ return fail('Could not load the dashboard.', 'index.html: ' + e.message); }
   const REV = grabStr(SRC, 'APP_REV');
+  let FB = null; try{ FB = grabStr(SRC, 'FB_URL'); }catch(e){ console.warn('[beta] FB_URL not found:', e.message); }
+  /* User Guide: the main dashboard's own static page, with every inline handler removed */
+  let HELP = '';
+  { const a = SRC.indexOf('<div class="page" id="page-help"');
+    const b = a < 0 ? -1 : SRC.indexOf('<div class="page" id=', a + 10);
+    if(a >= 0 && b > a) HELP = SRC.slice(SRC.indexOf('>', a) + 1, b)
+      .replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\son\w+\s*=\s*("[^"]*"|'[^']*')/gi, ''); }
 
   say('Checking your sign-in…');
   let user;
@@ -1095,8 +1228,8 @@ async function run(){
 
   let EXTRACTED;
   try{
-    const ex = extractClosure(SRC);
-    EXTRACTED = ex.code;
+    const ex = extractClosure(SRC, idents(DRIVER));
+    EXTRACTED = stateDecls(ex.declared) + '\n' + ex.code;
     console.log('[beta] extracted ' + ex.names.length + ' names from index.html ' + REV + ':', ex.names.join(', '));
     /* Local preview only: the proxy accepts the site's Origin, so a local relay stands in. */
     if(DEV && qs.get('relay')) EXTRACTED = EXTRACTED.replace(/^const G_URL\s*=\s*'[^']*'/m, "const G_URL = '" + qs.get('relay').replace(/'/g,'') + "'");
@@ -1119,6 +1252,7 @@ async function run(){
   const payload = (res, src, ts) => {
     const now = new Date();
     return { asOf: localDay(now), generatedAt: now.toISOString(), appRev: REV, source: src, cacheTs: ts,
+      helpHtml: HELP, feedbackUrl: FB,
       user, loadWarnings: res.loadWarnings.concat(res.checks), kpi7: res.kpi7,
       depts: res.depts, reports: res.reports, audits: res.audits };
   };
@@ -1129,38 +1263,60 @@ async function run(){
                 ' · ' + ((Date.now() - t0) / 1000).toFixed(1) + 's');
   };
 
+  /* With a cache: paint at once from it (lite pass), then complete CMR-CAR / ECAR / KPI 7 /
+     verification rounds in a second pass — from Galileo when the cache is stale (r165), else from
+     the same cache. Without a cache: one full load before the first paint, as before. */
   let res;
-  try{ res = await load({ cache }); }
+  try{ res = await load({ cache, lite: !!cache }); }
   catch(e){ console.error('[beta] load failed', e); return fail('Could not load data from Galileo.', e.message); }
-  done(res, cache ? (stale ? 'from STALE cache' : 'from cache') : 'from Galileo');
+  done(res, cache ? (stale ? 'first paint from STALE cache' : 'first paint from cache') : 'from Galileo');
 
   window.QA_REAL_DATA = payload(res, cache ? 'cache' : 'galileo', cache ? cache.ts : null);
+  window.QA_REAL_DATA.partial = res.partial;
+  window.BETA_API = res.api;   /* lazy screens call the main dashboard's loaders through this */
   const app = document.createElement('script');
   app.textContent = document.getElementById('beta-app').textContent;
   bootEl.hidden = true;
   document.body.appendChild(app);
-  if(!stale) return;
+  if(!cache) return;
 
-  /* ── background refresh (r165) ── */
+  /* ── second pass ── */
   const tag = document.querySelector('.demo-tag');
   const hours = Math.round((Date.now() - cache.ts) / 3600e3);
-  if(tag) tag.textContent = 'Beta · refreshing…';
-  toast('Showing data from ' + hours + 'h ago', 'Refreshing from Galileo in the background.');
-  let fresh;
+  if(tag) tag.textContent = stale ? 'Beta · refreshing…' : 'Beta · loading more…';
+  if(stale) toast('Showing data from ' + hours + 'h ago', 'Refreshing from Galileo in the background.');
+  let full = null, how = stale ? 'background refresh' : 'completed from cache', note = '';
   try{
-    fresh = await load({ cache: null, background: true });
-    if(fresh.loadWarnings.length || fresh.checks.length) throw new Error(fresh.loadWarnings.concat(fresh.checks).join(' · '));
+    full = await load(stale ? { cache: null, background: true } : { cache });
+    /* [r165] a refresh swaps only when every source succeeded */
+    if(stale && (full.loadWarnings.length || full.checks.length)) throw new Error(full.loadWarnings.concat(full.checks).join(' · '));
   }catch(e){
-    console.warn('[beta] background refresh failed — keeping cached data:', e);
-    if(tag){ tag.textContent = 'Beta · ' + hours + 'h old'; }
-    toast('Background refresh incomplete', 'Still showing data from ' + hours + 'h ago. Reload to retry. (' + e.message + ')');
+    console.warn('[beta] second pass failed:', e);
+    full = null;
+    if(stale){
+      /* keep the cached reports, but still complete CMR-CAR / ECAR / KPI 7 on top of them */
+      note = 'Still showing data from ' + hours + 'h ago (' + e.message + ').';
+      try{ full = await load({ cache }); how = 'completed from STALE cache'; }catch(e2){ note += ' ' + e2.message; }
+    } else note = e.message;
+  }
+  if(!full){
+    window.QA_REAL_DATA.partialError = note || 'loading failed';
+    if(tag) tag.textContent = 'Beta · incomplete';
+    toast('Some data could not be loaded', note + ' Reload to retry.');
+    render();
     return;
   }
-  done(fresh, 'background refresh');
-  window.QA_REAL_DATA = payload(fresh, 'galileo', null);
+  done(full, how);
+  /* one object for the whole session: the UI holds REAL by reference */
+  Object.assign(window.QA_REAL_DATA, payload(full, how === 'background refresh' ? 'galileo' : 'cache', how === 'background refresh' ? null : cache.ts),
+                { partial: false, partialError: null });
+  window.BETA_API = full.api;
   betaSwap(window.QA_REAL_DATA);
-  if(tag){ tag.textContent = 'Beta'; tag.title = 'Live Galileo data via index.html ' + REV + ' · loaded ' + new Date().toLocaleString(); }
-  toast('Data refreshed', fresh.reports.length + ' reports from Galileo.');
+  if(tag){ tag.textContent = note ? 'Beta · ' + hours + 'h old' : 'Beta';
+    tag.title = 'Live Galileo data via index.html ' + REV + ' · ' + how + ' · ' + new Date().toLocaleString(); }
+  if(note) toast('Background refresh incomplete', note + ' Reload to retry.');
+  else if(stale) toast('Data refreshed', full.reports.length + ' reports from Galileo.');
+  if(!note && full.loadWarnings.length) toast('Some data did not load', full.loadWarnings.join(' · '));
 }
 run();
 })();
@@ -1235,7 +1391,8 @@ const NAV = [
       {id:'cmrcar', label:'CMR-CAR'},
       {id:'ecar',   label:'ECAR'},
       {id:'amoecar',label:'AMO-ECAR'},
-      {id:'mcar',   label:'MCAR'}
+      {id:'mcar',   label:'MCAR'},
+      {id:'osr',    label:'OSR / MOSR'}
     ]},
   { id:'analytics', label:'Analytics',  icon:'chart',    task:'analyse', title:'Analytics',
     lead:'Trends and indicators over time, not the day-to-day queue.',
@@ -1550,7 +1707,7 @@ function buildIndex(){
   REPORTS.forEach(r=> idx.push({
     kind:'Report', key:r.number, sub:r.code+' · '+r.auditTitle,
     hay:(r.number+' '+r.auditTitle+' '+r.finding+' '+r.owner+' '+(r.acReg||'')+' '+r.dept).toLowerCase(),
-    go:{screen:'findings', tab:r.form, id:r.id}, meta:r.status
+    go:{screen:'findings', tab:(r.form==='other'?'all':r.form), id:r.id}, meta:r.status
   }));
   AUDITS.forEach(a=> idx.push({
     kind:'Audit', key:a.number, sub:a.title+' · '+a.location,
@@ -1578,6 +1735,7 @@ function betaSwap(D){
   AUDITS.splice(0, AUDITS.length, ...D.audits);
   refLists(D.depts);
   INDEX.splice(0, INDEX.length, ...buildIndex());
+  betaResetLazy();   /* lazy screens reload from the fresh scope */
   const keep = state.filters.dept;
   $('#fDept').innerHTML = '<option value="">All departments</option>'
     + DEPTS.map(d=>'<option value="'+esc(d)+'">'+esc(d)+'</option>').join('');
@@ -1864,7 +2022,7 @@ function renderOverview(){
   });
 
   const tiles = [
-    kpiTile({label:'Open findings', value:String(open.length), note:'across all five forms', go:'work', tab:'open',
+    kpiTile({label:'Open findings', value:String(open.length), note:REAL ? 'across every report type' : 'across all five forms', go:'work', tab:'open',
              series:s.open, trend:trendTag(s.open[11], s.open[10], 'down','')}),
     kpiTile({label:'Overdue', value:String(overdue.length), note:'past target date', go:'work', tab:'overdue',
              series:s.overdue, alarm:overdue.length>0, trend:trendTag(s.overdue[11], s.overdue[10], 'down','')}),
@@ -1872,12 +2030,12 @@ function renderOverview(){
              series:rateSeries, alarm:rate<70, trend:trendTag(rateSeries[11], rateSeries[10], 'up','pt')}),
     kpiTile({label:'Avg days to close', value:String(avgClose), note:'raised to closed', go:'analytics', tab:'kpi',
              series:closeSeries, trend:trendTag(closeSeries[11], closeSeries[10], 'down','d')}),
-    /* Beta: the tile formula is a prototype simplification, not loadKpi2 — show no number
-       rather than a wrong one (it read 328.6% on live data, 22/09/2026). */
-    REAL
-      ? kpiTile({label:'KPI 2 · early detection', value:'—', note:'Not yet in the beta · see the main dashboard', go:'analytics', tab:'early', series:[]})
-      : kpiTile({label:'KPI 2 · early detection', value:pct(mcar,amo)+'%', note:'MCAR ÷ AMO-ECAR', go:'analytics', tab:'early',
+    /* Same formula as the main dashboard's KPI 2 card on KPI Charts (buildKPI2 5257–5259):
+       MCAR count ÷ AMO-ECAR count in the period. The early-detection rate is its own screen. */
+    kpiTile({label:'KPI 2 · MCAR ÷ AMO-ECAR', value:pct(mcar,amo)+'%', note:mcar+' MCAR ÷ '+amo+' AMO-ECAR', go:'analytics', tab:'kpi',
              series:k2Series, trend:trendTag(k2Series[11], k2Series[10], 'up','pt')}),
+    (REAL && REAL.partial)
+      ? kpiTile({label:'KPI 7 · PAVOI assessed', value:'—', note:REAL.partialError ? 'verification rounds not loaded' : 'loading verification rounds…', go:'findings', tab:'pavoi', series:[]}) :
     kpiTile({label:'KPI 7 · PAVOI assessed', value:pct(pavAssessed, pav.length)+'%', note:pavAssessed+' of '+pav.length+' verified', go:'findings', tab:'pavoi',
              series:k7Series, alarm:pct(pavAssessed,pav.length)<70, trend:trendTag(k7Series[11], k7Series[10], 'up','pt')})
   ].join('');
@@ -1900,6 +2058,7 @@ function renderOverview(){
 
   /* ---- open by form type ---- */
   const byForm = FORMS.map(f=>({ f, n: open.filter(r=>r.form===f.id).length }));
+  if(REAL) byForm.push({ f:{ id:'all', code:'Other forms' }, n: open.filter(r=>r.form==='other').length });
   const maxForm = Math.max(1, ...byForm.map(x=>x.n));
   const formBars = byForm.map(x=>
     '<button class="bar-row" type="button" data-go="findings" data-tab="'+x.f.id+'">'
@@ -2040,7 +2199,7 @@ function tableHTML(key, cfg, rows){
   let p = Math.min(state.page[key]||1, pages);
   const slice = sorted.slice((p-1)*PAGE_SIZE, p*PAGE_SIZE);
 
-  const body = slice.map(r=>'<tr tabindex="0" data-go="findings" data-tab="'+r.form+'" data-id="'+r.id+'">'
+  const body = slice.map(r=>'<tr tabindex="0" data-go="findings" data-tab="'+(r.form==='other'?'all':r.form)+'" data-id="'+r.id+'">'
     + cfg.cols.map(c=>{
         const col = COL[c];
         return '<td data-l="'+esc(col.l)+'"'+(col.main?' class="t-main"':(col.ar?' class="ar"':''))+'>'+col.c(r)+'</td>';
@@ -2459,7 +2618,9 @@ function render(){
               + ' aria-selected="'+(t.id===tab)+'">'+esc(t.label)+'</button>').join('')
           + '</div>' : '')
       + '</div>';
-    if(s === 'overview') html += renderOverview();
+    const beta = BETA_SCREENS[s+'/'+tab];
+    if(beta) html += beta();
+    else if(s === 'overview') html += renderOverview();
     else if(s === 'work' || s === 'findings') html += renderLane(s, tab);
     else if(s === 'audit') html += renderAudit(tab);
     else html += placeholder(nav, nav.tabs.find(t=>t.id===tab));
@@ -2529,6 +2690,7 @@ function closeDrawer(){
 /* ---- one delegated handler for the whole document ---- */
 function handle(el, e){
   const act = el.getAttribute('data-act');
+  if(act && BETA_ACT[act]){ BETA_ACT[act](el, e); return true; }
   if(act){
     if(act === 'sort'){
       const k = el.dataset.key, c = el.dataset.col, cur = state.sort[k];
@@ -2660,6 +2822,729 @@ document.addEventListener('keydown', e=>{
     else if(e.key === 'Enter' && searchHits[searchCursor]){ e.preventDefault(); openHit(searchHits[searchCursor]); }
   }
 });
+
+/* BETA-SCREENS:BEGIN */
+/* ==========================================================================
+   BETA · SCREENS ON THE MAIN DASHBOARD'S OWN LOADERS
+   Every number below comes from a function or store of index.html, reached through
+   window.BETA_API (see the loader). Nothing is re-derived here except layout: where a
+   main-dashboard function mixes its calculation with DOM writes, the calculation is
+   repeated line for line and the source line range is cited next to it.
+   ========================================================================== */
+const API = () => window.BETA_API;
+const BS = { pg:{}, ataLevel:'2', ataY:TODAY.getFullYear(), ataM:TODAY.getMonth()+1, k2g:'nature',
+             rsTab:'f088', rsSF:'all', rsQ:'', osrForm:'', osrSF:'all', osrOu:'', afForm:'',
+             docType:null, docSt:'', docRev:'', docQ:'', usersF:'all', fbMsg:'' };
+const LAZY = {};
+function betaResetLazy(){ Object.keys(LAZY).forEach(k => delete LAZY[k]); }
+const IS_ADMIN = () => !!(REAL && REAL.user && REAL.user.role === 'admin');
+
+/* Run a main-dashboard loader once; re-render the screen when it settles. The main loaders
+   swallow their own errors (toast + flag stays false), so "settled but not ready" is an error
+   too, and it is reported with the loader's own last error toast. */
+function lazy(key, run, ready){
+  if(ready()) return 'ready';
+  const L = LAZY[key];
+  if(L && L.err) return 'error';
+  if(L) return 'loading';
+  const here = location.hash;
+  LAZY[key] = {};
+  Promise.resolve().then(run).then(v => {
+    LAZY[key].value = v;
+    if(!ready()){
+      const t = API().toasts().filter(x => x.kind === 'err').pop();
+      LAZY[key].err = t ? t.m : 'The loader finished without data.';
+    }
+  }).catch(e => { LAZY[key].err = e && e.message ? e.message : String(e); })
+    .then(() => { if(location.hash === here) render(); });
+  return 'loading';
+}
+function lazyState(key, run, ready, what){
+  const st = lazy(key, run, ready);
+  if(st === 'ready') return null;
+  if(st === 'error') return cardMsg('Could not load '+what, LAZY[key].err, key);
+  return cardMsg('Loading '+what+'…', 'Fetching from Galileo through the main dashboard\'s own loader.', null, true);
+}
+function cardMsg(title, body, retryKey, spin){
+  return '<section class="sec"><div class="card"><div class="empty">'
+    + (spin ? '<div class="beta-boot-spin" aria-hidden="true"></div>' : ic('layers',28,'dim'))
+    + '<h3>'+esc(title)+'</h3><p class="t-sub">'+esc(body || '')+'</p>'
+    + (retryKey ? '<button class="btn" type="button" data-act="bretry" data-k="'+esc(retryKey)+'">Retry</button>' : '')
+    + '</div></div></section>';
+}
+
+/* ---- small building blocks, all on the design's own classes ---- */
+function card(title, sub, body, pad){
+  return '<div class="card"><div class="card-head"><h2>'+esc(title)+'</h2>'
+    + (sub ? '<span class="t-small dim od-fill">'+sub+'</span>' : '') + '</div>'
+    + (pad === false ? body : '<div class="card-pad" style="display:grid;gap:14px">'+body+'</div>') + '</div>';
+}
+function stat(label, value, note, alarm, wrap){
+  return '<div class="kpi'+(alarm?' alarm':'')+'" style="cursor:default">'
+    + '<span class="kpi-lbl">'+esc(label)+'</span><span class="kpi-val '+(wrap ? 'beta-wrap' : 'od-nowrap')+'">'+esc(value)+'</span>'
+    + '<span class="kpi-foot"><span class="kpi-note">'+esc(note || '')+'</span></span></div>';
+}
+const tiles = list => '<section class="sec"><div class="kpi-grid">'+list.join('')+'</div></section>';
+function segs(key, opts, cur){
+  return '<div class="od-row" role="group" style="--od-gap:6px;flex-wrap:wrap">' + opts.map(o =>
+    '<button class="btn'+(String(cur)===String(o[0])?' primary':'')+'" type="button" data-act="bset" data-k="'+key+'" data-v="'+esc(o[0])+'"'
+    + ' aria-pressed="'+(String(cur)===String(o[0]))+'">'+esc(o[1])+'</button>').join('') + '</div>';
+}
+function sel(key, opts, cur, label){
+  return '<label class="od-row t-small beta-sel" style="--od-gap:6px">'+(label?'<span class="dim">'+esc(label)+'</span>':'')
+    + '<select class="ctl" data-bset="'+key+'">' + opts.map(o =>
+      '<option value="'+esc(o[0])+'"'+(String(cur)===String(o[0])?' selected':'')+'>'+esc(o[1])+'</option>').join('')
+    + '</select></label>';
+}
+function searchBox(key, cur, ph){
+  return '<input class="ctl" type="search" data-bset="'+key+'" value="'+esc(cur||'')+'" placeholder="'+esc(ph||'Search')+'" style="min-width:min(220px,100%)">';
+}
+/* A plain table: cols = [{l, ar?}], rows = arrays of cell HTML. Paged like the design's lanes. */
+function plainTable(key, cols, rows, size, minW){
+  size = size || 25;
+  if(!rows.length) return '<div class="empty"><h3>No records</h3><p class="t-sub">Nothing matches the current filters.</p></div>';
+  const pages = Math.max(1, Math.ceil(rows.length/size));
+  const p = Math.min(BS.pg[key] || 1, pages);
+  const head = cols.map(c => '<th scope="col"'+(c.ar?' class="ar"':'')+'>'+esc(c.l)+'</th>').join('');
+  const body = rows.slice((p-1)*size, p*size).map(r => '<tr>'+r.map((cell,i) =>
+    '<td data-l="'+esc(cols[i].l)+'"'+(i===0?' class="t-main"':(cols[i].ar?' class="ar"':''))+'>'+cell+'</td>').join('')+'</tr>').join('');
+  let pager = '';
+  if(pages > 1){
+    pager = '<div class="pg">'
+      + '<button type="button" data-act="bpage" data-k="'+key+'" data-p="'+(p-1)+'"'+(p===1?' disabled':'')+' aria-label="Previous page">'+ic('chevron',14,'')+'</button>'
+      + '<button type="button" disabled>'+p+' / '+pages+'</button>'
+      + '<button type="button" data-act="bpage" data-k="'+key+'" data-p="'+(p+1)+'"'+(p===pages?' disabled':'')+' aria-label="Next page">'+ic('chevron',14,'')+'</button></div>';
+  }
+  /* many columns: keep a readable minimum and scroll inside the card (phones reflow to cards) */
+  return '<div class="tbl-wrap"><table class="tbl'+(minW ? ' beta-minw' : '')+'"'+(minW ? ' style="--beta-minw:'+minW+'px"' : '')+'><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>'
+    + '<div class="tbl-foot"><span class="t-small dim">Showing '+((p-1)*size+1)+'–'+Math.min(p*size, rows.length)+' of '+rows.length+'</span>'+pager+'</div>';
+}
+function barList(items, hotKey){
+  const max = Math.max(1, ...items.map(x => x.n));
+  return '<div class="bars">' + items.map(x =>
+    '<div class="bar-row" style="cursor:default"><span class="od-truncate t-small">'+esc(x.k)+'</span>'
+    + '<span class="bar-track"><span class="bar-fill'+(x.k===hotKey?' hot':'')+'" style="width:'+(x.n/max*100)+'%"></span></span>'
+    + '<span class="num strong od-nowrap">'+x.n+(x.sub?' <span class="dim t-small">'+esc(x.sub)+'</span>':'')+'</span></div>').join('') + '</div>';
+}
+/* main-dashboard date text: UTC date part (the fd() rule — T17:00Z is Vietnam midnight) */
+function fdx(v){
+  if(!v) return '—';
+  const s = String(v); const d = /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0,10) : '';
+  if(!d) return esc(s);
+  return fmtDate(new Date(+d.slice(0,4), +d.slice(5,7)-1, +d.slice(8,10)));
+}
+/* The global Year × Month filter, applied to a raw date string (raised_date) */
+function inPeriod(v){
+  const f = state.filters;
+  if(!f.years.length && !f.months.length) return true;
+  if(!v) return false;
+  /* local calendar, like raised_year = new Date(raised_date).getFullYear() in loadData */
+  const d = new Date(v); if(isNaN(d)) return false;
+  const y = d.getFullYear(), m = d.getMonth();
+  if(f.years.length && !f.years.includes(y)) return false;
+  if(f.months.length && !f.months.includes(m)) return false;
+  return true;
+}
+const statusChip = s => chip(s || '—');
+/* Second pass not finished (or failed): screens that need CMR-CAR / ECAR / KPI 7 say so
+   instead of showing zeros — "not loaded is not zero" (index.html 6272–6277). */
+function partialMsg(what){
+  return REAL.partialError
+    ? cardMsg(what+' could not be loaded', REAL.partialError+' Reload the page to retry.')
+    : cardMsg('Loading '+what+'…', 'The rest of the dashboard is ready; this part is still coming from Galileo.', null, true);
+}
+const whenFull = (what, fn) => () => REAL.partial ? partialMsg(what) : fn();
+
+/* ==========================================================================
+   ANALYTICS · KPI CHARTS  (index.html page-kpi)
+   ========================================================================== */
+function scrKpi(){
+  const A = API();
+  const data = A.allData().filter(r => inPeriod(r.raised_date));
+  /* buildKPICharts, index.html 4754–4768 */
+  const CLOSED_S = ['On-time Closed','Lately Closed'];
+  const tot = data.length;
+  const open = data.filter(r => r.semantic_status === 'Open').length;
+  const over = data.filter(r => r.semantic_status === 'Overdue').length;
+  const onTime = data.filter(r => r.semantic_status === 'On-time Closed').length;
+  const closed = data.filter(r => CLOSED_S.includes(r.semantic_status)).length;
+  const cat3 = data.filter(r => r.overdue_cat === 'CAT III').length;
+  const audits = new Set(data.map(r => r.audit_id).filter(Boolean)).size;
+  let html = tiles([
+    stat('Total records', String(tot), periodLabel()),
+    stat('Open', String(open), 'semantic status Open'),
+    stat('Overdue', String(over), 'past target date', over > 0),
+    stat('On-time rate', closed > 0 ? Math.round(onTime/closed*100)+'%' : '—', onTime+' of '+closed+' closed'),
+    stat('CAT III', String(cat3), 'overdue > 60 days', cat3 > 0),
+    stat('Audits', String(audits), 'distinct audits behind these records')
+  ]);
+
+  /* KPI 2 volume card, buildKPI2 5227–5277 (kpi2Rows = MCAR + AMO ECAR of allData) */
+  const k2 = lazyState('kpi2', () => A.loadKpi2(), () => A.kpi2().loaded, 'KPI 2 data');
+  let k2body;
+  if(k2) k2body = '<p class="t-sub dim">Loading Nature of finding…</p>';
+  else {
+    const rows = A.kpi2().rows.filter(r => inPeriod(r.raised_date));
+    const grp = {};
+    rows.forEach(r => (r.natureGroups.length ? r.natureGroups : ['(none)']).forEach(g => {
+      (grp[g] ||= { mcar:0, amo:0 })[r.type]++; }));
+    const keys = Object.keys(grp).filter(g => g !== '(none)')
+      .sort((a,b) => (grp[b].amo+grp[b].mcar) - (grp[a].amo+grp[a].mcar)).slice(0,12);
+    const totM = rows.filter(r => r.type === 'mcar').length, totA = rows.filter(r => r.type === 'amo').length;
+    k2body = '<div class="od-row" style="--od-gap:16px;align-items:baseline"><span class="kpi-val">'
+      + (totA > 0 ? Math.round(totM/totA*100)+'%' : 'N/A') + '</span><span class="t-small dim">MCAR '+totM+' ÷ AMO-ECAR '+totA+'</span></div>'
+      + plainTable('k2vol', [{l:'Nature group'},{l:'MCAR',ar:true},{l:'AMO-ECAR',ar:true},{l:'Rate',ar:true}],
+          keys.map(g => ['<span class="t-small">'+esc(g)+'</span>', '<span class="num">'+grp[g].mcar+'</span>',
+            '<span class="num">'+grp[g].amo+'</span>', '<span class="num strong">'+(grp[g].amo > 0 ? Math.round(grp[g].mcar/grp[g].amo*100)+'%' : '—')+'</span>']), 12);
+  }
+
+  /* KPI 7 by section, kpi7Stats 6191 + renderKpi7 6267 (rate withheld while any row is pending) */
+  if(REAL.partial) return html + '<section class="sec cols cols-2">'
+    + card('KPI 2 · MCAR ÷ AMO-ECAR', 'volume ratio by Nature of finding · '+esc(periodLabel()), k2body) + '</section>'
+    + partialMsg('KPI 7 and the ATA comparison');
+  const st = A.kpi7Stats(r => inPeriod(r.raised_date));
+  const rowRate = r => (r.total && !r.pending) ? A.kpi7Rate(r) : null;
+  const k7rows = st.order.map(k => st.rows[k]).map(r => [
+    '<span class="t-small">'+esc(r.key === '__unassigned__' ? 'Unassigned owner' : r.key)+'</span>',
+    '<span class="num">'+r.assessed+'</span>', '<span class="num">'+r.notAssessed+'</span>',
+    '<span class="num">'+r.closed+'</span>', '<span class="num">'+r.total+'</span>',
+    '<span class="num strong">'+A.kpi7Fmt(rowRate(r))+'</span>']);
+  k7rows.push(['<span class="strong">TOTAL — MQA</span>', '<span class="num strong">'+st.tot.assessed+'</span>',
+    '<span class="num strong">'+st.tot.notAssessed+'</span>', '<span class="num strong">'+st.tot.closed+'</span>',
+    '<span class="num strong">'+st.tot.total+'</span>', '<span class="num strong">'+A.kpi7Fmt(rowRate(st.tot))+'</span>']);
+  const lags = st.tot.lags.slice().sort((a,b) => a-b);
+  const k7note = st.tot.total ? st.tot.assessed+' / '+st.tot.total+' assessed · '+st.tot.notAssessed+' with no verification round'
+    + (lags.length ? ' · median '+lags[Math.floor(lags.length/2)]+'d to first verification' : '')
+    + (st.tot.withdrawn ? ' · '+st.tot.withdrawn+' withdrawn excluded' : '') : 'no PAVOI in this period';
+
+  html += '<section class="sec cols cols-2">'
+    + card('KPI 2 · MCAR ÷ AMO-ECAR', 'volume ratio by Nature of finding · '+esc(periodLabel()), k2body)
+    + card('KPI 7 · PAVOI assessed', esc(k7note),
+        plainTable('k7', [{l:'Section'},{l:'Assessed',ar:true},{l:'No verif.',ar:true},{l:'Closed',ar:true},{l:'Total',ar:true},{l:'KPI %',ar:true}], k7rows, 10))
+    + '</section>';
+  html += '<section class="sec">'+scrAta()+'</section>';
+  return html;
+}
+
+/* KPI QC — ATA comparison, renderATACompare 4839–4978 */
+function scrAta(){
+  const A = API();
+  const q = lazyState('qcs', () => A.loadQcs(), () => A.qcs().loaded, 'QC Spot Check findings');
+  const years = [...new Set(A.cmrData().concat(A.ecarData()).map(r => r.raised_year).filter(Boolean).concat([TODAY.getFullYear()]))].sort((a,b)=>b-a);
+  const ctl = '<div class="od-row" style="--od-gap:12px;flex-wrap:wrap">'
+    + sel('ataLevel', [['2','ATA 2-digit'],['4','ATA 4-digit'],['6','ATA 6-digit']], BS.ataLevel, 'Level')
+    + sel('ataY', years.map(y => [y, y]), BS.ataY, 'Year')
+    + sel('ataM', MONTHS_SHORT.map((m,i) => [i+1, m]), BS.ataM, 'Month') + '</div>';
+  if(q) return card('KPI QC · ATA comparison', 'internal findings (month N−1) ÷ ECAR (month N)', ctl + '<p class="t-sub dim">Loading QC Spot Check / QC PI findings…</p>');
+  const Y = +BS.ataY, M = +BS.ataM, level = +BS.ataLevel, pad = n => String(n).padStart(2,'0');
+  const denYM = Y+'-'+pad(M), numYM = M === 1 ? (Y-1)+'-12' : Y+'-'+pad(M-1);
+  const ymOf = d => String(d || '').slice(0,7);
+  const cmrQcRep = A.cmrData().filter(r => ymOf(r.raised_date) === numYM && r.category_id === A.QC_CAT_UUID);
+  const ecarRep = A.ecarData().filter(r => ymOf(r.raised_date) === denYM);
+  const num = {}, den = {};
+  const add = (m, raw) => { const a = A.normalizeATA(raw, level); m[a] = (m[a] || 0) + 1; };
+  cmrQcRep.forEach(r => (r.findingRows && r.findingRows.length) ? r.findingRows.forEach(fr => add(num, fr.ata || r.ata_chapter)) : add(num, r.ata_chapter));
+  A.qcsFindingList().filter(f => f.title === A.QCPI_TITLE && f.ym === numYM).forEach(f => add(num, f.ata));
+  ecarRep.forEach(r => (r.findingRows && r.findingRows.length) ? r.findingRows.forEach(fr => add(den, fr.ata || r.ata_chapter)) : add(den, r.ata_chapter));
+  const keys = [...new Set(Object.keys(num).concat(Object.keys(den)))].filter(k => k !== 'Other')
+    .sort((a,b) => ((num[b]||0)+(den[b]||0)) - ((num[a]||0)+(den[a]||0)));
+  /* cell(), 4925 — headline and TOTAL row come from the same call (rule 11) */
+  const cell = (n, d) => d > 0 ? { ratio:(n/d).toFixed(2), a: n >= d ? 'Effective' : n > 0 ? 'Under' : 'Missed' }
+                               : { ratio: n > 0 ? '∞' : '0', a: n > 0 ? 'Over-detect' : 'no data' };
+  const totN = keys.reduce((s,k) => s + (num[k]||0), 0), totD = keys.reduce((s,k) => s + (den[k]||0), 0);
+  const tc = cell(totN, totD);
+  const lab = k => level === 2 && A.ATA_LABELS[k] ? k+' · '+A.ATA_LABELS[k] : k;
+  const rows = [['<span class="strong">TOTAL</span>', '<span class="num strong">'+totN+'</span>', '<span class="num strong">'+totD+'</span>',
+                 '<span class="num strong">'+tc.ratio+'</span>', '<span class="tag">'+esc(tc.a)+'</span>']]
+    .concat(keys.map(k => { const c = cell(num[k]||0, den[k]||0);
+      return ['<span class="t-small">'+esc(lab(k))+'</span>', '<span class="num">'+(num[k]||0)+'</span>', '<span class="num">'+(den[k]||0)+'</span>',
+              '<span class="num">'+c.ratio+'</span>', '<span class="tag">'+esc(c.a)+'</span>']; }));
+  if((num.Other||0) + (den.Other||0) > 0)
+    rows.push(['<span class="dim t-small">No-ATA / non-numeric</span>', '<span class="num dim">'+(num.Other||0)+'</span>', '<span class="num dim">'+(den.Other||0)+'</span>', '<span class="dim">—</span>', '<span class="dim">N/A</span>']);
+  return card('KPI QC · ATA comparison', 'Internal '+totN+' ÷ ECAR '+totD+' = <span class="strong">'+tc.ratio+'</span> · '+numYM+' ÷ '+denYM
+      + ' · sources: CMR-CAR QC '+cmrQcRep.length+', ECAR '+ecarRep.length,
+    ctl + plainTable('ata', [{l:'ATA chapter'},{l:'Internal (N−1)',ar:true},{l:'ECAR (N)',ar:true},{l:'Ratio',ar:true},{l:'Assessment'}], rows, 15));
+}
+
+/* ==========================================================================
+   ANALYTICS · EARLY DETECTION (KPI 2)  (index.html page-kpi2, renderKpi2 5341–5370)
+   ========================================================================== */
+function scrEarly(){
+  const A = API();
+  const w = lazyState('kpi2', () => A.loadKpi2(), () => A.kpi2().loaded, 'KPI 2 data');
+  if(w) return w;
+  const all = A.kpi2().rows;
+  const rows = all.filter(r => inPeriod(r.raised_date));
+  const ecarRows = rows.filter(r => r.type === 'amo');
+  const mcarPool = all.filter(r => r.type === 'mcar');           /* ALL years, not period-filtered (5349) */
+  const early = new Set(ecarRows.filter(r => A.isEarlyDetected(r, mcarPool)).map(r => r.report_id));
+  const den = ecarRows.length, num = early.size;
+  const keysOf = r => BS.k2g === 'nature' ? (r.natureGroups.length ? r.natureGroups : ['(none)'])
+    : BS.k2g === 'quarter' ? [A.k2quarter(r.raised_date)] : BS.k2g === 'year' ? [String(r.raised_year || '(none)')] : [r.scope || '(none)'];
+  const groups = {};
+  ecarRows.forEach(r => keysOf(r).forEach(k => { const g = (groups[k] ||= { tot:0, m:0 }); g.tot++; if(early.has(r.report_id)) g.m++; }));
+  const keys = Object.keys(groups).sort((a,b) => groups[b].tot - groups[a].tot);
+  return tiles([
+      stat('Early-detection rate', den > 0 ? Math.round(num/den*100)+'%' : 'N/A', 'AMO-ECAR already found by an earlier MCAR'),
+      stat('Detected early', String(num), 'AMO-ECAR with a matching earlier MCAR'),
+      stat('AMO-ECAR total', String(den), periodLabel())
+    ])
+    + '<section class="sec">' + card('Early detection by group',
+        'match = earlier MCAR sharing a Nature group, or finding text overlap ≥ 50%',
+        segs('k2g', [['nature','Nature of finding'],['scope','Audit scope'],['quarter','Quarter'],['year','Year']], BS.k2g)
+        + plainTable('k2', [{l:'Group'},{l:'Detected early',ar:true},{l:'AMO-ECAR total',ar:true},{l:'Rate',ar:true}],
+            keys.map(k => ['<span class="t-small">'+esc(k)+'</span>', '<span class="num">'+(groups[k].m || '—')+'</span>',
+              '<span class="num">'+groups[k].tot+'</span>', '<span class="num strong">'+Math.round(groups[k].m/groups[k].tot*100)+'%</span>']))) + '</section>';
+}
+
+/* ==========================================================================
+   ANALYTICS · SAFETY (MSAG)  (loadSafety 8965, buildSafetyTable 9000)
+   ========================================================================== */
+function scrSafety(){
+  const A = API();
+  const w = lazyState('safety', () => A.loadSafety(), () => A.safety().loaded, 'MSAG report status');
+  if(w) return w;
+  const d = A.safety().data, all = [...d.line, d.base, d.workshop];
+  const t = all.reduce((a,r) => ({osrC:a.osrC+r.osrC, osrO:a.osrO+r.osrO, osrT:a.osrT+r.osrT, mosrC:a.mosrC+r.mosrC, mosrO:a.mosrO+r.mosrO, mosrT:a.mosrT+r.mosrT}),
+    {osrC:0, osrO:0, osrT:0, mosrC:0, mosrO:0, mosrT:0});
+  const n = v => '<span class="num">'+v+'</span>', o = v => v > 0 ? '<span class="num red strong">'+v+'</span>' : '<span class="num dim">0</span>';
+  const row = r => ['<span class="t-small">'+esc(r.coruson)+'</span>', n(r.osrC), o(r.osrO), n(r.osrT), n(r.mosrC), o(r.mosrO), n(r.mosrT)];
+  const head = l => ['<span class="t-micro">'+esc(l)+'</span>','','','','','',''];
+  const rows = [head('Line MSAG')].concat(d.line.map(row), [head('Base MSAG'), row(d.base), head('Workshop MSAG'), row(d.workshop),
+    ['<span class="strong">Total of report</span>', n(t.osrC), o(t.osrO), n(t.osrT), n(t.mosrC), o(t.mosrO), n(t.mosrT)]]);
+  return tiles([
+      stat('Total reports', (t.osrT + t.mosrT).toLocaleString('en-US'), 'OSR '+t.osrT+' · MOSR '+t.mosrT),
+      stat('OSR', t.osrT.toLocaleString('en-US'), 'Closed '+t.osrC+' · Open '+t.osrO),
+      stat('MOSR', t.mosrT.toLocaleString('en-US'), 'Closed '+t.mosrC+' · Open '+t.mosrO),
+      stat('Open reports', String(t.osrO + t.mosrO), 'awaiting action', (t.osrO + t.mosrO) > 0)
+    ])
+    + '<section class="sec">' + card('MSAG report status', 'OSR / MOSR owned by an MSAG group · loaded '+esc(d.updated),
+      plainTable('safety', [{l:'Group on Coruson'},{l:'OSR closed',ar:true},{l:'OSR open',ar:true},{l:'OSR total',ar:true},{l:'MOSR closed',ar:true},{l:'MOSR open',ar:true},{l:'MOSR total',ar:true}], rows, 40))
+    + '</section>';
+}
+
+/* ==========================================================================
+   ANALYTICS · SPI  (loadSPI 11467, spiEvaluate 11523, renderSPIPage 11570)
+   ========================================================================== */
+function spiChart(spi){
+  const W = 320, H = 120, L = 28, R = 8, T = 10, B = 20;
+  const rates = spi.months.map(m => m.rate), spt = spi.sptApproved;
+  const vals = rates.filter(v => v != null).concat(spt != null ? [spt] : []);
+  const max = Math.max(1, ...vals) * 1.15, iw = W-L-R, ih = H-T-B;
+  const x = i => L + i/11*iw, y = v => T + ih - (v/max)*ih;
+  let path = '', pts = '';
+  rates.forEach((v,i) => {
+    if(v == null) return;
+    path += (path && rates[i-1] != null ? ' L ' : ' M ') + x(i).toFixed(1)+' '+y(v).toFixed(1);
+    /* drawSPIChart 11633–11637: red when worse than SPT for the direction */
+    const ok = spt == null ? true : spi.direction === 'higher' ? v >= spt : v <= spt;
+    pts += '<circle cx="'+x(i).toFixed(1)+'" cy="'+y(v).toFixed(1)+'" r="3" fill="'+(ok ? 'var(--text-2)' : 'var(--accent)')+'"><title>Month '+(i+1)+': '+v+'</title></circle>';
+  });
+  const sptLine = spt != null ? '<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y(spt).toFixed(1)+'" y2="'+y(spt).toFixed(1)+'" stroke="var(--accent)" stroke-width="1.2" stroke-dasharray="4 3"/>' : '';
+  const xl = [0,3,6,9,11].map(i => '<text x="'+x(i).toFixed(1)+'" y="'+(H-5)+'" font-size="10" text-anchor="middle" fill="var(--text-3)" font-family="ui-monospace,monospace">'+(i+1)+'</text>').join('');
+  return '<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Monthly SPI rate against the CAAV-approved SPT">'
+    + '<line x1="'+L+'" x2="'+(W-R)+'" y1="'+(T+ih)+'" y2="'+(T+ih)+'" stroke="var(--hairline)"/>' + sptLine
+    + '<path d="'+path+'" fill="none" stroke="var(--text-2)" stroke-width="1.8"/>' + pts + xl + '</svg>';
+}
+function scrSpi(){
+  const A = API();
+  const w = lazyState('spi', () => A.loadSPI(), () => !!(LAZY.spi && LAZY.spi.value), 'SPI forms');
+  if(w) return w;
+  const all = LAZY.spi.value || [];
+  const f = state.filters;
+  const list = all.filter(s => !f.years.length || f.years.includes(s.raised_year));
+  if(!list.length) return cardMsg('No SPI forms in the selected years', all.length ? all.length+' SPI forms exist in other years — widen the Year filter.' : 'No AMO - SPI report was found.');
+  const ev = list.map(A.spiEvaluate);
+  const tracking = list.filter(s => s.months.some(m => m.rate != null)).length;
+  const cOn = ev.filter(e => e.status !== 'na' && e.currentLevel === 0).length;
+  const c1 = ev.filter(e => e.currentLevel === 1).length, c2 = ev.filter(e => e.currentLevel === 2).length, c3 = ev.filter(e => e.currentLevel >= 3).length;
+  const h1 = ev.reduce((s,e) => s+e.hist.l1, 0), h2 = ev.reduce((s,e) => s+e.hist.l2, 0), h3 = ev.reduce((s,e) => s+e.hist.l3, 0);
+  const cards = list.map((spi, i) => {
+    const e = ev[i];
+    const badge = e.status === 'na' ? '<span class="tag">No data</span>'
+      : e.currentLevel >= 1 ? '<span class="cat c'+Math.min(3, e.currentLevel)+'">Trigger level '+Math.min(3, e.currentLevel)+'</span>'
+      : '<span class="chip s-ontime">'+mark('On-time Closed')+'On target</span>';
+    return '<div class="card"><div class="card-head"><h2 class="od-truncate">'+esc(spi.title || spi.number)+'</h2>'+badge+'</div>'
+      + '<div class="card-pad" style="display:grid;gap:8px"><span class="t-small dim">'+esc(spi.number)
+      + ' · SPT (CAAV) '+esc(spi.sptApproved ?? '—')+' · previous year '+esc(spi.prevYear ?? '—')+' · '+(spi.direction === 'higher' ? 'higher' : 'lower')+' is better</span>'
+      + spiChart(spi) + (spi.remark ? '<span class="t-small">'+esc(spi.remark)+'</span>' : '') + '</div></div>';
+  }).join('');
+  return tiles([
+      stat('Total SPIs', String(list.length), 'all indicators'),
+      stat('Tracking', String(tracking), 'with monthly data'),
+      stat('Current trigger', 'L1 '+c1+' · L2 '+c2+' · L3 '+c3, cOn+' on target · latest month', c1+c2+c3 > 0, true),
+      stat('Trigger history', 'L1 '+h1+' · L2 '+h2+' · L3 '+h3, 'episodes in the year', false, true)
+    ]) + '<section class="sec beta-cards">'+cards+'</section>';
+}
+
+/* ==========================================================================
+   ANALYTICS · EVENT/IR REPORT STATUS  (loadRptStatus 9221, RS_COLS 9190, TECHNICAL_REFERENCE §8)
+   ========================================================================== */
+function scrStatus(){
+  const A = API();
+  const w = lazyState('rs', () => A.loadRptStatus(), () => A.rptStatus().loaded, 'EIS / F-088 report status');
+  if(w) return w;
+  const all = (A.rptStatus().rows || {})[BS.rsTab] || [];
+  const f = state.filters;
+  const scope = all.filter(r => !f.years.length || f.years.includes(+r.year));
+  const q = BS.rsQ.trim().toLowerCase();
+  const rows = scope.filter(r => BS.rsSF === 'all' || (BS.rsSF === 'open' ? r.open : !r.open))
+    .filter(r => !q || [r.num, r.subject, r.owner, r.links.join(' ')].join(' ').toLowerCase().includes(q));
+  const cnt = fn => scope.filter(fn).length;
+  const isEis = BS.rsTab === 'eis';
+  const cols = [{l:'Report'},{l:'Incharge person'},{l:'Completion on Coruson'},{l:'Workflow / add task'},{l:'Linked report'},{l:'Final report'},{l:'Status'}]
+    .concat(isEis ? [{l:'PAVOI'}] : []);
+  const body = rows.map(r => {
+    const gaps = A.rsDone(r) ? '<span class="chip s-ontime">'+mark('On-time Closed')+'Completed</span>'
+      : '<span class="chip s-overdue">'+mark('Overdue')+'Not completed</span><br>' + A.rsGaps(r).map(g => '<span class="t-small"><span class="strong">'+esc(g.k)+'</span> — '+esc(g.d)+'</span>').join('<br>');
+    const wf = (A.rsOkF(r) ? 'Satis' : '<span class="red strong">Unsatis</span>') + '<br><span class="t-small dim">'
+      + esc((r.rfi + r.task) > 0 ? r.rfi+' RFI · '+r.task+' Task' : (r.stage || 'no stage')) + '</span>';
+    const files = A.rsOkH(r) ? 'Uploaded<br><span class="t-small dim">'+r.files.length+' file(s)</span>' : '<span class="red strong">Miss final report</span>';
+    const cells = ['<span class="row-main"><span class="row-id">'+esc(r.num)+'</span><span class="row-sub od-clamp-2">'+esc(r.subject)+'</span></span>',
+      '<span class="t-small">'+esc(r.owner || '—')+'</span>', gaps, wf,
+      '<span class="t-small">'+(r.links.length ? r.links.map(esc).join('<br>') : '—')+'</span>', files, statusChip(r.status === 'Closed' ? 'Closed' : 'Open')];
+    if(isEis) cells.push('<span class="t-small">'+esc(r.links.filter(x => /^PAVOI/i.test(x)).join(', ') || '—')+'</span>');
+    return cells;
+  });
+  const done = cnt(r => A.rsDone(r)), n = scope.length;
+  return tiles([
+      stat('Completed on Coruson', done+' / '+n, 'fill + workflow + final report', done < n),
+      stat('Fill information', cnt(r => A.rsOkE(r))+' / '+n, 'every input cell filled'),
+      stat('Workflow', cnt(r => A.rsOkF(r))+' / '+n, 'RFI or Task, or stage completed'),
+      stat('Final report', cnt(r => A.rsOkH(r))+' / '+n, 'file in tab REPORT'),
+      stat('Linked', cnt(r => r.links.length > 0)+' / '+n, 'evaluation / linked report'),
+      stat('Open', String(cnt(r => r.open)), 'status on Coruson')
+    ])
+    + '<section class="sec">' + card('Report status on Coruson', 'Coruson is the source of truth. Evidence in the WORKFLOW tab is not exposed by Coruson — check it manually (SOP QT-002 §9).',
+      '<div class="od-row" style="--od-gap:12px;flex-wrap:wrap">'
+      + segs('rsTab', [['f088','F-088'],['eis','EIS']], BS.rsTab) + segs('rsSF', [['all','All'],['open','Open'],['closed','Closed']], BS.rsSF)
+      + searchBox('rsQ', BS.rsQ, 'Search number, title, owner, link') + '</div>'
+      + plainTable('rs-'+BS.rsTab, cols, body, 20, 1080)) + '</section>';
+}
+
+/* ==========================================================================
+   FINDINGS · ALL FORMS (every report type) and OSR / MOSR
+   ========================================================================== */
+function scrAllForms(){
+  const titles = [...new Set(REPORTS.map(r => r.code))].sort();
+  const cfg = { cols:['number','form','status','owner','raised','target','dtd','cat'],
+                rows: rs => BS.afForm ? rs.filter(r => r.code === BS.afForm) : rs };
+  let rows = cfg.rows(scoped());
+  if(state.cat) rows = rows.filter(r => r.cat === state.cat);
+  return '<section class="sec"><div class="card"><div class="card-head"><h2>All forms</h2>'
+    + '<span class="t-small dim od-fill">Every report type the dashboard loads — '+titles.length+' forms. The tabs above keep the five finding forms with their own columns.</span>'
+    + sel('afForm', [['','All forms']].concat(titles.map(t => [t, t])), BS.afForm) + '</div>'
+    + tableHTML('findings/all'+(BS.afForm ? '/'+BS.afForm : ''), cfg, rows) + '</div></section>';
+}
+function scrOsr(){
+  const A = API();
+  const w = lazyState('osr', () => A.loadOsr(), () => A.osr().loaded, 'OSR / MOSR');
+  if(w) return w;
+  const all = A.osr().rows;
+  const ous = [...new Set(all.map(r => r.org_unit_name).filter(Boolean))].sort();
+  const q = (state.rowQuery || '').toLowerCase();
+  const rows = all.filter(r => inPeriod(r.raised_date))
+    .filter(r => !BS.osrForm || r.report_title === BS.osrForm)
+    .filter(r => BS.osrSF === 'all' || r.report_status === BS.osrSF)
+    .filter(r => !BS.osrOu || r.org_unit_name === BS.osrOu)
+    .filter(r => !q || [r.report_number, r.report_title, r.org_unit_name, r.report_status].join(' ').toLowerCase().includes(q))
+    .sort((a,b) => String(b.raised_date).localeCompare(String(a.raised_date)));
+  const open = rows.filter(r => r.report_status === 'Open').length;
+  return tiles([
+      stat('OSR / MOSR', String(rows.length), periodLabel()),
+      stat('OSR', String(rows.filter(r => r.report_title === '1. OSR').length), 'form 1. OSR'),
+      stat('MOSR', String(rows.filter(r => r.report_title === 'MOSR').length), 'form MOSR'),
+      stat('Open', String(open), 'status on Coruson', open > 0)
+    ])
+    + '<section class="sec">' + card('OSR / MOSR — AMO + QA AMO', 'every non-archived unit under AMO and MQA : QA AMO · Open/Closed from report status (no Overdue is derived)',
+      '<div class="od-row" style="--od-gap:12px;flex-wrap:wrap">'
+      + segs('osrSF', [['all','All'],['Open','Open'],['Closed','Closed']], BS.osrSF)
+      + sel('osrForm', [['','OSR + MOSR'],['1. OSR','1. OSR'],['MOSR','MOSR']], BS.osrForm)
+      + sel('osrOu', [['','All org units']].concat(ous.map(o => [o, o])), BS.osrOu) + '</div>'
+      + plainTable('osr', [{l:'Report'},{l:'Form'},{l:'Status'},{l:'Raised'},{l:'Org unit'},{l:'Last modified'}],
+          rows.map(r => ['<span class="row-id">'+esc(r.report_number)+'</span>', '<span class="tag">'+esc(r.report_title)+'</span>',
+            statusChip(r.report_status === 'Closed' ? 'Closed' : r.report_status), '<span class="num">'+fdx(r.raised_date)+'</span>',
+            '<span class="t-small">'+esc(r.org_unit_name || '—')+'</span>', '<span class="num dim">'+fdx(r.modified_date)+'</span>']), 25, 720)) + '</section>';
+}
+
+/* ==========================================================================
+   AUDIT PLAN · BOTTLENECK  (loadStageAggregate 7715, renderBottleneckPanel 7754)
+   ========================================================================== */
+function scrBottleneck(){
+  const A = API();
+  const w = lazyState('stages', () => A.loadStages(), () => !!A.stages(), 'audit workflow stages');
+  if(w) return w;
+  const agg = A.stages();
+  const list = Object.entries(agg).filter(([,v]) => v.total > 0)
+    .sort((a,b) => (b[1].inprogress + b[1].pendingSignOff) - (a[1].inprogress + a[1].pendingSignOff)).slice(0,12);
+  const maxT = Math.max(1, ...list.map(([,v]) => v.total));
+  const sumT = Object.values(agg).reduce((s,v) => s + v.total, 0);
+  const rows = list.map(([k,v]) => {
+    const p = x => v.total ? x / v.total * 100 : 0;
+    const other = Math.max(0, 100 - p(v.completed) - p(v.inprogress) - p(v.notStarted));
+    return '<div class="bar-row" style="cursor:default;grid-template-columns:minmax(140px,1.2fr) minmax(0,2fr) auto">'
+      + '<span class="t-small od-truncate">'+esc(k)+'</span>'
+      + '<span class="stack" style="width:'+(v.total/maxT*100)+'%" title="completed '+v.completed+' · in progress '+v.inprogress+' · not started '+v.notStarted+'">'
+      + '<span style="width:'+p(v.completed)+'%;background:var(--text-3)"></span><span style="width:'+p(v.inprogress)+'%;background:var(--accent)"></span>'
+      + '<span style="width:'+p(v.notStarted)+'%;background:var(--accent-28)"></span><span style="width:'+other+'%;background:var(--hairline)"></span></span>'
+      + '<span class="num od-nowrap"><span class="strong">'+v.total+'</span> <span class="t-small dim">'+(v.inprogress + v.pendingSignOff)+' active</span></span></div>';
+  }).join('');
+  return '<section class="sec">' + card('Bottleneck analysis', list.length+' stages · '+sumT.toLocaleString('en-US')+' stage records · system-wide aggregate, not filtered by the Audit Plan filters',
+    '<div class="bars">'+rows+'</div><div class="legend">'
+    + '<span class="legend-i"><span class="swatch" style="background:var(--text-3)"></span>Completed</span>'
+    + '<span class="legend-i"><span class="swatch" style="background:var(--accent)"></span>In progress</span>'
+    + '<span class="legend-i"><span class="swatch" style="background:var(--accent-28)"></span>Not started</span>'
+    + '<span class="legend-i"><span class="swatch" style="background:var(--hairline)"></span>Other</span></div>') + '</section>';
+}
+
+/* ==========================================================================
+   LIBRARY · DOCUMENTS and USER GUIDE
+   ========================================================================== */
+function scrDocs(){
+  const A = API();
+  const w = lazyState('docs', () => A.loadDocs(), () => A.docs().data.length > 0, 'controlled documents');
+  if(w) return w;
+  const D = A.docs();
+  const branch = A.getDocsInBranch(BS.docType);
+  const today = new Date();
+  const q = BS.docQ.trim().toLowerCase();
+  const rows = branch.filter(d => !q || (d.document_number+' '+d.document_revision_title+' '+d.owner_name).toLowerCase().includes(q))
+    .filter(d => !BS.docSt || d.document_revision_status === BS.docSt)
+    .filter(d => !BS.docRev || A.reviewDueCategory(d.review_date, today) === BS.docRev);
+  const rev = c => branch.filter(d => A.reviewDueCategory(d.review_date, today) === c).length;
+  /* type tree: roots in the main dashboard's order, children of the selected node */
+  const node = BS.docType ? D.index[BS.docType] : null;
+  const kids = (node ? node.children : D.tree).filter(n => n.doc_count > 0);
+  const crumbs = [];
+  for(let n = node; n; n = n.parent_id ? D.index[n.parent_id] : null) crumbs.unshift(n);
+  const tree = '<div class="od-row t-small" style="--od-gap:6px;flex-wrap:wrap">'
+    + '<button class="link-b" type="button" data-act="bset" data-k="docType" data-v="">All documents</button>'
+    + crumbs.map(n => ' › <button class="link-b" type="button" data-act="bset" data-k="docType" data-v="'+esc(n.type_id)+'">'+esc(n.title)+'</button>').join('') + '</div>'
+    + (kids.length ? '<div class="bars">' + kids.slice(0,40).map(n =>
+        '<button class="bar-row" type="button" data-act="bset" data-k="docType" data-v="'+esc(n.type_id)+'">'
+        + '<span class="od-truncate t-small">'+esc(n.title)+'</span>'
+        + '<span class="bar-track"><span class="bar-fill" style="width:'+(n.doc_count/Math.max(1, ...kids.map(n => n.doc_count))*100)+'%"></span></span>'
+        + '<span class="num strong od-nowrap">'+n.doc_count+'</span></button>').join('') + '</div>'
+      : '<p class="t-small dim">No sub-types.</p>');
+  return tiles([
+      stat('Documents', String(branch.length), node ? node.title : 'all types'),
+      stat('Active', String(branch.filter(d => d.document_revision_status === 'Active').length), 'current revision'),
+      stat('Distributed', String(branch.filter(d => d.has_been_distributed).length), 'sent to copyholders'),
+      stat('Review overdue', String(rev('overdue')), 'review date passed', rev('overdue') > 0),
+      stat('Review ≤ 30 days', String(rev('30d')), 'due soon'),
+      stat('Owners', String(new Set(branch.map(d => d.owner_name).filter(Boolean)).size), 'distinct owners')
+    ])
+    + '<section class="sec cols cols-2 beta-docs">'
+    + card('Document types', 'by type_id — titles can be edited by admins', tree)
+    + card('Register', rows.length+' documents',
+        '<div class="od-row" style="--od-gap:12px;flex-wrap:wrap">' + searchBox('docQ', BS.docQ, 'Number, title or owner')
+        + sel('docSt', [['','All statuses'],['Active','Active'],['Obsolete','Obsolete']], BS.docSt)
+        + sel('docRev', [['','Any review date'],['overdue','Review overdue'],['30d','Due ≤ 30 days'],['90d','Due ≤ 90 days'],['ok','OK']], BS.docRev) + '</div>'
+        + plainTable('docs', [{l:'Document'},{l:'Type'},{l:'Rev',ar:true},{l:'Status'},{l:'Owner'},{l:'Review date'},{l:'Distributed'}],
+            rows.map(d => {
+              const t = D.index[d.type_id];
+              const rc = A.reviewDueCategory(d.review_date, today);
+              return ['<span class="row-main"><span class="row-id">'+esc(d.document_number)+'</span><span class="row-sub od-clamp-2">'+esc(d.document_revision_title)+'</span></span>',
+                '<span class="t-small">'+esc(t ? A.lastTwoLevels(t.path || t.title) : (d.document_type || '—'))+'</span>',
+                '<span class="num">'+esc(d.revision_number ?? '—')+'</span>',
+                d.document_revision_status === 'Active' ? '<span class="tag">Active</span>' : '<span class="dim">'+esc(d.document_revision_status || '—')+'</span>',
+                '<span class="t-small">'+esc(d.owner_name || '—')+'</span>',
+                '<span class="num">'+fdx(d.review_date)+'</span>'+(rc === 'overdue' ? ' <span class="cat c3">overdue</span>' : rc === '30d' ? ' <span class="cat c1">≤30d</span>' : ''),
+                d.has_been_distributed ? 'Yes' : '<span class="dim">—</span>'];
+            }), 25, 860))
+    + '</section>';
+}
+function scrGuide(){
+  if(!REAL || !REAL.helpHtml) return cardMsg('User guide not found', 'The guide is read from the main dashboard page; it was not found in this build.');
+  return '<section class="sec"><div class="card"><div class="card-pad prose beta-guide">'+REAL.helpHtml+'</div></div></section>';
+}
+
+/* ==========================================================================
+   ADMIN · USERS, EXPORTS, MY DASHBOARD, FEEDBACK
+   ========================================================================== */
+function adminOnly(){ return cardMsg('Admins only', 'This screen is available to dashboard administrators, as in the main dashboard.'); }
+function scrUsers(){
+  if(!IS_ADMIN()) return adminOnly();
+  const sb = window.BETA_SB;
+  if(!sb) return cardMsg('Not signed in', 'User management needs the signed-in Supabase session.');
+  const w = lazyState('users:'+BS.usersF, async () => {
+    let q = sb.from('users').select('id,email,full_name,role,created_at').order('created_at', { ascending:false });
+    if(BS.usersF !== 'all') q = q.eq('role', BS.usersF);
+    const { data, error } = await q;
+    if(error) throw new Error(error.message);
+    return data || [];
+  }, () => !!(LAZY['users:'+BS.usersF] && LAZY['users:'+BS.usersF].value), 'users');
+  if(w) return w;
+  const list = LAZY['users:'+BS.usersF].value, me = REAL.user && REAL.user.email;
+  const act = (id, a, l, extra) => '<button class="btn" type="button" data-act="buser" data-a="'+a+'" data-id="'+esc(id)+'"'+(extra||'')+'>'+l+'</button>';
+  return '<section class="sec">' + card('User management', list.length+' users · Supabase public.users',
+    segs('usersF', [['all','All'],['pending','Pending'],['approved','Approved'],['rejected','Rejected']], BS.usersF)
+    + plainTable('users', [{l:'Full name'},{l:'Username'},{l:'Role'},{l:'Registered'},{l:'Actions'}], list.map(u => {
+        const self = u.email === me;
+        const acts = u.role === 'pending' ? act(u.id,'approve','Approve') + act(u.id,'reject','Reject')
+          : u.role === 'approved' && !self ? act(u.id,'admin','Make admin') + act(u.id,'reject','Revoke')
+          : u.role === 'rejected' ? act(u.id,'approve','Re-approve') : '<span class="dim t-small">'+esc(u.role)+'</span>';
+        return ['<span class="strong">'+esc(u.full_name || '—')+'</span>', '<span class="t-small">'+esc(u.email)+'</span>', '<span class="tag">'+esc(u.role)+'</span>',
+          '<span class="num">'+fdx(u.created_at)+'</span>',
+          '<span class="od-row" style="--od-gap:6px;flex-wrap:wrap">'+acts+(self ? '' : act(u.id,'delete','Delete',' data-email="'+esc(u.email)+'" data-role="'+esc(u.role)+'"'))+'</span>'];
+      }), 20)) + '</section>';
+}
+async function userAction(el){
+  if(!IS_ADMIN() || !window.BETA_SB) return;
+  const sb = window.BETA_SB, id = el.dataset.id, a = el.dataset.a;
+  try{
+    if(a === 'approve' || a === 'reject'){
+      const { error } = await sb.from('users').update({ role: a === 'approve' ? 'approved' : 'rejected' }).eq('id', id); if(error) throw error;
+    } else if(a === 'admin'){
+      if(!confirm('Grant admin rights to this user?')) return;
+      const { error } = await sb.from('users').update({ role:'admin' }).eq('id', id); if(error) throw error;
+    } else if(a === 'delete'){
+      if(!confirm('Delete '+el.dataset.email+' permanently? The account is removed from Supabase Auth and the profile table.')) return;
+      /* same Edge Function as the main dashboard (deleteUser 8943): service_role stays server-side */
+      const { data, error } = await sb.functions.invoke('delete-user', { body:{ target_id:id } });
+      if(error || (data && data.error)) throw new Error((data && data.error) || error.message);
+    }
+    Object.keys(LAZY).filter(k => k.startsWith('users:')).forEach(k => delete LAZY[k]);
+    toast('User updated', 'Change saved.'); render();
+  }catch(e){ toast('Could not update user', e.message || String(e)); }
+}
+
+function scrExports(){
+  if(!IS_ADMIN()) return adminOnly();
+  const titles = [...new Set(REPORTS.map(r => r.code))].sort();
+  const rows = scoped().filter(r => !BS.afForm || r.code === BS.afForm);
+  return '<section class="sec cols cols-2">'
+    + card('Excel export', rows.length+' records · '+esc(periodLabel())+(BS.afForm ? ' · '+esc(BS.afForm) : ''),
+        '<p class="t-sub">The records on screen, with the same filters: year, month, department and form. One sheet per summary, one with every row.</p>'
+        + sel('afForm', [['','All forms']].concat(titles.map(t => [t, t])), BS.afForm, 'Form')
+        + '<span><button class="btn primary" type="button" data-act="bexport">Download .xlsx</button></span>')
+    + card('PDF and weekly overdue report', 'letterhead layouts', '<p class="t-sub">The PDF report and the weekly Overdue workbook keep their VietJet letterhead layout in the main dashboard. Open Export Reports there; your session carries over in this tab.</p>'
+        + '<span><a class="btn" href="./">Open the main dashboard</a></span>')
+    + '</section>';
+}
+function loadXlsx(){
+  if(window.XLSX) return Promise.resolve(window.XLSX);
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = () => res(window.XLSX); s.onerror = () => rej(new Error('could not load the Excel library'));
+    document.head.appendChild(s);
+  });
+}
+async function doExport(){
+  if(!IS_ADMIN()) return toast('Only admins can export', '');
+  try{
+    const XLSX = await loadXlsx();
+    const rows = scoped().filter(r => !BS.afForm || r.code === BS.afForm);
+    const d = v => v ? fmtDate(v) : '';
+    const cnt = s => rows.filter(r => r.status === s).length;
+    const kpi = [['Metric','Value'],['Total',rows.length],['Open',cnt('Open')],['Overdue',cnt('Overdue')],['On-time Closed',cnt('On-time Closed')],
+      ['Lately Closed',cnt('Lately Closed')],['Closed (no target)',cnt('Closed')],['Repetitive',rows.filter(r => r.repetitive).length],
+      ['CAT I',rows.filter(r => r.cat === 'I').length],['CAT II',rows.filter(r => r.cat === 'II').length],['CAT III',rows.filter(r => r.cat === 'III').length]];
+    const forms = [...new Set(rows.map(r => r.code))].sort();
+    const fs = [['Form','Open','Overdue','On-time','Lately','Closed','Total']].concat(forms.map(f => {
+      const x = rows.filter(r => r.code === f), c = s => x.filter(r => r.status === s).length;
+      return [f, c('Open'), c('Overdue'), c('On-time Closed'), c('Lately Closed'), c('Closed'), x.length]; }));
+    const det = [['Report No','Form','Status','Raised','Target','Days to due','CAT','Finding level','Repetitive','Owner','Department','Audit']]
+      .concat(rows.slice().sort((a,b) => a.code.localeCompare(b.code) || (a.raised||0) - (b.raised||0)).map(r =>
+        [r.number, r.code, r.status, d(r.raised), d(r.target), r.dtd ?? '', r.cat ? 'CAT '+r.cat : '', r.level, r.repetitive ? 'Yes' : 'No', r.owner, r.dept, r.auditTitle]));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kpi), 'KPI Summary');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(fs), 'Form Summary');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(det), 'Detail Data');
+    XLSX.writeFile(wb, 'QA_AMO_'+periodLabel().replace(/[^\w-]+/g,'_')+'_'+REAL.asOf+'.xlsx');
+  }catch(e){ console.warn('[beta] export failed', e); toast('Export failed', e.message || String(e)); }
+}
+
+function scrMyDash(){
+  if(!IS_ADMIN()) return adminOnly();
+  let widgets = [];
+  try{ widgets = JSON.parse(localStorage.getItem('db_widgets_' + (REAL.user && REAL.user.email)) || '[]'); }catch(e){ widgets = []; }
+  if(!widgets.length) return cardMsg('No pinned widgets', 'Widgets pinned from the Query Builder in the main dashboard appear here. The Query Builder itself is not carried into the redesign.');
+  const A = API();
+  const cards = widgets.map(wd => {
+    const key = 'w:'+wd.id;
+    const st = lazy(key, async () => {
+      const fl = (wd.filters || []).filter(f => f.field && f.value !== '').map(f => f.op === 'contains'
+        ? 'contains('+f.field+",'"+String(f.value).replace(/'/g,"''")+"')"
+        : f.field+' '+f.op+' '+(isNaN(f.value) ? "'"+String(f.value).replace(/'/g,"''")+"'" : f.value));
+      let u = A.G_URL + wd.table + '?$select=' + encodeURIComponent((wd.fields || []).join(','));
+      if(fl.length) u += '&$filter=' + encodeURIComponent(fl.join(' and '));
+      if(wd.sortField) u += '&$orderby=' + encodeURIComponent(wd.sortField + ' ' + (wd.sortDir || 'asc'));
+      u += '&$top=' + (wd.limit || 500);
+      return A.fetchAll(u);
+    }, () => !!(LAZY[key] && LAZY[key].value));
+    let body;
+    if(st === 'loading') body = '<p class="t-sub dim">Loading…</p>';
+    else if(st === 'error') body = '<p class="t-sub red">'+esc(LAZY[key].err)+'</p>';
+    else {
+      const data = LAZY[key].value;
+      if(wd.vizType === 'kpi') body = '<span class="kpi-val">'+data.length+'</span>';
+      else if(wd.vizType === 'bar' || wd.vizType === 'pie'){
+        const x = wd.chartX || (wd.fields || [])[0], y = wd.chartY, g = {};
+        data.forEach(r => { const k = String(r[x] ?? '—'); g[k] = (g[k] || 0) + (y && y !== '__count__' ? (+r[y] || 0) : 1); });
+        body = barList(Object.entries(g).sort((a,b) => b[1]-a[1]).slice(0,20).map(([k,n]) => ({ k, n:Math.round(n*100)/100 })));
+      } else body = plainTable(key, (wd.fields || []).map(f => ({ l:f })), data.map(r => (wd.fields || []).map(f => '<span class="t-small">'+esc(r[f] ?? '—')+'</span>')), 10);
+    }
+    return card(wd.name || 'Widget', esc(wd.table)+' · '+esc(wd.vizType || 'table'), body);
+  }).join('');
+  return '<section class="sec beta-cards">'+cards+'</section>';
+}
+
+function scrFeedback(){
+  return '<section class="sec">' + card('Feedback', 'goes to the dashboard owner (Telegram), one-way',
+    '<p class="t-sub">Describe what you saw and where. The current screen and app revision are attached automatically.</p>'
+    + '<textarea class="ctl" id="betaFb" maxlength="1500" rows="6" style="width:100%;font:inherit;padding:10px">'+esc(BS.fbMsg)+'</textarea>'
+    + '<span><button class="btn primary" type="button" data-act="bfeedback">Send feedback</button></span>') + '</section>';
+}
+async function sendFeedback(){
+  const ta = document.getElementById('betaFb'), msg = ta ? ta.value.trim() : '';
+  if(!msg) return toast('Write a message first', '');
+  if(!REAL.feedbackUrl || !window.BETA_SB) return toast('Feedback unavailable', 'Sign in on the main dashboard in this tab first.');
+  try{
+    const { data } = await window.BETA_SB.auth.getSession();
+    const token = data && data.session && data.session.access_token;
+    if(!token) throw new Error('session expired — sign in again');
+    const r = await fetch(REAL.feedbackUrl, { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+token },
+      body: JSON.stringify({ message: msg.slice(0,1500), name: REAL.user.full_name || '', role: REAL.user.role || '',
+        page: 'beta · '+location.hash, rev: REAL.appRev + ' (beta)', ua: navigator.userAgent }) });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    BS.fbMsg = ''; if(ta) ta.value = '';
+    toast('Feedback sent', 'Thank you — it reached the dashboard owner.');
+  }catch(e){ toast('Could not send feedback', e.message || String(e)); }
+}
+
+/* ---- screen registry, action handlers, form controls ---- */
+const BETA_SCREENS = REAL ? {
+  'findings/all': scrAllForms, 'findings/osr': scrOsr,
+  'findings/cmrcar': whenFull('CMR-CAR', () => renderLane('findings','cmrcar')),
+  'findings/ecar':   whenFull('ECAR', () => renderLane('findings','ecar')),
+  'findings/pavoi':  whenFull('PAVOI verification rounds', () => renderPavoi()),
+  'work/verify':     whenFull('PAVOI verification rounds', () => renderLane('work','verify')),
+  'analytics/kpi': scrKpi, 'analytics/spi': scrSpi, 'analytics/safety': scrSafety,
+  'analytics/early': scrEarly, 'analytics/status': scrStatus,
+  'audit/bottleneck': scrBottleneck,
+  'library/documents': scrDocs, 'library/guide': scrGuide,
+  'admin/users': scrUsers, 'admin/exports': scrExports, 'admin/mydash': scrMyDash, 'admin/feedback': scrFeedback
+} : {};
+const BETA_ACT = {
+  bset: el => { BS[el.dataset.k] = el.dataset.v === '' ? (el.dataset.k === 'docType' ? null : '') : el.dataset.v; BS.pg = {}; render(); },
+  bpage: el => { BS.pg[el.dataset.k] = Number(el.dataset.p); render(); },
+  bretry: el => { delete LAZY[el.dataset.k]; render(); },
+  buser: el => { userAction(el); },
+  bexport: () => { doExport(); },
+  bfeedback: () => { sendFeedback(); }
+};
+document.addEventListener('change', e => {
+  const k = e.target && e.target.getAttribute && e.target.getAttribute('data-bset');
+  if(!k) return;
+  BS[k] = e.target.value; BS.pg = {}; render();
+});
+document.addEventListener('input', e => {
+  if(e.target && e.target.id === 'betaFb') BS.fbMsg = e.target.value;
+});
+
+/* BETA-SCREENS:END */
 
 /* ==========================================================================
    BOOT

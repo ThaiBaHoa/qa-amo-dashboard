@@ -19,7 +19,16 @@ Mở: đăng nhập ở `/` rồi mở `/beta.html` trong **cùng tab**. Lùi: `
   scope riêng, **chỉ thay khi đủ nguồn + đối chiếu sạch** (`betaSwap()` thay nội dung REPORTS/AUDITS/INDEX, không reload).
   Đo local 22/09: cache 5h → UI 6,7s, `[wf] DELTA 126 report 4,1s`, `[cf] DELTA 11 report 4,3s`, nạp ngầm xong 16,5s;
   sau đó `wfRaw`/`cfRaw`/`qaAmoV5` không đổi byte nào về mốc/số dòng.
-- Còn: KPI 2 đang để "—" (chưa nối `loadKpi2`); bước kiểm đăng nhập chưa thử trên live; Analytics/Library/Admin vẫn là placeholder.
+- ✅ **22/09 tối — đủ màn, đủ dữ liệu** (commit sau fe97a4d): mọi loại report của `allData` (37 form, `form:'other'`) +
+  CMR-CAR + ECAR = 7.021 report; tab mới Findings › OSR/MOSR; Analytics › KPI charts / SPI / Safety / Early detection /
+  Event-IR status; Audit › Bottleneck; Library › Documents / User guide; Admin › Users / Exports (.xlsx) / My dashboard / Feedback.
+  Mỗi màn gọi **loader của chính index.html** qua `window.BETA_API` (danh sách hàm cố định, KHÔNG eval — bộ phân loại quyền
+  đã chặn phương án eval). Loader tự dò phụ thuộc (`extractClosure`: gốc + mọi tên DRIVER nhắc tới; tự tắt `render*/show*/…Chart`;
+  hiểu regex literal; khai báo gộp `let a=…, b=…` không bị khai báo lại). Có cache ⇒ vẽ ngay (lite), CMR-CAR/ECAR/KPI 7 nạp lượt 2.
+  Kiểm local: 25 màn không lỗi JS, 18 màn không tràn ngang ở 375px. Chưa thử trên live: Users, Feedback (cần phiên Supabase thật).
+- Nguồn dựng: `Vault-CongViec/.../rebuild UIUX/beta-src/` (`loader.js`, `screens.js`, `build.mjs`, README).
+- Còn: bước kiểm đăng nhập chưa thử trên live; Export PDF / Overdue weekly vẫn ở bản chính; chi tiết tài liệu (copyholders) và
+  modal EIS/QCS chưa port; chờ Eric duyệt mã hoá status không màu.
 - Hồ sơ: note `om` `inbox/2026-09-22-qa-amo-dashboard-betahtml-open-design-ui-on-live-data-logic.md`.
 
 ---
