@@ -1376,16 +1376,16 @@ function ic(name,size,cls){
    secondary tabs — see the Design rationale screen for the full mapping. */
 const NAV = [
   { id:'overview',  label:'Overview',   icon:'grid',     task:'monitor', title:'Overview',
-    lead:'Where the department stands right now, and what needs attention today.' },
+    lead:'QA AMO reports and audits for the selected period.' },
   { id:'work',      label:'Work Queue', icon:'inbox',    task:'act',     title:'Work Queue',
-    lead:'Findings that need an action from someone. One list, four lanes.',
+    lead:'Reports requiring action: open, overdue and awaiting verification.',
     tabs:[
       {id:'open',   label:'Open reports'},
       {id:'overdue',label:'Overdue'},
       {id:'verify', label:'Awaiting verification'}
     ]},
   { id:'findings',  label:'Findings',   icon:'file',     task:'act',     title:'Findings',
-    lead:'The full register, by form type. Every form keeps its own columns and its own rules.',
+    lead:'Report register by form type.',
     tabs:[
       {id:'all',    label:'All forms'},
       {id:'pavoi',  label:'PAVOI'},
@@ -1396,7 +1396,7 @@ const NAV = [
       {id:'osr',    label:'OSR / MOSR'}
     ]},
   { id:'analytics', label:'Analytics',  icon:'chart',    task:'analyse', title:'Analytics',
-    lead:'Trends and indicators over time, not the day-to-day queue.',
+    lead:'KPIs, SPIs and report status by period.',
     tabs:[
       {id:'kpi',    label:'KPI charts'},
       {id:'spi',    label:'SPI'},
@@ -1405,20 +1405,20 @@ const NAV = [
       {id:'status', label:'Event/IR report status'}
     ]},
   { id:'audit',     label:'Audit Plan', icon:'calendar', task:'audit',   title:'Audit Plan',
-    lead:'The annual programme: what is scheduled, what is running, what produced findings.',
+    lead:'Audit and inspection programme: schedule, status and findings.',
     tabs:[
       {id:'timeline',  label:'Timeline'},
       {id:'list',      label:'Schedule list'},
       {id:'bottleneck',label:'Bottleneck analysis'}
     ]},
   { id:'library',   label:'Library',    icon:'book',     task:'reference', title:'Library',
-    lead:'Controlled documents and guidance. Read, not acted on.',
+    lead:'Controlled documents and user guide.',
     tabs:[
       {id:'documents',label:'Documents'},
       {id:'guide',    label:'User guide'}
     ]},
   { id:'admin',     label:'Admin',      icon:'cog',      task:'admin',   title:'Admin',
-    lead:'Access, exports and personal configuration.',
+    lead:'User access, report export and feedback.',
     tabs:[
       {id:'users',   label:'User management'},
       {id:'exports', label:'Export reports'},
@@ -1426,7 +1426,7 @@ const NAV = [
       {id:'feedback',label:'Feedback'}
     ]}
 ];
-const TASK_LABEL = { monitor:'Monitor', act:'Act', analyse:'Analyse', audit:'Audit', reference:'Reference', admin:'Administer' };
+const TASK_LABEL = { monitor:'Dashboard', act:'Reports', analyse:'Analytics', audit:'Audit', reference:'Library', admin:'Administration' };
 const NAV_BY_ID = Object.fromEntries(NAV.map(n=>[n.id,n]));
 
 /* ==========================================================================
@@ -2004,7 +2004,10 @@ function renderOverview(){
   const overdue = rows.filter(r=>r.status==='Overdue');
   const closedRows = rows.filter(r=>r.closed && r.raised);
   const onTime = closedRows.filter(r=>r.status==='On-time Closed').length;
-  const rate = pct(onTime, closedRows.length);
+  /* On-time Closed ÷ (On-time Closed + Lately Closed) — main dashboard User Guide; 'Closed'
+     without a target date cannot be graded and stays out of the denominator */
+  const graded = rows.filter(r=>r.status==='On-time Closed' || r.status==='Lately Closed').length;
+  const rate = pct(onTime, graded);
   const avgClose = closedRows.length ? Math.round(closedRows.reduce((t,r)=>t+dayDiff(r.closed,r.raised),0)/closedRows.length) : 0;
   const mcar = rows.filter(r=>r.form==='mcar').length;
   const amo  = rows.filter(r=>r.form==='amoecar').length;
@@ -2016,7 +2019,8 @@ function renderOverview(){
   const rateSeries = SERIES_MONTHS.map(mo=>{
     const st = new Date(mo.y,mo.m,1);
     const c = rows.filter(r=>r.closed && r.closed>=st && r.closed<=mo.end);
-    return c.length ? pct(c.filter(r=>r.status==='On-time Closed').length, c.length) : 0;
+    const gr = c.filter(r=>r.status==='On-time Closed' || r.status==='Lately Closed').length;
+    return gr ? pct(c.filter(r=>r.status==='On-time Closed').length, gr) : 0;
   });
   const closeSeries = SERIES_MONTHS.map(mo=>{
     const st = new Date(mo.y,mo.m,1);
@@ -2034,13 +2038,13 @@ function renderOverview(){
   });
 
   const tiles = [
-    kpiTile({label:'Open findings', value:String(open.length), note:REAL ? 'across every report type' : 'across all five forms', go:'work', tab:'open',
+    kpiTile({label:'Open reports', value:String(open.length), note:REAL ? 'across every report type' : 'across all five forms', go:'work', tab:'open',
              series:s.open, trend:trendTag(s.open[11], s.open[10], 'down','')}),
     kpiTile({label:'Overdue', value:String(overdue.length), note:'past target date', go:'work', tab:'overdue',
              series:s.overdue, alarm:overdue.length>0, trend:trendTag(s.overdue[11], s.overdue[10], 'down','')}),
-    kpiTile({label:'On-time closure', value:rate+'%', note:'target ≥ 70%', go:'analytics', tab:'kpi',
+    kpiTile({label:'On-time closure rate', value:rate+'%', note:'target ≥ 70% · '+onTime+' of '+graded, go:'analytics', tab:'kpi',
              series:rateSeries, alarm:rate<70, trend:trendTag(rateSeries[11], rateSeries[10], 'up','pt')}),
-    kpiTile({label:'Avg days to close', value:String(avgClose), note:'raised to closed', go:'analytics', tab:'kpi',
+    kpiTile({label:'Average closure time', value:avgClose+' d', note:'raised date to close date', go:'analytics', tab:'kpi',
              series:closeSeries, trend:trendTag(closeSeries[11], closeSeries[10], 'down','d')}),
     /* Same formula as the main dashboard's KPI 2 card on KPI Charts (buildKPI2 5257–5259):
        MCAR count ÷ AMO-ECAR count in the period. The early-detection rate is its own screen. */
@@ -2048,8 +2052,8 @@ function renderOverview(){
              series:k2Series, trend:trendTag(k2Series[11], k2Series[10], 'up','pt')}),
     (REAL && REAL.partial)
       ? kpiTile({label:'KPI 7 · PAVOI assessed', value:'—', note:REAL.partialError ? 'verification rounds not loaded' : 'loading verification rounds…', go:'findings', tab:'pavoi', series:[]}) :
-    kpiTile({label:'KPI 7 · PAVOI assessed', value:pct(pavAssessed, pav.length)+'%', note:pavAssessed+' of '+pav.length+' verified', go:'findings', tab:'pavoi',
-             series:k7Series, alarm:pct(pavAssessed,pav.length)<70, trend:trendTag(k7Series[11], k7Series[10], 'up','pt')})
+    kpiTile({label:'KPI 7 · PAVOI assessed', value:pct(pavAssessed, pav.length)+'%', note:pavAssessed+' of '+pav.length+' assessed (verification round recorded)', go:'findings', tab:'pavoi',
+             series:k7Series, alarm:pct(pavAssessed,pav.length)<50, trend:trendTag(k7Series[11], k7Series[10], 'up','pt')})
   ].join('');
 
   /* ---- overdue at a glance ---- */
@@ -2107,20 +2111,20 @@ function renderOverview(){
   const sched = auditsScoped().filter(a=>a.status==='Scheduled').length;
 
   return '<section class="sec">'
-    + '<div class="sec-head"><h2>Right now</h2><span class="t-small dim">'+esc(periodLabel())
+    + '<div class="sec-head"><h2>Key indicators</h2><span class="t-small dim">'+esc(periodLabel())
     + (state.filters.dept?' · '+esc(state.filters.dept):'')
-    + ' · every tile opens the list behind it</span></div>'
+    + ' · select a tile to open the report list</span></div>'
     + '<div class="kpi-grid">'+tiles+'</div></section>'
 
     + '<section class="sec cols cols-32">'
-    + '<div class="card"><div class="card-head"><h2>Overdue at a glance</h2>'
+    + '<div class="card"><div class="card-head"><h2>Overdue reports by CAT</h2>'
     + '<span class="t-small dim od-fill">'+overdue.length+' past target · CAT follows the current 30 / 60-day bands</span></div>'
     + '<div class="card-pad" style="display:grid;gap:16px">'
     + (overdue.length ? '<div class="stack" role="img" aria-label="Overdue split by CAT band">'+stack+'</div><div class="bars">'+catRows+'</div>'
-        + '<div style="display:grid;gap:6px"><span class="t-micro">Longest running</span>'+oldest+'</div>'
-        : '<div class="empty"><h3>Nothing overdue in this range</h3><p class="t-sub">Every finding raised in the selected period is still inside its target date.</p></div>')
+        + '<div style="display:grid;gap:6px"><span class="t-micro">Most overdue</span>'+oldest+'</div>'
+        : '<div class="empty"><h3>Nothing overdue in this range</h3><p class="t-sub">No report raised in the selected period is past its target date.</p></div>')
     + '</div></div>'
-    + '<div class="card"><div class="card-head"><h2>Open by form type</h2></div>'
+    + '<div class="card"><div class="card-head"><h2>Open reports by form</h2></div>'
     + '<div class="card-pad" style="display:grid;gap:16px">'
     + '<div class="bars">'+formBars+'</div>'
     + '<div class="od-row" style="--od-gap:20px;flex-wrap:wrap">'+donut(mix)
@@ -2129,12 +2133,12 @@ function renderOverview(){
     + '</div></div></div></div></section>'
 
     + '<section class="sec cols cols-2">'
-    + '<div class="card"><div class="card-head"><h2>Raised vs closed</h2><span class="t-small dim">last 12 months</span></div>'
+    + '<div class="card"><div class="card-head"><h2>Reports raised vs closed</h2><span class="t-small dim">last 12 months</span></div>'
     + '<div class="card-pad" style="display:grid;gap:12px">'+linePair(s.raised, s.closed, SERIES_MONTHS.map(m=>m.label))
     + '<div class="legend"><span class="legend-i"><span class="swatch" style="background:var(--accent);border-color:var(--accent)"></span>Raised</span>'
     + '<span class="legend-i"><span class="swatch" style="background:repeating-linear-gradient(90deg,var(--text-2) 0 4px,transparent 4px 7px)"></span>Closed</span>'
     + '<span class="legend-i dim">'+liveAudits+' audits running · '+sched+' scheduled</span></div></div></div>'
-    + '<div class="card"><div class="card-head"><h2>Recent activity</h2><span class="t-small dim">newest first</span></div>'
+    + '<div class="card"><div class="card-head"><h2>Recent report events</h2><span class="t-small dim">newest first</span></div>'
     + '<div class="card-pad"><div class="act">'+(feed || '<p class="t-sub dim">No activity in this range.</p>')+'</div></div></div>'
     + '</section>';
 }
@@ -2170,12 +2174,12 @@ const COL = {
 
 const LANES = {
   'work/open':    { cols:['number','form','status','owner','raised','target','dtd','level'],
-                    rows:rs=>rs.filter(isOpen), title:'Open reports', lead:'Everything still to be actioned, newest target first.' },
+                    rows:rs=>rs.filter(isOpen), title:'Open reports', lead:'Open and overdue reports, nearest target date first.' },
   'work/overdue': { cols:['number','form','cat','dtd','owner','dept','target','level'],
-                    rows:rs=>rs.filter(r=>r.status==='Overdue'), title:'Overdue', lead:'Past the target date. CAT bands follow the existing 30 and 60-day rule.' },
+                    rows:rs=>rs.filter(r=>r.status==='Overdue'), title:'Overdue', lead:'Reports past their target date. CAT I ≤ 30 days, CAT II 31–60 days, CAT III > 60 days overdue.' },
   'work/verify':  { cols:['number','status','owner','raised','verified','dtd'],
                     rows:rs=>rs.filter(r=>r.form==='pavoi' && isOpen(r) && !assessed(r)),
-                    title:'Awaiting verification', lead:'Open PAVOI with no verification round yet — the numerator KPI 7 is missing.' },
+                    title:'Awaiting verification', lead:'Open PAVOI with no verification round recorded — not yet counted as assessed in KPI 7.' },
   'findings/all':     { cols:['number','form','status','owner','aircraft','raised','dtd','cat'], rows:rs=>rs },
   'findings/cmrcar':  { cols:['number','aircraft','status','dept','raised','target','dtd'], rows:rs=>rs.filter(r=>r.form==='cmrcar') },
   'findings/ecar':    { cols:['number','aircraft','status','finding','raised','dtd'], rows:rs=>rs.filter(r=>r.form==='ecar') },
