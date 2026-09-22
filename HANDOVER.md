@@ -5,6 +5,13 @@
 
 ---
 
+## ⏳ r168-i1 — OSR / MOSR ĐỦ 6 FORM (22/09/2026, ĐÃ COMMIT, CHƯA PUSH)
+
+- Galileo ($count + distinct): 1.491 report (2026: 509) trong 5 + 25 đơn vị; trước chỉ 1.277 (thiếu 4 form: OSR cũ,
+  4. Confidential OSR, Confidential OSR, Confidential MOSR = 214). Eric chốt tính Confidential ở page này; Safety MSAG không đụng.
+- Galileo có 32 dòng trùng `valid_to eq null` cùng report_id → app dedup theo modified_date (đúng).
+- Luật mới (Eric 22/09): verify số từ Galileo TRƯỚC, web chỉ để so.
+
 ## ✅ r168 — TẢI NHANH KHI GALILEO TREO + CACHE ĐỦ LƯỢT 2 (22/09/2026, ĐÃ PUSH a0581bc — live)
 
 - Kiểm live 22/09: lần nguội đầu sau deploy xong 7.022 report / 0 cảnh báo ở 253s (~33s là màn đăng nhập của tab mới;

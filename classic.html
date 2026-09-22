@@ -699,9 +699,15 @@ body.kiosk .mob-menu{display:none!important}
               <button class="pill" onclick="setOsr('Open',this)">Open</button>
               <button class="pill" onclick="setOsr('Closed',this)">Closed</button>
               <select class="sel" id="osrFormF" onchange="TS.osr.page=1;renderOsr()">
-                <option value="">1. OSR + MOSR</option>
+                <option value="">OSR + MOSR (all forms)</option>
+                <option value="k:OSR">OSR (all forms)</option>
+                <option value="k:MOSR">MOSR (all forms)</option>
                 <option value="1. OSR">1. OSR</option>
+                <option value="OSR">OSR</option>
+                <option value="4. Confidential OSR">4. Confidential OSR</option>
+                <option value="Confidential OSR">Confidential OSR</option>
                 <option value="MOSR">MOSR</option>
+                <option value="Confidential MOSR">Confidential MOSR</option>
               </select>
               <select class="sel" id="osrOuF" onchange="TS.osr.page=1;renderOsr()"><option value="">All org units</option></select>
               <div class="ymulti" id="osrYearF"></div>
@@ -2516,7 +2522,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.22-r168';
+const APP_REV = '2026.09.22-r168-i1';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -9114,7 +9120,16 @@ function buildSafetyTable(d){
 // Line Maintenance 1.060 · QA AMO 188 · Workshop 16 · Store 8.
 // Chỉ report_status (Open/Closed), KHÔNG suy Overdue: tính Target date cần custom field + workflow.
 // Page Safety (owner ∈ nhóm MSAG) giữ nguyên.
-const OSR_TITLES = ['1. OSR','MOSR'];
+// [r168-i1] ĐỦ 6 form họ OSR/MOSR, gồm Confidential (Eric chốt 22/09/2026: page này tính cả
+// Confidential; page Safety MSAG giữ luật r120-i1 loại Confidential, KHÔNG đụng). Probe 22/09/2026
+// trong 2 nhánh (report không trùng): 1. OSR 787 · MOSR 490 · OSR (form cũ) 106 · 4. Confidential OSR 53 ·
+// Confidential MOSR 41 · Confidential OSR 14 = 1.491 (trước chỉ 2 form = 1.277, thiếu 214).
+// Đơn vị archive không làm rơi report nào (0). "VJGS - OSR" thuộc Ground Services, 0 report trong nhánh.
+// Lưu ý phạm vi: org_unit của OSR là đơn vị NGƯỜI BÁO CÁO — 4.238 OSR do nhóm MSAG xử lý nhưng người
+// báo cáo ở Cabin/Flight Crew… KHÔNG thuộc page này (chúng ở page Safety MSAG). Eric chốt giữ lọc theo org unit.
+const OSR_TITLES = ['1. OSR','OSR','4. Confidential OSR','Confidential OSR','MOSR','Confidential MOSR'];
+// Nhóm hiển thị: một nguồn cho classic và giao diện mới (đọc r.osr_kind / r.confidential).
+const osrKind = t => /MOSR/i.test(t||'') ? 'MOSR' : 'OSR';
 const OSR_ROOT_IDS = [ORG_UNIT_ID, '31d36b1e-ee23-491e-b0eb-598ab56b4a86'];   // MQA : QA AMO · AMO (con của VietjetAir)
 let osrLoaded=false, osrRows=[];
 const dRenderOsr=debounce(renderOsr,300);
@@ -9142,7 +9157,8 @@ async function loadOsr(){
       const ex=m[r.report_id];
       if(!ex || new Date(r.modified_date)>new Date(ex.modified_date)) m[r.report_id]=r;
     });
-    osrRows=Object.values(m).map(r=>({...r, raised_year: r.raised_date ? new Date(r.raised_date).getFullYear() : null}));
+    osrRows=Object.values(m).map(r=>({...r, raised_year: r.raised_date ? new Date(r.raised_date).getFullYear() : null,
+      osr_kind: osrKind(r.report_title), confidential: /confidential/i.test(r.report_title||'')}));
     const years=[...new Set(osrRows.map(r=>r.raised_year).filter(Boolean))].sort((a,b)=>b-a);
     initYearMulti('osrYearF', years, {onChange:()=>{TS.osr.page=1;renderOsr();}});
     const ous=[...new Set(osrRows.map(r=>r.org_unit_name).filter(Boolean))].sort();
@@ -9164,7 +9180,7 @@ function renderOsr(){
   const ts=TS.osr, ff=g('osrFormF')?.value||'', ou=g('osrOuF')?.value||'', srch=(g('osrSrch')?.value||'').toLowerCase();
   let data=osrRows.filter(r=>{
     if(ts.sf!=='all' && r.report_status!==ts.sf) return false;
-    if(ff && r.report_title!==ff) return false;
+    if(ff && (ff.startsWith('k:') ? r.osr_kind!==ff.slice(2) : r.report_title!==ff)) return false;
     if(ou && r.org_unit_name!==ou) return false;
     if(!ymHas('osrYearF', r.raised_year)) return false;
     if(srch && ![r.report_number,r.report_title,r.org_unit_name,r.report_status].join(' ').toLowerCase().includes(srch)) return false;

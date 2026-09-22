@@ -3823,22 +3823,25 @@ function scrOsr(){
   const ous = [...new Set(all.map(r => r.org_unit_name).filter(Boolean))].sort();
   const q = (state.rowQuery || '').toLowerCase();
   const rows = all.filter(r => inPeriod(r.raised_date))
-    .filter(r => !BS.osrForm || r.report_title === BS.osrForm)
+    /* 'k:OSR' / 'k:MOSR' = every form of that kind (osr_kind set by classic loadOsr, r168-i1) */
+    .filter(r => !BS.osrForm || (BS.osrForm.startsWith('k:') ? r.osr_kind === BS.osrForm.slice(2) : r.report_title === BS.osrForm))
     .filter(r => BS.osrSF === 'all' || r.report_status === BS.osrSF)   /* metrics-ok: OSR/MOSR Coruson status */
     .filter(r => !BS.osrOu || r.org_unit_name === BS.osrOu)
     .filter(r => !q || [r.report_number, r.report_title, r.org_unit_name, r.report_status].join(' ').toLowerCase().includes(q))
     .sort((a,b) => String(b.raised_date).localeCompare(String(a.raised_date)));
   const open = rows.filter(r => r.report_status === 'Open').length;   /* metrics-ok: OSR/MOSR Coruson status (classic loadOsr) */
+  const conf = k => rows.filter(r => r.osr_kind === k && r.confidential).length;
   return tiles([
       stat('OSR / MOSR', String(rows.length), periodLabel()),
-      stat('OSR', String(rows.filter(r => r.report_title === '1. OSR').length), 'form 1. OSR'),
-      stat('MOSR', String(rows.filter(r => r.report_title === 'MOSR').length), 'form MOSR'),
+      stat('OSR', String(rows.filter(r => r.osr_kind === 'OSR').length), '1. OSR · OSR · incl. ' + conf('OSR') + ' confidential'),
+      stat('MOSR', String(rows.filter(r => r.osr_kind === 'MOSR').length), 'MOSR · incl. ' + conf('MOSR') + ' confidential'),
       stat('Open', String(open), 'status on Coruson', open > 0)
     ])
-    + '<section class="sec">' + card('OSR / MOSR — AMO + QA AMO', 'every non-archived unit under AMO and MQA : QA AMO · Open/Closed from report status (no Overdue is derived)',
+    + '<section class="sec">' + card('OSR / MOSR — AMO + QA AMO', 'raised by a unit under AMO or MQA : QA AMO (org unit of the reporter) · all OSR / MOSR forms incl. Confidential · Open/Closed from report status',
       '<div class="od-row" style="--od-gap:12px;flex-wrap:wrap">'
       + segs('osrSF', [['all','All'],['Open','Open'],['Closed','Closed']], BS.osrSF)
-      + sel('osrForm', [['','OSR + MOSR'],['1. OSR','1. OSR'],['MOSR','MOSR']], BS.osrForm)
+      + sel('osrForm', [['','OSR + MOSR (all forms)'],['k:OSR','OSR (all forms)'],['k:MOSR','MOSR (all forms)']]
+          .concat([...new Set(all.map(r => r.report_title))].sort().map(t => [t, t])), BS.osrForm)
       + sel('osrOu', [['','All org units']].concat(ous.map(o => [o, o])), BS.osrOu) + '</div>'
       + plainTable('osr', [{l:'Report'},{l:'Form'},{l:'Status'},{l:'Raised'},{l:'Org unit'},{l:'Last modified'}],
           rows.map(r => ['<span class="row-id">'+esc(r.report_number)+'</span>', '<span class="tag">'+esc(r.report_title)+'</span>',
