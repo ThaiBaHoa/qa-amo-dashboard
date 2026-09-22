@@ -5,6 +5,19 @@
 
 ---
 
+## ⏳ CHƯA COMMIT — bảng MSAG report status + đo tốc độ tải (22/09/2026)
+
+- Eric: Analytics › Safety (MSAG) tiêu đề cột lệch với số, bảng bị cắt 62vh nên không chụp gọn một ảnh.
+- Đã sửa **chỉ trong nguồn** `Vault-CongViec/.../rebuild UIUX/beta-src/` (repo chưa đụng):
+  `screens.js` — `plainTable(..., opt)`: cột `ac` canh giữa, `opt.full` bỏ trần chiều cao, `opt.compact` dòng gọn; scrSafety dùng cả ba.
+  `beta-template.html` — `.tbl th.ar` canh phải theo cột số (sửa chung mọi bảng), `.ac`, `.tbl-full`, `.tbl-compact`.
+- Kiểm: `node build.mjs` OK; trang thử (CSS thật + plainTable thật, số từ ảnh Eric) → 17 dòng trong ~500px, tiêu đề thẳng số.
+  Chưa kiểm trên dữ liệu thật (Galileo 504 lúc thử). Việc còn lại: `node make-index.mjs` → quy-trinh-chuan (bump rev, commit, push).
+- ⚠️ Đừng chép `beta.html` đã build vào repo để thử: từ r167 `beta.html` trong repo là trang chuyển hướng.
+- Đo tải chậm (Eric yêu cầu kiểm toàn bộ, CHƯA LÀM): curl thẳng proxy — cùng truy vấn 2–5s rồi 504 sau 90s / 520 sau 50s;
+  app thử lại 3×90s ≈ 4,5 phút mới báo lỗi; mỗi lượt tải ~32 MB (workflow ~18 MB), proxy không cache;
+  Chrome đứng >45s ở bước "Custom fields" (nghẽn main thread). Note vault: `reference/qa-amo-dashboard/2026-09-22-msag-report-status-*`.
+
 ## ✅ r167-i1 — MỘT NGUỒN ĐỊNH NGHĨA CHỈ SỐ + SỬA SELF-CHECK (22/09/2026, ĐÃ PUSH f9dd939 — live)
 
 - Eric: Overview (65,9%) lệch KPI charts (43%) là lỗi đã nhắc nhiều lần → yêu cầu cơ chế tự đồng bộ mọi chỗ.
