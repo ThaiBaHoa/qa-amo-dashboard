@@ -5,7 +5,7 @@
 
 ---
 
-## ⏳ UI 23/09 — Send feedback cho mọi người · Library bỏ cột type · bỏ Department (CHƯA COMMIT index.html, chờ Eric)
+## ⏳ UI 23/09 — Send feedback cho mọi người · Library bỏ cột type · bỏ Department (ĐÃ PUSH 26eb069 — live phục vụ bản mới, curl 23/09)
 
 - Eric review live r168-i1: (1) Feedback nằm trong Admin → viewer không dùng được; (2) Library mã tài liệu canh giữa,
   cột Document types cắt chữ; (3) Department lọc lung tung; (4) tab Findings bấm vào trống.
@@ -13,7 +13,7 @@
   Feedback = dialog `bfbopen` (sidebar dưới tên + drawer More), bỏ tab Admin › Feedback; Library register full width +
   dropdown loại (đủ tên, drill + breadcrumb); bỏ hẳn bộ lọc Department; mã tài liệu canh trái; drawer More phone hết mất chữ.
 - Kiểm local dữ liệu thật: build + lint OK, console 0 lỗi. Mục 4 không tái hiện ở local (nghi do Department đang chọn).
-- Còn: Eric duyệt → commit/push → kiểm live + gửi 1 feedback thật. Backup nguồn: `rebuild UIUX/beta-src-bak-20260923/`.
+- Còn: gửi 1 feedback thật trên live (cần đăng nhập — Eric tự làm); mục 4 nếu còn trống thì hỏi tab nào. Backup nguồn: `rebuild UIUX/beta-src-bak-20260923/`.
 
 ## ✅ r168-i1 — OSR / MOSR ĐỦ 6 FORM (22/09/2026, ĐÃ PUSH 37e1902 — live, khớp Galileo 1.491 / 2026: 509)
 
