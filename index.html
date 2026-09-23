@@ -447,6 +447,7 @@ select.ctl{min-width:168px;cursor:pointer}
 .tbl.tbl-compact td{padding-top:7px;padding-bottom:7px}
 .row-main{display:grid;gap:2px}
 .row-main>*{display:block}
+.row-main>button{justify-self:start;text-align:left;padding-left:0}   /* a stretched button centres its text */
 .row-id{font-family:var(--mono);font-size:13.5px;font-weight:700;color:var(--text)}
 .row-sub{font-size:13.5px;color:var(--text-3)}
 .tbl-foot{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);padding:var(--s3) var(--s4);border-top:1px solid var(--border)}
@@ -609,6 +610,10 @@ mark{background:var(--accent-34);color:var(--on-wash);border-radius:3px;padding:
     opacity:0;pointer-events:none;z-index:60;transition:opacity var(--dur-out) var(--ease-out);
   }
   body:not(.rail-off) .nav-b:hover::after,body:not(.rail-off) .nav-b:focus-visible::after{opacity:1}
+  /* the rail is the sidebar only — the phone "More" drawer keeps its labels */
+  body:not(.rail-off) #drawerBody .nav-label{display:inline}
+  body:not(.rail-off) #drawerBody .nav-b{justify-content:flex-start;padding:10px 12px}
+  body:not(.rail-off) #drawerBody .nav-b::after{content:none}
   .split{grid-template-columns:minmax(0,1fr)}
   .rec-list{max-height:360px}
 }
@@ -726,8 +731,7 @@ body.kiosk .app{grid-template-columns:minmax(0,1fr) !important}
 .beta-cards{display:grid;gap:var(--s4);grid-template-columns:repeat(auto-fit,minmax(min(380px,100%),1fr))}
 .beta-cards > .card, .cols > .card{min-width:0}
 .kpi-val.beta-wrap{white-space:normal;font-size:clamp(18px,4.5vw,28px)}
-.beta-docs{grid-template-columns:minmax(0,1fr) minmax(0,2.2fr)}
-@media (max-width:1100px){.beta-docs{grid-template-columns:minmax(0,1fr)}}
+.beta-docs .beta-sel .ctl{max-width:min(420px,100%)}
 .beta-guide h1,.beta-guide h2,.beta-guide h3{margin:var(--s4) 0 var(--s2)}
 .beta-guide p,.beta-guide li{color:var(--text-2);font-size:15px;line-height:1.6}
 .beta-guide table{border-collapse:collapse;width:100%;font-size:14px}
@@ -774,6 +778,7 @@ body.kiosk .app{grid-template-columns:minmax(0,1fr) !important}
         </span>
       </div>
       <div class="beta-account" id="betaAccount" hidden>
+        <button class="link-b" type="button" data-act="bfbopen">Send feedback</button>
         <button class="link-b" type="button" data-act="bpassword">Change password</button>
         <button class="link-b" type="button" data-act="bsignout">Sign out</button>
       </div>
@@ -823,10 +828,6 @@ body.kiosk .app{grid-template-columns:minmax(0,1fr) !important}
             <div class="msel-ft"><button class="link-b" type="button" data-msel-all="month">All months</button><span class="t-small dim">Pick several</span></div>
           </div>
         </div>
-      </div>
-      <div class="fb-field">
-        <label for="fDept">Department</label>
-        <select class="ctl" id="fDept"></select>
       </div>
       <div class="fb-chips" id="fbChips" aria-live="polite"></div>
     </div>
@@ -1824,12 +1825,11 @@ const NAV = [
       {id:'guide',    label:'User guide'}
     ]},
   { id:'admin',     label:'Admin',      icon:'cog',      task:'admin',   title:'Admin',
-    lead:'User access, report export and feedback.',
+    lead:'User access and report export.',
     tabs:[
       {id:'users',   label:'User management'},
       {id:'exports', label:'Export reports'},
-      {id:'mydash',  label:'My dashboard'},
-      {id:'feedback',label:'Feedback'}
+      {id:'mydash',  label:'My dashboard'}
     ]}
 ];
 const TASK_LABEL = { monitor:'Dashboard', act:'Reports', analyse:'Analytics', audit:'Audit', reference:'Library', admin:'Administration' };
@@ -2297,10 +2297,6 @@ function betaSwap(D){
   refLists(D.depts);
   INDEX.splice(0, INDEX.length, ...buildIndex());
   betaResetLazy();   /* lazy screens reload from the fresh scope */
-  const keep = state.filters.dept;
-  $('#fDept').innerHTML = '<option value="">All departments</option>'
-    + DEPTS.map(d=>'<option value="'+esc(d)+'">'+esc(d)+'</option>').join('');
-  if(DEPTS.includes(keep)) $('#fDept').value = keep; else state.filters.dept = '';
   render();
 }
 
@@ -2310,7 +2306,7 @@ function betaSwap(D){
 const state = {
   screen:'overview',
   tab:{ work:'open', findings:'all', analytics:'kpi', audit:'timeline', library:'documents', admin:'users' },
-  filters:{ years:[TODAY.getFullYear()], months:[], dept:'' },
+  filters:{ years:[TODAY.getFullYear()], months:[] },
   cat:'',
   rowQuery:'',
   sort:{},
@@ -2323,7 +2319,7 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>'
 /* Period filter = calendar years x calendar months, both multi-select.
    Empty list means "all". Default: the current year, every month. */
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const defaultFilters = () => ({ years:[TODAY.getFullYear()], months:[], dept:'' });
+const defaultFilters = () => ({ years:[TODAY.getFullYear()], months:[] });
 const dataYears = () => [...new Set(REPORTS.filter(r=>r.raised).map(r=>r.raised.getFullYear()))].sort((a,b)=>b-a);
 const isDefaultYears = ys => ys.length === 1 && ys[0] === TODAY.getFullYear();
 function monthsLabel(ms){
@@ -2347,7 +2343,6 @@ function applyFilters(rows){
   return rows.filter(r=>{
     /* a report with no raised date cannot be placed in a period: it only shows with no period filter */
     if(!M.inPeriodDay(r.raised, f)) return false;   /* period rule lives in METRICS */
-    if(f.dept && r.dept !== f.dept) return false;
     return true;
   });
 }
@@ -2365,7 +2360,6 @@ const qaScope = rows => M.qa(rows);   /* definition lives in METRICS */
 let pendingId = null;
 function go(screen, tab, opts){
   opts = opts || {};
-  if(opts.dept !== undefined) state.filters.dept = opts.dept;
   if(opts.years !== undefined)  state.filters.years  = opts.years;
   if(opts.months !== undefined) state.filters.months = opts.months;
   state.rowQuery = opts.q !== undefined ? opts.q : (opts.keepQuery ? state.rowQuery : '');
@@ -2511,7 +2505,8 @@ function renderChrome(){
       + ic(n.icon,20)+'<span class="nav-label">'+esc(n.label)+'</span></button>';
   }).join('') + (REAL ? '' : '<div class="nav-sep"></div><button class="nav-b" type="button" data-go="rationale">'
     + ic('layers',20)+'<span class="nav-label">Design rationale</span></button>')
-    + (REAL ? '<div class="nav-sep"></div><button class="nav-b" type="button" data-act="bpassword"><span class="nav-label">Change password</span></button>'
+    + (REAL ? '<div class="nav-sep"></div><button class="nav-b" type="button" data-act="bfbopen"><span class="nav-label">Send feedback</span></button>'
+      + '<button class="nav-b" type="button" data-act="bpassword"><span class="nav-label">Change password</span></button>'
       + '<button class="nav-b" type="button" data-act="bsignout"><span class="nav-label">Sign out</span></button>' : '');
 
   const title = state.screen === 'rationale' ? 'Design rationale' : NAV_BY_ID[state.screen].title;
@@ -2521,8 +2516,8 @@ function renderChrome(){
 /* The filter bar is persistent across every data screen; reference and
    admin screens have nothing to filter, so it steps out of the way. */
 const FILTERED_SCREENS = ['overview','work','findings','audit','analytics'];
-/* Department exists on findings only — audits, analytics and OSR/MOSR carry no such field */
-const deptApplies = () => ['overview','work','findings'].includes(state.screen) && !(state.screen === 'findings' && state.tab.findings === 'osr');
+/* No Department filter (Eric 23/09/2026): the field means a different thing per form (PAVOI owner
+   section, CMR-CAR department, none on ECAR), so filtering by it emptied whole tabs */
 function renderFilterBar(){
   const on = FILTERED_SCREENS.includes(state.screen);
   $('#filterbar').hidden = !on;
@@ -2530,16 +2525,12 @@ function renderFilterBar(){
   const f = state.filters, chips = [];
   if(!isDefaultYears(f.years)) chips.push(['years', 'Year: '+yearsLabel(f.years)]);
   if(f.months.length) chips.push(['months', 'Month: '+monthsLabel(f.months)]);
-  if(f.dept)  chips.push(['dept', f.dept]);
   if(state.rowQuery) chips.push(['q', 'matching “'+state.rowQuery+'”']);
   $('#fbChips').innerHTML = chips.length
     ? chips.map(c=>'<span class="fchip">'+esc(c[1])+'<button type="button" data-act="clearone" data-k="'+c[0]+'" aria-label="Remove filter: '+esc(c[1])+'">'+ic('x',14)+'</button></span>').join('')
       + '<button class="link-b" type="button" data-act="clearall">Clear all</button>'
     : '<span class="t-small dim">No filters beyond the current year.</span>';
   syncPeriodPicker();
-  $('#fDept').value  = f.dept;
-  /* style, not [hidden]: .fb-field sets display and would override the attribute */
-  const df = $('#fDept').closest('.fb-field'); if(df) df.style.display = deptApplies() ? '' : 'none';
 }
 
 /* ==========================================================================
@@ -2653,7 +2644,6 @@ function renderOverview(){
 
   return '<section class="sec">'
     + '<div class="sec-head"><h2>Key indicators</h2><span class="t-small dim">'+esc(periodLabel())
-    + (state.filters.dept?' · '+esc(state.filters.dept):'')
     + ' · select a tile to open the report list</span></div>'
     + '<div class="kpi-grid">'+tiles+'</div></section>'
 
@@ -2781,7 +2771,7 @@ function tableHTML(key, cfg, rows){
 }
 function emptyState(){
   return '<div class="empty">'+ic('search',28,'dim')+'<h3>Nothing matches the current filters</h3>'
-    + '<p class="t-sub">The year, month, department or search term is excluding every record. Widen one of them to see results.</p>'
+    + '<p class="t-sub">The year, month or search term is excluding every record. Widen one of them to see results.</p>'
     + '<button class="btn" type="button" data-act="clearall">Clear all filters</button></div>';
 }
 function renderLane(screen, tab){
@@ -3267,7 +3257,6 @@ function handle(el, e){
       const k = el.dataset.k;
       if(k === 'years')  state.filters.years  = [TODAY.getFullYear()];
       if(k === 'months') state.filters.months = [];
-      if(k === 'dept')  state.filters.dept = '';
       if(k === 'q')     state.rowQuery = '';
       state.page = {}; render(); return true;
     }
@@ -3894,20 +3883,17 @@ function scrDocs(){
     .filter(d => !BS.docSt || d.document_revision_status === BS.docSt)
     .filter(d => !BS.docRev || A.reviewDueCategory(d.review_date, today) === BS.docRev);
   const rev = c => branch.filter(d => A.reviewDueCategory(d.review_date, today) === c).length;
-  /* type tree: roots in the main dashboard's order, children of the selected node */
+  /* type filter: a dropdown of the sub-types of the current level (full titles, main dashboard's order);
+     picking one drills in, the path above the table steps back out */
   const node = BS.docType ? D.index[BS.docType] : null;
   const kids = (node ? node.children : D.tree).filter(n => n.doc_count > 0);
   const crumbs = [];
   for(let n = node; n; n = n.parent_id ? D.index[n.parent_id] : null) crumbs.unshift(n);
-  const tree = '<div class="od-row t-small" style="--od-gap:6px;flex-wrap:wrap">'
+  const typeSel = sel('docType', [[node ? node.type_id : '', node ? 'All types in this folder' : 'All document types']]
+    .concat(kids.map(n => [n.type_id, n.title + ' (' + n.doc_count + ')'])), node ? node.type_id : '');
+  const path = node ? '<div class="od-row t-small" style="--od-gap:6px;flex-wrap:wrap"><span class="dim">Type:</span>'
     + '<button class="link-b" type="button" data-act="bset" data-k="docType" data-v="">All documents</button>'
-    + crumbs.map(n => ' › <button class="link-b" type="button" data-act="bset" data-k="docType" data-v="'+esc(n.type_id)+'">'+esc(n.title)+'</button>').join('') + '</div>'
-    + (kids.length ? '<div class="bars">' + kids.slice(0,40).map(n =>
-        '<button class="bar-row" type="button" data-act="bset" data-k="docType" data-v="'+esc(n.type_id)+'">'
-        + '<span class="od-truncate t-small">'+esc(n.title)+'</span>'
-        + '<span class="bar-track"><span class="bar-fill" style="width:'+(n.doc_count/Math.max(1, ...kids.map(n => n.doc_count))*100)+'%"></span></span>'
-        + '<span class="num strong od-nowrap">'+n.doc_count+'</span></button>').join('') + '</div>'
-      : '<p class="t-small dim">No sub-types.</p>');
+    + crumbs.map(n => ' › <button class="link-b" type="button" data-act="bset" data-k="docType" data-v="'+esc(n.type_id)+'">'+esc(n.title)+'</button>').join('') + '</div>' : '';
   return tiles([
       stat('Documents', String(branch.length), node ? node.title : 'all types'),
       stat('Active', String(branch.filter(d => d.document_revision_status === 'Active').length), 'current revision'),
@@ -3916,10 +3902,9 @@ function scrDocs(){
       stat('Review ≤ 30 days', String(rev('30d')), 'due soon'),
       stat('Owners', String(new Set(branch.map(d => d.owner_name).filter(Boolean)).size), 'distinct owners')
     ])
-    + '<section class="sec cols cols-2 beta-docs">'
-    + card('Document types', 'by type_id — titles can be edited by admins', tree)
+    + '<section class="sec beta-docs">'
     + card('Register', rows.length+' documents',
-        '<div class="od-row" style="--od-gap:12px;flex-wrap:wrap">' + searchBox('docQ', BS.docQ, 'Number, title or owner')
+        path + '<div class="od-row" style="--od-gap:12px;flex-wrap:wrap">' + typeSel + searchBox('docQ', BS.docQ, 'Number, title or owner')
         + sel('docSt', [['','All statuses'],['Active','Active'],['Obsolete','Obsolete']], BS.docSt)
         + sel('docRev', [['','Any review date'],['overdue','Review overdue'],['30d','Due ≤ 30 days'],['90d','Due ≤ 90 days'],['ok','OK']], BS.docRev) + '</div>'
         + plainTable('docs', [{l:'Document'},{l:'Type'},{l:'Rev',ar:true},{l:'Status'},{l:'Owner'},{l:'Review date'},{l:'Distributed'}],
@@ -4026,11 +4011,14 @@ function scrMyDash(){
   return '<section class="sec beta-cards">'+cards+'</section>';
 }
 
-function scrFeedback(){
-  return '<section class="sec">' + card('Feedback', 'goes to the dashboard owner (Telegram), one-way',
+/* Feedback is open to every signed-in user, from any screen: a dialog over the current screen,
+   so the screen that is attached is the one the user is looking at */
+function feedbackModal(){
+  openModal('Send feedback', 'goes to the dashboard owner (Telegram), one-way',
     '<p class="t-sub">Describe what you saw and where. The current screen and app revision are attached automatically.</p>'
     + '<textarea class="ctl" id="betaFb" maxlength="1500" rows="6" style="width:100%;font:inherit;padding:10px">'+esc(BS.fbMsg)+'</textarea>'
-    + '<span><button class="btn primary" type="button" data-act="bfeedback">Send feedback</button></span>') + '</section>';
+    + '<span><button class="btn primary" type="button" data-act="bfeedback">Send feedback</button></span>');
+  const ta = document.getElementById('betaFb'); if(ta) ta.focus();
 }
 async function sendFeedback(){
   const ta = document.getElementById('betaFb'), msg = ta ? ta.value.trim() : '';
@@ -4045,6 +4033,7 @@ async function sendFeedback(){
         page: 'beta · '+location.hash, rev: REAL.appRev + ' (beta)', ua: navigator.userAgent }) });
     if(!r.ok) throw new Error('HTTP '+r.status);
     BS.fbMsg = ''; if(ta) ta.value = '';
+    closeModal();
     toast('Feedback sent', 'Thank you — it reached the dashboard owner.');
   }catch(e){ toast('Could not send feedback', e.message || String(e)); }
 }
@@ -4060,14 +4049,15 @@ const BETA_SCREENS = REAL ? {
   'analytics/early': scrEarly, 'analytics/status': scrStatus,
   'audit/bottleneck': scrBottleneck,
   'library/documents': scrDocs, 'library/guide': scrGuide,
-  'admin/users': scrUsers, 'admin/exports': () => scrExportsFull(), 'admin/mydash': scrMyDash, 'admin/feedback': scrFeedback
+  'admin/users': scrUsers, 'admin/exports': () => scrExportsFull(), 'admin/mydash': scrMyDash
 } : {};
 const BETA_ACT = {
   bset: el => { BS[el.dataset.k] = el.dataset.v === '' ? (el.dataset.k === 'docType' ? null : '') : el.dataset.v; BS.pg = {}; render(); },
   bpage: el => { BS.pg[el.dataset.k] = Number(el.dataset.p); render(); },
   bretry: el => { delete LAZY[el.dataset.k]; render(); },
   buser: el => { userAction(el); },
-  bfeedback: () => { sendFeedback(); }
+  bfeedback: () => { sendFeedback(); },
+  bfbopen: () => { feedbackModal(); }
 };
 document.addEventListener('change', e => {
   const k = e.target && e.target.getAttribute && e.target.getAttribute('data-bset');
@@ -4475,8 +4465,8 @@ function scrGuideNew(){
     + '<tr><td>Analytics</td><td>KPI charts, SPI, Safety (MSAG), Early detection (KPI 2) and Event/IR report status on Coruson.</td></tr>'
     + '<tr><td>Audit Plan</td><td>The audit and inspection programme: timeline, schedule list and bottleneck analysis.</td></tr>'
     + '<tr><td>Library</td><td>Controlled documents and this guide.</td></tr>'
-    + '<tr><td>Admin</td><td>User management, report export, pinned widgets and feedback (administrators; feedback is open to everyone).</td></tr></table>'
-    + '<p><b>Filter bar.</b> <b>Year</b> and <b>Month</b> are multi-select (for example Jul–Sep, or 2025 and 2026 together; the Q1–Q4 buttons pick a quarter). The filter stays when you change section. <b>Department</b> appears only where reports carry a department (Overview, Work Queue, Findings). The chips under the bar show what is filtered; <b>Clear all</b> returns to the current year.</p>'
+    + '<tr><td>Admin</td><td>User management, report export and pinned widgets (administrators).</td></tr></table>'
+    + '<p><b>Filter bar.</b> <b>Year</b> and <b>Month</b> are multi-select (for example Jul–Sep, or 2025 and 2026 together; the Q1–Q4 buttons pick a quarter). The filter stays when you change section. The chips under the bar show what is filtered; <b>Clear all</b> returns to the current year.</p>'
     + '<p><b>Search</b> (Ctrl K) finds report numbers, audit numbers and titles, aircraft and people. The moon/sun button switches dark and light theme.</p>')
   + sec('terms','Status, CAT and forms',
     '<table><tr><th>Status</th><th>Meaning</th></tr>'
@@ -4526,7 +4516,7 @@ function scrGuideNew(){
     + '<p><b>I cannot see Admin screens.</b> They are for administrators. Ask an administrator to change your role.</p>'
     + '<p><b>How do I add a user?</b> The user chooses Request an account; an administrator approves it in Admin › User management.</p>'
     + '<p><b>Where is the previous dashboard?</b> It is kept as a backup at <b>/classic.html</b>.</p>'
-    + '<p><b>How do I report a problem?</b> Admin › Feedback sends your message to the dashboard owner.</p>');
+    + '<p><b>How do I report a problem?</b> <b>Send feedback</b> (under your name in the sidebar, or in the More menu on a phone) sends your message to the dashboard owner, with the screen you are on.</p>');
 }
 BETA_ACT.bgoto = el => { const t = document.getElementById(el.dataset.id); if(t) t.scrollIntoView({ behavior:'smooth', block:'start' }); };
 BETA_SCREENS['library/guide'] = scrGuideNew;
@@ -4563,9 +4553,6 @@ BETA_SCREENS['library/guide'] = scrGuideNew;
     $('#betaAiBtn').hidden = false;
   }
 
-  $('#fDept').innerHTML = '<option value="">All departments</option>'
-    + DEPTS.map(d=>'<option value="'+esc(d)+'">'+esc(d)+'</option>').join('');
-
   $('#themeBtn').addEventListener('click', ()=> setTheme(currentTheme() === 'light' ? 'dark' : 'light'));
   if(window.matchMedia){
     const mq = window.matchMedia('(prefers-color-scheme: light)');
@@ -4593,7 +4580,6 @@ BETA_SCREENS['library/guide'] = scrGuideNew;
     state.filters[key] = c.checked ? [...new Set([...cur, v])] : cur.filter(x=>x !== v);
     periodChanged();
   });
-  $('#fDept').addEventListener('change',  e=>{ state.filters.dept  = e.target.value; state.page = {}; render(); });
 
   $('#searchBtn').addEventListener('click', openSearch);
   $('#searchScrim').addEventListener('click', closeSearch);
