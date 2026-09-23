@@ -2746,7 +2746,8 @@ function tableHTML(key, cfg, rows){
   let p = Math.min(state.page[key]||1, pages);
   const slice = sorted.slice((p-1)*PAGE_SIZE, p*PAGE_SIZE);
 
-  const body = slice.map(r=>'<tr tabindex="0" data-go="findings" data-tab="'+(r.form==='other'?'all':r.form)+'" data-id="'+r.id+'">'
+  /* a row opens the report itself (detail dialog); PAVOI keeps its list + record screen */
+  const body = slice.map(r=>'<tr tabindex="0" '+(REAL && r.form!=='pavoi' ? 'data-act="breport"' : 'data-go="findings" data-tab="'+(r.form==='other'?'all':r.form)+'"')+' data-id="'+r.id+'">'
     + cfg.cols.map(c=>{
         const col = COL[c];
         return '<td data-l="'+esc(col.l)+'"'+(col.main?' class="t-main"':(col.ar?' class="ar"':''))+'>'+col.c(r)+'</td>';
@@ -3151,7 +3152,7 @@ function render(){
 
   if(pendingId){
     const r = REPORTS.find(x=>x.id === pendingId);
-    if(r){ if(r.form === 'pavoi') state.sel.pavoi = r.id; else state.rowQuery = r.number; }
+    if(r){ if(r.form === 'pavoi') state.sel.pavoi = r.id; else { state.rowQuery = r.number; if(REAL) setTimeout(() => showReport(r.id), 0); } }
     pendingId = null;
     renderFilterBar();
   }
@@ -4108,6 +4109,49 @@ function showEis(id){
       : '<p class="t-sub dim">No corrective actions found.</p>') + '</div>';
   openModal(r.report_number, r.semantic_status+' · due (latest CA) '+fdx(r.Target_date)+' · '+r.eis_ca_done+'/'+r.eis_ca_total+' CA done', body);
 }
+/* Report detail — a register row opens the report itself (Eric 23/09/2026: a click only filtered the
+   register down to that row). Status, CAT and days to due come from the REPORTS row the register shows;
+   the fields from the raw record: CMR-CAR as showCmrDetail 6710, ECAR as showEcarDetail 7342. */
+const stageName = t => String(t || '—').replace(/([a-z])([A-Z])/g, '$1 $2');
+function showReport(id){
+  const A = API(), rep = REPORTS.find(x => x.id === id); if(!rep) return;
+  if(rep.code === A.EIS_TITLE) return showEis(id);
+  if(rep.code === A.QCS_TITLE) return showQcs(id);
+  const src = rep.form === 'cmrcar' ? A.cmrData() : rep.form === 'ecar' ? A.ecarData() : A.allData();
+  const r = src.find(x => x.report_id === id); if(!r) return;
+  const head = kv([['Status', chip(rep.status), true], ['CAT', catChip(rep.cat), true], ['Days to due', dueCell(rep), true]]);
+  const findings = rows => rows.length ? '<div style="display:grid;gap:8px"><span class="t-micro">Findings ('+rows.length+')</span>'
+    + rows.map((f,i) => '<div class="beta-block"><span class="od-row" style="--od-gap:8px;flex-wrap:wrap"><span class="strong">Finding '+(i+1)+'</span>'
+      + (f.ata ? '<span class="tag">ATA '+esc(f.ata)+'</span>' : '') + '</span><span class="t-sub" style="white-space:pre-wrap">'+esc(f.desc || '—')+'</span></div>').join('') + '</div>' : '';
+  const rowsOf = x => (x.findingRows && x.findingRows.length ? x.findingRows.filter(f => f.desc || f.ata) : (x.findings || []).map(d => ({ desc:d })));
+  let body;
+  if(rep.form === 'cmrcar'){
+    body = head + kv([['Aircraft', r.aircraft_reg], ['Finding level', r.finding_level], ['NC type', r.nc_type], ['ATA chapter', r.ata_chapter],
+        ['Defect classification', r.defect_class], ['Department', r.dept], ['Raised date', fdx(r.raised_date)], ['Target date', fdx(r.Target_date)],
+        ['Date completed', fdx(r.close_date)], ['Issued to', r.issued_to], ['Verified by', r.verified_by], ['Audit ref. no', r.audit_ref]])
+      + (findings(rowsOf(r)) || block('Finding', r.finding_desc))
+      + block('Corrective action plan', r.cap) + block('Final action taken', r.final_action) + block('RCA analysis', r.rca);
+  } else if(rep.form === 'ecar'){
+    body = head + kv([['Aircraft', r.aircraft_reg], ['ATA chapter', r.ata_chapter], ['Issued by', r.issued_by], ['Audit', r.audit_title],
+        ['Raised date', fdx(r.raised_date)], ['Target date', fdx(r.Target_date)], ['Date completed', fdx(r.close_date)]])
+      + (findings(rowsOf(r)) || block('Finding', r.finding_desc));
+  } else {
+    const st = (r.wf_stages || []).slice().sort((a,b) => String(a.stage_target_date || a.stage_completed_date || '9').localeCompare(String(b.stage_target_date || b.stage_completed_date || '9')));
+    body = head + kv([['Form', r.report_title], ['Org unit', r.org_unit_name], ['Department', r.dept], ['Owner', r.owner_name],
+        ['Issued to', r.issued_person], ['Finding level', r.finding_level], ['Repetitive', r.is_rep ? 'Yes' : 'No'],
+        ['Audit', [r.audit_number, r.audit_title].filter(Boolean).join(' · ') || null], ['Source report', r.report_ref],
+        ['Raised date', fdx(r.raised_date)], ['Target date', fdx(r.Target_date)], ['Extension 1', r.ext1_date ? fdx(r.ext1_date) : undefined],
+        ['Extension 2', r.ext2_date ? fdx(r.ext2_date) : undefined], ['Date completed', fdx(r.completed_date)], ['Date closed', fdx(r.close_date)]])
+      + block(rep.form === 'pavoi' ? 'Request for verification' : 'Finding', rep.form === 'pavoi' ? r.rfv : r.finding_desc)
+      + block('Verification result', r.verif_result)
+      + (st.length ? '<div style="display:grid;gap:8px"><span class="t-micro">Workflow stages ('+st.length+')</span>'
+        + plainTable('rpt-stages', [{l:'Stage'},{l:'Status'},{l:'Target'},{l:'Completed'}],
+            st.map(s => ['<span class="t-small">'+esc(stageName(s.stage_type))+'</span>', '<span class="t-small">'+esc(s.stage_status || '—')+'</span>',
+              '<span class="num">'+fdx(s.stage_target_date)+'</span>', '<span class="num">'+fdx(s.stage_completed_date)+'</span>']), 50, 0, { compact:true }) + '</div>' : '');
+  }
+  openModal(r.report_number || rep.number, rep.code + (rep.auditTitle && rep.auditTitle !== '—' ? ' · ' + rep.auditTitle : ''), body);
+}
+
 /* QC Spot Check detail — showQcsDetail 6750–6806 */
 function showQcs(id){
   const A = API(); MODAL_KEY = 'qcs:'+id;
@@ -4398,6 +4442,7 @@ Object.assign(BETA_ACT, {
   bmodalclose: () => closeModal(),
   beis: el => showEis(el.dataset.id),
   bqcs: el => showQcs(el.dataset.id),
+  breport: el => showReport(el.dataset.id),
   bdoc: el => showDoc(el.dataset.id),
   bdoctab: el => showDoc(el.dataset.id, el.dataset.t),
   baudit: el => showAudit(el.dataset.id),

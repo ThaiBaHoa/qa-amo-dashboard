@@ -13,6 +13,9 @@
   Feedback = dialog `bfbopen` (sidebar dưới tên + drawer More), bỏ tab Admin › Feedback; Library register full width +
   dropdown loại (đủ tên, drill + breadcrumb); bỏ hẳn bộ lọc Department; mã tài liệu canh trái; drawer More phone hết mất chữ.
 - Kiểm local dữ liệu thật: build + lint OK, console 0 lỗi. Mục 4 không tái hiện ở local (nghi do Department đang chọn).
+- Tiếp (Eric 23/09): bấm dòng Findings chỉ lọc bảng về 1 dòng, không có nội dung report → thêm `showReport` (screens2.js):
+  dialog chi tiết cho CMR-CAR (như showCmrDetail), ECAR (như showEcarDetail), allData (MCAR/AMO-ECAR/OSR… + workflow stages);
+  EIS/QCS dùng showEis/showQcs; PAVOI giữ màn list+detail. Dòng Work Queue, Ctrl K, Overview cũng mở dialog. Kiểm local 6 bảng OK.
 - Còn: gửi 1 feedback thật trên live (cần đăng nhập — Eric tự làm); mục 4 nếu còn trống thì hỏi tab nào. Backup nguồn: `rebuild UIUX/beta-src-bak-20260923/`.
 
 ## ✅ r168-i1 — OSR / MOSR ĐỦ 6 FORM (22/09/2026, ĐÃ PUSH 37e1902 — live, khớp Galileo 1.491 / 2026: 509)
