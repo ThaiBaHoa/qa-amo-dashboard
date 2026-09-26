@@ -5,7 +5,7 @@
 
 ---
 
-## ⏳ r169 — Corrective actions trong popup report (26/09/2026, CHƯA PUSH)
+## ✅ r169 — Corrective actions trong popup report (26/09/2026, ĐÃ PUSH 948e883 — live, kiểm 26/09: RP-070 4 CA, RP-072 (0), menu Reports, brand mới)
 
 - Kèm (Eric 26/09, KHÔNG bump rev): menu/tiêu đề `Findings` → `Reports` (id vẫn `findings`, URL `#findings/…` giữ nguyên);
   brand `Quality Assurance` → `Safety - Quality Assurance` (sidebar + màn đăng nhập); guide.js `Findings ›` → `Reports ›`.
