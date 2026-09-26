@@ -5,6 +5,13 @@
 
 ---
 
+## ⏳ r169-i1 — Tô màu CA trong popup (26/09/2026, CHƯA PUSH)
+
+- Eric: dòng Target / Completed / VOI cần màu để dễ nhìn. Thêm token `--ok/--warn/--info` (+ `-bg`, sáng + tối) trong beta-template;
+  thẻ CA viền trái theo trạng thái (xanh lá đúng hạn · vàng trễ · đỏ overdue · xanh dương đang mở), Target/Completed thành
+  pill màu kèm `Nd late` / `on time` / `Nd overdue` / `Nd left`; VOI thành ô riêng nền xanh lá (xanh dương nếu CA chưa xong).
+- screens2.js `caTone`/`caMeta`, trạng thái qua `M.is*` (lint OK). Kiểm local RP-070 (sáng) + EIS-018 (tối).
+
 ## ✅ r169 — Corrective actions trong popup report (26/09/2026, ĐÃ PUSH 948e883 — live, kiểm 26/09: RP-070 4 CA, RP-072 (0), menu Reports, brand mới)
 
 - Kèm (Eric 26/09, KHÔNG bump rev): menu/tiêu đề `Findings` → `Reports` (id vẫn `findings`, URL `#findings/…` giữ nguyên);

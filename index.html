@@ -87,6 +87,8 @@
      on the dark ground clears 4.5:1 (#E30613 itself reaches only 3.99:1). */
   --accent:#E30613;
   --accent-fg:#FF6B6F;
+  /* corrective-action status colours (r169-i1): on time · late · open, each with a wash */
+  --ok:#4ADE94; --ok-bg:rgba(74,222,148,.12); --warn:#F7C35C; --warn-bg:rgba(247,195,92,.13); --info:#7CC0FF; --info-bg:rgba(124,192,255,.12);
   --accent-fg-2:#FFB3B5;
   --accent-08:rgba(227,6,19,.08);
   --accent-12:rgba(227,6,19,.12);
@@ -163,6 +165,7 @@ html[data-theme="light"]{
 
   --accent:#E30613;
   --accent-fg:#AA040F;
+  --ok:#12723A; --ok-bg:rgba(18,114,58,.09); --warn:#8F5300; --warn-bg:rgba(199,125,0,.12); --info:#0A58A8; --info-bg:rgba(10,88,168,.08);
   --accent-fg-2:#8C0209;
 
   --on-wash:#8C0209;
@@ -705,6 +708,19 @@ body.rail .beta-account{display:none}
 .beta-kv dd{margin:0;font-size:15px}
 .beta-block{border:1px solid var(--border);border-radius:var(--r-ctl);padding:var(--s3);display:grid;gap:6px}
 .beta-block.hot{border-left:3px solid var(--accent)}
+/* corrective action card (r169-i1): left edge + pills coloured by status */
+.beta-block.ca-ok{border-left:4px solid var(--ok)}.beta-block.ca-late{border-left:4px solid var(--warn)}
+.beta-block.ca-over{border-left:4px solid var(--accent)}.beta-block.ca-open{border-left:4px solid var(--info)}.beta-block.ca-none{border-left:4px solid var(--border-strong)}
+.ca-meta{display:flex;flex-wrap:wrap;gap:6px}
+.ca-pill{display:inline-flex;align-items:baseline;gap:6px;padding:3px 10px;border-radius:999px;font-size:13px;background:var(--sunken);color:var(--text-2)}
+.ca-pill b{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3)}
+.ca-pill.ok{background:var(--ok-bg);color:var(--ok)}.ca-pill.ok b{color:var(--ok)}
+.ca-pill.warn{background:var(--warn-bg);color:var(--warn)}.ca-pill.warn b{color:var(--warn)}
+.ca-pill.over{background:var(--accent-12);color:var(--accent-fg)}.ca-pill.over b{color:var(--accent-fg)}
+.ca-pill.info{background:var(--info-bg);color:var(--info)}.ca-pill.info b{color:var(--info)}
+.ca-voi{display:grid;gap:2px;padding:8px 12px;border-radius:var(--r-ctl);background:var(--ok-bg);border-left:3px solid var(--ok);font-size:13px;color:var(--text);white-space:pre-wrap}
+.ca-voi b{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--ok)}
+.ca-voi.pending{background:var(--info-bg);border-left-color:var(--info)}.ca-voi.pending b{color:var(--info)}
 #betaTop{display:flex;align-items:center;gap:var(--s2)}
 #betaTop .t-small{white-space:nowrap}
 .beta-ai{position:fixed;right:22px;top:80px;bottom:22px;width:min(420px,calc(100vw - 28px));max-height:640px;z-index:120;
@@ -4120,10 +4136,31 @@ function caList(cas, always){
   if(!cas.length) return always ? '<div style="display:grid;gap:8px"><span class="t-micro">Corrective actions (0)</span><p class="t-sub dim">No corrective actions entered on Coruson for this report.</p></div>' : '';
   const s = M.caSummary(cas);
   return '<div style="display:grid;gap:8px"><span class="t-micro">Corrective actions ('+s.total+') · '+s.closed+' closed · '+s.late+' late · '+s.overdue+' overdue</span>'
-    + cas.map((c,i) => '<div class="beta-block'+(M.isOverdue(c)?' hot':'')+'">'
+    + cas.map((c,i) => '<div class="beta-block '+caTone(c).card+'">'
       + '<span class="od-row" style="--od-gap:8px;flex-wrap:wrap"><span class="strong">CA '+(i+1)+'</span><span class="t-small dim">'+esc([c.dept, c.classification].filter(Boolean).join(' · '))+'</span>'+chip(c.status)+'</span>'
       + '<span class="t-sub" style="white-space:pre-wrap">'+esc(c.action || '—')+'</span>'
-      + '<span class="t-small dim">Target '+fdx(c.target)+' · Completed '+fdx(c.completed)+(c.voi ? ' · VOI: '+esc(c.voi) : '')+'</span></div>').join('') + '</div>';
+      + caMeta(c)
+      + (c.voi ? '<div class="ca-voi'+(c.completed ? '' : ' pending')+'"><b>Verification of implementation (VOI)</b>'+esc(c.voi)+'</div>' : '')
+      + '</div>').join('') + '</div>';
+}
+/* r169-i1 (Eric: "cần có màu sắc để dễ nhìn"): colour of a CA card and its Target / Completed pills by status */
+const caDayN = (a, b) => Math.round((M.dayOf(a) - M.dayOf(b)) / 864e5);
+function caTone(c){
+  if(M.isOnTime(c))  return { card:'ca-ok',   target:'',     done:'ok' };
+  if(M.isLate(c))    return { card:'ca-late', target:'warn', done:'warn' };
+  if(M.isOverdue(c)) return { card:'ca-over', target:'over', done:'over' };
+  if(M.isInTarget(c))return { card:'ca-open', target:'info', done:'' };
+  return { card:'ca-none', target:'', done:'' };
+}
+function caMeta(c){
+  const t = caTone(c);
+  const note = M.isLate(c) ? ' · '+caDayN(c.completed, c.target)+'d late'
+             : M.isOnTime(c) && c.target ? ' · on time'
+             : M.isOverdue(c) ? ' · '+caDayN(TODAY, c.target)+'d overdue'
+             : M.isInTarget(c) && c.target ? ' · '+caDayN(c.target, TODAY)+'d left' : '';
+  const pill = (cls, label, val) => '<span class="ca-pill'+(cls ? ' '+cls : '')+'"><b>'+label+'</b>'+val+'</span>';
+  return '<div class="ca-meta">' + pill(t.target, 'Target', fdx(c.target))
+    + pill(t.done, 'Completed', (c.completed ? fdx(c.completed) : 'not yet') + note) + '</div>';
 }
 /* EIS detail — showEisDetail 6700–6744 */
 function showEis(id){
