@@ -5,7 +5,7 @@
 
 ---
 
-## ⏳ r170 — Closure by quarter + chữ popup audit (26/09/2026, CHƯA PUSH)
+## ✅ r170 — Closure by quarter + chữ popup audit (26/09/2026, ĐÃ PUSH 77617d1 — live, curl APP_REV = r170)
 
 - Việc 2 họp 24/09. KPI charts: bảng Closure by quarter (`M.byQuarter` + consistency); popup audit ô Closed ghi số on time/late/no target.
 - Extension chưa tách (Eric: chờ form có ngày cấp gia hạn) — số probe ở PROJECT_TECH_SPEC §14 r170.
