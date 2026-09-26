@@ -5,6 +5,12 @@
 
 ---
 
+## ⏳ r170 — Closure by quarter + chữ popup audit (26/09/2026, CHƯA PUSH)
+
+- Việc 2 họp 24/09. KPI charts: bảng Closure by quarter (`M.byQuarter` + consistency); popup audit ô Closed ghi số on time/late/no target.
+- Extension chưa tách (Eric: chờ form có ngày cấp gia hạn) — số probe ở PROJECT_TECH_SPEC §14 r170.
+- Đề xuất sửa form (việc 2b): `Vault-CongViec/02-Bao-Cao/RS-2026-09-26-De-xuat-sua-form-Coruson-ly-do-tre-gia-han.md`.
+
 ## ✅ r169-i1 — Tô màu CA trong popup (26/09/2026, ĐÃ PUSH 40da83d — live, curl APP_REV = r169-i1)
 
 - Eric: dòng Target / Completed / VOI cần màu để dễ nhìn. Thêm token `--ok/--warn/--info` (+ `-bg`, sáng + tối) trong beta-template;

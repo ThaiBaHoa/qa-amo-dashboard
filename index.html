@@ -2135,6 +2135,17 @@ const M = {
     return A.allData().filter(r => map[r.report_id] && M.inPeriod(r, f)).map(r => ({ r, cas: map[r.report_id] }));
   },
 
+  /* closure health by quarter (r170, anh Ngọc 24/09/2026: a quarter must show how many reports
+     ever passed their target even when all are closed). Quarter of raised_date, the selected
+     years (month filter ignored — a quarter is its own period). everLate = late closed + overdue. */
+  byQuarter(rows, f){
+    f = f || state.filters;
+    const base = M.period(rows, { years: f.years, months: [] }), by = {};
+    base.forEach(r => { const d = M.raisedDay(r); if(!d) return;
+      const k = d.getFullYear() + ' Q' + (Math.floor(d.getMonth() / 3) + 1); (by[k] ||= []).push(r); });
+    return Object.keys(by).sort().reverse().map(k => { const s = M.summary(by[k]); return { q: k, s, everLate: s.late + s.overdue }; });
+  },
+
   kpi2: rows => { const mcar = rows.filter(r => r.form === 'mcar').length, amo = rows.filter(r => r.form === 'amoecar').length;
                   return { mcar, amo, pct: M.pct(mcar, amo) }; },
 
@@ -2194,6 +2205,10 @@ M.consistency = function(){
   const k2 = M.kpi2(qa);
   say('KPI 2 MCAR vs classic', k2.mcar, raw.filter(r => r.report_title === 'MCAR').length);
   say('KPI 2 AMO-ECAR vs classic', k2.amo, raw.filter(r => r.report_title === 'AMO ECAR').length);
+  { const bq = M.byQuarter(M.qa(REPORTS), f);
+    say('Quarters: total vs year', bq.reduce((t, x) => t + x.s.total, 0), s.total);
+    say('Quarters: late closed vs year', bq.reduce((t, x) => t + x.s.late, 0), s.late);
+    say('Quarters: overdue vs year', bq.reduce((t, x) => t + x.s.overdue, 0), s.overdue); }
   if(A.eis().loaded){
     const cr = M.caReports(f), all = cr.flatMap(x => x.cas), cs = M.caSummary(all);
     say('Corrective actions: closed + open vs total', cs.closed + cs.open, cs.total);
@@ -3559,6 +3574,21 @@ function scrKpi(){
     stat('Audits', String(S.audits), 'distinct audits behind these reports')
   ]);
 
+  /* r170 — closure health by quarter (METRICS byQuarter): reports that ever passed their target
+     stay visible after they close. Extension is not separated yet: Coruson records no date on which
+     an extension was granted (Eric 26/09/2026: wait for the form change). */
+  const bq = M.byQuarter(M.qa(REPORTS));
+  html += '<section class="sec">' + card('Closure by quarter',
+      'Reports by quarter raised · '+esc(state.filters.years.length ? state.filters.years.join(', ') : 'all years')
+      + ' · Late closed = closed after the target date · Ever past target = late closed + overdue',
+      plainTable('kpi-q', [{l:'Quarter'},{l:'Raised',ar:true},{l:'On-time closed',ar:true},{l:'Late closed',ar:true},{l:'Closed, no target',ar:true},
+        {l:'Open',ar:true},{l:'Overdue',ar:true},{l:'Ever past target',ar:true},{l:'On-time rate',ar:true}],
+        bq.map(x => ['<span class="strong">'+esc(x.q)+'</span>', '<span class="num">'+x.s.total+'</span>', '<span class="num">'+x.s.onTime+'</span>',
+          '<span class="num'+(x.s.late ? ' red strong' : '')+'">'+x.s.late+'</span>', '<span class="num">'+x.s.ungraded+'</span>',
+          '<span class="num">'+x.s.inTarget+'</span>', '<span class="num'+(x.s.overdue ? ' red strong' : '')+'">'+x.s.overdue+'</span>',
+          '<span class="num strong">'+x.everLate+' <span class="dim t-small">('+M.pct(x.everLate, x.s.total)+'%)</span></span>',
+          '<span class="num strong">'+(x.s.graded ? x.s.onTimeRate+'%' : '—')+'</span>']), 12, 900)) + '</section>';
+
   /* KPI 2 volume card, buildKPI2 5227–5277 (kpi2Rows = MCAR + AMO ECAR of allData) */
   const k2 = lazyState('kpi2', () => A.loadKpi2(), () => A.kpi2().loaded, 'KPI 2 data');
   let k2body;
@@ -4333,7 +4363,7 @@ function showAudit(id){
   const f = M.qa(REPORTS).filter(r => r.auditId === id).sort((x,y) => String(x.number).localeCompare(String(y.number)));
   const S = M.summary(f);
   const body = '<div class="kpi-grid">' + stat('Findings', String(S.total), 'reports raised under this audit') + stat('Open', String(S.inTarget), 'inside target')
-      + stat('Overdue', String(S.overdue), 'past target', S.overdue > 0) + stat('Closed', String(S.total - S.open), 'on time, late or no target') + '</div>'
+      + stat('Overdue', String(S.overdue), 'past target', S.overdue > 0) + stat('Closed', String(S.total - S.open), S.onTime+' on time · '+S.late+' late · '+S.ungraded+' no target', S.late > 0) + '</div>'
     + '<div style="display:grid;gap:8px"><span class="t-micro">Workflow stages</span>'
     + (stageRows.length ? plainTable('aud-st-'+id, [{l:'Stage'},{l:'Status'},{l:'Owner'},{l:'Start'},{l:'Due'},{l:'Completed'},{l:'Duration',ar:true}], stageRows, 30, 760)
                         : '<p class="t-sub dim">No workflow stages recorded for this audit.</p>') + '</div>'
