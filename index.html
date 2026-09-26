@@ -448,6 +448,9 @@ select.ctl{min-width:168px;cursor:pointer}
 .tbl th.ac, .tbl td.ac, .tbl th.ac>button, .tbl th.ac>span{text-align:center;justify-content:center}
 .tbl-wrap.tbl-full{max-height:none}
 .tbl.tbl-compact td{padding-top:7px;padding-bottom:7px}
+/* MSAG report status: group names one step up from t-small (14px) */
+.tbl .t-grp{font-size:16px;line-height:1.5;color:var(--text-2);white-space:nowrap}
+.tbl .t-grp-h{font-size:14px}
 .row-main{display:grid;gap:2px}
 .row-main>*{display:block}
 .row-main>button{justify-self:start;text-align:left;padding-left:0}   /* a stretched button centres its text */
@@ -3508,7 +3511,7 @@ function searchBox(key, cur, ph){
   return '<input class="ctl" type="search" data-bset="'+key+'" value="'+esc(cur||'')+'" placeholder="'+esc(ph||'Search')+'" style="min-width:min(220px,100%)">';
 }
 /* A plain table: cols = [{l, ar?}], rows = arrays of cell HTML. Paged like the design's lanes. */
-/* opt.full: no height cap (whole table in one view) · opt.compact: tighter rows · col.ac: centred column */
+/* opt.full: no height cap (whole table in one view) · opt.compact: tighter rows · col.ac: centred column · col.w: column width */
 function plainTable(key, cols, rows, size, minW, opt){
   opt = opt || {};
   const al = c => c.ac ? 'ac' : c.ar ? 'ar' : '';
@@ -3516,7 +3519,7 @@ function plainTable(key, cols, rows, size, minW, opt){
   if(!rows.length) return '<div class="empty"><h3>No records</h3><p class="t-sub">Nothing matches the current filters.</p></div>';
   const pages = Math.max(1, Math.ceil(rows.length/size));
   const p = Math.min(BS.pg[key] || 1, pages);
-  const head = cols.map(c => '<th scope="col"'+(al(c)?' class="'+al(c)+'"':'')+'>'+esc(c.l)+'</th>').join('');
+  const head = cols.map(c => '<th scope="col"'+(al(c)?' class="'+al(c)+'"':'')+(c.w?' style="width:'+c.w+'"':'')+'>'+esc(c.l)+'</th>').join('');
   const body = rows.slice((p-1)*size, p*size).map(r => '<tr>'+r.map((cell,i) =>
     '<td data-l="'+esc(cols[i].l)+'"'+(i===0?' class="t-main"':(al(cols[i])?' class="'+al(cols[i])+'"':''))+'>'+cell+'</td>').join('')+'</tr>').join('');
   let pager = '';
@@ -3718,8 +3721,8 @@ function scrSafety(){
   const t = all.reduce((a,r) => ({osrC:a.osrC+r.osrC, osrO:a.osrO+r.osrO, osrT:a.osrT+r.osrT, mosrC:a.mosrC+r.mosrC, mosrO:a.mosrO+r.mosrO, mosrT:a.mosrT+r.mosrT}),
     {osrC:0, osrO:0, osrT:0, mosrC:0, mosrO:0, mosrT:0});
   const n = v => '<span class="num">'+v+'</span>', o = v => v > 0 ? '<span class="num red strong">'+v+'</span>' : '<span class="num dim">0</span>';
-  const row = r => ['<span class="t-small">'+esc(r.coruson)+'</span>', n(r.osrC), o(r.osrO), n(r.osrT), n(r.mosrC), o(r.mosrO), n(r.mosrT)];
-  const head = l => ['<span class="t-micro">'+esc(l)+'</span>','','','','','',''];
+  const row = r => ['<span class="t-grp">'+esc(r.coruson)+'</span>', n(r.osrC), o(r.osrO), n(r.osrT), n(r.mosrC), o(r.mosrO), n(r.mosrT)];
+  const head = l => ['<span class="t-micro t-grp-h">'+esc(l)+'</span>','','','','','',''];
   const rows = [head('Line MSAG')].concat(d.line.map(row), [head('Base MSAG'), row(d.base), head('Workshop MSAG'), row(d.workshop),
     ['<span class="strong">Total of report</span>', n(t.osrC), o(t.osrO), n(t.osrT), n(t.mosrC), o(t.mosrO), n(t.mosrT)]]);
   return tiles([
@@ -3729,7 +3732,7 @@ function scrSafety(){
       stat('Open reports', String(t.osrO + t.mosrO), 'awaiting action', (t.osrO + t.mosrO) > 0)
     ])
     + '<section class="sec">' + card('MSAG report status', 'OSR / MOSR owned by an MSAG group · loaded '+esc(d.updated),
-      plainTable('safety', [{l:'Group on Coruson'},{l:'OSR closed',ac:true},{l:'OSR open',ac:true},{l:'OSR total',ac:true},{l:'MOSR closed',ac:true},{l:'MOSR open',ac:true},{l:'MOSR total',ac:true}], rows, 40, 0, {full:true, compact:true}))
+      plainTable('safety', [{l:'Group on Coruson',w:'240px'},{l:'OSR closed',ac:true},{l:'OSR open',ac:true},{l:'OSR total',ac:true},{l:'MOSR closed',ac:true},{l:'MOSR open',ac:true},{l:'MOSR total',ac:true}], rows, 40, 0, {full:true, compact:true}))
     + '</section>';
 }
 
