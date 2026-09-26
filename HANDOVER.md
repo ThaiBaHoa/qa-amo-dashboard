@@ -5,6 +5,20 @@
 
 ---
 
+## ⏳ r169 — Corrective actions trong popup report (26/09/2026, CHƯA PUSH)
+
+- Kèm (Eric 26/09, KHÔNG bump rev): menu/tiêu đề `Findings` → `Reports` (id vẫn `findings`, URL `#findings/…` giữ nguyên);
+  brand `Quality Assurance` → `Safety - Quality Assurance` (sidebar + màn đăng nhập); guide.js `Findings ›` → `Reports ›`.
+- Việc 1 họp anh Ngọc 24/09: khuyến nghị F-088 + báo cáo điều tra theo dõi như finding, mọi report.
+- `classic.html` `loadEisDetail`: CA của mọi report (section có `Corrective Action(s)`); CA của report đã đóng thiếu
+  Date completed → `Closed`. Chi tiết + số probe: TECHNICAL_REFERENCE bẫy 13, PROJECT_TECH_SPEC §14 r169.
+- Giao diện (`beta-src`: metrics.js `M.caSummary`/`M.caReports` + consistency · screens2.js `caList` + `caForms`
+  trong showEis + showReport) → build (lint OK) → make-index. Eric 26/09: KHÔNG làm tab/trang riêng — đã gỡ tab `ca`.
+- Kiểm local (preview beta-local, dữ liệu thật): 263 CA / 80 report mọi năm, khớp probe; popup RP-070 4 CA (3 late),
+  RP-072 '(0) No corrective actions entered', EIS-016 8 closed / 0 overdue; console 0 lỗi. Backup template: `rebuild UIUX/beta-template.bak-20260926.html`.
+- Còn: Eric duyệt → push → kiểm live; Extension theo CA KHÔNG có trường trên Coruson (cần sửa form nếu anh Ngọc muốn);
+  RP-072/RP-074 overdue cấp report nhưng chưa nhập CA trên Coruson.
+
 ## ⏳ UI 23/09 — Send feedback cho mọi người · Library bỏ cột type · bỏ Department (ĐÃ PUSH 26eb069 — live phục vụ bản mới, curl 23/09)
 
 - Eric review live r168-i1: (1) Feedback nằm trong Admin → viewer không dùng được; (2) Library mã tài liệu canh giữa,

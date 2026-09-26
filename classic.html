@@ -2522,7 +2522,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.22-r168-i1';
+const APP_REV = '2026.09.26-r169';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -5508,9 +5508,16 @@ const EIS_CA_FIELDS = ['Corrective Action(s)','Corrective Action Classification'
 // hỗ trợ filter theo report_id → query có `report_id eq <uuid>` trả VỀ RỖNG (đã sai ở patch trước:
 // CAs=0/Departments=—). Đây đúng pattern loadCmr/loadEcar (CMR_RF + applySecIdOverlay) đang chạy ổn.
 // Cả 2 fetch truyền `skipOv=true` (đối số 2) → KHÔNG chiếm overlay loading toàn cục (vết r41).
+// [r169] Corrective actions của MỌI report trong allData (anh Ngọc 24/09/2026: khuyến nghị F-088 + báo
+// cáo điều tra theo dõi như finding, áp dụng mọi report). eisCAMap giờ chứa CA của mọi form có nhóm
+// CORRECTIVE ACTIONS (probe 26/09: F-088 166 · EIS 62 · MQA Event Investigation Report 15 · AMO ECAR 20),
+// không chỉ EIS. Một section chỉ là CA khi có field 'Corrective Action(s)': 'Department' / 'Target date' /
+// 'Date completed' là tên field dùng chung — luật cũ (action||target||dept) trên mọi form sẽ đếm nhầm
+// phần đầu report thành CA (MCAR 395, PAVOI 246). Với EIS hai luật cho cùng 62 → EIS không đổi.
 async function loadEisDetail(){
   const eisIds = new Set(allData.filter(r=>r.report_title===EIS_TITLE).map(r=>r.report_id).filter(Boolean));
-  if(!eisIds.size){ eisLoaded=true; return; }
+  const repById = new Map(allData.filter(r=>r.report_id).map(r=>[r.report_id,r]));
+  if(!repById.size){ eisLoaded=true; return; }
   const eisIdSet = eisIds;
 
   const q = v => `'${String(v).replace(/'/g,"''")}'`;
@@ -5545,12 +5552,12 @@ async function loadEisDetail(){
     // ── CA map (group by section_id) ──
     const bySec={};
     caRaw.forEach(f=>{
-      if(!eisIdSet.has(f.report_id) || !f.section_id) return;
+      if(!repById.has(f.report_id) || !f.section_id) return;
       const byR=bySec[f.report_id]||(bySec[f.report_id]={});
       const ca =byR[f.section_id]||(byR[f.section_id]={});
       const v=f.value_text!=null?String(f.value_text).trim():'';
       switch(f.field_name){
-        case 'Corrective Action(s)':                 ca.action=v; break;
+        case 'Corrective Action(s)':                 ca.action=v; ca.isCa=true; break;
         case 'Corrective Action Classification':     ca.classification=v; break;
         case 'Department':                           ca.dept=v; break;
         case 'Target date':                          ca.target=v||null; break;
@@ -5558,13 +5565,20 @@ async function loadEisDetail(){
         case 'Verification of implementation (VOI)': ca.voi=v; break;
       }
     });
+    // [r169] Trạng thái CA = semCalc như finding: có Date completed → On-time/Lately Closed so với Target
+    // date; chưa có → Open/Overdue. Report đã ĐÓNG mà CA thiếu Date completed → 'Closed' (không chấm
+    // đúng/trễ hạn) — trước r169 bị tính Overdue, nên EIS-016 hiện "Lately Closed · 2 overdue".
+    const CLOSED_ST = ['On-time Closed','Lately Closed','Closed'];
     eisCAMap={};
     Object.entries(bySec).forEach(([rid,secs])=>{
-      eisCAMap[rid]=Object.values(secs)
-        .filter(c=>c.action||c.target||c.dept)
+      const rep=repById.get(rid);
+      const repClosed=!!(rep.close_date || CLOSED_ST.includes(rep.semantic_status));
+      const cas=Object.values(secs)
+        .filter(c=>c.isCa && (c.action||c.target||c.dept))
         .map(c=>({action:c.action||'',classification:c.classification||'',dept:c.dept||'',
           target:c.target||null,completed:c.completed||null,voi:c.voi||'',
-          status:semCalc('Open',c.completed||null,c.target||null), age:ageCalc(c.target||null)}));
+          status:semCalc(repClosed?'Closed':'Open',c.completed||null,c.target||null), age:ageCalc(c.target||null)}));
+      if(cas.length) eisCAMap[rid]=cas;
     });
   }catch(e){ console.warn('EIS load error:',e); }
   eisLoaded=true;

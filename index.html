@@ -764,7 +764,7 @@ body.kiosk .app{grid-template-columns:minmax(0,1fr) !important}
     <div class="brand">
       <span class="brand-mark" aria-hidden="true">VJ</span>
       <span class="brand-text">
-        <span class="brand-name">Quality Assurance</span>
+        <span class="brand-name">Safety - Quality Assurance</span>
         <span class="brand-sub">AMO · VietJet Air</span>
       </span>
     </div>
@@ -1791,7 +1791,7 @@ const NAV = [
       {id:'overdue',label:'Overdue'},
       {id:'verify', label:'Awaiting verification'}
     ]},
-  { id:'findings',  label:'Findings',   icon:'file',     task:'act',     title:'Findings',
+  { id:'findings',  label:'Reports',    icon:'file',     task:'act',     title:'Reports',
     lead:'Report register by form type.',
     tabs:[
       {id:'all',    label:'All forms'},
@@ -2103,6 +2103,22 @@ const M = {
   /* reports closed inside a window — the monthly trend of rate and closure time */
   closedIn: (rows, from, to) => rows.filter(r => r.closed && r.closed >= from && r.closed <= to),
 
+  /* corrective actions (r169) — the requirements an F-088 / investigation report places on other
+     departments, tracked like findings (anh Ngọc 24/09/2026). Each CA carries the classic semCalc
+     status (loadEisDetail): On-time Closed / Lately Closed by Date completed vs Target date,
+     Open / Overdue while not completed, Closed (ungraded) when the report closed with no date. */
+  caSummary(cas){
+    const n = p => cas.filter(p).length;
+    const onTime = n(M.isOnTime), late = n(M.isLate);
+    return { total: cas.length, closed: n(M.isClosed), onTime, late, ungraded: n(M.isUngraded),
+             open: n(M.isOpen), inTarget: n(M.isInTarget), overdue: n(M.isOverdue), onTimeRate: M.pct(onTime, onTime + late) };
+  },
+  /* reports that carry corrective actions, in the period, with their CAs (API().eis().ca) */
+  caReports(f){
+    const A = API(), map = A.eis().ca || {};
+    return A.allData().filter(r => map[r.report_id] && M.inPeriod(r, f)).map(r => ({ r, cas: map[r.report_id] }));
+  },
+
   kpi2: rows => { const mcar = rows.filter(r => r.form === 'mcar').length, amo = rows.filter(r => r.form === 'amoecar').length;
                   return { mcar, amo, pct: M.pct(mcar, amo) }; },
 
@@ -2162,6 +2178,13 @@ M.consistency = function(){
   const k2 = M.kpi2(qa);
   say('KPI 2 MCAR vs classic', k2.mcar, raw.filter(r => r.report_title === 'MCAR').length);
   say('KPI 2 AMO-ECAR vs classic', k2.amo, raw.filter(r => r.report_title === 'AMO ECAR').length);
+  if(A.eis().loaded){
+    const cr = M.caReports(f), all = cr.flatMap(x => x.cas), cs = M.caSummary(all);
+    say('Corrective actions: closed + open vs total', cs.closed + cs.open, cs.total);
+    say('Corrective actions: per-report sum vs total', cr.reduce((t, x) => t + M.caSummary(x.cas).overdue, 0), cs.overdue);
+    const eis = cr.filter(x => x.r.report_title === A.EIS_TITLE);
+    say('Corrective actions: EIS register overdue vs tracker', eis.reduce((t, x) => t + A.enrichEis(x.r).eis_ca_overdue, 0), M.caSummary(eis.flatMap(x => x.cas)).overdue);
+  }
   const aud = A.auditData().filter(a => a.is_qa_amo_scope && M.auditInPeriod(a, f));
   say('Audit Plan rows vs audit KPI total', AUDITS.filter(a => M.auditInPeriod(a, f)).length, aud.length);
   if(out.length) console.error('[metrics] consistency check failed:', out);
@@ -4087,6 +4110,21 @@ const kv = pairs => '<dl class="beta-kv">' + pairs.filter(p => p[1] !== undefine
   '<div><dt>'+esc(p[0])+'</dt><dd>'+(p[2] ? p[1] : esc(p[1] == null || p[1] === '' ? '—' : p[1]))+'</dd></div>').join('') + '</dl>';
 const block = (label, text, hot) => text ? '<div class="beta-block'+(hot?' hot':'')+'"><span class="t-micro">'+esc(label)+'</span><span class="t-sub" style="white-space:pre-wrap">'+esc(text)+'</span></div>' : '';
 
+/* Corrective actions of one report (r169) — EIS and every other form with a CORRECTIVE ACTIONS group */
+/* forms whose reports carry a CORRECTIVE ACTIONS group (a report of such a form with none shows "(0)") */
+function caForms(){
+  const A = API(), map = A.eis().ca || {};
+  return new Set(A.allData().filter(r => map[r.report_id]).map(r => r.report_title));
+}
+function caList(cas, always){
+  if(!cas.length) return always ? '<div style="display:grid;gap:8px"><span class="t-micro">Corrective actions (0)</span><p class="t-sub dim">No corrective actions entered on Coruson for this report.</p></div>' : '';
+  const s = M.caSummary(cas);
+  return '<div style="display:grid;gap:8px"><span class="t-micro">Corrective actions ('+s.total+') · '+s.closed+' closed · '+s.late+' late · '+s.overdue+' overdue</span>'
+    + cas.map((c,i) => '<div class="beta-block'+(M.isOverdue(c)?' hot':'')+'">'
+      + '<span class="od-row" style="--od-gap:8px;flex-wrap:wrap"><span class="strong">CA '+(i+1)+'</span><span class="t-small dim">'+esc([c.dept, c.classification].filter(Boolean).join(' · '))+'</span>'+chip(c.status)+'</span>'
+      + '<span class="t-sub" style="white-space:pre-wrap">'+esc(c.action || '—')+'</span>'
+      + '<span class="t-small dim">Target '+fdx(c.target)+' · Completed '+fdx(c.completed)+(c.voi ? ' · VOI: '+esc(c.voi) : '')+'</span></div>').join('') + '</div>';
+}
 /* EIS detail — showEisDetail 6700–6744 */
 function showEis(id){
   const A = API(); MODAL_KEY = 'eis:'+id;
@@ -4101,12 +4139,7 @@ function showEis(id){
     + block('Immediate action(s)', d['Immediate action(s)'])
     + (d.MEDA && d.MEDA.length ? '<div class="beta-block"><span class="t-micro">Contributing factors (MEDA)</span><span class="od-row" style="--od-gap:6px;flex-wrap:wrap">'
         + d.MEDA.map(m => '<span class="tag">'+esc(m)+'</span>').join('') + '</span></div>' : '')
-    + '<div style="display:grid;gap:8px"><span class="t-micro">Corrective actions ('+cas.length+')</span>'
-    + (cas.length ? cas.map((c,i) => '<div class="beta-block'+(c.status==='Overdue'?' hot':'')+'">'   /* metrics-ok: EIS corrective-action status (classic loadEisDetail) */
-        + '<span class="od-row" style="--od-gap:8px;flex-wrap:wrap"><span class="strong">CA '+(i+1)+'</span><span class="t-small dim">'+esc([c.dept, c.classification].filter(Boolean).join(' · '))+'</span>'+chip(c.status)+'</span>'
-        + '<span class="t-sub">'+esc(c.action || '—')+'</span>'
-        + '<span class="t-small dim">Target '+fdx(c.target)+' · Completed '+fdx(c.completed)+(c.voi ? ' · VOI: '+esc(c.voi) : '')+'</span></div>').join('')
-      : '<p class="t-sub dim">No corrective actions found.</p>') + '</div>';
+    + caList(cas, true);
   openModal(r.report_number, r.semantic_status+' · due (latest CA) '+fdx(r.Target_date)+' · '+r.eis_ca_done+'/'+r.eis_ca_total+' CA done', body);
 }
 /* Report detail — a register row opens the report itself (Eric 23/09/2026: a click only filtered the
@@ -4144,6 +4177,10 @@ function showReport(id){
         ['Extension 2', r.ext2_date ? fdx(r.ext2_date) : undefined], ['Date completed', fdx(r.completed_date)], ['Date closed', fdx(r.close_date)]])
       + block(rep.form === 'pavoi' ? 'Request for verification' : 'Finding', rep.form === 'pavoi' ? r.rfv : r.finding_desc)
       + block('Verification result', r.verif_result)
+      /* r169: corrective actions of this report (F-088, investigation reports, AMO ECAR…); load once, then re-open */
+      + (A.eis().loaded ? caList(A.eis().ca[id] || [], caForms().has(r.report_title))
+         : (MODAL_KEY = 'rpt:'+id, Promise.resolve(A.loadEis()).then(() => { if(MODAL_KEY === 'rpt:'+id) showReport(id); }),
+            '<p class="t-small dim">Loading corrective actions…</p>'))
       + (st.length ? '<div style="display:grid;gap:8px"><span class="t-micro">Workflow stages ('+st.length+')</span>'
         + plainTable('rpt-stages', [{l:'Stage'},{l:'Status'},{l:'Target'},{l:'Completed'}],
             st.map(s => ['<span class="t-small">'+esc(stageName(s.stage_type))+'</span>', '<span class="t-small">'+esc(s.stage_status || '—')+'</span>',
@@ -4536,9 +4573,9 @@ function scrGuideNew(){
   + sec('screens','Screens',
     '<ul><li><b>Overview</b>: key indicators, overdue reports by CAT with the most overdue, open reports by form, reports raised vs closed over 12 months, recent report events.</li>'
     + '<li><b>Work Queue</b>: Open reports (nearest target first), Overdue (with CAT), Awaiting verification (open PAVOI with no verification round). Select a row to open the report.</li>'
-    + '<li><b>Findings › All forms</b>: every report type. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings).</li>'
-    + '<li><b>Findings › PAVOI</b>: register on the left, record on the right with the verification history and the RFI / Task list of open PAVOI.</li>'
-    + '<li><b>Findings › OSR / MOSR</b>: OSR and MOSR of AMO and MQA : QA AMO, Open or Closed from Coruson.</li>'
+    + '<li><b>Reports › All forms</b>: every report type. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings).</li>'
+    + '<li><b>Reports › PAVOI</b>: register on the left, record on the right with the verification history and the RFI / Task list of open PAVOI.</li>'
+    + '<li><b>Reports › OSR / MOSR</b>: OSR and MOSR of AMO and MQA : QA AMO, Open or Closed from Coruson.</li>'
     + '<li><b>Analytics › Event/IR report status</b>: EIS and F-088 completeness on Coruson; each row lists what is missing.</li>'
     + '<li><b>Audit Plan</b>: KPI tiles, a timeline by scheduled start month, and a schedule list. Select an audit for its workflow stages and findings. <b>Bottleneck analysis</b> counts stages across all audits in Galileo.</li>'
     + '<li><b>Library › Documents</b>: browse by document type; the document number opens copyholders (on time, late, overdue) and the workflow.</li></ul>')
