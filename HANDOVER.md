@@ -5,7 +5,7 @@
 
 ---
 
-## ⏳ r169-i1 — Tô màu CA trong popup (26/09/2026, CHƯA PUSH)
+## ✅ r169-i1 — Tô màu CA trong popup (26/09/2026, ĐÃ PUSH 40da83d — live, curl APP_REV = r169-i1)
 
 - Eric: dòng Target / Completed / VOI cần màu để dễ nhìn. Thêm token `--ok/--warn/--info` (+ `-bg`, sáng + tối) trong beta-template;
   thẻ CA viền trái theo trạng thái (xanh lá đúng hạn · vàng trễ · đỏ overdue · xanh dương đang mở), Target/Completed thành
