@@ -15,3 +15,6 @@
 .wrangler/
 node_modules/
 .test-r155-body.mjs
+
+# Ảnh chụp dữ liệu Galileo — DỮ LIỆU THẬT của VietJet, mà repo này CÔNG KHAI (script ở nhánh local-agent-tools).
+scripts/snapshot.json
