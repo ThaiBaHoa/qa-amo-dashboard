@@ -187,6 +187,10 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
   (`FETCH_TIMEOUT_MS`) plus **2 retries** with 2s/5s backoff on timeout/5xx/429/network
   errors (`fetchWithRetry`). Keep `FETCH_TIMEOUT_MS` equal to the `galileo-proxy`
   Worker timeout (`worker.js` L52) — see Known issues. [r141]
+  **Since r173-i1 the timeout covers the body too** (a fresh `FETCH_TIMEOUT_MS` starts when the 200
+  headers arrive; before, a body that stalled mid-download hung `loadData` forever), and **hedging
+  (`fetchHedged`) stops once one copy has 200 headers** — the other copies are aborted instead of
+  downloading the same 18 MB alongside it. Hedging still covers the 'server silent' case it was built for.
   **Pass `skipOv=true` on every secondary / modal / lazy call** — otherwise the shared
   global overlay hijacks with stale text ("vết r41" bug).
 - `loadRptStatus` / `renderRptStatus` — **Report Status on Coruson** (r131): bảng tình trạng hoàn thiện
@@ -509,7 +513,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.09.28-r173
+Rev current: 2026.09.28-r173-i1
 
 ORG_UNIT_IDS          ← main pages: 'QA AMO' + ALL its sub-units, resolved at load
                          from dwreporting_organisational_unit_hierarchy (r143).

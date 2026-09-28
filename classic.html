@@ -2522,7 +2522,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.28-r173';
+const APP_REV = '2026.09.28-r173-i1';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3498,7 +3498,9 @@ async function loadData(forceRefresh=false, opts={}) {
 
     // [r143] PHẢI chạy TRƯỚC Promise.all: request 'Report summary' dùng kết quả này làm $filter.
     // Đây là ngoại lệ duy nhất của ghi chú "6 request độc lập" ở trên.
-    await loadOrgUnitIds();
+    // [r173-i1] Chỉ 'Report summary' chờ cây org unit (qua promise bên dưới); 5 nguồn kia khởi
+    // chạy ngay thay vì cùng xếp hàng sau nó. loadOrgUnitIds không bao giờ reject (tự lùi về QA AMO).
+    const orgP = loadOrgUnitIds();
 
     let summary = [], usersRaw = [], grpRaw = [], auRaw = [];
     let userMap = {}, wfMap = {}, wfAllMap = {}, fMap = {};
@@ -3507,10 +3509,10 @@ async function loadData(forceRefresh=false, opts={}) {
 
       // 1. SUMMARY — lấy toàn bộ QA AMO, không filter year
       par('Report summary',
-        G_URL + 'dwreporting_report_summary' +
+        orgP.then(() => fetchAll(G_URL + 'dwreporting_report_summary' +
         '?$select=report_id,report_title,report_number,report_status,' +
         'org_unit_name,raised_date,audit_title,audit_id,modified_date,valid_from,valid_to,owner_id' +
-        '&$filter=' + encodeURIComponent(orgUnitFilter()),   // [r143] QA AMO + ban con, lọc theo UUID
+        '&$filter=' + encodeURIComponent(orgUnitFilter()), true)),   // [r143] QA AMO + ban con, lọc theo UUID
         rows => {
           try {
             // DEDUP: giữ 1 record/report_id có modified_date mới nhất, bỏ record không có report_number
@@ -3842,28 +3844,47 @@ const _sleep = ms => new Promise(r => setTimeout(r, ms));
 const HEDGE_MS  = 15000;
 const HEDGE_MAX = 3;
 
-async function fetchOnce(url, extCtl) {
+// [r173-i1] onHeaders: báo cho fetchHedged biết bản này đã có header 200 (đang tải thân).
+// Hạn giờ phủ CẢ phần thân: trước đây clearTimeout chạy trước r.json(), thân đứng giữa chừng
+// là treo vô hạn (isLoading kẹt true, auto-refresh/kiosk bỏ lượt mãi). Thân có hạn riêng
+// FETCH_TIMEOUT_MS tính từ lúc có header — thân lớn (workflow ~18 MB) tải chậm vẫn kịp.
+async function fetchOnce(url, extCtl, onHeaders) {
   const ctl = extCtl || new AbortController();
-  const tid = setTimeout(()=>ctl.abort(), FETCH_TIMEOUT_MS);
-  let r;
-  try { r = await fetch(url, {signal:ctl.signal}); }
-  catch(e){ throw new Error(e.name==='AbortError'
-      ? `Request timed out (${FETCH_TIMEOUT_MS/1000}s) — server responded slowly`
-      : e.message); }
-  finally { clearTimeout(tid); }
-  if(!r.ok) throw new Error('HTTP '+r.status+' '+r.statusText);
-  return r.json();
+  let tid = setTimeout(()=>ctl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    let r;
+    try { r = await fetch(url, {signal:ctl.signal}); }
+    catch(e){ throw new Error(e.name==='AbortError'
+        ? `Request timed out (${FETCH_TIMEOUT_MS/1000}s) — server responded slowly`
+        : e.message); }
+    if(!r.ok) throw new Error('HTTP '+r.status+' '+r.statusText);
+    clearTimeout(tid);
+    tid = setTimeout(()=>ctl.abort(), FETCH_TIMEOUT_MS);
+    if(onHeaders) onHeaders();
+    try { return await r.json(); }
+    catch(e){ throw new Error(e.name==='AbortError'
+        ? `Response body timed out (${FETCH_TIMEOUT_MS/1000}s) — download stalled`
+        : e.message); }
+  } finally { clearTimeout(tid); }
 }
 
 // Một attempt = 1 request, +1 bản dự phòng mỗi HEDGE_MS, tối đa HEDGE_MAX bản. Thành công đầu
 // tiên thắng, các bản còn lại bị huỷ. Reject khi MỌI bản đã khởi chạy đều hỏng (lỗi của bản
 // cuối) — vd 504 sớm khi chưa tới lượt dự phòng — để fetchWithRetry thử lại có backoff như cũ.
+// [r173-i1] Chỉ dự phòng khi server CHƯA TRẢ LỜI. Trước đây bản dự phòng vẫn bắn mỗi 15s
+// tới khi một bản đọc XONG thân — workflow ~18 MB mất ~26s nên bị tải trùng 3 bản song song,
+// giành băng thông của chính bản đang tải. Nay bản đầu có header 200 thì ngừng dự phòng và
+// huỷ các bản còn đang chờ; nó hỏng giữa chừng thì reject → fetchWithRetry thử lại như cũ.
 function fetchHedged(url) {
   return new Promise((resolve, reject) => {
-    const ctls = []; let settled = false, started = 0, failed = 0, hid = null;
+    const ctls = []; let settled = false, streaming = false, started = 0, failed = 0, hid = null;
     const go = () => {
       const ctl = new AbortController(), me = ++started; ctls.push(ctl);
-      fetchOnce(url, ctl).then(v => {
+      fetchOnce(url, ctl, () => {
+        if(streaming || settled) return;
+        streaming = true; clearTimeout(hid);
+        ctls.forEach(c => { if(c !== ctl) c.abort(); });
+      }).then(v => {
         if(settled) return;
         settled = true; clearTimeout(hid);
         ctls.forEach(c => { if(c !== ctl) c.abort(); });
@@ -3874,7 +3895,7 @@ function fetchHedged(url) {
         failed++;
         if(failed >= started){ settled = true; clearTimeout(hid); reject(e); }
       });
-      if(started < HEDGE_MAX) hid = setTimeout(() => { if(!settled) go(); }, HEDGE_MS);
+      if(started < HEDGE_MAX) hid = setTimeout(() => { if(!settled && !streaming) go(); }, HEDGE_MS);
     };
     go();
   });
