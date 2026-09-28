@@ -1372,7 +1372,7 @@ async function idbDel(){}
 `;
 
 const DRIVER = `
-let saveCache = false;
+let saveCache = false, mem = null;
 if(HOOK.cache){
   /* [r173-i2] status / ageing / CAT were graded on the day the cache was written: regrade for today
      (classic regradeRows / regradeAudits, the same ones its cacheLoad uses) */
@@ -1387,6 +1387,9 @@ if(HOOK.cache){
   /* [classic r141/r145] save the cache only when all six sources succeeded — written after the
      second pass below (r168), so the CMR-CAR / ECAR / KPI 7 part can go into the same entry */
   saveCache = HOOK.write && !loadFailures.length;
+  /* [first paint without a cache] the entry this load would cache, handed back so the second pass can
+     run on it after the screen is up (run() → load({ cache: res.mem })) */
+  mem = { ts: Date.now(), rev: HOOK.rev, dv: HOOK.dv, a: allData, b: auditData, ou: ORG_UNIT_IDS };
 }
 HOOK.say('Loading CMR-CAR, ECAR and PAVOI verification…', allData.length + ' reports ready');
 const VER_URL = G_URL + 'dwanalytics_report_field' +
@@ -1411,11 +1414,13 @@ if(!HOOK.lite && X2 && X2.v === 1){
   /* cached only when all four came back clean — a partial CMR-CAR must not be frozen for 4 hours */
   secondOk = cmrLoaded && ecarLoaded && kpi7Loaded && TOASTS.filter(t => t.kind === 'err').length === err0;
 }
-if(saveCache){
-  const pv = new Set(allData.filter(r => r.report_title === 'PAVOI').map(r => r.report_id));
-  const entry = { ts: Date.now(), rev: HOOK.rev, dv: HOOK.dv, a: allData, b: auditData, ou: ORG_UNIT_IDS };
-  if(secondOk) entry.x = { v: 1, cmr: cmrData, ecar: ecarData, k7c: kpi7Cnt, k7v: kpi7Ver,
-    ver: verRaw.filter(f => f.section_id && pv.has(f.report_id)) };
+const second = () => { const pv = new Set(allData.filter(r => r.report_title === 'PAVOI').map(r => r.report_id));
+  return { v: 1, cmr: cmrData, ecar: ecarData, k7c: kpi7Cnt, k7v: kpi7Ver, ver: verRaw.filter(f => f.section_id && pv.has(f.report_id)) }; };
+/* a cache that lacks the second-pass part (written by a lite first paint, or before r168) gets it added
+   once the second pass comes back clean — same entry, same ts — so the next open paints everything at once */
+const entry = saveCache ? Object.assign({}, mem, secondOk ? { x: second() } : {})
+  : (HOOK.write && HOOK.cache && !X2 && secondOk && !HOOK.background) ? Object.assign({}, HOOK.cache, { x: second() }) : null;
+if(entry){
   try{ await HOOK.writeStore(HOOK.cacheKey, entry); }
   catch(e){ console.warn('[cache] save failed:', e && e.name, e && e.message); toast('Cache could not be saved: ' + (e && e.message), 'cache'); }
 }
@@ -1572,7 +1577,7 @@ const SCREEN_API = {
   AI_URL, aiSystem, AI_TOOLS, aiRunTool, aiMd,
 };
 
-return { reports, audits, depts, checks, partial: !!HOOK.lite,
+return { reports, audits, depts, checks, partial: !!HOOK.lite, mem,
   raw: HOOK.dev ? { a: allData, b: auditData, ou: ORG_UNIT_IDS } : null,
   /* The scope stays alive for lazy screens (Safety, SPI, Report Status…). They get a fixed list
      of named loaders and read-only getters (SCREEN_API below), never a way to run arbitrary code. */
@@ -1674,11 +1679,13 @@ async function run(){
 
   /* With a cache: paint at once from it (lite pass), then complete CMR-CAR / ECAR / KPI 7 /
      verification rounds in a second pass — from Galileo when the cache is stale (r165), else from
-     the same cache. Without a cache: one full load before the first paint, as before. */
+     the same cache. Without a cache (28/09/2026): the screen goes up after the reports too, and the second
+     pass runs on that same data (res.mem) — before, a first open waited for CMR-CAR / ECAR / KPI 7 as well
+     (94s and 189s measured on 22/09 when Galileo stalled). */
   /* [r168] a cache that already holds the second-pass data (x) paints everything at once */
   const whole = !!cache && !!(cache.x && cache.x.v === 1);
   let res;
-  try{ res = await load({ cache, lite: !!cache && !whole }); }
+  try{ res = await load({ cache, lite: !whole }); }
   catch(e){ console.error('[beta] load failed', e); return fail('Could not load data from Galileo.', e.message); }
   done(res, cache ? (stale ? 'first paint from STALE cache' : 'first paint from cache') : 'from Galileo');
 
@@ -1693,7 +1700,7 @@ async function run(){
   const tag = document.querySelector('.demo-tag');
   /* official page: "Live"; beta.html: "Beta" — plus the state of the data */
   const tagText = s => WRITE ? (s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Live') : 'Beta' + (s ? ' · ' + s : '');
-  if(tag) tag.textContent = tagText(cache ? (stale ? 'refreshing…' : whole ? '' : 'loading more…') : '');
+  if(tag) tag.textContent = tagText(stale ? 'refreshing…' : whole ? '' : 'loading more…');
   /* ↻ and the 12-hour timer: a full load from Galileo in a fresh scope, swapped only when every
      source succeeded (r165) — the screen keeps the current data meanwhile */
   let refreshing = false;
@@ -1718,7 +1725,26 @@ async function run(){
     }
     refreshing = false;
   };
-  if(!cache) return;
+  if(!cache){
+    let full = null, note = '';
+    try{ full = await load({ cache: res.mem }); }catch(e){ console.warn('[beta] second pass failed:', e); note = e.message; }
+    if(!full){
+      window.QA_REAL_DATA.partialError = note || 'loading failed';
+      if(tag) tag.textContent = tagText('incomplete');
+      toast('Some data could not be loaded', note + ' Reload to retry.');
+      render();
+      return;
+    }
+    /* the first pass's warnings (a failed source) must not vanish when the second pass swaps in */
+    full.loadWarnings = res.loadWarnings.concat(full.loadWarnings.filter(w => !res.loadWarnings.includes(w)));
+    done(full, 'completed after first paint');
+    Object.assign(window.QA_REAL_DATA, payload(full, 'galileo', null), { partial: false, partialError: null });
+    window.BETA_API = full.api;
+    betaSwap(window.QA_REAL_DATA);
+    if(tag){ tag.textContent = tagText(''); tag.title = 'Live Galileo data via classic.html ' + REV + ' · first open · ' + new Date().toLocaleString(); }
+    if(full.loadWarnings.length) toast('Some data did not load', full.loadWarnings.join(' · '));
+    return;
+  }
   if(whole && !stale){
     if(tag) tag.title = 'Live Galileo data via classic.html ' + REV + ' · complete from cache · ' + new Date(cache.ts).toLocaleString();
     return;
