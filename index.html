@@ -1539,6 +1539,8 @@ const SCREEN_API = {
   loadEis: () => loadEisDetail(), eis: () => ({ loaded: eisLoaded, desc: eisDescMap, ca: eisCAMap }), enrichEis, enrichQcs,
   /* AMO - HIRA classifications (r171 loadHiraCls): HIRA method / hazard type / additional mitigation */
   HIRA_TITLE, loadHira: () => loadHiraCls(), hira: () => ({ loaded: hiraLoaded, map: hiraClsMap }),
+  /* AMO - Additional Mitigation (r172 loadCapa): tasks graded by semCalc + form content */
+  CAPA_TITLE, loadCapa: () => loadCapa(), capa: () => ({ loaded: capaLoaded, tasks: capaTaskMap, info: capaInfoMap }), capaTaskStats,
   /* Audit Plan bottleneck (system-wide $apply aggregate, invariant I7) */
   loadStages: () => loadStageAggregate(), stages: () => stageAggregate,
   normalizeStageTitle,
@@ -3847,6 +3849,7 @@ function scrAllForms(){
   const titles = [...new Set(REPORTS.map(r => r.code))].sort();
   const A = API();
   if(BS.afForm === A.EIS_TITLE || BS.afForm === A.QCS_TITLE) return scrFormDetail(titles);
+  if(BS.afForm === A.CAPA_TITLE) return scrCapa(titles);
   /* AMO - HIRA (r171): its three EVALUATION classifications replace Form and CAT */
   const hira = BS.afForm === A.HIRA_TITLE;
   const w = hira && lazyState('hira', () => A.loadHira(), () => A.hira().loaded, 'HIRA classifications');
@@ -3869,6 +3872,83 @@ Object.assign(COL, {
   hazardType:{ l:'Hazard type', v:r=>hiraCls(r,'type') || 'zzz', c:r=>hiraCell(hiraCls(r,'type')) },
   addMitig:{ l:'Additional mitigation', v:r=>hiraCls(r,'mitig') || 'zzz', c:r=>hiraCell(hiraCls(r,'mitig')) }
 });
+/* AMO - Additional Mitigation (r172): PAVOI-style register — list on the left, the record with its
+   mitigation actions, workflow tasks (graded by semCalc in classic loadCapa) and verification on the right */
+function scrCapa(titles){
+  const A = API();
+  const w = lazyState('capa', () => A.loadCapa(), () => A.capa().loaded, 'Additional Mitigation tasks');
+  const head = sel('afForm', [['','All forms']].concat(titles.map(t => [t, t])), BS.afForm);
+  if(w) return w;
+  const rows = scoped().filter(r => r.code === A.CAPA_TITLE)
+    .sort((a,b) => { const ao = isOpen(a)?0:1, bo = isOpen(b)?0:1; return ao-bo || a.dtd-b.dtd; });
+  if(!rows.length) return '<section class="sec"><div class="card"><div class="card-head"><h2>'+esc(A.CAPA_TITLE)+'</h2><span class="od-fill"></span>'+head+'</div>'+emptyState()+'</div></section>';
+  if(!BS.capaSel || !rows.some(r => r.id === BS.capaSel)) BS.capaSel = rows[0].id;
+  const r = rows.find(x => x.id === BS.capaSel);
+  const { tasks, info } = A.capa();
+  const all = A.capaTaskStats(rows.map(x => x.id)), S = A.capaTaskStats(r.id);
+  const inf = info[r.id] || { actions: [] };
+  const dueTxt = x => x.closed ? '' : '<span class="t-small dim od-nowrap">'+(x.dtd < 0 ? Math.abs(x.dtd)+'d over' : x.dtd+'d left')+'</span>';
+
+  const list = rows.map(x => {
+    const s = A.capaTaskStats(x.id);
+    return '<button class="rec" type="button" data-act="bcapa" data-id="'+x.id+'"'+(x.id === r.id ? ' aria-current="true"' : '')+'>'
+      + '<span class="rec-top"><span class="row-id">'+esc(x.number)+'</span>'+chip(x.status)+'</span>'
+      + '<span class="row-sub od-truncate">'+esc((info[x.id] || {}).title || '—')+'</span>'
+      + '<span class="od-row" style="--od-gap:8px"><span class="tag">'+s.done+'/'+s.total+' tasks done</span>'
+      + (s.overdue ? '<span class="cat c3">'+s.overdue+' overdue</span>' : '') + dueTxt(x) + '</span></button>';
+  }).join('');
+
+  const flag = S.overdue
+    ? { cls:'warn', t: S.overdue+' task'+(S.overdue > 1 ? 's' : '')+' overdue', b: 'Longest '+S.worstDays+' day'+(S.worstDays === 1 ? '' : 's')+' past target. '+S.open+' of '+S.total+' tasks still open.' }
+    : S.open
+    ? { cls:'', t: S.open+' task'+(S.open > 1 ? 's' : '')+' in progress', b: 'All open tasks are inside their target date. '+S.done+' of '+S.total+' completed.' }
+    : S.total
+    ? { cls: S.late ? 'warn' : '', t: 'All '+S.total+' tasks completed', b: S.onTime+' on time · '+S.late+' late'+(S.noTarget ? ' · '+S.noTarget+' without target' : '')+'.' }
+    : { cls:'warn', t: 'No task raised', b: 'No Request For Information or task has been raised in the workflow of this report.' };
+
+  const meta = [['Status', null], ['Owner', r.owner], ['Raised', fmtDate(r.raised)], ['Target', fmtDate(r.target)],
+    ['Days to due', r.closed ? 'closed '+fmtDate(r.closed) : (r.dtd < 0 ? Math.abs(r.dtd)+(r.dtd === -1 ? ' day' : ' days')+' over' : r.dtd+(r.dtd === 1 ? ' day' : ' days')+' left')],
+    ['Report reference', inf.ref || '—']]
+    .map(m => '<div class="meta-i"><span class="meta-k">'+esc(m[0])+'</span>'
+      + (m[1] === null ? '<span class="meta-v">'+chip(r.status)+'</span>' : '<span class="meta-v'+(m[0] === 'Report reference' ? '' : ' od-truncate')+'" title="'+esc(m[1])+'">'+esc(m[1])+'</span>')+'</div>').join('');
+
+  const acts = inf.actions.length
+    ? plainTable('capa-a-'+r.id, [{l:'Mitigation action'},{l:'Department'},{l:'Target'}], inf.actions.map(a =>
+        ['<span class="t-small">'+esc(a.text || '—')+'</span>', '<span class="t-small">'+esc(a.dept || '—')+'</span>', '<span class="num">'+fdx(a.target)+'</span>']), 20, 640)
+    : '<p class="t-sub dim">No mitigation action recorded on the form.</p>';
+  const tl = tasks[r.id] || [];
+  const sdx = v => v ? '<span class="num od-nowrap">'+fmtShort(new Date(+String(v).slice(0,4), +String(v).slice(5,7)-1, +String(v).slice(8,10)))+'</span>' : '<span class="dim">—</span>';
+  const tasksTbl = tl.length
+    ? plainTable('capa-t-'+r.id, [{l:'Task'},{l:'Owner'},{l:'Status'},{l:'Target'},{l:'Completed'}], tl.map(t =>
+        ['<span class="t-small strong">'+esc(t.task_title)+'</span>'+(t.task_related_section_name ? ' <span class="tag">'+esc(t.task_related_section_name)+'</span>' : '')
+          + (t.task_instructions ? '<br><span class="t-small dim od-clamp-2" title="'+esc(t.task_instructions)+'">'+esc(t.task_instructions)+'</span>' : ''),
+         '<span class="t-small">'+esc(t.task_owner || '—')+'</span>', '<span class="od-nowrap">'+chip(t.sem)+'</span>',
+         sdx(t.task_target_date), sdx(t.task_completed_date)]), 25)
+    : '<p class="t-sub dim">No task raised.</p>';
+  const ver = inf.voi || inf.verDate
+    ? '<p class="t-sub">'+esc(inf.voi || '—')+'</p><span class="t-small dim">'+(inf.verDate ? fdx(inf.verDate) : 'no date')+' · '+esc(inf.verBy || '—')+'</span>'
+    : '<p class="t-sub dim">No verification recorded yet.</p>';
+
+  return tiles([
+      stat('Additional Mitigation', String(rows.length), rows.filter(isOpen).length+' open · '+periodLabel()),
+      stat('Tasks', all.done+' / '+all.total, 'completed'),
+      stat('Tasks overdue', String(all.overdue), all.open+' open tasks', all.overdue > 0),
+      stat('Completed late', String(all.late), all.onTime+' on time', all.late > 0)
+    ])
+    + '<section class="sec"><div class="split">'
+    + '<div class="card"><div class="card-head"><h2>Additional Mitigation</h2><span class="od-fill"></span>'+head+'</div>'
+      + '<div class="rec-list">'+list+'</div></div>'
+    + '<div class="card"><div class="card-head"><h2 class="mono">'+esc(r.number)+'</h2>'+chip(r.status)+'<span class="od-fill"></span></div>'
+      + '<div class="card-pad" style="display:grid;gap:24px">'
+      + '<div class="meta">'+meta+'</div>'
+      + '<div class="note '+flag.cls+'"><span class="note-hd">'+(flag.cls ? ic('alert',16) : ic('check',16))+esc(flag.t)+'</span><span class="t-small">'+esc(flag.b)+'</span></div>'
+      + '<div style="display:grid;gap:8px"><span class="t-micro">Title</span><p class="t-sub">'+esc(inf.title || '—')+'</p>'
+        + (inf.details ? '<details><summary class="t-small strong" style="cursor:pointer">Additional details</summary><p class="t-small dim" style="margin-top:6px">'+esc(inf.details)+'</p></details>' : '') + '</div>'
+      + '<div style="display:grid;gap:8px"><span class="t-micro">Mitigation actions ('+inf.actions.length+')</span>'+acts+'</div>'
+      + '<div style="display:grid;gap:8px"><span class="t-micro">Tasks ('+tl.length+')</span>'+tasksTbl+'</div>'
+      + '<div style="display:grid;gap:8px"><span class="t-micro">Verification of implementation</span>'+ver+'</div>'
+      + '</div></div></div></section>';
+}
 /* EIS / QC Spot Check register with the classic schema columns; a row opens its detail */
 function scrFormDetail(titles){
   const A = API(), eis = BS.afForm === A.EIS_TITLE;
@@ -4566,6 +4646,7 @@ setInterval(() => { if(REAL && !REAL.partial && Date.now() - (REAL.cacheTs || Da
 Object.assign(BETA_ACT, {
   bmodalclose: () => closeModal(),
   beis: el => showEis(el.dataset.id),
+  bcapa: el => { BS.capaSel = el.dataset.id; render(); },
   bqcs: el => showQcs(el.dataset.id),
   breport: el => showReport(el.dataset.id),
   bdoc: el => showDoc(el.dataset.id),

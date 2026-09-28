@@ -5,6 +5,11 @@
 
 ---
 
+## ⏳ r172 — AMO - Additional Mitigation theo dõi như PAVOI (28/09/2026, CHƯA PUSH, chờ Eric duyệt cùng r171)
+
+- All forms chọn `AMO - Additional Mitigation`: màn kiểu PAVOI (danh sách + chi tiết, Tasks graded bằng `semCalc`, overdue lên đầu). `loadCapa` + `capaTaskStats` trong classic.
+- Kiểm local: 76 task · 44 on time · 17 late · 4 overdue · 11 open khớp đếm lại từ Galileo thô. Galileo `task_delivery_status` nói 28 late (so theo giờ) — cần Eric chốt luật theo ngày.
+
 ## ⏳ r171 — AMO - HIRA: 3 cột Classifications (28/09/2026, COMMIT a714673 — CHƯA PUSH, chờ Eric duyệt)
 
 - All forms chọn `AMO - HIRA`: bỏ Form + CAT, thêm HIRA method · Hazard type · Additional mitigation (nguồn `dwanalytics_report_classification_field`, `loadHiraCls`).

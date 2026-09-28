@@ -2522,7 +2522,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.28-r171';
+const APP_REV = '2026.09.28-r172';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -5250,6 +5250,71 @@ async function loadHiraCls(){
     o[k]=o[k] ? o[k]+', '+r.value_text : r.value_text;
   });
   hiraClsMap=m; hiraLoaded=true;
+}
+// [r172] AMO - Additional Mitigation (VJC-AMO-CAPA-xx) — theo dõi như PAVOI: từng Task/RFI của workflow,
+// hạn và overdue (Eric 28/09/2026). Probe 28/09: 8 report (Test-CAPA-01 là form khác, report_title
+// 'Test AMO - Additional Mitigation' → tự loại). Task: dwreporting_report_task lọc report_title (1 request,
+// 98 dòng, 1,1s), bỏ Deleted + dòng giữ chỗ stage (task_title rỗng, "Approve for report closure") theo
+// isPavoiItem. Trạng thái task = semCalc (luật finding/CA, so THEO NGÀY) — Galileo task_delivery_status
+// so theo giờ nên task xong ĐÚNG ngày hạn bị Galileo gọi 'completed late', dashboard tính On-time.
+// Nội dung form: dwanalytics_report_field theo report_id (chunk 15): HEADER Title / Report Reference
+// (số HIRA / Hazard Log / MCCF gốc) / Additional details, nhóm MITIGATION ACTION (Mitigation Action ·
+// Target date · Department, gom theo section_id), VERIFICATION (VOI · Date verified · Verified by).
+const CAPA_TITLE = 'AMO - Additional Mitigation';
+let capaLoaded=false, capaTaskMap={}, capaInfoMap={};
+const capaTaskSem = t => semCalc(t.task_status==='Completed' || t.task_completed_date ? 'Closed' : 'Open',
+  t.task_completed_date, t.task_target_date);
+async function loadCapa(){
+  const ids=[...new Set(allData.filter(r=>r.report_title===CAPA_TITLE).map(r=>r.report_id))];
+  const tasks=fetchAll(G_URL+'dwreporting_report_task?$select=report_id,task_id,task_title,task_owner,task_status,'
+    +'task_target_date,task_completed_date,task_instructions,task_response,task_related_section_name'
+    +'&$filter='+encodeURIComponent("report_title eq '"+CAPA_TITLE+"'"), true);
+  const chunks=[]; for(let i=0;i<ids.length;i+=15) chunks.push(ids.slice(i,i+15));
+  const fields=Promise.all(chunks.map(ch=>fetchAll(G_URL+'dwanalytics_report_field?$select=report_id,section_id,section_name,field_name,value_text'
+    +'&$filter='+encodeURIComponent('('+ch.map(id=>'report_id eq '+id).join(' or ')+')'), true))).then(a=>[].concat.apply([],a));
+  const [tRaw,fRaw]=await Promise.all([tasks,fields]);
+  const idSet=new Set(ids), tm={}, im={};
+  tRaw.forEach(t=>{ if(idSet.has(t.report_id) && isPavoiItem(t)) (tm[t.report_id] ||= []).push({...t, sem: capaTaskSem(t)}); });
+  // Task chưa xong (Overdue/Open) lên đầu, rồi theo hạn — người xem thấy việc tồn trước.
+  const capaDone=t=>t.task_status==='Completed' || !!t.task_completed_date;
+  Object.values(tm).forEach(l=>l.sort((a,b)=>(capaDone(a)-capaDone(b))
+    || String(a.task_target_date||'9').localeCompare(String(b.task_target_date||'9'))));
+  fRaw.forEach(f=>{
+    if(!idSet.has(f.report_id)) return;
+    const o=(im[f.report_id] ||= {title:'',ref:'',details:'',actions:{},voi:'',verDate:'',verBy:''});
+    const v=f.value_text||'';
+    if(f.section_name==='MITIGATION ACTION' && f.section_id){
+      const a=(o.actions[f.section_id] ||= {text:'',target:'',dept:''});
+      if(f.field_name==='Mitigation Action') a.text=v;
+      else if(f.field_name==='Target date') a.target=v;
+      else if(f.field_name==='Department') a.dept=v;
+      return;
+    }
+    switch(f.field_name){
+      case 'Title': o.title=v; break;
+      case 'Report Reference': o.ref=v; break;
+      case 'Additional details': o.details=v; break;
+      case 'Verification of implementation (VOI)': o.voi=v; break;
+      case 'Date verified': o.verDate=v; break;
+      case 'Verified by (auditor)': o.verBy=v; break;
+    }
+  });
+  Object.values(im).forEach(o=>{ o.actions=Object.values(o.actions).filter(a=>a.text||a.target||a.dept)
+    .sort((a,b)=>String(a.text).localeCompare(String(b.text),undefined,{numeric:true})); });
+  capaTaskMap=tm; capaInfoMap=im; capaLoaded=true;
+}
+// Đếm task của một (hoặc nhiều) CAPA theo semCalc — một nguồn cho danh sách, tiles và chi tiết.
+function capaTaskStats(reportIds){
+  const s={total:0,done:0,onTime:0,late:0,noTarget:0,open:0,overdue:0,worstDays:0};
+  [].concat(reportIds).forEach(id=>(capaTaskMap[id]||[]).forEach(t=>{
+    s.total++;
+    if(t.sem==='On-time Closed'){ s.done++; s.onTime++; }
+    else if(t.sem==='Lately Closed'){ s.done++; s.late++; }
+    else if(t.sem==='Closed'){ s.done++; s.noTarget++; }
+    else if(t.sem==='Overdue'){ s.open++; s.overdue++; s.worstDays=Math.max(s.worstDays, -(ageCalc(t.task_target_date)||0)); }
+    else s.open++;
+  }));
+  return s;
 }
 function setAF(sf,btn){
   TS.af.sf=sf;TS.af.page=1;
