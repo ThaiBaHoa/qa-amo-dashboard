@@ -5,7 +5,7 @@
 
 ---
 
-## ⏳ Đợt 1 rà hiệu năng: r173-i1 · r173-i2 · giữ cuộn (28/09/2026, máy nhà — COMMIT, CHƯA PUSH)
+## ✅ Đợt 1 rà hiệu năng: r173-i1 · r173-i2 · giữ cuộn (28/09/2026, máy nhà — ĐÃ PUSH 998fa0e, live, curl APP_REV = r173-i2)
 
 - Nguồn: bản rà hiệu năng/UX 28/09 (18 mục, chia 3 đợt). Đợt 1 = 5 mục ưu tiên; mục 1+2+4 gộp r173-i1, mục 9 = r173-i2, mục 12 = commit giao diện.
 - **r173-i1** (classic): timeout 90s phủ cả thân response (trước: thân đứng giữa chừng → `loadData` treo mãi); dự phòng ngừng khi đã có header 200 (trước: thân lớn bị tải 2–3 bản song song); chỉ Report summary chờ cây org unit.
@@ -14,7 +14,7 @@
 - Kiểm: test Node (fetch giả) trên hàm trích nguyên — cũ treo / mới reject đúng hạn; local dữ liệu thật 7.063 report · 1.098 audit, cache giả lập cũ MCAR-0381 → Overdue CAT I, audit 4/0 → 3/1, `M.consistency()` rỗng; Next page ×3 → trang 2/3/4, focus giữ, cuộn giữ; đổi màn → về đầu; console sạch.
 - Đo Worker thật (curl, mạng nhà): workflow 18,5 MB byte đầu 3,8–8,3s, thân +0,6s → lợi ích dự phòng chỉ rõ trên mạng chậm (công ty?). Mã nguồn Worker `galileo-proxy` không nằm trong repo.
 - Hạ tầng: `beta-src/build.mjs` đọc `QA_AMO_REPO` (mặc định F:), `beta-devserver.mjs` tự tìm repo F: hoặc `%USERPROFILE%/Documents/GitHub`. Backup nguồn: `rebuild UIUX/beta-src-bak-20260928/`.
-- Còn: Eric duyệt → push → kiểm live (curl APP_REV = r173-i2). Đợt 2 (tải nhanh khi lên rev mới, lần đầu không cache, gộp quét report_field, RFI song song, tách font/letterhead) và đợt 3 (UX) chưa làm.
+- Push 28/09 22:00 (Eric chọn cách 1): chỉ 3 commit đợt 1 lên `main`. Commit `325d3a4` (bộ công cụ agent, AGENT_FACTS.md lộ cách vượt proxy + số liệu thật) **KHÔNG push** — giữ ở nhánh local `local-agent-tools` trên máy nhà. Live: curl classic APP_REV = r173-i2, index có `lastRoute` + `regradeRows(HOOK.cache.a)`; chưa mở live đã đăng nhập (cần Eric). Đợt 2 (tải nhanh khi lên rev mới, lần đầu không cache, gộp quét report_field, RFI song song, tách font/letterhead) và đợt 3 (UX) chưa làm.
 
 ## ✅ r173 — Nối HIRA ↔ CAPA (28/09/2026, ĐÃ PUSH 352a4df — live, curl APP_REV = r173)
 
