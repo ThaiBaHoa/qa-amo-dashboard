@@ -5,11 +5,13 @@
 
 ---
 
-## ⏳ Đợt 2 + proxy đòi đăng nhập: r174 · r175 · r176 (28/09/2026 tối, máy nhà — COMMIT, CHƯA PUSH, WORKER CHƯA DEPLOY)
+## ⏳ Đợt 2 + proxy đòi đăng nhập: r174 · r175 · r176 (28/09/2026 — BƯỚC 1+2 XONG: Worker soft deploy fc09a341 · push 4615f6b live r176; CHỜ BƯỚC 3 enforce)
 
 - **r174** lên rev không vứt cache (`CACHE_DATA_VER`) · **index.html** lần mở đầu hiện màn hình trước lượt 2 · **r175** CMR/ECAR chung lượt quét report_field + RFI song song · **r176** app gửi token Supabase (`gFetch`), mã `galileo-proxy` vào repo, Worker kiểm đăng nhập + stream. Mục 8 (tách font/letterhead) **bỏ**: Pages trả 304, gzip classic 367 KB.
 - Kiểm local dữ liệu thật: xem §14 từng rev. Worker mới chạy `wrangler dev --remote --var AUTH_MODE:enforce`: không token / token rác / cách vượt cũ → 401; Eric đăng nhập → mọi request 200, 7.063 report.
 - **Lên live — 3 bước, mỗi bước Eric duyệt:** (1) `cd workers/galileo-proxy && npx.cmd wrangler deploy` với `AUTH_MODE: soft` (tương thích trang cũ, thêm stream + CORS Authorization) → curl live vẫn 200; (2) `git push` r174–r176 → curl APP_REV = r176; (3) xem Workers Logs (`"auth":"soft-allow"`) tới khi không còn request thiếu token từ trình duyệt (trang cũ còn mở / kiosk) → đổi `AUTH_MODE` thành `enforce`, deploy lại.
+- 28/09 22:50 bước 1: `wrangler deploy` AUTH_MODE soft, version `fc09a341-530b-4ba7-8e85-edb840e192c1`; curl live: không token 200 (trang cũ không gãy), sai Origin 403, preflight cho `Authorization`, workflow 18,5 MB byte đầu 3,15s / xong 5,36s (stream). 22:53 bước 2: live APP_REV = r176, classic có `gFetch`, index có stub `gAuth`. CMR-CAR-2361: Eric sửa OU trên Coruson → Galileo `org_unit_name: TQA`.
+- **Bước 3 (chờ Eric):** `npx.cmd wrangler tail galileo-proxy --format pretty` hoặc Workers Logs, lọc `soft-allow` — còn dòng từ trình duyệt (kiosk/tab cũ chưa tải lại) thì chờ; hết thì đổi `AUTH_MODE` → `enforce` trong `wrangler.jsonc`, deploy, commit.
 - Sẽ ngừng chạy khi enforce: script ở nhánh local `local-agent-tools` (galileo.py, pavoi-snapshot.py), `rebuild UIUX/snapshot.mjs` / relay local không đăng nhập, Power BI nếu có dùng proxy. Lùi: deploy `worker.live-2026-09-28.js` hoặc đặt `AUTH_MODE: soft`.
 - Còn mở: `galileo-ai` (khóa Anthropic) có thể cũng không kiểm đăng nhập — chưa xem mã. CMR-CAR-2361 thuộc org QA AMO nên hiện riêng là 'CMR CAR' trong All forms — chờ Eric chọn sửa Coruson hay gộp làn.
 
