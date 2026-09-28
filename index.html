@@ -3213,6 +3213,10 @@ function openHit(h){
 /* ==========================================================================
    RENDER + EVENTS
    ========================================================================== */
+/* Screen + tab of the last render: scroll goes back to the top only when this changes. A re-render on
+   the same screen (sort, pager, record pick, lazy load finishing, background refresh) keeps the scroll
+   and gives focus back to the control that was focused, found again by its id / data-* attributes. */
+let lastRoute = null;
 function render(){
   renderChrome();
   renderFilterBar();
@@ -3246,9 +3250,22 @@ function render(){
     else if(s === 'audit') html += renderAudit(tab);
     else html += placeholder(nav, nav.tabs.find(t=>t.id===tab));
   }
-  $('#screen').innerHTML = html;
+  const route = s + '/' + (state.tab[s] || ''), scr = $('#screen'), ae = document.activeElement;
+  /* exact match first; then, for a labelled control whose data changes (pager "Next page" moves
+     data-p 2 → 3), the same label + action — else focus would land on the page-number button "2" */
+  const sel = names => ae.tagName.toLowerCase() + [...ae.attributes].filter(a => names(a.name))
+    .map(a => '[' + a.name + '="' + CSS.escape(a.value) + '"]').join('');
+  let refocus = [];
+  if(route === lastRoute && ae && scr.contains(ae)){
+    if([...ae.attributes].some(a => a.name === 'id' || a.name.startsWith('data-')))
+      refocus.push(sel(n => n === 'id' || n === 'aria-label' || n.startsWith('data-')));
+    if(ae.hasAttribute('aria-label')) refocus.push(sel(n => n === 'aria-label' || n === 'data-act' || n === 'data-key'));
+  }
+  scr.innerHTML = html;
   if(REAL && typeof topExtras === 'function') $('#betaTop').innerHTML = topExtras();
-  $('#main-content').scrollTop = 0;
+  if(route !== lastRoute) $('#main-content').scrollTop = 0;
+  else { const el = refocus.map(q => scr.querySelector(q)).find(Boolean); if(el) el.focus({ preventScroll: true }); }
+  lastRoute = route;
 }
 
 /* ---- toast ---- */

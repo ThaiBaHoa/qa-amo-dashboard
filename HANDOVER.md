@@ -5,6 +5,17 @@
 
 ---
 
+## ⏳ Đợt 1 rà hiệu năng: r173-i1 · r173-i2 · giữ cuộn (28/09/2026, máy nhà — COMMIT, CHƯA PUSH)
+
+- Nguồn: bản rà hiệu năng/UX 28/09 (18 mục, chia 3 đợt). Đợt 1 = 5 mục ưu tiên; mục 1+2+4 gộp r173-i1, mục 9 = r173-i2, mục 12 = commit giao diện.
+- **r173-i1** (classic): timeout 90s phủ cả thân response (trước: thân đứng giữa chừng → `loadData` treo mãi); dự phòng ngừng khi đã có header 200 (trước: thân lớn bị tải 2–3 bản song song); chỉ Report summary chờ cây org unit.
+- **r173-i2** (classic + loader.js): mở cache chấm lại `semantic_status`/`report_ageing`/`overdue_cat` + đếm audit theo hôm nay (`regradeRows`/`regradeAudits`).
+- **Giao diện** (beta-template.html `render()`): chỉ về đầu trang khi đổi màn/tab; sort/pager/chọn record/nạp xong giữ vị trí cuộn và trả focus về đúng nút (pager "Next page" khớp theo aria-label).
+- Kiểm: test Node (fetch giả) trên hàm trích nguyên — cũ treo / mới reject đúng hạn; local dữ liệu thật 7.063 report · 1.098 audit, cache giả lập cũ MCAR-0381 → Overdue CAT I, audit 4/0 → 3/1, `M.consistency()` rỗng; Next page ×3 → trang 2/3/4, focus giữ, cuộn giữ; đổi màn → về đầu; console sạch.
+- Đo Worker thật (curl, mạng nhà): workflow 18,5 MB byte đầu 3,8–8,3s, thân +0,6s → lợi ích dự phòng chỉ rõ trên mạng chậm (công ty?). Mã nguồn Worker `galileo-proxy` không nằm trong repo.
+- Hạ tầng: `beta-src/build.mjs` đọc `QA_AMO_REPO` (mặc định F:), `beta-devserver.mjs` tự tìm repo F: hoặc `%USERPROFILE%/Documents/GitHub`. Backup nguồn: `rebuild UIUX/beta-src-bak-20260928/`.
+- Còn: Eric duyệt → push → kiểm live (curl APP_REV = r173-i2). Đợt 2 (tải nhanh khi lên rev mới, lần đầu không cache, gộp quét report_field, RFI song song, tách font/letterhead) và đợt 3 (UX) chưa làm.
+
 ## ✅ r173 — Nối HIRA ↔ CAPA (28/09/2026, ĐÃ PUSH 352a4df — live, curl APP_REV = r173)
 
 - Qua số HIRA trong Report Reference của CAPA; HIRA-16 Yes nhưng không có CAPA; CAPA-01/03/08 không nối (CAPA-03 ghi mã AMO-ENV-025 sai — cần Safety sửa trên Coruson).
