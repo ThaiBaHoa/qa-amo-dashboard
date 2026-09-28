@@ -2522,7 +2522,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.28-r174';
+const APP_REV = '2026.09.28-r175';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -6065,33 +6065,34 @@ async function loadPavoiRfi(force=false){
   const todo = openIds.filter(id => !pavoiRfiDone.has(id));
   if(!todo.length){ pavoiRfiLoaded=true; renderPavoi(); return; }
   setOv(true,'Loading PAVOI RFI...','');
-  const CHUNK = 15, MAX_TRY = 3;
-  let failed = 0;
-  for(let i=0;i<todo.length;i+=CHUNK){
-    const ids = todo.slice(i,i+CHUNK);
+  // [r175] Các chunk chạy SONG SONG từng đợt PAR (trước: tuần tự), và bỏ vòng thử lại bên ngoài — fetchAll
+  // đã tự thử lại 3 lần có dự phòng, chồng thêm 3 lần nữa là tới 9 lần × 90s cho một chunk hỏng.
+  // Chunk hỏng vẫn để pavoiRfiLoaded=false → mở lại trang thử đúng các report còn thiếu.
+  const CHUNK = 15, PAR = 4;
+  let failed = 0, doneN = 0;
+  const chunks = [];
+  for(let i=0;i<todo.length;i+=CHUNK) chunks.push(todo.slice(i,i+CHUNK));
+  const one = async ids => {
     const orClause = ids.map(id=>'report_id eq '+id).join(' or ');     // GUID không bọc nháy
     const url = G_URL + 'dwreporting_report_task' +
       '?$select=report_id,task_id,task_title,task_owner,task_status,task_delivery_status,' +
       'task_target_date,task_completed_date,task_instructions,task_response,task_related_section_name' +
       '&$filter=' + encodeURIComponent('('+orClause+')');   // lấy MỌI task (RFI + Task), lọc trong JS
-    setOv(true,'Loading PAVOI RFI/Task...',`${Math.min(i+CHUNK,todo.length)}/${todo.length} reports`);
-    let ok = false;
-    for(let attempt=1; attempt<=MAX_TRY && !ok; attempt++){
-      try{
-        const raw = await fetchAll(url, true);
-        raw.forEach(t=>{
-          if(!isPavoiItem(t)) return;                        // loại Deleted + stage placeholder (title rỗng)
-          (pavoiRfiMap[t.report_id] ||= []).push(t);
-        });
-        ids.forEach(id => pavoiRfiDone.add(id));            // đánh dấu các report trong chunk đã xong
-        ok = true;
-      }catch(e){
-        console.warn(`[PAVOI RFI] chunk@${i} try ${attempt}/${MAX_TRY} failed:`, e.message);
-        if(attempt<MAX_TRY) await new Promise(res=>setTimeout(res, 400*attempt)); // backoff
-      }
+    try{
+      const raw = await fetchAll(url, true);
+      raw.forEach(t=>{
+        if(!isPavoiItem(t)) return;                        // loại Deleted + stage placeholder (title rỗng)
+        (pavoiRfiMap[t.report_id] ||= []).push(t);
+      });
+      ids.forEach(id => pavoiRfiDone.add(id));            // đánh dấu các report trong chunk đã xong
+    }catch(e){
+      failed++;
+      console.warn('[PAVOI RFI] chunk failed (' + ids.length + ' reports):', e.message);
     }
-    if(!ok) failed++;
-  }
+    doneN += ids.length;
+    setOv(true,'Loading PAVOI RFI/Task...',`${doneN}/${todo.length} reports`);
+  };
+  for(let i=0;i<chunks.length;i+=PAR) await Promise.all(chunks.slice(i,i+PAR).map(one));
   if(failed){
     pavoiRfiLoaded = false;   // còn chunk lỗi → mở lại trang sẽ thử lại đúng các report còn thiếu
     toast(`PAVOI RFI/Task: ${failed} group(s) failed to load — reopen the page to retry`,'err');
@@ -6698,8 +6699,20 @@ function parseAircraftFromTitle(title){
   return m?m[1].toUpperCase():title.replace(/^CMR\s+/i,'').trim()||null;
 }
 
+// [r175] CMR-CAR và ECAR cùng quét `dwanalytics_report_field` toàn hệ thống theo field_name (view này
+// KHÔNG có report_title để lọc): CMR 4 field, ECAR 2 field là tập con — trước đây 2 request riêng.
+// Nay cả hai gọi đúng MỘT URL ngay đầu hàm (trước request summary), nên khi chạy song song (lượt 2 của
+// loadData / giao diện mới) _fetchAllInflight (r168) gộp thành 1 request. Người gọi chỉ đọc mảng.
+const FINDING_RF_FIELDS = ['Finding description','ATA Chapter','Finding level','NC Type'];
+function fetchFindingRf(){
+  return fetchAll(G_URL+'dwanalytics_report_field'+
+    '?$select=report_id,field_name,value_text,section_id,report_field_created_date'+
+    '&$filter='+encodeURIComponent(FINDING_RF_FIELDS.map(f=>"field_name eq '"+f+"'").join(' or ')), true);
+}
+
 async function loadCmr(){
   setOv(true,'Loading CMR-CAR...','');
+  const rfP=fetchFindingRf().catch(e=>{console.warn('CMR report_field fetch failed:',e);return[];});   // [r175]
   try{
     const raw=await fetchAll(
       G_URL+'dwreporting_report_summary'+
@@ -6727,8 +6740,6 @@ async function loadCmr(){
         "field_name eq 'Final action taken' or field_name eq 'Issued to (person)' or "+
         "field_name eq 'Verified by (auditor)' or field_name eq 'Date completed' or "+
         "field_name eq 'RCA analysis'";
-      const CMR_RF="field_name eq 'Finding description' or field_name eq 'ATA Chapter' or "+
-        "field_name eq 'Finding level' or field_name eq 'NC Type'";
       // Fetch both views in parallel: form_section_field for metadata, report_field for section_id pairing
       // [r161] form_section_field lọc thêm `report_title eq 'CMR CAR'` NGAY TRÊN VIEW (view này có cột
       // report_title; report_field thì KHÔNG có nên vẫn quét theo field_name). Quét toàn hệ thống 15 field
@@ -6739,10 +6750,7 @@ async function loadCmr(){
         fetchAll(G_URL+'dwanalytics_report_form_section_field'+
           '?$select=report_id,field_name,text_value,report_field_created_date'+
           '&$filter='+encodeURIComponent("report_title eq 'CMR CAR' and ("+CMR_FF+")")),
-        fetchAll(G_URL+'dwanalytics_report_field'+
-          '?$select=report_id,field_name,value_text,section_id,report_field_created_date'+
-          '&$filter='+encodeURIComponent(CMR_RF), true)
-          .catch(e=>{console.warn('CMR report_field fetch failed:',e);return[];})
+        rfP
       ]);
       fMap = buildFindingRowsByIndex(fRaw, cmrIdSet,
         ['Finding description','ATA Chapter','Finding level','NC Type']);
@@ -7179,6 +7187,11 @@ const ECAR_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','
 
 async function loadEcar(){
   setOv(true,'Loading ECAR...','');
+  // [r175] cùng lượt quét với loadCmr; ECAR chỉ lấy 2 field như trước (Finding level / NC Type của CMR
+  // lọt vào sẽ đổi findingRows của ECAR)
+  const rfP=fetchFindingRf()
+    .then(rows=>rows.filter(f=>f.field_name==='Finding description'||f.field_name==='ATA Chapter'))
+    .catch(e=>{console.warn('ECAR report_field fetch failed:',e);return[];});
   try{
     const raw=await fetchAll(
       G_URL+'dwreporting_report_summary'+
@@ -7202,7 +7215,6 @@ async function loadEcar(){
         "field_name eq 'Aircraft Registration' or field_name eq 'Finding description' or "+
         "field_name eq 'ATA Chapter' or "+
         "field_name eq 'Date completed' or field_name eq 'Issued by'";
-      const ECAR_RF="field_name eq 'Finding description' or field_name eq 'ATA Chapter'";
       // Fetch both views in parallel
       // [r161] Lọc thêm `report_title eq 'ECAR'` ngay trên view như loadCmr — 58.726 → 7.828 dòng
       // (4,6s → 2,3s, đo 10/09/2026). Query ECAR chưa hỏng nhưng cùng bệnh với CMR (quét toàn hệ thống),
@@ -7212,10 +7224,7 @@ async function loadEcar(){
         fetchAll(G_URL+'dwanalytics_report_form_section_field'+
           '?$select=report_id,field_name,text_value,report_field_created_date'+
           '&$filter='+encodeURIComponent("report_title eq 'ECAR' and ("+ECAR_FF+")")),
-        fetchAll(G_URL+'dwanalytics_report_field'+
-          '?$select=report_id,field_name,value_text,section_id,report_field_created_date'+
-          '&$filter='+encodeURIComponent(ECAR_RF), true)
-          .catch(e=>{console.warn('ECAR report_field fetch failed:',e);return[];})
+        rfP
       ]);
       fMap = buildFindingRowsByIndex(fRaw, ecarIdSet,
         ['Finding description','ATA Chapter']);
