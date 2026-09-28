@@ -1413,7 +1413,7 @@ if(!HOOK.lite && X2 && X2.v === 1){
 }
 if(saveCache){
   const pv = new Set(allData.filter(r => r.report_title === 'PAVOI').map(r => r.report_id));
-  const entry = { ts: Date.now(), rev: HOOK.rev, a: allData, b: auditData, ou: ORG_UNIT_IDS };
+  const entry = { ts: Date.now(), rev: HOOK.rev, dv: HOOK.dv, a: allData, b: auditData, ou: ORG_UNIT_IDS };
   if(secondOk) entry.x = { v: 1, cmr: cmrData, ecar: ecarData, k7c: kpi7Cnt, k7v: kpi7Ver,
     ver: verRaw.filter(f => f.section_id && pv.has(f.report_id)) };
   try{ await HOOK.writeStore(HOOK.cacheKey, entry); }
@@ -1642,19 +1642,22 @@ async function run(){
 
   say('Reading cached data…');
   const c = await readMainStore(SRC, grabStr(SRC, 'CACHE_KEY'));
-  const cache = c && c.rev === REV && Array.isArray(c.a) && c.a.length ? c : null;
-  /* [r165] same rule as cacheLoad(): a same-rev cache older than CACHE_TTL is still shown at
-     once, then refreshed in the background. TTL is read from classic.html, not copied. */
+  /* [r174] same rule as cacheLoad(): the cache is dropped only when its STRUCTURE version (CACHE_DATA_VER)
+     differs. A cache from another rev, or older than CACHE_TTL, is still shown at once, then refreshed in
+     the background (r165) — a deploy no longer sends everyone to a cold Galileo load. */
+  const DV = grabStr(SRC, 'CACHE_DATA_VER');
+  const cache = c && c.dv === DV && Array.isArray(c.a) && c.a.length ? c : null;
+  const newRev = !!cache && cache.rev !== REV;
   let TTL = 4 * 3600e3;
   try{ TTL = new Function(grabDecl(SRC, 'CACHE_TTL') + '\nreturn CACHE_TTL;')(); }catch(e){ console.warn('[beta] CACHE_TTL not read, using 4h:', e.message); }
-  const stale = !!cache && Date.now() - cache.ts > TTL;
+  const stale = !!cache && (newRev || Date.now() - cache.ts > TTL);
 
   /* One extraction, one fresh scope per load: a background refresh cannot see or disturb the
      state of the load that is on screen. */
   const body = PRELUDE + EXTRACTED + '\nreturn (async () => {\n' + DRIVER + '\n})();';
   const load = opts => (new Function('HOOK', body))(Object.assign({
     say, dev: DEV, readStore: k => readMainStore(SRC, k),
-    write: WRITE, writeStore: (k, v) => writeMainStore(SRC, k, v), cacheKey: grabStr(SRC, 'CACHE_KEY'), rev: REV }, opts));
+    write: WRITE, writeStore: (k, v) => writeMainStore(SRC, k, v), cacheKey: grabStr(SRC, 'CACHE_KEY'), rev: REV, dv: DV }, opts));
   const payload = (res, src, ts) => {
     const now = new Date();
     return { asOf: localDay(now), generatedAt: now.toISOString(), appRev: REV, source: src, cacheTs: ts,
@@ -1721,7 +1724,8 @@ async function run(){
     return;
   }
   const hours = Math.round((Date.now() - cache.ts) / 3600e3);
-  if(stale) toast('Showing data from ' + hours + 'h ago', 'Refreshing from Galileo in the background.');
+  if(stale) toast(newRev ? 'New dashboard version' : 'Showing data from ' + hours + 'h ago',
+                  (newRev ? 'Showing the saved data; ' : '') + 'Refreshing from Galileo in the background.');
   let full = null, how = stale ? 'background refresh' : 'completed from cache', note = '';
   try{
     full = await load(stale ? { cache: null, background: true } : { cache });

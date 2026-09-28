@@ -167,6 +167,11 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
   IndexedDB (`wfRaw`, `cfRaw`, not tied to APP_REV): full load once / every 7 days / on ↻,
   otherwise only reports whose rows changed since the `modified_date` watermark.
   **Never mutate `allData` directly** — use enriched clones only.
+  **A deploy no longer drops the cache (r174):** the cache is dropped only when `CACHE_DATA_VER`
+  differs; a cache from another rev is shown at once and refreshed in the background (like one older
+  than 4h). **Bump `CACHE_DATA_VER` when you change the SHAPE of cached data** (add/rename/re-mean a
+  field of allData/auditData/the second-pass `x`) — otherwise the new screen code runs on old rows
+  until the background refresh lands. A logic change that keeps the same fields needs no bump.
   **A cache open regrades by today (r173-i2):** `semantic_status` / `report_ageing` / `overdue_cat` are
   date-relative, so `cacheLoad` (classic) and the index.html DRIVER pass cached rows through
   `regradeRows` (+ `regradeAudits` for audit open/overdue/closed counts). A new date-relative field
@@ -517,7 +522,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.09.28-r173-i2
+Rev current: 2026.09.28-r174
 
 ORG_UNIT_IDS          ← main pages: 'QA AMO' + ALL its sub-units, resolved at load
                          from dwreporting_organisational_unit_hierarchy (r143).

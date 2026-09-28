@@ -2522,7 +2522,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.28-r173-i2';
+const APP_REV = '2026.09.28-r174';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3079,6 +3079,12 @@ window.addEventListener('DOMContentLoaded', async ()=>{
 // IndexedDB không dính trần ~5 MB (hạn mức theo dung lượng đĩa trống), và structured clone
 // bỏ luôn được bước JSON.stringify 6 MB mỗi lần ghi.
 const CACHE_KEY   = 'qaAmoV5';
+// [r174] Phiên bản CẤU TRÚC của cache — tách khỏi APP_REV. Trước r174 lên rev nào cũng vứt cache, nên
+// mỗi lần deploy (có ngày 3 rev) mọi người phải nạp nguội vài phút. Nay rev mới vẫn HIỆN NGAY cache cũ
+// rồi nạp mới ngầm (như cache quá 4 giờ); chỉ vứt khi số này khác. TĂNG số này khi đổi HÌNH DẠNG dữ
+// liệu mà màn hình cần (thêm/đổi tên trường của allData/auditData/x, đổi nghĩa một trường) — thiếu
+// trường thì màn hình hỏng trong lúc chờ nạp ngầm. Đổi logic tính mà giữ nguyên trường thì KHÔNG cần.
+const CACHE_DATA_VER = 'd1';
 const CACHE_TTL   = 4 * 60 * 60 * 1000; // 4 hours
 const CACHE_DB    = 'qaAmoCache';
 const CACHE_STORE = 'blobs';
@@ -3311,11 +3317,12 @@ async function cacheLoad() {
     // khác hẳn nhau về mức nghiêm trọng, gộp chung thành một chữ "miss" là mất thông tin.
     if (!c) { cacheMissReason = 'chưa có cache nào được ghi'; return false; }
     if (!c.ts || !c.a)                      { cacheMissReason = 'bản cache hỏng cấu trúc'; return false; }
-    // Vứt cache khi lên rev mới (deploy đổi logic/field) → tránh phục vụ data cũ
-    // tính theo code cũ. Vd r126 nới filter Audit Plan nhưng cache r125 vẫn thiếu audit.
-    // [r165] Xét rev TRƯỚC hạn 4 giờ: bản cũ của rev khác không được phục vụ kể cả kiểu 'stale'.
-    if (c.rev !== APP_REV) {
-      cacheMissReason = 'lên rev mới (' + c.rev + ' → ' + APP_REV + ')';
+    // [r174] Chỉ vứt khi CẤU TRÚC cache khác (CACHE_DATA_VER). Rev khác → hiện ngay rồi nạp mới ngầm
+    // (stale) — số liệu tính theo code cũ chỉ tồn tại tới khi lượt nạp ngầm xong (vd r126 nới filter
+    // Audit Plan: cache r125 thiếu audit vài chục giây thay vì bắt mọi người nạp nguội). Cache ghi trước
+    // r174 không có dv → vứt một lần.
+    if (c.dv !== CACHE_DATA_VER) {
+      cacheMissReason = 'cấu trúc cache khác (' + (c.dv || 'trước r174') + ' → ' + CACHE_DATA_VER + ')';
       idbDel(CACHE_KEY).catch(()=>{}); return false;
     }
     // [r165] QUÁ 4 GIỜ → vẫn HIỆN NGAY bản cũ, rồi initApp() nạp mới NGẦM (stale-while-revalidate).
@@ -3323,8 +3330,10 @@ async function cacheLoad() {
     // cùng lúc curl tới Cloudflare 6,8 MB/s. Một lượt nạp nguội khi đó mất ~6 phút rồi còn báo
     // "Could not load data", trong khi 5/5 lượt mở gần nhất đều trượt cache vì 'quá hạn 4 giờ'.
     // Người xem thấy ngay số của lần trước (có ghi tuổi) thay vì màn che quay vô hạn.
-    const stale = Date.now() - c.ts > CACHE_TTL;
-    if (stale) cacheMissReason = 'quá hạn 4 giờ — hiện bản cũ, nạp mới ngầm';
+    const newRev = c.rev !== APP_REV;
+    const stale = newRev || Date.now() - c.ts > CACHE_TTL;
+    if (stale) cacheMissReason = newRev ? 'lên rev mới (' + c.rev + ' → ' + APP_REV + ') — hiện bản cũ, nạp mới ngầm'
+                                        : 'quá hạn 4 giờ — hiện bản cũ, nạp mới ngầm';
     allData   = regradeRows(c.a);                          // [r173-i2] chấm lại theo hôm nay
     auditData = regradeAudits(c.b || [], allData);
     if (Array.isArray(c.ou) && c.ou.length) ORG_UNIT_IDS = c.ou;   // [r143] phiên mở từ cache không chạy loadData
@@ -3361,7 +3370,7 @@ async function cacheLoad() {
 // của admin, kèm console.warn có SỐ (byte định ghi, quota còn lại) để chẩn đoán được ngay.
 // Không await ở người gọi: hàm tự nuốt mọi lỗi, không bao giờ ném ra ngoài.
 async function cacheSave() {
-  const payload = {ts:Date.now(), rev:APP_REV, a:allData, b:auditData,
+  const payload = {ts:Date.now(), rev:APP_REV, dv:CACHE_DATA_VER, a:allData, b:auditData,
                    dtf:docTypeFlat, sa:stageAggregate, ou:ORG_UNIT_IDS};
   try {
     // structured clone — KHÔNG JSON.stringify: bỏ được bước dựng chuỗi ~6 MB mỗi lượt ghi.
