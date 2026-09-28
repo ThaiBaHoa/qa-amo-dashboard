@@ -453,6 +453,17 @@ App có **3 Worker riêng** — đừng nhầm:
 
 ### 1. `galileo-proxy` (dữ liệu — `G_URL`)
 
+> **Từ r176 (28/09/2026) mã nguồn nằm TRONG repo:** `workers/galileo-proxy/` (wrangler, deploy `npx.cmd wrangler deploy`
+> trong thư mục đó; bản lấy từ editor Cloudflare trước đó giữ ở `worker.live-2026-09-28.js`). Hai thay đổi:
+> **(a) đòi đăng nhập** — `Authorization: Bearer <access token Supabase>`; worker gọi `SUPA_URL/auth/v1/user`, rồi đọc
+> `public.users.role` bằng chính token đó (RLS `select_all`: người dùng đọc được dòng của mình); `pending`/`rejected`/không
+> có hồ sơ → 403, không/sai token → 401; kết quả nhớ 5 phút/token (không quá hạn token). Công tắc `AUTH_MODE`
+> (`wrangler.jsonc` vars): `soft` = kiểm + log, vẫn trả; `enforce` = chặn. Chỉ kiểm `Origin` là không đủ: header ai cũng
+> giả được. App: mọi request G_URL đi qua `gFetch`/`gAuth` (classic.html), giao diện mới lấy token từ phiên của nó.
+> **(b) truyền dần thân response** (trước: `await response.text()` rồi mới trả → trình duyệt không có header tới byte cuối,
+> dự phòng r173-i1 vô tác dụng). Thử trước khi live: `npx.cmd wrangler dev --remote --port 8787 --var AUTH_MODE:enforce`
+> + preview `beta-local` với `?relay=http://127.0.0.1:5520/proxy-dev/&auth=1` (relay chuyển tiếp Authorization).
+
 ```javascript
 const ALLOWED_ORIGINS = [
   'https://vjc-qa-amo.com',
@@ -486,7 +497,7 @@ const ALLOWED_ORIGINS = [
 - `shot` (dataURL JPEG) gửi bằng `sendPhoto` **rời** khỏi tin nhắn text — caption Telegram
   giới hạn 1024 ký tự, nhét chung sẽ bị cắt. Ảnh hỏng thì bỏ qua, tin text đã gửi xong.
 - **Source nằm TRONG repo:** `workers/qa-feedback/` (wrangler). Deploy `npx.cmd wrangler deploy`,
-  xem log `npx.cmd wrangler tail`. Khác `galileo-proxy` và `galileo-ai` — hai worker đó chỉ
+  xem log `npx.cmd wrangler tail`. `galileo-proxy` cũng đã vào repo từ r176; `galileo-ai` vẫn chỉ
   tồn tại trong editor trên Cloudflare dashboard, không có bản nào trong git.
 - Tách riêng khỏi `galileo-proxy` **có chủ đích**: proxy là đường dữ liệu sống của toàn app,
   hỏng nó là mất data mọi trang; kênh báo lỗi hỏng thì chỉ hỏng nút báo lỗi.

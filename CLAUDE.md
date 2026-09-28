@@ -139,6 +139,9 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
    for kiosk auto-refresh; `location.reload()` wipes the session and shows login screen.
 
 2. **Galileo** (`G_URL`, ~line 768) — report data. A Cloudflare Worker proxy
+   (**source in `workers/galileo-proxy/` since r176; it requires a signed-in Supabase user** — every
+   request to G_URL must go through `gFetch`/`fetchAll`, never a bare `fetch`, or it gets 401 once
+   `AUTH_MODE` is `enforce`)
    (`galileo-proxy.thaibahoa2308.workers.dev`) in front of an OData API. All report/
    workflow/audit data comes from here via `fetchAll()`.
 
@@ -522,7 +525,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.09.28-r175
+Rev current: 2026.09.28-r176
 
 ORG_UNIT_IDS          ← main pages: 'QA AMO' + ALL its sub-units, resolved at load
                          from dwreporting_organisational_unit_hierarchy (r143).

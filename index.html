@@ -1233,7 +1233,9 @@ const STUBS = new Set(['g','s','setOv','toast','showLoadError','renderAll','cach
   'idbGet','idbSet','idbDel','idbTx','idbOpen','cfWatermark','resetLazyStores','updateCacheAge','ageLabel',
   'allData','auditData','cmrData','ecarData','loadFailures','isLoading','cmrLoaded','ecarLoaded',
   'kpi7Loaded','kpi7Busy','kpi7Cnt','kpi7Ver','kpi7Done','pavoiRfiLoaded','pavoiRfiMap','pavoiRfiDone',
-  'eisLoaded','eisCAMap','eisDescMap','qcsLoaded','qcsMap','localStorage','sessionStorage']);
+  'eisLoaded','eisCAMap','eisDescMap','qcsLoaded','qcsMap','localStorage','sessionStorage',
+  /* [r176] the Galileo sign-in header comes from this page's own Supabase session (SB), not classic's sb */
+  'gAuth']);
 /* Main-dashboard functions that draw its own DOM (render*, show*, *Chart…). A loader reached
    through the closure often ends by calling one of them; in the beta that call becomes a no-op,
    because the beta draws its own screens. A name listed in ROOTS is always extracted for real. */
@@ -1369,6 +1371,8 @@ async function idbSet(k, v){
   return HOOK.writeStore(k, v);
 }
 async function idbDel(){}
+/* [r176] galileo-proxy requires a signed-in user: classic's gFetch asks gAuth for the header */
+async function gAuth(){ return HOOK.auth ? HOOK.auth() : {}; }
 `;
 
 const DRIVER = `
@@ -1662,6 +1666,8 @@ async function run(){
   const body = PRELUDE + EXTRACTED + '\nreturn (async () => {\n' + DRIVER + '\n})();';
   const load = opts => (new Function('HOOK', body))(Object.assign({
     say, dev: DEV, readStore: k => readMainStore(SRC, k),
+    auth: async () => { try{ const s = SB && (await SB.auth.getSession()).data.session;
+      return s && s.access_token ? { Authorization: 'Bearer ' + s.access_token } : {}; }catch(e){ return {}; } },
     write: WRITE, writeStore: (k, v) => writeMainStore(SRC, k, v), cacheKey: grabStr(SRC, 'CACHE_KEY'), rev: REV, dv: DV }, opts));
   const payload = (res, src, ts) => {
     const now = new Date();

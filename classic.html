@@ -2522,7 +2522,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.28-r175';
+const APP_REV = '2026.09.28-r176';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3857,12 +3857,28 @@ const HEDGE_MAX = 3;
 // Hạn giờ phủ CẢ phần thân: trước đây clearTimeout chạy trước r.json(), thân đứng giữa chừng
 // là treo vô hạn (isLoading kẹt true, auto-refresh/kiosk bỏ lượt mãi). Thân có hạn riêng
 // FETCH_TIMEOUT_MS tính từ lúc có header — thân lớn (workflow ~18 MB) tải chậm vẫn kịp.
+// [r176] galileo-proxy đòi đăng nhập: mọi request tới G_URL mang access token Supabase của phiên này.
+// Trước r176 proxy chỉ xét Origin — header ai cũng giả được, nên ai biết URL cũng đọc được dữ liệu
+// Galileo. getSession() tự làm mới token sắp hết hạn (autoRefreshToken), nên kiosk 12 giờ vẫn chạy.
+// Không có phiên (chưa đăng nhập / Supabase không tải được) → không gửi header; proxy chế độ 'soft' vẫn
+// trả, chế độ 'enforce' trả 401. MỌI fetch tới G_URL phải đi qua gFetch (hoặc fetchAll).
+async function gAuth() {
+  try {
+    const s = sb && (await sb.auth.getSession()).data.session;
+    return s && s.access_token ? { Authorization: 'Bearer ' + s.access_token } : {};
+  } catch(e) { return {}; }
+}
+async function gFetch(url, init = {}) {
+  const h = await gAuth();
+  return fetch(url, { ...init, headers: { ...(init.headers || {}), ...h } });
+}
+
 async function fetchOnce(url, extCtl, onHeaders) {
   const ctl = extCtl || new AbortController();
   let tid = setTimeout(()=>ctl.abort(), FETCH_TIMEOUT_MS);
   try {
     let r;
-    try { r = await fetch(url, {signal:ctl.signal}); }
+    try { r = await gFetch(url, {signal:ctl.signal}); }   // [r176] kèm token
     catch(e){ throw new Error(e.name==='AbortError'
         ? `Request timed out (${FETCH_TIMEOUT_MS/1000}s) — server responded slowly`
         : e.message); }
@@ -10818,7 +10834,7 @@ async function qbLoadOrgUnits(tbl) {
   const status = g('qbOrgUnitStatus');
   try {
     const url = G_URL + tbl + '?$select=org_unit_name&$top=2000';
-    const data = ((await (await fetch(url)).json()).value || []);
+    const data = ((await (await gFetch(url)).json()).value || []);
     const units = [...new Set(data.map(r => r.org_unit_name).filter(Boolean))].sort();
     const sel = g('qbOrgUnitSel');
     if(!sel) return;
@@ -10933,7 +10949,7 @@ async function qbRun() {
     const limit=parseInt(g('qbLimit')?.value)||500;
     const primaryUrl=G_URL+primaryTbl+'?'+select+filterStr+sortStr+'&$top='+limit;
 
-    const primaryData=((await (await fetch(primaryUrl)).json()).value||[]);
+    const primaryData=((await (await gFetch(primaryUrl)).json()).value||[]);
     let merged=primaryData.map(r=>({...r}));
 
     // Fetch all join tables in parallel
@@ -10947,7 +10963,7 @@ async function qbRun() {
         joinFilter='&$filter='+keyVals.map(k=>`${join.foreignKey} eq '${String(k).replace(/'/g,"''")}'`).join(' or ');
       }
       const joinUrl=G_URL+join.table+'?'+joinSelect+joinFilter+'&$top=5000';
-      const joinData=((await (await fetch(joinUrl)).json()).value||[]);
+      const joinData=((await (await gFetch(joinUrl)).json()).value||[]);
       return {join, data:joinData};
     }));
 
@@ -11291,7 +11307,7 @@ async function dbFetchWidget(w) {
     }
     const sortStr = w.sortField ? `&$orderby=${w.sortField} ${w.sortDir||'asc'}` : '';
     const url = G_URL + w.table + '?' + select + filterStr + sortStr + '&$top=' + (w.limit||500);
-    const resp = await fetch(url);
+    const resp = await gFetch(url);
     const json = await resp.json();
     dbRenderPanel(body, w, json.value||[]);
   } catch(e) {
@@ -11463,7 +11479,7 @@ window.fetchATAChapters = async function(fieldName = 'ATA Chapter') {
   console.log(`%c[ATA] Finding values for field: "${fieldName}"...`, 'color:#58A6FF;font-weight:bold');
   try {
     const url = G_URL + `dwanalytics_report_form_section_field?$filter=field_name eq '${fieldName}'&$select=text_value&$top=5000`;
-    const r = await fetch(url);
+    const r = await gFetch(url);
     if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
     const j = await r.json();
 
@@ -11538,7 +11554,7 @@ window.probeGalileoTables = async function() {
     const batch = candidates.slice(i, i + 5);
     await Promise.all(batch.map(async tbl => {
       try {
-        const r = await fetch(G_URL + tbl + '?$top=2');
+        const r = await gFetch(G_URL + tbl + '?$top=2');
         if (r.ok) {
           const j = await r.json();
           ok.push({ table: tbl, records: j.value?.length, fields: j.value?.[0] ? Object.keys(j.value[0]) : [] });
@@ -11571,7 +11587,7 @@ window.debugFindingRaw = async function(reportRef) {
   // Fetch ALL columns available for this report — no $select filter
   const url = G_URL+'dwanalytics_report_form_section_field'
     +'?$top=1&$filter='+encodeURIComponent(`report_id eq ${r.report_id}`);
-  const probe = await (await fetch(url)).json();
+  const probe = await (await gFetch(url)).json();
   console.log('%c[DEBUG] All available columns:', 'color:#3FB950;font-weight:bold');
   if(probe.value[0]) console.log(Object.keys(probe.value[0]));
 
@@ -11579,7 +11595,7 @@ window.debugFindingRaw = async function(reportRef) {
   const url2 = G_URL+'dwanalytics_report_form_section_field'
     +'?$filter='+encodeURIComponent(`report_id eq ${r.report_id}`)
     +'&$top=200';
-  const j = await (await fetch(url2)).json();
+  const j = await (await gFetch(url2)).json();
   console.log('%c[DEBUG] Full rows (all columns):', 'color:#D29922;font-weight:bold');
   console.table(j.value.map((row,i)=>({
     i,

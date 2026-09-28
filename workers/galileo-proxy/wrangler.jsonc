@@ -1,0 +1,23 @@
+{
+  // galileo-proxy — deploy: `npx.cmd wrangler deploy` in this folder.
+  // Secret GALILEO_KEY lives on Cloudflare only (never here); deploy does not touch it.
+  "name": "galileo-proxy",
+  "main": "src/worker.js",
+  "workers_dev": true,
+  "preview_urls": false,
+  "compatibility_date": "2026-05-16",
+  "vars": {
+    // 'soft' = check sign-in and log, still serve · 'enforce' = refuse without a valid session
+    "AUTH_MODE": "soft",
+    // public values, the same ones classic.html ships to every browser
+    "SUPA_URL": "https://czftzgdcnpnspbbegwjt.supabase.co",
+    "SUPA_KEY": "sb_publishable_eGdEXBCSD_19tu4sOV8NWQ_8mZmUqqq"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "redact_query_string": false,
+    "logs": { "enabled": true, "head_sampling_rate": 1, "persist": true, "invocation_logs": true },
+    "traces": { "enabled": false, "persist": true, "head_sampling_rate": 1 }
+  }
+}
