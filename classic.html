@@ -2522,7 +2522,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.28-r172';
+const APP_REV = '2026.09.28-r173';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3444,6 +3444,8 @@ function resetLazyStores(){
   try{ localStorage.removeItem(KPI7_CACHE_KEY); }catch{}
   eisLoaded=false; eisCAMap={}; eisDescMap={};   // reset EIS per-CA cache để Refresh kéo lại
   qcsLoaded=false; qcsMap={};                     // reset QC Spot Check cache để Refresh kéo lại
+  hiraLoaded=false; hiraClsMap={};                // [r173] HIRA classifications + CAPA (r171/r172)
+  capaLoaded=false; capaTaskMap={}; capaInfoMap={}; hiraCapaMap={};
 }
 async function loadData(forceRefresh=false, opts={}) {
   if(isLoading){toast('Loading data, please wait...','info');return;}
@@ -5261,7 +5263,7 @@ async function loadHiraCls(){
 // (số HIRA / Hazard Log / MCCF gốc) / Additional details, nhóm MITIGATION ACTION (Mitigation Action ·
 // Target date · Department, gom theo section_id), VERIFICATION (VOI · Date verified · Verified by).
 const CAPA_TITLE = 'AMO - Additional Mitigation';
-let capaLoaded=false, capaTaskMap={}, capaInfoMap={};
+let capaLoaded=false, capaTaskMap={}, capaInfoMap={}, hiraCapaMap={};   // hiraCapaMap[HIRA report_id] = [CAPA report_id] (r173)
 const capaTaskSem = t => semCalc(t.task_status==='Completed' || t.task_completed_date ? 'Closed' : 'Open',
   t.task_completed_date, t.task_target_date);
 async function loadCapa(){
@@ -5301,7 +5303,18 @@ async function loadCapa(){
   });
   Object.values(im).forEach(o=>{ o.actions=Object.values(o.actions).filter(a=>a.text||a.target||a.dept)
     .sort((a,b)=>String(a.text).localeCompare(String(b.text),undefined,{numeric:true})); });
-  capaTaskMap=tm; capaInfoMap=im; capaLoaded=true;
+  // [r173] Nối CAPA → HIRA: Galileo KHÔNG có report link giữa hai form (linked_* = -1), nên đọc số HIRA
+  // ghi trong 'Report Reference' (vd "VJC AMO-HAZARD LOG-25, VJC AMO-HIRA-22"). CHỈ nối khi ghi rõ số
+  // HIRA — KHÔNG đoán theo mã mối nguy/tiêu đề: probe 28/09 CAPA-02/04 ghi tiêu đề "AMO-ENV-012" nhưng mối
+  // nguy thật là AMO-ENV-009 (HIRA-09), CAPA-03 chỉ ghi "AMO-ENV-025" (không HIRA nào mang mã này).
+  const hiraByNo={};
+  allData.forEach(r=>{ const m=r.report_title===HIRA_TITLE && String(r.report_number||'').match(/HIRA-0*(\d+)\s*$/i); if(m) hiraByNo[+m[1]]=r.report_id; });
+  const hm={};
+  Object.entries(im).forEach(([id,o])=>{
+    o.hira=[...new Set([...String(o.ref||'').matchAll(/HIRA[\s-]*0*(\d+)/gi)].map(m=>hiraByNo[+m[1]]).filter(Boolean))];
+    o.hira.forEach(h=>(hm[h] ||= []).push(id));
+  });
+  capaTaskMap=tm; capaInfoMap=im; hiraCapaMap=hm; capaLoaded=true;
 }
 // Đếm task của một (hoặc nhiều) CAPA theo semCalc — một nguồn cho danh sách, tiles và chi tiết.
 function capaTaskStats(reportIds){

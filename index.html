@@ -753,6 +753,7 @@ body.kiosk .app{grid-template-columns:minmax(0,1fr) !important}
 /* r171 AMO - HIRA register: 9 columns fit a laptop width — headers may wrap, report number stays on one line */
 .af-hira .tbl th, .af-hira .tbl th button{white-space:normal;text-align:left}
 .af-hira .row-id{white-space:nowrap}
+.af-hira td[data-l="Days to due"], .af-hira td[data-l="Days to due"] *{white-space:normal}
 .beta-docs .beta-sel .ctl{max-width:min(420px,100%)}
 .beta-guide h1,.beta-guide h2,.beta-guide h3{margin:var(--s4) 0 var(--s2)}
 .beta-guide p,.beta-guide li{color:var(--text-2);font-size:15px;line-height:1.6}
@@ -1540,7 +1541,7 @@ const SCREEN_API = {
   /* AMO - HIRA classifications (r171 loadHiraCls): HIRA method / hazard type / additional mitigation */
   HIRA_TITLE, loadHira: () => loadHiraCls(), hira: () => ({ loaded: hiraLoaded, map: hiraClsMap }),
   /* AMO - Additional Mitigation (r172 loadCapa): tasks graded by semCalc + form content */
-  CAPA_TITLE, loadCapa: () => loadCapa(), capa: () => ({ loaded: capaLoaded, tasks: capaTaskMap, info: capaInfoMap }), capaTaskStats,
+  CAPA_TITLE, loadCapa: () => loadCapa(), capa: () => ({ loaded: capaLoaded, tasks: capaTaskMap, info: capaInfoMap, byHira: hiraCapaMap }), capaTaskStats,
   /* Audit Plan bottleneck (system-wide $apply aggregate, invariant I7) */
   loadStages: () => loadStageAggregate(), stages: () => stageAggregate,
   normalizeStageTitle,
@@ -3852,7 +3853,8 @@ function scrAllForms(){
   if(BS.afForm === A.CAPA_TITLE) return scrCapa(titles);
   /* AMO - HIRA (r171): its three EVALUATION classifications replace Form and CAT */
   const hira = BS.afForm === A.HIRA_TITLE;
-  const w = hira && lazyState('hira', () => A.loadHira(), () => A.hira().loaded, 'HIRA classifications');
+  const w = hira && (lazyState('hira', () => A.loadHira(), () => A.hira().loaded, 'HIRA classifications')
+    || lazyState('capa', () => A.loadCapa(), () => A.capa().loaded, 'Additional Mitigation (CAPA) links'));
   if(w) return w;
   const cfg = { cols: hira ? ['number','status','hiraMethod','hazardType','addMitig','owner','raised','target','dtd']
                            : ['number','form','status','owner','raised','target','dtd','cat'],
@@ -3870,8 +3872,20 @@ const hiraCell = v => v ? '<span class="t-small">'+esc(v)+'</span>' : '<span cla
 Object.assign(COL, {
   hiraMethod:{ l:'HIRA method', v:r=>hiraCls(r,'method') || 'zzz', c:r=>hiraCell(hiraCls(r,'method')) },
   hazardType:{ l:'Hazard type', v:r=>hiraCls(r,'type') || 'zzz', c:r=>hiraCell(hiraCls(r,'type')) },
-  addMitig:{ l:'Additional mitigation', v:r=>hiraCls(r,'mitig') || 'zzz', c:r=>hiraCell(hiraCls(r,'mitig')) }
+  addMitig:{ l:'Additional mitigation', v:r=>hiraCls(r,'mitig') || 'zzz', c:hiraMitigCell }
 });
+/* r173: the CAPA reports that name this HIRA in their Report Reference (classic loadCapa → hiraCapaMap).
+   A CAPA number opens the Additional Mitigation register on that record. */
+const hiraNo = id => { const x = API().allData().find(d => d.report_id === id); return x ? String(x.report_number).replace(/^VJC AMO-/, '') : '?'; };
+const capaNo = id => { const x = API().allData().find(d => d.report_id === id); return x ? String(x.report_number).replace(/^VJC-AMO-/, '') : '?'; };
+function hiraMitigCell(r){
+  const A = API(), v = hiraCls(r,'mitig'), caps = (A.capa().byHira || {})[r.id] || [];
+  const links = caps.map(id => { const s = A.capaTaskStats(id);
+    return '<span style="display:grid;gap:2px;justify-items:start"><button class="link-b row-id" type="button" data-act="bgocapa" data-id="'+esc(id)+'">'+esc(capaNo(id))+'</button>'
+      + (s.overdue ? '<span class="cat c3">'+s.overdue+' overdue</span>' : '<span class="t-small dim">'+s.done+'/'+s.total+' tasks</span>')+'</span>'; }).join('');
+  const gap = v === 'Yes' && !caps.length ? '<span class="cat c1" title="Additional mitigation = Yes, but no AMO - Additional Mitigation report names this HIRA in its Report Reference">No CAPA</span>' : '';
+  return '<span style="display:grid;gap:6px;justify-items:start">'+hiraCell(v)+links+gap+'</span>';
+}
 /* AMO - Additional Mitigation (r172): PAVOI-style register — list on the left, the record with its
    mitigation actions, workflow tasks (graded by semCalc in classic loadCapa) and verification on the right */
 function scrCapa(titles){
@@ -3894,7 +3908,9 @@ function scrCapa(titles){
     return '<button class="rec" type="button" data-act="bcapa" data-id="'+x.id+'"'+(x.id === r.id ? ' aria-current="true"' : '')+'>'
       + '<span class="rec-top"><span class="row-id">'+esc(x.number)+'</span>'+chip(x.status)+'</span>'
       + '<span class="row-sub od-truncate">'+esc((info[x.id] || {}).title || '—')+'</span>'
-      + '<span class="od-row" style="--od-gap:8px"><span class="tag">'+s.done+'/'+s.total+' tasks done</span>'
+      + '<span class="od-row" style="--od-gap:8px">'
+      + (((info[x.id] || {}).hira || []).map(h => '<span class="tag">'+esc(hiraNo(h))+'</span>').join('') || '<span class="cat c1">No HIRA</span>')
+      + '<span class="tag">'+s.done+'/'+s.total+' tasks done</span>'
       + (s.overdue ? '<span class="cat c3">'+s.overdue+' overdue</span>' : '') + dueTxt(x) + '</span></button>';
   }).join('');
 
@@ -3910,7 +3926,11 @@ function scrCapa(titles){
     ['Days to due', r.closed ? 'closed '+fmtDate(r.closed) : (r.dtd < 0 ? Math.abs(r.dtd)+(r.dtd === -1 ? ' day' : ' days')+' over' : r.dtd+(r.dtd === 1 ? ' day' : ' days')+' left')],
     ['Report reference', inf.ref || '—']]
     .map(m => '<div class="meta-i"><span class="meta-k">'+esc(m[0])+'</span>'
-      + (m[1] === null ? '<span class="meta-v">'+chip(r.status)+'</span>' : '<span class="meta-v'+(m[0] === 'Report reference' ? '' : ' od-truncate')+'" title="'+esc(m[1])+'">'+esc(m[1])+'</span>')+'</div>').join('');
+      + (m[1] === null ? '<span class="meta-v">'+chip(r.status)+'</span>' : '<span class="meta-v'+(m[0] === 'Report reference' ? '' : ' od-truncate')+'" title="'+esc(m[1])+'">'+esc(m[1])+'</span>')+'</div>').join('')
+    /* r173: the HIRA this CAPA names in Report Reference — opens that HIRA report */
+    + '<div class="meta-i"><span class="meta-k">Source HIRA</span><span class="meta-v">'
+      + ((inf.hira || []).length ? inf.hira.map(h => '<button class="link-b row-id" type="button" data-act="breport" data-id="'+esc(h)+'">'+esc(hiraNo(h))+'</button>').join(' ')
+         : '<span class="cat c1" title="Report Reference does not name a VJC AMO-HIRA number">Not linked</span>')+'</span></div>';
 
   const acts = inf.actions.length
     ? plainTable('capa-a-'+r.id, [{l:'Mitigation action'},{l:'Department'},{l:'Target'}], inf.actions.map(a =>
@@ -4647,6 +4667,7 @@ Object.assign(BETA_ACT, {
   bmodalclose: () => closeModal(),
   beis: el => showEis(el.dataset.id),
   bcapa: el => { BS.capaSel = el.dataset.id; render(); },
+  bgocapa: el => { BS.afForm = API().CAPA_TITLE; BS.capaSel = el.dataset.id; render(); window.scrollTo(0, 0); },
   bqcs: el => showQcs(el.dataset.id),
   breport: el => showReport(el.dataset.id),
   bdoc: el => showDoc(el.dataset.id),

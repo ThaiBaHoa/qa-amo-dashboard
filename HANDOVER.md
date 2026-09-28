@@ -5,6 +5,10 @@
 
 ---
 
+## ⏳ r173 — Nối HIRA ↔ CAPA (28/09/2026, CHƯA PUSH)
+
+- Qua số HIRA trong Report Reference của CAPA; HIRA-16 Yes nhưng không có CAPA; CAPA-01/03/08 không nối (CAPA-03 ghi mã AMO-ENV-025 sai — cần Safety sửa trên Coruson).
+
 ## ✅ r172 — AMO - Additional Mitigation theo dõi như PAVOI (28/09/2026, ĐÃ PUSH 6f781db — live, curl APP_REV = r172)
 
 - All forms chọn `AMO - Additional Mitigation`: màn kiểu PAVOI (danh sách + chi tiết, Tasks graded bằng `semCalc`, overdue lên đầu). `loadCapa` + `capaTaskStats` trong classic.
