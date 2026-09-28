@@ -167,6 +167,10 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
   IndexedDB (`wfRaw`, `cfRaw`, not tied to APP_REV): full load once / every 7 days / on ↻,
   otherwise only reports whose rows changed since the `modified_date` watermark.
   **Never mutate `allData` directly** — use enriched clones only.
+  **A cache open regrades by today (r173-i2):** `semantic_status` / `report_ageing` / `overdue_cat` are
+  date-relative, so `cacheLoad` (classic) and the index.html DRIVER pass cached rows through
+  `regradeRows` (+ `regradeAudits` for audit open/overdue/closed counts). A new date-relative field
+  stored in the cache must be added there, or an old cache shows yesterday's value.
   **Never touch `loadData()` or `ORG_UNIT` unless the change is intentionally cross-page.**
 - `startKiosk` / `kioskShow` / `stopKiosk` — **LED wall mode (r137)**, off unless the URL has
   `?kiosk=` (`1` = 30s/page, or `5`–`600` for a custom interval; anything else falls back to 30s).
@@ -513,7 +517,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.09.28-r173-i1
+Rev current: 2026.09.28-r173-i2
 
 ORG_UNIT_IDS          ← main pages: 'QA AMO' + ALL its sub-units, resolved at load
                          from dwreporting_organisational_unit_hierarchy (r143).

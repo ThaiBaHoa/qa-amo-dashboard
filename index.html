@@ -1374,7 +1374,9 @@ async function idbDel(){}
 const DRIVER = `
 let saveCache = false;
 if(HOOK.cache){
-  allData = HOOK.cache.a; auditData = HOOK.cache.b || [];
+  /* [r173-i2] status / ageing / CAT were graded on the day the cache was written: regrade for today
+     (classic regradeRows / regradeAudits, the same ones its cacheLoad uses) */
+  allData = regradeRows(HOOK.cache.a); auditData = regradeAudits(HOOK.cache.b || [], allData);
   if(Array.isArray(HOOK.cache.ou) && HOOK.cache.ou.length) ORG_UNIT_IDS = HOOK.cache.ou;
 } else {
   HOOK.say('Loading reports from Galileo…', 'First open without a cache can take a minute or two.');
@@ -1399,7 +1401,7 @@ let verRaw = [], secondOk = false;
    Galileo stalled. Everything on screen now has ONE age; ↻ and the 4-hour refresh reload all of it. */
 const X2 = HOOK.cache && HOOK.cache.x;
 if(!HOOK.lite && X2 && X2.v === 1){
-  cmrData = X2.cmr; cmrLoaded = true; ecarData = X2.ecar; ecarLoaded = true;
+  cmrData = regradeRows(X2.cmr); cmrLoaded = true; ecarData = regradeRows(X2.ecar); ecarLoaded = true;
   kpi7Cnt = X2.k7c; kpi7Ver = X2.k7v; kpi7Done = new Set(Object.keys(X2.k7c)); kpi7Loaded = true;
   verRaw = X2.ver;
 } else if(!HOOK.lite){

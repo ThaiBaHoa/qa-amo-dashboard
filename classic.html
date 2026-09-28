@@ -2522,7 +2522,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.28-r173-i1';
+const APP_REV = '2026.09.28-r173-i2';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3325,8 +3325,8 @@ async function cacheLoad() {
     // Người xem thấy ngay số của lần trước (có ghi tuổi) thay vì màn che quay vô hạn.
     const stale = Date.now() - c.ts > CACHE_TTL;
     if (stale) cacheMissReason = 'quá hạn 4 giờ — hiện bản cũ, nạp mới ngầm';
-    allData   = c.a;
-    auditData = c.b || [];
+    allData   = regradeRows(c.a);                          // [r173-i2] chấm lại theo hôm nay
+    auditData = regradeAudits(c.b || [], allData);
     if (Array.isArray(c.ou) && c.ou.length) ORG_UNIT_IDS = c.ou;   // [r143] phiên mở từ cache không chạy loadData
     if (c.sa) stageAggregate = c.sa;
     if (c.dtf) {
@@ -4205,6 +4205,31 @@ function catCalc(ag, sm) {
   if (ag>=-30) return 'CAT I';
   if (ag>=-60) return 'CAT II';
   return 'CAT III';
+}
+
+// [r173-i2] semantic_status / report_ageing / overdue_cat tính theo HÔM NAY lúc nạp, rồi nằm
+// nguyên trong cache. Từ r165 cache cũ bao lâu cũng được hiện (SWR), nên mở cache ghi từ hôm
+// trước là Overdue/CAT lệch — và lệch luôn nếu lượt nạp ngầm hỏng. Chấm lại bằng đúng 3 hàm
+// trên, từ các trường đã lưu (report_status, close_date, Target_date — allData, CMR-CAR, ECAR
+// cùng tên). Trả bản sao, không sửa mảng truyền vào.
+function regradeRows(rows) {
+  return rows.map(r => {
+    const sm = semCalc(r.report_status, r.close_date, r.Target_date);
+    const ag = ageCalc(r.Target_date);
+    return { ...r, semantic_status: sm, report_ageing: ag, overdue_cat: catCalc(ag, sm) };
+  });
+}
+// Đếm lại open/overdue/closed của audit theo trạng thái vừa chấm (cùng luật khối AUDIT PLAN).
+function regradeAudits(audits, rows) {
+  const by = {};
+  rows.forEach(r => { (by[r.audit_id] ||= []).push(r); });
+  return audits.map(a => {
+    const f = by[a.audit_id] || [];
+    return { ...a,
+      open_count:    f.filter(r => r.semantic_status === 'Open').length,
+      overdue_count: f.filter(r => r.semantic_status === 'Overdue').length,
+      closed_count:  f.filter(r => ['On-time Closed','Lately Closed','Closed'].includes(r.semantic_status)).length };
+  });
 }
 
 // ── MCAR deadline rule (r101) ─────────────────────────────────
