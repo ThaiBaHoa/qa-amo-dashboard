@@ -2522,7 +2522,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.26-r170';
+const APP_REV = '2026.09.28-r171';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -5228,6 +5228,29 @@ const AF_FORMS = [
   'MQA Investigation Report','QC PI Report','QC Spot Check Report','Surveillance Report',
 ];
 const AF_FORM_SET = new Set(AF_FORMS);
+// [r171] AMO - HIRA: 3 trường Classifications (tab EVALUATION trên Coruson) Eric chốt 28/09/2026 đưa lên
+// bảng All forms. Nguồn: dwanalytics_report_classification_field — 1 dòng/trường/giá trị hiện tại
+// (list_name + value_text). KHÔNG dùng dwreporting_report_classification_detail (lịch sử theo từng version,
+// 1.242 dòng cho 24 report, bản chụp mới nhất có report thiếu trường) và KHÔNG dùng category_title của
+// report_summary (lệch EFFECTIVENESS RATING 11/24). Probe 28/09/2026: lọc theo 3 list_name = 300 dòng
+// toàn hệ thống, 1,2s — form khác (Hazard Log…) dùng trùng tên list nên phải lọc lại theo report_id HIRA.
+// 24/24 report HIRA đủ cả 3 trường; nếu một trường chọn nhiều giá trị thì nối bằng ', '.
+const HIRA_TITLE = 'AMO - HIRA';
+const HIRA_CLS = {'HIRA METHOD':'method','HAZARD TYPE':'type','ADDITIONAL MITIGATION?':'mitig'};
+let hiraLoaded=false, hiraClsMap={};
+async function loadHiraCls(){
+  const ids=new Set(allData.filter(r=>r.report_title===HIRA_TITLE).map(r=>r.report_id));
+  const flt=Object.keys(HIRA_CLS).map(n=>"list_name eq '"+n+"'").join(' or ');
+  const raw=await fetchAll(G_URL+'dwanalytics_report_classification_field?$select=report_id,list_name,value_text&$filter='+encodeURIComponent(flt), true);
+  const m={};
+  raw.forEach(r=>{
+    const k=HIRA_CLS[r.list_name];
+    if(!k || !ids.has(r.report_id) || !r.value_text) return;
+    const o=(m[r.report_id] ||= {});
+    o[k]=o[k] ? o[k]+', '+r.value_text : r.value_text;
+  });
+  hiraClsMap=m; hiraLoaded=true;
+}
 function setAF(sf,btn){
   TS.af.sf=sf;TS.af.page=1;
   document.querySelectorAll('#page-allforms .pill').forEach(p=>p.classList.remove('on'));

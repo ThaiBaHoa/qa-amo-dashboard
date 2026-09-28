@@ -750,6 +750,9 @@ body.kiosk .app{grid-template-columns:minmax(0,1fr) !important}
 .beta-cards{display:grid;gap:var(--s4);grid-template-columns:repeat(auto-fit,minmax(min(380px,100%),1fr))}
 .beta-cards > .card, .cols > .card{min-width:0}
 .kpi-val.beta-wrap{white-space:normal;font-size:clamp(18px,4.5vw,28px)}
+/* r171 AMO - HIRA register: 9 columns fit a laptop width — headers may wrap, report number stays on one line */
+.af-hira .tbl th, .af-hira .tbl th button{white-space:normal;text-align:left}
+.af-hira .row-id{white-space:nowrap}
 .beta-docs .beta-sel .ctl{max-width:min(420px,100%)}
 .beta-guide h1,.beta-guide h2,.beta-guide h3{margin:var(--s4) 0 var(--s2)}
 .beta-guide p,.beta-guide li{color:var(--text-2);font-size:15px;line-height:1.6}
@@ -1534,6 +1537,8 @@ const SCREEN_API = {
   /* All forms (15 AF_FORMS) with EIS / QC Spot Check detail */
   AF_FORMS, EIS_TITLE, QCS_TITLE,
   loadEis: () => loadEisDetail(), eis: () => ({ loaded: eisLoaded, desc: eisDescMap, ca: eisCAMap }), enrichEis, enrichQcs,
+  /* AMO - HIRA classifications (r171 loadHiraCls): HIRA method / hazard type / additional mitigation */
+  HIRA_TITLE, loadHira: () => loadHiraCls(), hira: () => ({ loaded: hiraLoaded, map: hiraClsMap }),
   /* Audit Plan bottleneck (system-wide $apply aggregate, invariant I7) */
   loadStages: () => loadStageAggregate(), stages: () => stageAggregate,
   normalizeStageTitle,
@@ -3842,15 +3847,28 @@ function scrAllForms(){
   const titles = [...new Set(REPORTS.map(r => r.code))].sort();
   const A = API();
   if(BS.afForm === A.EIS_TITLE || BS.afForm === A.QCS_TITLE) return scrFormDetail(titles);
-  const cfg = { cols:['number','form','status','owner','raised','target','dtd','cat'],
+  /* AMO - HIRA (r171): its three EVALUATION classifications replace Form and CAT */
+  const hira = BS.afForm === A.HIRA_TITLE;
+  const w = hira && lazyState('hira', () => A.loadHira(), () => A.hira().loaded, 'HIRA classifications');
+  if(w) return w;
+  const cfg = { cols: hira ? ['number','status','hiraMethod','hazardType','addMitig','owner','raised','target','dtd']
+                           : ['number','form','status','owner','raised','target','dtd','cat'],
                 rows: rs => BS.afForm ? rs.filter(r => r.code === BS.afForm) : rs };
   let rows = cfg.rows(scoped());
   if(state.cat) rows = rows.filter(r => r.cat === state.cat);
-  return '<section class="sec"><div class="card"><div class="card-head"><h2>All forms</h2>'
+  return '<section class="sec"><div class="card'+(hira ? ' af-hira' : '')+'"><div class="card-head"><h2>All forms</h2>'
     + '<span class="t-small dim od-fill">Every report type the dashboard loads — '+titles.length+' forms. The tabs above keep the five finding forms with their own columns.</span>'
     + sel('afForm', [['','All forms']].concat(titles.map(t => [t, t])), BS.afForm) + '</div>'
     + tableHTML('findings/all'+(BS.afForm ? '/'+BS.afForm : ''), cfg, rows) + '</div></section>';
 }
+/* AMO - HIRA classification columns (values from loadHiraCls; '—' when the report has none) */
+const hiraCls = (r, k) => ((API().hira().map || {})[r.id] || {})[k] || '';
+const hiraCell = v => v ? '<span class="t-small">'+esc(v)+'</span>' : '<span class="dim">—</span>';
+Object.assign(COL, {
+  hiraMethod:{ l:'HIRA method', v:r=>hiraCls(r,'method') || 'zzz', c:r=>hiraCell(hiraCls(r,'method')) },
+  hazardType:{ l:'Hazard type', v:r=>hiraCls(r,'type') || 'zzz', c:r=>hiraCell(hiraCls(r,'type')) },
+  addMitig:{ l:'Additional mitigation', v:r=>hiraCls(r,'mitig') || 'zzz', c:r=>hiraCell(hiraCls(r,'mitig')) }
+});
 /* EIS / QC Spot Check register with the classic schema columns; a row opens its detail */
 function scrFormDetail(titles){
   const A = API(), eis = BS.afForm === A.EIS_TITLE;
