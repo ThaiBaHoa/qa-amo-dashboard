@@ -5,6 +5,11 @@
 
 ---
 
+## ⏳ r171 — AMO - HIRA: 3 cột Classifications (28/09/2026, COMMIT a714673 — CHƯA PUSH, chờ Eric duyệt)
+
+- All forms chọn `AMO - HIRA`: bỏ Form + CAT, thêm HIRA method · Hazard type · Additional mitigation (nguồn `dwanalytics_report_classification_field`, `loadHiraCls`).
+- Kiểm local dữ liệu thật: 24/24 khớp probe Galileo, vừa 1440px, self-check/consistency sạch. Còn: push + kiểm live; phần mitigation actions (số lượng + trạng thái) của họp 24/09 mục 8 chưa làm; nguồn beta-src sửa ở vault (`screens.js`, `loader.js`, `beta-template.html`).
+
 ## ✅ r170 — Closure by quarter + chữ popup audit (26/09/2026, ĐÃ PUSH 77617d1 — live, curl APP_REV = r170)
 
 - Việc 2 họp 24/09. KPI charts: bảng Closure by quarter (`M.byQuarter` + consistency); popup audit ô Closed ghi số on time/late/no target.
