@@ -5,7 +5,7 @@
 
 ---
 
-## ⏳ r173 — Nối HIRA ↔ CAPA (28/09/2026, CHƯA PUSH)
+## ✅ r173 — Nối HIRA ↔ CAPA (28/09/2026, ĐÃ PUSH 352a4df — live, curl APP_REV = r173)
 
 - Qua số HIRA trong Report Reference của CAPA; HIRA-16 Yes nhưng không có CAPA; CAPA-01/03/08 không nối (CAPA-03 ghi mã AMO-ENV-025 sai — cần Safety sửa trên Coruson).
 
