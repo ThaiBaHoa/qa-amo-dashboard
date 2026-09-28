@@ -5,12 +5,12 @@
 
 ---
 
-## ⏳ r172 — AMO - Additional Mitigation theo dõi như PAVOI (28/09/2026, CHƯA PUSH, chờ Eric duyệt cùng r171)
+## ✅ r172 — AMO - Additional Mitigation theo dõi như PAVOI (28/09/2026, ĐÃ PUSH 6f781db — live, curl APP_REV = r172)
 
 - All forms chọn `AMO - Additional Mitigation`: màn kiểu PAVOI (danh sách + chi tiết, Tasks graded bằng `semCalc`, overdue lên đầu). `loadCapa` + `capaTaskStats` trong classic.
-- Kiểm local: 76 task · 44 on time · 17 late · 4 overdue · 11 open khớp đếm lại từ Galileo thô. Galileo `task_delivery_status` nói 28 late (so theo giờ) — cần Eric chốt luật theo ngày.
+- Kiểm local: 76 task · 44 on time · 17 late · 4 overdue · 11 open khớp đếm lại từ Galileo thô. Galileo `task_delivery_status` nói 28 late (so theo giờ) — **Eric chốt 28/09: giữ so theo ngày**.
 
-## ⏳ r171 — AMO - HIRA: 3 cột Classifications (28/09/2026, COMMIT a714673 — CHƯA PUSH, chờ Eric duyệt)
+## ✅ r171 — AMO - HIRA: 3 cột Classifications (28/09/2026, ĐÃ PUSH a714673 — live cùng r172)
 
 - All forms chọn `AMO - HIRA`: bỏ Form + CAT, thêm HIRA method · Hazard type · Additional mitigation (nguồn `dwanalytics_report_classification_field`, `loadHiraCls`).
 - Kiểm local dữ liệu thật: 24/24 khớp probe Galileo, vừa 1440px, self-check/consistency sạch. Còn: push + kiểm live; phần mitigation actions (số lượng + trạng thái) của họp 24/09 mục 8 chưa làm; nguồn beta-src sửa ở vault (`screens.js`, `loader.js`, `beta-template.html`).
