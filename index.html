@@ -2399,6 +2399,7 @@ function betaSwap(D){
   AUDITS.splice(0, AUDITS.length, ...D.audits);
   refLists(D.depts);
   INDEX.splice(0, INDEX.length, ...buildIndex());
+  yearList(); syncPeriodPicker();
   betaResetLazy();   /* lazy screens reload from the fresh scope */
   render();
 }
@@ -2460,6 +2461,27 @@ const scoped = () => applyQuery(applyFilters(REPORTS));
 const qaScope = rows => M.qa(rows);   /* definition lives in METRICS */
 
 /* ---- routing: real hash routes, so Back and deep links behave ---- */
+/* The Year × Month filter and the row search live in the URL too (29/09/2026): #/findings/all?y=2025,2026&m=7,8&q=MCAR
+   — a reload keeps them and a copied link opens on the same view. Written with replaceState after every render
+   (no history entry, no hashchange); read back when the page opens and on Back/Forward. y=all = every year;
+   months are 1–12 in the URL. Compare routes with hashPath(), never with location.hash. */
+const hashPath = () => location.hash.split('?')[0];
+function readUrlFilters(){
+  const qs = location.hash.split('?')[1]; if(!qs) return;
+  const p = new URLSearchParams(qs), nums = s => (s || '').split(',').map(Number).filter(Number.isInteger);
+  if(p.has('y')) state.filters.years = p.get('y') === 'all' ? [] : nums(p.get('y')).filter(y => y > 1990 && y < 2100);
+  if(p.has('m')) state.filters.months = nums(p.get('m')).filter(m => m >= 1 && m <= 12).map(m => m - 1);
+  state.rowQuery = p.get('q') || '';
+}
+function writeUrlFilters(){
+  const path = hashPath(); if(!/^#\//.test(path)) return;
+  const f = state.filters, p = new URLSearchParams();
+  if(!isDefaultYears(f.years)) p.set('y', f.years.length ? [...f.years].sort((a,b)=>a-b).join(',') : 'all');
+  if(f.months.length) p.set('m', [...f.months].sort((a,b)=>a-b).map(m => m + 1).join(','));
+  if(state.rowQuery.trim()) p.set('q', state.rowQuery.trim());
+  const want = path + (p.toString() ? '?' + p.toString().replace(/%2C/g, ',') : '');
+  if(location.hash !== want) history.replaceState(history.state, '', location.pathname + location.search + want);
+}
 let pendingId = null;
 function go(screen, tab, opts){
   opts = opts || {};
@@ -2469,11 +2491,12 @@ function go(screen, tab, opts){
   if(opts.id) pendingId = opts.id;
   const t = tab || state.tab[screen];
   const next = '#/' + screen + (t ? '/' + t : '');
-  if(location.hash === next) route();   /* same route, filters changed */
+  if(hashPath() === next) route();      /* same route, filters changed */
   else location.hash = next;            /* hashchange drives the render */
 }
-function route(){
-  const parts = location.hash.replace(/^#\/?/,'').split('/').filter(Boolean);
+function route(fromUrl){
+  if(fromUrl) readUrlFilters();
+  const parts = hashPath().replace(/^#\/?/,'').split('/').filter(Boolean);
   let screen = parts[0] || 'overview';
   if((screen !== 'rationale' || REAL) && !NAV_BY_ID[screen]) screen = 'overview';
   const nav = NAV_BY_ID[screen];
@@ -2485,7 +2508,7 @@ function route(){
   state.screen = screen;
   render();
 }
-window.addEventListener('hashchange', route);
+window.addEventListener('hashchange', () => route(true));
 
 /* ==========================================================================
    SHARED VIEW PIECES
@@ -2648,24 +2671,28 @@ function kpiTile(o){
     + '<span class="kpi-foot">'+(o.trend||'')+'<span class="kpi-note">'+esc(o.note)+'</span></span>'
     + spark(o.series, !!o.alarm) + '</button>';
 }
-/* Every number of the Overview, computed only through METRICS (M.consistency checks it). */
-function overviewStats(rows){
+/* Every number of the Overview, computed only through METRICS (M.consistency checks it).
+   trend = the rows the 12-month sparklines count: the SAME scope and search, but NOT the Year × Month
+   filter — the sparklines are always the last 12 months. Fed the period-filtered rows (before 29/09/2026),
+   a current-year filter showed Oct–Dec of last year as 0, and one month selected showed 11 empty months. */
+function overviewStats(rows, trend){
+  trend = trend || rows;
   const s = M.summary(rows);
   const monthly = fn => SERIES_MONTHS.map(mo => fn(new Date(mo.y, mo.m, 1), mo.end));
   return {
     s,
-    series: seriesFor(rows),
-    rateSeries: monthly((a, b) => M.summary(M.closedIn(rows, a, b)).onTimeRate),
-    closeSeries: monthly((a, b) => M.summary(M.closedIn(rows, a, b)).avgCloseDays),
+    series: seriesFor(trend),
+    rateSeries: monthly((a, b) => M.summary(M.closedIn(trend, a, b)).onTimeRate),
+    closeSeries: monthly((a, b) => M.summary(M.closedIn(trend, a, b)).avgCloseDays),
     k2: M.kpi2(rows),
-    k2Series: monthly((a, b) => M.kpi2(rows.filter(r => r.raised && r.raised >= a && r.raised <= b)).pct),
+    k2Series: monthly((a, b) => M.kpi2(trend.filter(r => r.raised && r.raised >= a && r.raised <= b)).pct),
     k7: REAL ? (REAL.partial ? null : M.kpi7()) : null,
     k7Series: REAL && !REAL.partial ? monthly((a, b) => M.kpi7In(r => { const d = M.dayOf(r.raised_date); return d && d >= a && d <= b; })) : []
   };
 }
 function renderOverview(){
   const rows = qaScope(scoped());
-  const O = overviewStats(rows), S = O.s, s = O.series;
+  const O = overviewStats(rows, qaScope(applyQuery(REPORTS))), S = O.s, s = O.series;
   const open = rows.filter(M.isOpen), overdue = rows.filter(M.isOverdue);
   const rate = S.onTimeRate, avgClose = S.avgCloseDays, rateSeries = O.rateSeries, closeSeries = O.closeSeries;
   const k2Series = O.k2Series, k7Series = O.k7Series;
@@ -2702,7 +2729,7 @@ function renderOverview(){
     + '<span class="bar-track"><span class="bar-fill'+(i===2?' hot':'')+'" style="width:'+(catTotal?x.n/catTotal*100:0)+'%;background:'+['var(--accent-28)','var(--accent-62)','var(--accent)'][i]+'"></span></span>'
     + '<span class="num strong od-nowrap">'+x.n+'</span></button>').join('');
   const oldest = overdue.slice().sort((a,b)=>a.dtd-b.dtd).slice(0,3).map(r=>
-    '<button class="act-i" type="button" data-go="findings" data-tab="'+r.form+'" data-id="'+r.id+'">'
+    '<button class="act-i" type="button" data-go="findings" data-tab="'+(r.form==='other'?'all':r.form)+'" data-id="'+esc(r.id)+'">'
     + '<span class="act-dot hot"></span>'
     + '<span class="act-body"><span class="row-id">'+esc(r.number)+'</span>'
     + '<span class="row-sub od-truncate">'+esc(r.auditTitle)+' · '+esc(r.owner)+'</span></span>'
@@ -3299,8 +3326,12 @@ function render(){
   }
   scr.innerHTML = html;
   if(REAL && typeof topExtras === 'function') $('#betaTop').innerHTML = topExtras();
+  writeUrlFilters();
   if(route !== lastRoute) $('#main-content').scrollTop = 0;
-  else { const el = refocus.map(q => scr.querySelector(q)).find(Boolean); if(el) el.focus({ preventScroll: true }); }
+  else { const el = refocus.map(q => scr.querySelector(q)).find(Boolean);
+    if(el){ el.focus({ preventScroll: true });
+      /* a text box gets its caret back at the end, so typing continues where it was */
+      if(el.tagName === 'INPUT' && /^(search|text)$/.test(el.type)) try{ el.setSelectionRange(el.value.length, el.value.length); }catch(e){} } }
   lastRoute = route;
 }
 
@@ -3405,14 +3436,19 @@ function handle(el, e){
 }
 /* ---- month / year multi-select ---- */
 function buildPeriodPicker(){
-  $('#fYearList').innerHTML = dataYears().map(y=>
-    '<label class="msel-opt"><input type="checkbox" data-msel="year" value="'+y+'"><span class="num">'+y+'</span></label>').join('');
+  yearList();
   $('#fMonthList').innerHTML = MONTHS_SHORT.map((m,k)=>
     '<label class="msel-opt"><input type="checkbox" data-msel="month" value="'+k+'"><span>'+m+'</span></label>').join('');
   $('#fQuarters').innerHTML = [0,1,2,3].map(q=>
     '<button class="msel-qb" type="button" data-msel-q="'+q+'" aria-pressed="false">Q'+(q+1)+'</button>').join('');
   $('#fYearBtn').insertAdjacentHTML('beforeend', ic('chevron',16));
   $('#fMonthBtn').insertAdjacentHTML('beforeend', ic('chevron',16));
+}
+/* The years on offer come from the data. Rebuilt on betaSwap too: years that arrive with the second
+   pass (CMR-CAR / ECAR) or a refresh were missing when the list was only built at start-up. */
+function yearList(){
+  $('#fYearList').innerHTML = dataYears().map(y=>
+    '<label class="msel-opt"><input type="checkbox" data-msel="year" value="'+y+'"><span class="num">'+y+'</span></label>').join('');
 }
 function syncPeriodPicker(){
   const f = state.filters;
@@ -3507,7 +3543,7 @@ document.addEventListener('keydown', e=>{
    ========================================================================== */
 const API = () => window.BETA_API;
 const BS = { pg:{}, ataLevel:'2', ataY:TODAY.getFullYear(), ataM:TODAY.getMonth()+1, k2g:'nature',
-             rsTab:'f088', rsSF:'all', rsQ:'', osrForm:'', osrSF:'all', osrOu:'', afForm:'',
+             rsTab:'f088', rsSF:'all', rsQ:'', osrForm:'', osrSF:'all', osrOu:'', afForm:'', exForm:'',
              docType:null, docSt:'', docRev:'', docQ:'', usersF:'all', fbMsg:'' };
 const LAZY = {};
 function betaResetLazy(){ Object.keys(LAZY).forEach(k => delete LAZY[k]); }
@@ -3521,7 +3557,7 @@ function lazy(key, run, ready){
   const L = LAZY[key];
   if(L && L.err) return 'error';
   if(L) return 'loading';
-  const here = location.hash;
+  const here = hashPath();   /* the route, without the ?filters */
   LAZY[key] = {};
   Promise.resolve().then(run).then(v => {
     LAZY[key].value = v;
@@ -3530,7 +3566,7 @@ function lazy(key, run, ready){
       LAZY[key].err = t ? t.m : 'The loader finished without data.';
     }
   }).catch(e => { LAZY[key].err = e && e.message ? e.message : String(e); })
-    .then(() => { if(location.hash === here) render(); });
+    .then(() => { if(hashPath() === here) render(); });
   return 'loading';
 }
 function lazyState(key, run, ready, what){
@@ -3712,8 +3748,8 @@ function scrAta(){
     + sel('ataY', years.map(y => [y, y]), BS.ataY, 'Year')
     + sel('ataM', MONTHS_SHORT.map((m,i) => [i+1, m]), BS.ataM, 'Month') + '</div>';
   if(q) return card('KPI QC · ATA comparison', 'internal findings (month N−1) ÷ ECAR (month N)', ctl + '<p class="t-sub dim">Loading QC Spot Check / QC PI findings…</p>');
-  const Y = +BS.ataY, M = +BS.ataM, level = +BS.ataLevel, pad = n => String(n).padStart(2,'0');
-  const denYM = Y+'-'+pad(M), numYM = M === 1 ? (Y-1)+'-12' : Y+'-'+pad(M-1);
+  const Y = +BS.ataY, Mo = +BS.ataM, level = +BS.ataLevel, pad = n => String(n).padStart(2,'0');
+  const denYM = Y+'-'+pad(Mo), numYM = Mo === 1 ? (Y-1)+'-12' : Y+'-'+pad(Mo-1);
   const ymOf = d => String(d || '').slice(0,7);
   const cmrQcRep = A.cmrData().filter(r => ymOf(r.raised_date) === numYM && r.category_id === A.QC_CAT_UUID);
   const ecarRep = A.ecarData().filter(r => ymOf(r.raised_date) === denYM);
@@ -4299,7 +4335,8 @@ const BETA_SCREENS = REAL ? {
 } : {};
 const BETA_ACT = {
   bset: el => { BS[el.dataset.k] = el.dataset.v === '' ? (el.dataset.k === 'docType' ? null : '') : el.dataset.v; BS.pg = {}; render(); },
-  bpage: el => { BS.pg[el.dataset.k] = Number(el.dataset.p); render(); },
+  bpage: el => { BS.pg[el.dataset.k] = Number(el.dataset.p);
+    if(el.closest('#betaModal') && MODAL_REDRAW) redrawModal(el); else render(); },
   bretry: el => { delete LAZY[el.dataset.k]; render(); },
   buser: el => { userAction(el); },
   bfeedback: () => { sendFeedback(); },
@@ -4307,11 +4344,18 @@ const BETA_ACT = {
 };
 document.addEventListener('change', e => {
   const k = e.target && e.target.getAttribute && e.target.getAttribute('data-bset');
-  if(!k) return;
+  if(!k || BS[k] === e.target.value) return;   /* a search box already applied while typing */
   BS[k] = e.target.value; BS.pg = {}; render();
 });
+/* Search boxes filter while typing, 250 ms after the last key (before 29/09/2026 only on Enter / leaving
+   the box). render() gives focus back to the box by its data-bset and puts the caret at the end. */
+let bsearchTimer = null;
 document.addEventListener('input', e => {
   if(e.target && e.target.id === 'betaFb') BS.fbMsg = e.target.value;
+  const el = e.target, k = el && el.type === 'search' && el.getAttribute('data-bset');
+  if(!k) return;
+  clearTimeout(bsearchTimer);
+  bsearchTimer = setTimeout(() => { if(BS[k] === el.value) return; BS[k] = el.value; BS.pg = {}; render(); }, 250);
 });
 
 /* ==========================================================================
@@ -4319,13 +4363,44 @@ document.addEventListener('input', e => {
    ========================================================================== */
 
 /* ---- modal ---- */
+/* Keyboard: opening remembers what had focus and closing gives it back (29/09/2026); Tab and Shift+Tab stay
+   inside the open modal instead of walking the page behind it. */
+let MODAL_RETURN = null;
 function openModal(title, sub, body){
+  if($('#betaModal').hidden) MODAL_RETURN = document.activeElement;   /* not on a redraw of the same modal */
   $('#betaModalTitle').textContent = title; $('#betaModalSub').textContent = sub || '';
   $('#betaModalBody').innerHTML = body; $('#betaModal').hidden = false;
   const b = $('#betaModal .icon-b'); if(b) b.focus();
 }
-function closeModal(){ $('#betaModal').hidden = true; MODAL_KEY = null; }
+function closeModal(){
+  $('#betaModal').hidden = true; MODAL_KEY = null; MODAL_REDRAW = null;
+  const back = MODAL_RETURN; MODAL_RETURN = null;
+  if(back && document.contains(back) && back.focus) back.focus({ preventScroll: true });
+}
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Tab' || $('#betaModal').hidden) return;
+  const f = [...$('#betaModal').querySelectorAll('button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')]
+    .filter(el => el.offsetParent !== null);
+  if(!f.length) return;
+  const first = f[0], last = f[f.length - 1], inside = $('#betaModal').contains(document.activeElement);
+  if(e.shiftKey && (document.activeElement === first || !inside)){ e.preventDefault(); last.focus(); }
+  else if(!e.shiftKey && (document.activeElement === last || !inside)){ e.preventDefault(); first.focus(); }
+});
 let MODAL_KEY = null;   /* the record the modal shows; lazy loads re-open it only if it is still current */
+/* How to draw the open modal again — set by modals with a paged table (report stages, document copyholders,
+   audit stages / reports). The pager inside the modal calls it; before 29/09/2026 it called render(), which
+   only redraws #screen, so paging a modal did nothing. */
+let MODAL_REDRAW = null;
+function redrawModal(pager){
+  const body = $('#betaModalBody'), top = body ? body.scrollTop : 0;
+  const q = 'button[data-act="bpage"][data-k="'+CSS.escape(pager.dataset.k)+'"][aria-label="'+CSS.escape(pager.getAttribute('aria-label') || '')+'"]';
+  MODAL_REDRAW();
+  if(body) body.scrollTop = top;
+  /* same button again; on the first / last page it is disabled, so the other pager button of that table */
+  const again = $('#betaModal').querySelector(q);
+  const other = $('#betaModal').querySelector('button[data-act="bpage"][data-k="'+CSS.escape(pager.dataset.k)+'"]:not([disabled])');
+  const f = again && !again.disabled ? again : other; if(f) f.focus({ preventScroll: true });
+}
 document.addEventListener('keydown', e => { if(e.key === 'Escape' && !$('#betaModal').hidden) closeModal(); });
 document.addEventListener('click', e => { if(e.target && e.target.id === 'betaModal') closeModal(); });
 const kv = pairs => '<dl class="beta-kv">' + pairs.filter(p => p[1] !== undefined).map(p =>
@@ -4391,6 +4466,7 @@ function showEis(id){
 const stageName = t => String(t || '—').replace(/([a-z])([A-Z])/g, '$1 $2');
 function showReport(id){
   const A = API(), rep = REPORTS.find(x => x.id === id); if(!rep) return;
+  MODAL_REDRAW = () => showReport(id);
   if(rep.code === A.EIS_TITLE) return showEis(id);
   if(rep.code === A.QCS_TITLE) return showQcs(id);
   const src = rep.form === 'cmrcar' ? A.cmrData() : rep.form === 'ecar' ? A.ecarData() : A.allData();
@@ -4459,7 +4535,7 @@ function showQcs(id){
 /* Document detail — showDocDetail 9957, renderDocTaskTable 10030, workflow 10225–10270 */
 const DOC_CACHE = {};
 function showDoc(revId, tab){
-  const A = API(); MODAL_KEY = 'doc:'+revId;
+  const A = API(); MODAL_KEY = 'doc:'+revId; MODAL_REDRAW = () => showDoc(revId, tab);
   const d = A.docs().data.find(x => x.document_revision_id === revId); if(!d) return;
   tab = tab || 'copy';
   const key = tab+':'+revId;
@@ -4510,7 +4586,7 @@ function dDayLocal(v){ const s = String(v).slice(0,10); return new Date(+s.slice
 /* Audit detail — showAuditDetail 8256: stages (per audit_id, never the whole audit_workflow — I7) + findings */
 const AUD_STAGES = {};
 function showAudit(id){
-  const A = API(); MODAL_KEY = 'aud:'+id;
+  const A = API(); MODAL_KEY = 'aud:'+id; MODAL_REDRAW = () => showAudit(id);
   const a = A.auditData().find(x => x.audit_id === id); if(!a) return;
   const sub = [a.workflow_category, a.status, a.lead_auditor_name, a.location_name, 'scheduled '+fdx(a.scheduled_start_date)].filter(Boolean).join(' · ');
   let stages = a.audit_stages && a.audit_stages.length ? a.audit_stages : AUD_STAGES[id];
@@ -4587,7 +4663,7 @@ async function savePassword(){
 function exportRowsFor(f, form, status){
   return M.period(M.qa(REPORTS), f).filter(r => !form || r.code === form).filter(r => !status || M.hasStatus(r, status));
 }
-const exportRows = () => exportRowsFor(state.filters, BS.afForm, BS.expSt);
+const exportRows = () => exportRowsFor(state.filters, BS.exForm, BS.expSt);   /* own key: afForm is Reports › All forms */
 function scrExportsFull(){
   if(!IS_ADMIN()) return adminOnly();
   const titles = [...new Set(M.qa(REPORTS).map(r => r.code))].sort();
@@ -4599,7 +4675,7 @@ function scrExportsFull(){
     + '<section class="sec cols cols-2">'
     + card('Report export', 'PDF on the VietJet letterhead, or Excel (KPI summary, form summary, detail)',
         '<div class="od-row" style="--od-gap:12px;flex-wrap:wrap">'
-        + sel('afForm', [['','All forms']].concat(titles.map(t => [t, t])), BS.afForm, 'Form')
+        + sel('exForm', [['','All forms']].concat(titles.map(t => [t, t])), BS.exForm, 'Form')
         + sel('expSt', [['','All statuses'],['Open','Open'],['Overdue','Overdue'],['On-time Closed','On-time Closed'],['Lately Closed','Lately Closed'],['Closed','Closed']], BS.expSt, 'Status') + '</div>'
         + '<p class="t-small dim">Year and month come from the filter bar. CMR-CAR and ECAR (TQA) are not part of this export, as in the classic dashboard.</p>'
         + '<span class="od-row" style="--od-gap:8px"><button class="btn primary" type="button" data-act="bexp" data-k="pdf"'+busy+'>Export PDF</button>'
@@ -4617,7 +4693,7 @@ async function runExport(kind){
     await window.betaLoadExportLibs();
     const A = API(), rows = M.raw(exportRows());
     if((kind === 'pdf' || kind === 'xlsx') && !rows.length) throw new Error('No records match the filters.');
-    A.setExport(REAL.user, rows, BS.afForm ? [BS.afForm] : [], state.filters.years, state.filters.months);
+    A.setExport(REAL.user, rows, BS.exForm ? [BS.exForm] : [], state.filters.years, state.filters.months);
     if(kind === 'pdf') await A.exportPDF();
     else if(kind === 'xlsx') await A.exportExcel();
     else if(kind === 'ovx') await A.exportOverdueReport();
@@ -4650,18 +4726,28 @@ async function aiSend(){
   const t = $('#aiIn'), q = t ? t.value.trim() : ''; if(!q || AI.busy) return;
   const A = API();
   AI.msgs.push({ role:'user', content:q });
-  if(AI.msgs.length > 24){ AI.msgs = AI.msgs.slice(-16); while(AI.msgs.length && AI.msgs[0].role !== 'user') AI.msgs.shift(); }
+  /* Trim to the last ~16 messages, starting at a QUESTION. Tool results are role 'user' too; a history that
+     starts with one whose tool call was trimmed away is rejected by the API on every later question. */
+  if(AI.msgs.length > 24){ AI.msgs = AI.msgs.slice(-16); while(AI.msgs.length && !(AI.msgs[0].role === 'user' && typeof AI.msgs[0].content === 'string')) AI.msgs.shift(); }
   AI.busy = true; aiRender();
   try{
     for(let round = 0; round < 6; round++){
-      const r = await fetch(A.AI_URL, { method:'POST', headers:{ 'Content-Type':'application/json' },
-        body: JSON.stringify({ system: A.aiSystem(), tools: A.AI_TOOLS, messages: AI.msgs }) });
-      const data = await r.json().catch(() => ({}));
+      /* 90 s per round, like a Galileo request: a stalled worker must not leave the panel on "Querying…" */
+      const ctl = new AbortController(), tid = setTimeout(() => ctl.abort(), 90000);
+      let r, data;
+      try{
+        r = await fetch(A.AI_URL, { method:'POST', headers:{ 'Content-Type':'application/json' }, signal: ctl.signal,
+          body: JSON.stringify({ system: A.aiSystem(), tools: A.AI_TOOLS, messages: AI.msgs }) });
+        data = await r.json().catch(() => ({}));
+      }catch(e){ throw new Error(e.name === 'AbortError' ? 'no answer within 90 s' : e.message); }
+      finally{ clearTimeout(tid); }
       if(!r.ok) throw new Error((data.error && data.error.message) || ('HTTP ' + r.status));
       AI.msgs.push({ role:'assistant', content:data.content });
       if(data.stop_reason !== 'tool_use') break;
-      AI.msgs.push({ role:'user', content: data.content.filter(c => c.type === 'tool_use').map(c => ({
-        type:'tool_result', tool_use_id:c.id, content: JSON.stringify(A.aiRunTool(c.name, c.input)) })) });
+      /* every tool call gets a result, an error included — an unanswered tool_use makes the API refuse the rest */
+      AI.msgs.push({ role:'user', content: data.content.filter(c => c.type === 'tool_use').map(c => {
+        let out; try{ out = JSON.stringify(A.aiRunTool(c.name, c.input)); }catch(e){ out = JSON.stringify({ error: e.message || String(e) }); }
+        return { type:'tool_result', tool_use_id:c.id, content: out }; }) });
     }
   }catch(e){
     AI.msgs.push({ role:'assistant', content:'The assistant could not answer: ' + (e.message || e) });
@@ -4916,7 +5002,7 @@ BETA_SCREENS['library/guide'] = scrGuideNew;
 
   state.cat = '';
   if(!location.hash) location.hash = '#/overview';
-  route();
+  route(true);
   if(REAL && typeof startKiosk === 'function') startKiosk();
 })();
 </script>

@@ -5,6 +5,13 @@
 
 ---
 
+## ⏳ Đợt 3 rà hiệu năng/UX — giao diện (29/09/2026, máy nhà — COMMIT, CHƯA PUSH)
+
+- Chỉ `index.html` (nguồn `beta-src`: beta-template.html, screens.js, screens2.js), không bump rev. Backup nguồn: `rebuild UIUX/beta-src-bak-20260928/` (trước đợt 1).
+- Sửa: sparkline 12 tháng Overview không còn bị bộ lọc Năm/Tháng cắt (`overviewStats(rows, trend)`); phân trang TRONG modal (`MODAL_REDRAW`/`redrawModal`); danh sách Năm dựng lại ở `betaSwap`; AI: cắt lịch sử bắt đầu ở câu hỏi (không mồ côi tool_result), timeout 90s/vòng, tool lỗi vẫn có tool_result; ô tìm trong màn lọc khi gõ (250 ms), giữ focus + con trỏ; Năm/Tháng/ô tìm lưu trong URL (`?y=…&m=…&q=…`, replaceState, so route bằng `hashPath()`); modal trả focus khi đóng + Tab không thoát ra; link 'Most overdue' form other → tab all; `scrAta` đổi biến M→Mo (che METRICS); Admin › Export có khoá riêng `exForm`.
+- KHÔNG làm (đo trước): 'bảng chỉ dựng trang đang xem' + memo — mọi màn vẽ ≤ 48 ms trên dữ liệu thật (Overview 48, Audit timeline mọi năm 37, KPI2 16, All forms 7.068 dòng 3 ms).
+- Kiểm local dữ liệu thật: xem commit message. Còn: Eric duyệt → push → kiểm live.
+
 ## ⏳ Đợt 2 + proxy đòi đăng nhập: r174 · r175 · r176 (28/09/2026 — BƯỚC 1+2 XONG: Worker soft deploy fc09a341 · push 4615f6b live r176; CHỜ BƯỚC 3 enforce)
 
 - **r174** lên rev không vứt cache (`CACHE_DATA_VER`) · **index.html** lần mở đầu hiện màn hình trước lượt 2 · **r175** CMR/ECAR chung lượt quét report_field + RFI song song · **r176** app gửi token Supabase (`gFetch`), mã `galileo-proxy` vào repo, Worker kiểm đăng nhập + stream. Mục 8 (tách font/letterhead) **bỏ**: Pages trả 304, gzip classic 367 KB.
