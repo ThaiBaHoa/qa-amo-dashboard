@@ -525,13 +525,16 @@ select.ctl{min-width:168px;cursor:pointer}
 .am-h.now{color:var(--accent)}
 .am-l{padding:6px 10px;border-top:1px solid var(--hairline);display:flex;gap:6px;align-items:baseline;min-width:0}
 .am-c{border-top:1px solid var(--hairline);border-left:1px solid var(--hairline);padding:5px 4px;display:flex;flex-wrap:wrap;gap:3px;align-content:flex-start;min-height:28px}
-.am-d{width:12px;height:12px;border-radius:50%;padding:0;border:1.5px solid var(--text-3);background:var(--text-3);cursor:pointer;flex:none}
-.am-d.k-performed{background:var(--data-2);border-color:var(--data-2)}
-.am-d.k-progress{background:var(--data-1);border-color:var(--data-1)}
-.am-d.k-scheduled{background:transparent;border-style:dashed}
+.am-d{width:12px;height:12px;border-radius:50%;padding:0;border:1.5px solid var(--ok);background:var(--ok);cursor:pointer;flex:none}
+/* status colours (Eric 29/09/2026: grey was hard to read on dark): the --ok / --info / --warn tokens of r169-i1 have a
+   light-theme and a dark-theme value, so one rule serves both. Closed green · Performed blue · In Progress amber ·
+   Scheduled dashed ring · overdue findings red. */
+.am-d.k-performed{background:var(--info);border-color:var(--info)}
+.am-d.k-progress{background:var(--warn);border-color:var(--warn)}
+.am-d.k-scheduled{background:transparent;border:1.5px dashed var(--text-2)}
 .am-d.k-overdue{background:var(--accent);border-color:var(--accent)}
 .am-d:hover,.am-d:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.am-key{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:-1px;border:1.5px solid var(--text-3);background:var(--text-3)}
+.am-key{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:-1px;border:1.5px solid var(--ok);background:var(--ok)}
 
 /* ---------- split view (PAVOI) ---------- */
 .split{display:grid;grid-template-columns:minmax(300px,356px) minmax(0,1fr);gap:var(--s3);align-items:start}
@@ -3072,8 +3075,8 @@ function renderAudit(tab){
     + seg('show', 'overdue', 'With overdue '+ALL.filter(a => a.overdue > 0).length) + '</div>';
   const key = (style, label) => '<span class="legend-i"><span class="am-key" style="'+style+'"></span>'+label+'</span>';
   const legend = '<div class="legend">'
-    + key('', 'Closed') + key('background:var(--data-2);border-color:var(--data-2)', 'Performed')
-    + key('background:var(--data-1);border-color:var(--data-1)', 'In progress') + key('background:transparent;border-style:dashed', 'Scheduled')
+    + key('', 'Closed') + key('background:var(--info);border-color:var(--info)', 'Performed')
+    + key('background:var(--warn);border-color:var(--warn)', 'In Progress') + key('background:transparent;border:1.5px dashed var(--text-2)', 'Scheduled')
     + key('background:var(--accent);border-color:var(--accent)', 'Has overdue findings')
     + '<span class="legend-i dim">'+MONTHS[now]+' is the current month · select a dot for detail</span></div>';
 
