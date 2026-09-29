@@ -208,6 +208,9 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
 - `loadRptStatus` / `renderRptStatus` — **Report Status on Coruson** (r131): bảng tình trạng hoàn thiện
   report EIS & F-088, thay file Excel làm tay hàng tháng. Chấm Satis/Unsatis 4 cột từ Galileo. Luật chấm
   + 7 cái bẫy đã xác minh nằm ở `TECHNICAL_REFERENCE.md` §8 — **đọc trước khi sửa**, đừng suy lại từ đầu.
+- **Galileo values are shown verbatim (Eric 29/09/2026).** Status / stage / form names as Galileo records them
+  (`InProgress`, `PendingSignOff`, `NotStarted`…): no friendlier relabelling, no merging of statuses, no widening of
+  an existing indicator's definition. Extra context goes next to it under the Galileo name. Ask before changing a label.
 - `renderAF` — All Forms table, schema-driven via `AF_SCHEMAS{report_title → {cols[], rowClick?}}`
   (`_default` = 14-col fallback). Form-specific views: EIS (`loadEisDetail`/`enrichEis`/
   `showEisDetail`) and QC Spot Check (`loadQcsDetail`/`enrichQcs`/`showQcsDetail`, r107) —
@@ -525,7 +528,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.09.29-r177
+Rev current: 2026.09.29-r178
 
 ORG_UNIT_IDS          ← main pages: 'QA AMO' + ALL its sub-units, resolved at load
                          from dwreporting_organisational_unit_hierarchy (r143).

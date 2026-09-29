@@ -2522,7 +2522,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.29-r177';
+const APP_REV = '2026.09.29-r178';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3455,6 +3455,7 @@ function resetLazyStores(){
   qcsLoaded=false; qcsMap={};                     // reset QC Spot Check cache để Refresh kéo lại
   hiraLoaded=false; hiraClsMap={};                // [r173] HIRA classifications + CAPA (r171/r172)
   capaLoaded=false; capaTaskMap={}; capaInfoMap={}; hiraCapaMap={};
+  auditStageRows=null;                            // [r178] bước audit của màn Workflow stages
 }
 async function loadData(forceRefresh=false, opts={}) {
   if(isLoading){toast('Loading data, please wait...','info');return;}
@@ -7939,6 +7940,28 @@ function renderAuditKpi(data) {
     kpiCard('Bottleneck',    bottleneckStage.split(' (')[0]||'—', topStage?topStage[1]+' audit':'—', 'kpi-tone-muted'),
     kpiCard('Year',          yearsStr, `${years.length} years`, 'kpi-tone-muted'),
   ].join('');
+}
+
+// ── [r178] BƯỚC WORKFLOW CỦA AUDIT QA AMO (màn "Workflow stages") ─────────
+// Eric 29/09/2026 chọn hướng A: thay "Bottleneck analysis" (gom TOÀN HỆ THỐNG, mọi năm, không theo bộ lọc) bằng
+// bảng bước của đúng các audit QA AMO, theo bộ lọc Năm × Tháng, tên bước + trạng thái NGUYÊN VĂN Galileo.
+// Nguồn dwreporting_audit_stage (một dòng một bước — xem TECHNICAL_REFERENCE 'Bước workflow — dùng view nào').
+// Lazy, một lần mỗi lượt dữ liệu: 1.098 audit → 14 request `audit_id in (80 UUID)`, 4 song song (~10s; đo 29/09:
+// 80 audit = 399 dòng, 2,4s). Lọc kỳ làm ở màn hình. Lỗi → ném ra để màn hiện Retry.
+let auditStageRows = null;   // audit_id → [{stage_title, status, owner, target_date, completed_date}]
+async function loadAuditStageRows() {
+  if (auditStageRows) return auditStageRows;
+  const ids = auditData.filter(a => a.is_qa_amo_scope).map(a => a.audit_id).filter(Boolean);
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += 80) chunks.push(ids.slice(i, i + 80));
+  const map = {};
+  const one = async ch => (await fetchAll(G_URL + 'dwreporting_audit_stage' +
+      '?$select=audit_id,stage_title,status,owner,target_date,completed_date' +
+      '&$filter=' + encodeURIComponent('audit_id in (' + ch.join(',') + ')'), true))
+    .forEach(r => { (map[r.audit_id] ||= []).push(r); });
+  for (let i = 0; i < chunks.length; i += 4) await Promise.all(chunks.slice(i, i + 4).map(one));
+  auditStageRows = map;
+  return map;
 }
 
 // ── STAGE AGGREGATE FUNCTIONS ─────────────────────────────────

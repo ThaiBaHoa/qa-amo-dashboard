@@ -5,12 +5,14 @@
 
 ---
 
-## ⏳ r177 — Bước workflow đúng nguồn (29/09/2026, máy nhà — COMMIT 5e5e425, CHƯA PUSH)
+## ✅ r178 — Audit Plan › Workflow stages (29/09/2026) — thay 'Bottleneck analysis', xem §14
+
+## ✅ r177 — Bước workflow đúng nguồn (29/09/2026 — ĐÃ PUSH, live 23:32)
 
 - Eric: modal MNT-1030 thiếu bước + sai thứ tự so với Coruson. Gốc: `dwreporting_*_workflow` trải phẳng theo task. Chi tiết + số probe: PROJECT_TECH_SPEC §14 r177, TECHNICAL_REFERENCE 'Bước workflow — dùng view nào'.
 - Kèm: ô CAR follow-up / Bottleneck trên Audit Plan xưa nay luôn 0 / '—' trên live (bước chỉ nạp khi ≤ 50 audit) — nay có số, định nghĩa giữ như cũ (chỉ `InProgress`), `PendingSignOff` ghi riêng. 2026: CAR follow-up 0 InProgress · 3 PendingSignOff; Bottleneck Perform 6.
 - **Luật Eric 29/09:** trạng thái / tên từ Galileo hiện NGUYÊN VĂN, không tự đổi tên hay gộp (vd không gộp PendingSignOff vào InProgress).
-- Còn: push → kiểm live; modal audit của classic.html chưa xem bằng mắt. Chờ Eric quyết tên / phạm vi trang 'Bottleneck analysis' (hiện đếm toàn hệ thống, không theo bộ lọc).
+- Còn: modal audit của classic.html chưa xem bằng mắt. 'Bottleneck analysis' → r178 (Eric chọn hướng A).
 
 ## ✅ Audit Plan địa điểm × tháng + thương hiệu 'Safety & Quality Assurance' (29/09/2026 — ĐÃ PUSH d4d7365, live 22:59)
 

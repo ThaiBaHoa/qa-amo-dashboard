@@ -1571,6 +1571,8 @@ const SCREEN_API = {
   CAPA_TITLE, loadCapa: () => loadCapa(), capa: () => ({ loaded: capaLoaded, tasks: capaTaskMap, info: capaInfoMap, byHira: hiraCapaMap }), capaTaskStats,
   /* Audit Plan bottleneck (system-wide $apply aggregate, invariant I7) */
   loadStages: () => loadStageAggregate(), stages: () => stageAggregate,
+  /* [r178] every stage of the QA AMO audits (Workflow stages screen) */
+  loadAuditStages: () => loadAuditStageRows(), auditStages: () => auditStageRows,
   normalizeStageTitle,
   /* Documents (type tree by type_id UUID, invariant I8) */
   loadDocs: () => loadDocuments(), docs: () => ({ data: docData, index: docTypeIndex, tree: docTypeTree }),
@@ -1897,7 +1899,7 @@ const NAV = [
     tabs:[
       {id:'timeline',  label:'Timeline'},
       {id:'list',      label:'Schedule list'},
-      {id:'bottleneck',label:'Bottleneck analysis'}
+      {id:'bottleneck',label:'Workflow stages'}
     ]},
   { id:'library',   label:'Library',    icon:'book',     task:'reference', title:'Library',
     lead:'Controlled documents and user guide.',
@@ -3128,7 +3130,7 @@ const PH = {
                        ['MCAR ÷ AMO-ECAR as a rate over time','Split by ATA chapter and by department','The internal and authority findings side by side for the same scope']],
   'analytics/status': ['Event and IR report status — the EIS and F-088 extracts from Coruson.',
                        ['F-088 and EIS as two tabs of the same table','Open and closed split, with the year filter','The standing caveat that WORKFLOW-tab evidence is not exposed by Coruson reporting and must be checked by hand']],
-  'audit/bottleneck': ['Where audits are getting stuck, aggregated by workflow stage.',
+  'audit/bottleneck': ['The workflow stages of the audits, counted by Galileo status.',
                        ['Count and average age of audits sitting at each stage','The stages that most often exceed their expected duration','Drill from a stage into the audits held there']],
   'library/documents':['The controlled document tree, read-only.',
                        ['Group tree on the left, document list on the right','Filter by group, revision state and review date','Nothing here is actioned — Library is for reading']],
@@ -3637,7 +3639,8 @@ function searchBox(key, cur, ph){
   return '<input class="ctl" type="search" data-bset="'+key+'" value="'+esc(cur||'')+'" placeholder="'+esc(ph||'Search')+'" style="min-width:min(220px,100%)">';
 }
 /* A plain table: cols = [{l, ar?}], rows = arrays of cell HTML. Paged like the design's lanes. */
-/* opt.full: no height cap (whole table in one view) · opt.compact: tighter rows · col.ac: centred column · col.w: column width */
+/* opt.full: no height cap (whole table in one view) · opt.compact: tighter rows · col.ac: centred column · col.w: column width
+   · col.raw: header text exactly as given (no upper-casing) — for Galileo values such as InProgress */
 function plainTable(key, cols, rows, size, minW, opt){
   opt = opt || {};
   const al = c => c.ac ? 'ac' : c.ar ? 'ar' : '';
@@ -3645,7 +3648,7 @@ function plainTable(key, cols, rows, size, minW, opt){
   if(!rows.length) return '<div class="empty"><h3>No records</h3><p class="t-sub">Nothing matches the current filters.</p></div>';
   const pages = Math.max(1, Math.ceil(rows.length/size));
   const p = Math.min(BS.pg[key] || 1, pages);
-  const head = cols.map(c => '<th scope="col"'+(al(c)?' class="'+al(c)+'"':'')+(c.w?' style="width:'+c.w+'"':'')+'>'+esc(c.l)+'</th>').join('');
+  const head = cols.map(c => '<th scope="col"'+(al(c)?' class="'+al(c)+'"':'')+((c.w||c.raw)?' style="'+(c.w?'width:'+c.w+';':'')+(c.raw?'text-transform:none':'')+'"':'')+'>'+esc(c.l)+'</th>').join('');
   const body = rows.slice((p-1)*size, p*size).map(r => '<tr>'+r.map((cell,i) =>
     '<td data-l="'+esc(cols[i].l)+'"'+(i===0?' class="t-main"':(al(cols[i])?' class="'+al(cols[i])+'"':''))+'>'+cell+'</td>').join('')+'</tr>').join('');
   let pager = '';
@@ -4150,31 +4153,53 @@ function scrOsr(){
 /* ==========================================================================
    AUDIT PLAN · BOTTLENECK  (loadStageAggregate 7715, renderBottleneckPanel 7754)
    ========================================================================== */
+/* AUDIT PLAN · WORKFLOW STAGES (r178, replaces "Bottleneck analysis" — Eric 29/09/2026, option A).
+   The QA AMO audits of the selected period (the same set as the KPI tiles), every stage of each (loadAuditStageRows,
+   dwreporting_audit_stage), counted by stage title × status. Titles and statuses are the Galileo values as they are
+   (no renaming, no merging). An InProgress / PendingSignOff count opens the audits concerned. */
+function stageScopeAudits(){ const A = API(); return A.auditData().filter(a => a.is_qa_amo_scope && M.auditInPeriod(a)); }
 function scrBottleneck(){
   const A = API();
-  const w = lazyState('stages', () => A.loadStages(), () => !!A.stages(), 'audit workflow stages');
+  const w = lazyState('auditstages', () => A.loadAuditStages(), () => !!A.auditStages(), 'audit workflow stages');
   if(w) return w;
-  const agg = A.stages();
-  const list = Object.entries(agg).filter(([,v]) => v.total > 0)
-    .sort((a,b) => (b[1].inprogress + b[1].pendingSignOff) - (a[1].inprogress + a[1].pendingSignOff)).slice(0,12);
-  const maxT = Math.max(1, ...list.map(([,v]) => v.total));
-  const sumT = Object.values(agg).reduce((s,v) => s + v.total, 0);
-  const rows = list.map(([k,v]) => {
-    const p = x => v.total ? x / v.total * 100 : 0;
-    const other = Math.max(0, 100 - p(v.completed) - p(v.inprogress) - p(v.notStarted));
-    return '<div class="bar-row" style="cursor:default;grid-template-columns:minmax(140px,1.2fr) minmax(0,2fr) auto">'
-      + '<span class="t-small od-truncate">'+esc(k)+'</span>'
-      + '<span class="stack" style="width:'+(v.total/maxT*100)+'%" title="completed '+v.completed+' · in progress '+v.inprogress+' · not started '+v.notStarted+'">'
-      + '<span style="width:'+p(v.completed)+'%;background:var(--text-3)"></span><span style="width:'+p(v.inprogress)+'%;background:var(--accent)"></span>'
-      + '<span style="width:'+p(v.notStarted)+'%;background:var(--accent-28)"></span><span style="width:'+other+'%;background:var(--hairline)"></span></span>'
-      + '<span class="num od-nowrap"><span class="strong">'+v.total+'</span> <span class="t-small dim">'+(v.inprogress + v.pendingSignOff)+' active</span></span></div>';
-  }).join('');
-  return '<section class="sec">' + card('Bottleneck analysis', list.length+' stages · '+sumT.toLocaleString('en-US')+' stage records · system-wide aggregate, not filtered by the Audit Plan filters',
-    '<div class="bars">'+rows+'</div><div class="legend">'
-    + '<span class="legend-i"><span class="swatch" style="background:var(--text-3)"></span>Completed</span>'
-    + '<span class="legend-i"><span class="swatch" style="background:var(--accent)"></span>In progress</span>'
-    + '<span class="legend-i"><span class="swatch" style="background:var(--accent-28)"></span>Not started</span>'
-    + '<span class="legend-i"><span class="swatch" style="background:var(--hairline)"></span>Other</span></div>') + '</section>';
+  const rows = A.auditStages(), audits = stageScopeAudits();
+  const agg = {}, statuses = new Set();
+  let n = 0;
+  audits.forEach(a => (rows[a.audit_id] || []).forEach(s => {
+    const k = s.stage_title || '—', st = s.status || '—';
+    (agg[k] ||= { total:0 }); agg[k][st] = (agg[k][st] || 0) + 1; agg[k].total++; statuses.add(st); n++;
+  }));
+  const ORDER = ['InProgress','PendingSignOff','NotStarted','Completed'];
+  const cols = ORDER.filter(s => statuses.has(s)).concat([...statuses].filter(s => !ORDER.includes(s)).sort());
+  const list = Object.entries(agg).sort((x,y) => (y[1].InProgress || 0) - (x[1].InProgress || 0)
+    || (y[1].PendingSignOff || 0) - (x[1].PendingSignOff || 0) || y[1].total - x[1].total || x[0].localeCompare(y[0]));
+  const cell = (k, st, v) => !v ? '<span class="dim">—</span>'
+    : (st === 'InProgress' || st === 'PendingSignOff')
+      ? '<button class="link-b num strong" type="button" data-act="bstagelist" data-stage="'+esc(k)+'" data-status="'+esc(st)+'" aria-label="'+esc(v+' audits, '+k+', '+st)+'">'+v+'</button>'
+      : '<span class="num">'+v+'</span>';
+  const table = list.length ? plainTable('auditstages', [{l:'Stage'}].concat(cols.map(c => ({ l:c, ar:true, raw:true }))).concat([{ l:'Total', ar:true }]),
+      list.map(([k, v]) => ['<span class="t-small">'+esc(k)+'</span>'].concat(cols.map(c => cell(k, c, v[c]))).concat(['<span class="num">'+v.total+'</span>'])), 30, 720)
+    : '<div class="empty"><h3>No stages</h3><p class="t-sub">No workflow stages recorded for the audits of this period.</p></div>';
+  return '<section class="sec">' + card('Workflow stages', audits.length+' QA AMO audits · '+esc(periodLabel())+' · '+n.toLocaleString('en-US')
+      + ' stages · stage names and statuses as recorded in Galileo · select an InProgress or PendingSignOff count for the audits', table, false) + '</section>';
+}
+/* the audits behind one InProgress / PendingSignOff count */
+function stageAuditList(stage, status){
+  const A = API(), rows = A.auditStages() || {};
+  const list = [];
+  stageScopeAudits().forEach(a => (rows[a.audit_id] || []).forEach(s => {
+    if((s.stage_title || '—') === stage && (s.status || '—') === status) list.push({ a, s });
+  }));
+  list.sort((x,y) => String(x.s.target_date || '9').localeCompare(String(y.s.target_date || '9')));
+  const today = new Date(); today.setHours(0,0,0,0);
+  MODAL_KEY = 'stg:'+stage+'|'+status; MODAL_REDRAW = () => stageAuditList(stage, status);
+  openModal(stage + ' · ' + status, list.length+' audits · '+periodLabel()+' · select an audit for its detail',
+    plainTable('stg-'+stage+'-'+status, [{l:'Audit'},{l:'Location'},{l:'Owner'},{l:'Stage due'},{l:'Audit status'}], list.map(({ a, s }) => {
+      const late = s.target_date && dDayLocal(s.target_date) < today.getTime();
+      return ['<button class="link-b" type="button" data-act="baudit" data-id="'+esc(a.audit_id)+'"><span class="row-id">'+esc(a.number)+'</span></button> <span class="t-small dim">'+esc(a.title || '')+'</span>',
+        '<span class="t-small">'+esc(a.location_name || '—')+'</span>', '<span class="t-small">'+esc(s.owner || '—')+'</span>',
+        '<span class="num">'+fdx(s.target_date)+'</span>'+(late ? ' <span class="cat c3">overdue</span>' : ''), '<span class="t-small">'+esc(a.status || '—')+'</span>'];
+    }), 30, 720));
 }
 
 /* ==========================================================================
@@ -4367,7 +4392,8 @@ const BETA_ACT = {
   bretry: el => { delete LAZY[el.dataset.k]; render(); },
   buser: el => { userAction(el); },
   bfeedback: () => { sendFeedback(); },
-  bfbopen: () => { feedbackModal(); }
+  bfbopen: () => { feedbackModal(); },
+  bstagelist: el => { stageAuditList(el.dataset.stage, el.dataset.status); }
 };
 document.addEventListener('change', e => {
   const k = e.target && e.target.getAttribute && e.target.getAttribute('data-bset');
@@ -4896,7 +4922,7 @@ function auditKpiTiles(){
   return tiles([stat('Total audits', String(S.total), 'MNT · '+periodLabel()), stat('Closed', String(S.closed), 'status Closed'),
     stat('Open', String(S.open), 'in progress, performed or scheduled'), stat('Closure rate', S.rate+'%', S.closed+' of '+S.total, S.total > 0 && S.rate < 50),
     stat('CAR follow-up', inCar === null ? '—' : String(inCar), inCar === null ? 'loading…' : 'stage InProgress' + (carPso ? ' · ' + carPso + ' PendingSignOff' : '')),
-    stat('Bottleneck', top ? top[0] : '—', !known ? 'loading…' : top ? top[1]+' audits with this stage InProgress' : 'no stage InProgress', false, true),
+    stat('Top stage InProgress', top ? top[0] : '—', !known ? 'loading…' : top ? top[1]+' audits with this stage InProgress' : 'no stage InProgress', false, true),
     stat('Years', years.length ? (years.length <= 3 ? years.join(', ') : years[0]+'–'+years[years.length-1]) : '—', years.length+' year(s)', false, true)]);
 }
 
@@ -4924,7 +4950,7 @@ function scrGuideNew(){
     + '<tr><td>Work Queue</td><td>Act on reports: Open reports, Overdue, and PAVOI awaiting verification.</td></tr>'
     + '<tr><td>Findings</td><td>Read the register by form: All forms, PAVOI, CMR-CAR, ECAR, AMO-ECAR, MCAR, OSR / MOSR.</td></tr>'
     + '<tr><td>Analytics</td><td>KPI charts, SPI, Safety (MSAG), Early detection (KPI 2) and Event/IR report status on Coruson.</td></tr>'
-    + '<tr><td>Audit Plan</td><td>The audit and inspection programme: timeline, schedule list and bottleneck analysis.</td></tr>'
+    + '<tr><td>Audit Plan</td><td>The audit and inspection programme: timeline, schedule list and workflow stages.</td></tr>'
     + '<tr><td>Library</td><td>Controlled documents and this guide.</td></tr>'
     + '<tr><td>Admin</td><td>User management, report export and pinned widgets (administrators).</td></tr></table>'
     + '<p><b>Filter bar.</b> <b>Year</b> and <b>Month</b> are multi-select (for example Jul–Sep, or 2025 and 2026 together; the Q1–Q4 buttons pick a quarter). The filter stays when you change section. The chips under the bar show what is filtered; <b>Clear all</b> returns to the current year.</p>'
@@ -4956,7 +4982,7 @@ function scrGuideNew(){
     + '<li><b>Reports › PAVOI</b>: register on the left, record on the right with the verification history and the RFI / Task list of open PAVOI.</li>'
     + '<li><b>Reports › OSR / MOSR</b>: OSR and MOSR of AMO and MQA : QA AMO, Open or Closed from Coruson.</li>'
     + '<li><b>Analytics › Event/IR report status</b>: EIS and F-088 completeness on Coruson; each row lists what is missing.</li>'
-    + '<li><b>Audit Plan</b>: KPI tiles, a location × month view (one dot per audit in its scheduled month; filter by type or show only upcoming / with overdue findings), and a schedule list. Select a dot or a row for its workflow stages and findings. <b>Bottleneck analysis</b> counts stages across all audits in Galileo.</li>'
+    + '<li><b>Audit Plan</b>: KPI tiles, a location × month view (one dot per audit in its scheduled month; filter by type or show only upcoming / with overdue findings), and a schedule list. Select a dot or a row for its workflow stages and findings. <b>Workflow stages</b>: for the QA AMO audits in the selected period, how many stages of each name are in each Galileo status; select an InProgress or PendingSignOff count for the audits concerned.</li>'
     + '<li><b>Library › Documents</b>: browse by document type; the document number opens copyholders (on time, late, overdue) and the workflow.</li></ul>')
   + sec('export','Exports',
     '<p><b>Admin › Export reports</b> (administrators):</p>'
