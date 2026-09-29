@@ -516,6 +516,22 @@ select.ctl{min-width:168px;cursor:pointer}
 .tl-bar.k-progress{background:var(--data-1);color:var(--on-data-1)}
 .tl-bar.k-scheduled{background:repeating-linear-gradient(135deg,var(--hatch) 0 6px,transparent 6px 12px);border:1px dashed var(--border-strong);color:var(--text-2)}
 .tl-bar.k-overdue{background:var(--accent);color:var(--on-accent)}
+/* Audit Plan · location × month (29/09/2026): one dot per audit. Every audit sits in one month, so the old
+   one-row-per-audit timeline was 237 rows × 93 px (22,000 px) of mostly empty cells. */
+.am-wrap{overflow-x:auto}
+.am{display:grid;grid-template-columns:minmax(150px,200px) repeat(12,minmax(56px,1fr));min-width:860px}
+.am-h{padding:6px 4px;text-align:center}
+.am-h.now,.am-c.now{background:var(--accent-08)}
+.am-h.now{color:var(--accent)}
+.am-l{padding:6px 10px;border-top:1px solid var(--hairline);display:flex;gap:6px;align-items:baseline;min-width:0}
+.am-c{border-top:1px solid var(--hairline);border-left:1px solid var(--hairline);padding:5px 4px;display:flex;flex-wrap:wrap;gap:3px;align-content:flex-start;min-height:28px}
+.am-d{width:12px;height:12px;border-radius:50%;padding:0;border:1.5px solid var(--text-3);background:var(--text-3);cursor:pointer;flex:none}
+.am-d.k-performed{background:var(--data-2);border-color:var(--data-2)}
+.am-d.k-progress{background:var(--data-1);border-color:var(--data-1)}
+.am-d.k-scheduled{background:transparent;border-style:dashed}
+.am-d.k-overdue{background:var(--accent);border-color:var(--accent)}
+.am-d:hover,.am-d:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.am-key{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:-1px;border:1.5px solid var(--text-3);background:var(--text-3)}
 
 /* ---------- split view (PAVOI) ---------- */
 .split{display:grid;grid-template-columns:minmax(300px,356px) minmax(0,1fr);gap:var(--s3);align-items:start}
@@ -787,7 +803,7 @@ body.kiosk .app{grid-template-columns:minmax(0,1fr) !important}
     <div class="brand">
       <span class="brand-mark" aria-hidden="true">VJ</span>
       <span class="brand-text">
-        <span class="brand-name">Safety - Quality Assurance</span>
+        <span class="brand-name">Safety &amp; Quality Assurance</span>
         <span class="brand-sub">AMO · VietJet Air</span>
       </span>
     </div>
@@ -969,7 +985,7 @@ function authCard(inner){
   bootEl.classList.remove('is-error');
   bootEl.innerHTML = '<div class="beta-auth card" role="dialog" aria-labelledby="authTitle">'
     + '<div class="beta-auth-brand"><span class="beta-auth-logo">VJ</span><span><span class="strong">QA AMO Dashboard</span>'
-    + '<span class="t-small dim" style="display:block">Quality Assurance · AMO · VietJet Air</span></span></div>' + inner + '</div>';
+    + '<span class="t-small dim" style="display:block">Safety &amp; Quality Assurance · AMO · VietJet Air</span></span></div>' + inner + '</div>';
 }
 function alertBox(id){ return '<div class="beta-auth-alert" id="'+id+'" role="alert" hidden></div>'; }
 function showAlert(id, kind, msg){
@@ -2415,7 +2431,8 @@ const state = {
   rowQuery:'',
   sort:{},
   page:{},
-  sel:{ pavoi:null }
+  sel:{ pavoi:null },
+  aud:{ type:'', show:'all' }   /* Audit Plan filters (location × month view) */
 };
 const $  = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -3019,43 +3036,52 @@ function renderAudit(tab){
   if(tab === 'bottleneck') return placeholder(NAV_BY_ID.audit, NAV_BY_ID.audit.tabs.find(t=>t.id==='bottleneck'));
 
   const now = TODAY.getMonth();
-  const head = '<div class="tl-row tl-head"><div>Audit · lead · location</div>'
-    + MONTHS.map((m,i)=>'<div'+(i===now?' class="now"':'')+'>'+m+'</div>').join('') + '</div>';
-
-  const AUD = auditsScoped();
-  if(!AUD.length) return kpis + '<section class="sec"><div class="card">'+emptyState()+'</div></section>';
-  const multiYear = new Set(AUD.map(a=>a.year)).size > 1;
-  const body = AUD.map(a=>{
-    const cells = MONTHS.map((m,i)=>{
-      const on = i>=a.start && i<=a.end;
-      const cls = ['tl-cell', i===now?'now':'', on?'on':'', i===a.start?'start':'', i===a.end?'end':''].filter(Boolean).join(' ');
-      const kind = (a.overdue>0 && on && a.status!=='Scheduled') ? 'k-overdue' : AUD_KIND[a.status];
-      const label = (on && i===a.start) ? (a.findings ? a.findings+' findings' : a.status) : '';
-      return '<div class="'+cls+'">'+(on ? '<span class="tl-bar '+kind+'"><span class="od-truncate">'+esc(label)+'</span></span>' : '')+'</div>';
-    }).join('');
-    return '<div class="tl-row" tabindex="0" role="button" data-act="'+(REAL?'baudit':'toast')+'" data-id="'+esc(a.id)+'" data-t="'+esc(a.number)+'" '
-      + 'data-b="'+esc(a.title+' · '+a.type+' · lead '+a.lead+' · '+a.location+' · '+a.status+' · '+a.findings+' findings, '+a.open+' still open'+(a.overdue?', '+a.overdue+' overdue':'')+'.')+'">'
-      + '<div class="tl-lbl"><span class="od-row" style="--od-gap:8px"><span class="row-id">'+esc(a.number)+'</span>'
-        + (multiYear && a.year ? '<span class="tag">'+a.year+'</span>' : '')
-        + (a.overdue ? '<span class="cat c3">'+a.overdue+' overdue</span>' : '')+'</span>'
-      + '<span class="row-sub od-truncate">'+esc(a.title)+'</span>'
-      + '<span class="t-small dim od-truncate">'+esc(a.type)+' · '+esc(a.lead)+' · '+esc(a.location)+'</span></div>'
-      + cells + '</div>';
-  }).join('');
+  const ALL = auditsScoped();
+  if(!ALL.length) return kpis + '<section class="sec"><div class="card">'+emptyState()+'</div></section>';
+  /* location × month (29/09/2026, Eric chose option A): rows = locations (plus the year when several years are
+     selected), one dot per audit in the month it is scheduled. Filters: type and show (all / upcoming / overdue). */
+  const f = state.aud;
+  const typeN = t => ALL.filter(a => a.type === t).length;
+  const AUD = ALL.filter(a => (!f.type || a.type === f.type)
+    && (f.show === 'all' || (f.show === 'upcoming' ? a.status === 'Scheduled' : a.overdue > 0)));   /* metrics-ok: audit status, not report status */
+  const multiYear = new Set(ALL.map(a=>a.year)).size > 1;
+  const kind = a => (a.overdue>0 && a.status!=='Scheduled') ? 'k-overdue' : (AUD_KIND[a.status] || 'k-closed');   /* metrics-ok: audit status */
+  const rowKey = a => (a.location || '—') + (multiYear && a.year ? ' · ' + a.year : '');
+  const groups = {};
+  AUD.forEach(a => { (groups[rowKey(a)] ||= { year: a.year || 0, list: [] }).list.push(a); });
+  const keys = Object.keys(groups).sort((x,y) => groups[y].year - groups[x].year || groups[y].list.length - groups[x].list.length || x.localeCompare(y));
+  const short = l => String(l).replace(' Line Maintenance Station', ' Line');
+  const dot = a => '<button type="button" class="am-d '+kind(a)+'" data-act="'+(REAL?'baudit':'toast')+'" data-id="'+esc(a.id)+'" data-t="'+esc(a.number)+'" '
+    + 'data-b="'+esc(a.title+' · '+a.type+' · lead '+a.lead+' · '+a.location+' · '+a.status+' · '+a.findings+' findings, '+a.open+' still open'+(a.overdue?', '+a.overdue+' overdue':'')+'.')+'" '
+    + 'title="'+esc(a.number+' · '+a.title+' — '+a.type+' · '+a.status+' · '+a.findings+' findings'+(a.open?', '+a.open+' open':'')+(a.overdue?', '+a.overdue+' overdue':''))+'" '
+    + 'aria-label="'+esc(a.number+', '+a.status+(a.overdue?', '+a.overdue+' overdue findings':''))+'"></button>';
+  const grid = '<div class="am-wrap"><div class="am" aria-label="Audits by location and month">'
+    + '<div class="t-micro am-h" style="text-align:left;padding-left:10px">Location</div>'
+    + MONTHS.map((m,i) => '<div class="t-micro am-h'+(i===now?' now':'')+'">'+m+'</div>').join('')
+    + keys.map(k => { const g = groups[k].list;
+        return '<div class="am-l t-small" title="'+esc(k)+'"><span class="strong od-truncate">'+esc(short(k))+'</span><span class="dim num">'+g.length+'</span></div>'
+          + MONTHS.map((m,i) => '<div class="am-c'+(i===now?' now':'')+'">'+g.filter(a => a.start === i).map(dot).join('')+'</div>').join(''); }).join('')
+    + '</div></div>';
+  const seg = (k, v, label) => '<button class="btn'+(f[k]===v?' primary':'')+'" type="button" data-act="audf" data-k="'+k+'" data-v="'+v+'" aria-pressed="'+(f[k]===v)+'">'+esc(label)+'</button>';
+  const filters = '<div class="od-row" style="--od-gap:6px;flex-wrap:wrap"><span class="t-small dim">Type</span>'
+    + seg('type', '', 'All '+ALL.length) + ['Inspection','Audit','Other'].filter(typeN).map(t => seg('type', t, t+' '+typeN(t))).join('')
+    + '<span style="width:12px"></span><span class="t-small dim">Show</span>'
+    + seg('show', 'all', 'All') + seg('show', 'upcoming', 'Upcoming '+ALL.filter(a => a.status === 'Scheduled').length)   /* metrics-ok: audit status */
+    + seg('show', 'overdue', 'With overdue '+ALL.filter(a => a.overdue > 0).length) + '</div>';
+  const key = (style, label) => '<span class="legend-i"><span class="am-key" style="'+style+'"></span>'+label+'</span>';
+  const legend = '<div class="legend">'
+    + key('', 'Closed') + key('background:var(--data-2);border-color:var(--data-2)', 'Performed')
+    + key('background:var(--data-1);border-color:var(--data-1)', 'In progress') + key('background:transparent;border-style:dashed', 'Scheduled')
+    + key('background:var(--accent);border-color:var(--accent)', 'Has overdue findings')
+    + '<span class="legend-i dim">'+MONTHS[now]+' is the current month · select a dot for detail</span></div>';
 
   const counts = ['Closed','Performed','In Progress','Scheduled','Cancelled'].map(s=>({s, n:AUD.filter(a=>a.status===s).length})).filter(c=>c.n || c.s!=='Cancelled');   /* metrics-ok: audit status legend counts */
 
   return kpis + '<section class="sec"><div class="card">'
     + '<div class="card-head"><h2>'+(REAL ? 'Programme · '+esc(periodLabel()) : 'Annual programme 2026')+'</h2>'
-    + '<span class="t-small dim od-fill">'+AUD.length+' audits and inspections · bar spans the scheduled window · select a row for detail</span></div>'
-    + '<div class="card-pad" style="padding-bottom:0"><div class="legend">'
-    + '<span class="legend-i"><span class="swatch" style="background:repeating-linear-gradient(135deg,var(--hatch) 0 4px,transparent 4px 8px);border-style:dashed"></span>Scheduled</span>'
-    + '<span class="legend-i"><span class="swatch" style="background:var(--data-1)"></span>In progress</span>'
-    + '<span class="legend-i"><span class="swatch" style="background:var(--data-2)"></span>Performed</span>'
-    + '<span class="legend-i"><span class="swatch" style="background:var(--sunken)"></span>Closed</span>'
-    + '<span class="legend-i"><span class="swatch" style="background:var(--accent);border-color:var(--accent)"></span>Has overdue findings</span>'
-    + '<span class="legend-i dim">'+MONTHS[now]+' is the current month</span></div></div>'
-    + '<div class="tl-wrap"><div class="tl">'+head+'<div class="tl-body">'+body+'</div></div></div>'
+    + '<span class="t-small dim od-fill">'+AUD.length+(AUD.length !== ALL.length ? ' of '+ALL.length : '')+' audits and inspections · one dot per audit, in the month it is scheduled</span></div>'
+    + '<div class="card-pad" style="display:grid;gap:12px;padding-bottom:0">'+filters+legend+'</div>'
+    + (AUD.length ? '<div class="card-pad">'+grid+'</div>' : '<div class="card-pad">'+emptyState()+'</div>')
     + '<div class="tbl-foot">'+counts.map(c=>'<span class="t-small dim">'+c.s+' <span class="num strong">'+c.n+'</span></span>').join('')+'</div>'
     + '</div></section>';
 }
@@ -3405,6 +3431,7 @@ function handle(el, e){
     }
     if(act === 'page'){ state.page[el.dataset.key] = Number(el.dataset.p); render(); return true; }
     if(act === 'selpavoi'){ state.sel.pavoi = el.dataset.id; render(); return true; }
+    if(act === 'audf'){ state.aud[el.dataset.k] = el.dataset.v; render(); return true; }
     if(act === 'clearone'){
       const k = el.dataset.k;
       if(k === 'years')  state.filters.years  = [TODAY.getFullYear()];
@@ -4908,7 +4935,7 @@ function scrGuideNew(){
     + '<li><b>Reports › PAVOI</b>: register on the left, record on the right with the verification history and the RFI / Task list of open PAVOI.</li>'
     + '<li><b>Reports › OSR / MOSR</b>: OSR and MOSR of AMO and MQA : QA AMO, Open or Closed from Coruson.</li>'
     + '<li><b>Analytics › Event/IR report status</b>: EIS and F-088 completeness on Coruson; each row lists what is missing.</li>'
-    + '<li><b>Audit Plan</b>: KPI tiles, a timeline by scheduled start month, and a schedule list. Select an audit for its workflow stages and findings. <b>Bottleneck analysis</b> counts stages across all audits in Galileo.</li>'
+    + '<li><b>Audit Plan</b>: KPI tiles, a location × month view (one dot per audit in its scheduled month; filter by type or show only upcoming / with overdue findings), and a schedule list. Select a dot or a row for its workflow stages and findings. <b>Bottleneck analysis</b> counts stages across all audits in Galileo.</li>'
     + '<li><b>Library › Documents</b>: browse by document type; the document number opens copyholders (on time, late, overdue) and the workflow.</li></ul>')
   + sec('export','Exports',
     '<p><b>Admin › Export reports</b> (administrators):</p>'
