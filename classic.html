@@ -7908,16 +7908,18 @@ function renderAuditKpi(data) {
   const closed   = data.filter(a => a.status === 'Closed').length;
   const open     = data.filter(a => ['InProgress','Performed','Scheduled'].includes(a.status)).length;
   const rate     = total ? Math.round(closed/total*100) : 0;
-  // [r177] active_stages (bước đang chạy, nạp mỗi lượt) thay cho audit_stages (luôn rỗng khi > 50 audit).
-  // Đang chạy = InProgress hoặc PendingSignOff. Theo dõi CAR = mọi bước có "follow up" trong tên (CAR follow up,
-  // MCAR follow up, Finding follow up, Follow up CAR & Close Audit — tên khác nhau theo workflow).
+  // [r177] active_stages (bước InProgress / PendingSignOff, nạp mỗi lượt) thay cho audit_stages (luôn rỗng khi > 50
+  // audit). Định nghĩa GIỮ NGUYÊN như trước (Eric 29/09: Galileo ghi gì thì ghi đúng thế, không tự gộp):
+  // CAR follow-up = bước 'Follow up CAR' / 'Finding follow up' ở trạng thái InProgress. PendingSignOff KHÔNG gộp vào.
   const known    = data.every(a => Array.isArray(a.active_stages));
-  const inCar    = !known ? '—' : data.filter(a => a.active_stages.some(s => /follow[\s-]*up/i.test(s.stage_type))).length;
+  const isCarFu  = s => { const t = normalizeStageTitle(s.stage_type); return t === 'Follow up CAR' || t === 'Finding follow up'; };
+  const inCar    = !known ? '—' : data.filter(a => a.active_stages.some(s => isCarFu(s) && s.stage_status === 'InProgress')).length;
   // Bottleneck stage: most common InProgress stage across filtered data
   let bottleneckStage = '—';
   const stageCounts = {};
   data.forEach(a => {
-    (a.active_stages||[]).forEach(s => {   // [r177]
+    (a.active_stages||[]).forEach(s => {   // [r177] chỉ InProgress, như trước
+      if (s.stage_status !== 'InProgress') return;
       const t = normalizeStageTitle(s.stage_type);
       stageCounts[t] = (stageCounts[t]||0) + 1;
     });

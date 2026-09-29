@@ -4619,7 +4619,6 @@ function dDayLocal(v){ const s = String(v).slice(0,10); return new Date(+s.slice
    all, they carry no order column, and the report view only gives the stage type (Task /
    ReportAcceptReject), not the stage title. One request per record, on opening its modal. */
 const WF_STAGES = {};
-const WF_STATUS = { NotStarted:'Not started', InProgress:'In progress', PendingSignOff:'Pending sign-off', Completed:'Completed', Cancelled:'Cancelled', Skipped:'Skipped' };
 function wfStages(ctxId, key){
   const have = WF_STAGES[ctxId];
   if(have !== undefined) return have;          /* array, { err }, or null while loading */
@@ -4641,7 +4640,7 @@ function stagesTable(tableKey, stages){
     const late = !s.completed_date && s.target_date && s.status !== 'NotStarted' && s.status !== 'Cancelled' && dDayLocal(s.target_date) < today.getTime();
     const dur = s.started_date && s.completed_date ? Math.round((dDayLocal(s.completed_date) - dDayLocal(s.started_date)) / 864e5) : null;
     return ['<span class="t-small"><span class="dim num">'+(i+1)+'.</span> '+esc(s.title || '—')+'</span>',
-      '<span class="tag">'+esc(WF_STATUS[s.status] || s.status || '—')+'</span>'+(late ? ' <span class="cat c3">overdue</span>' : ''),
+      '<span class="tag">'+esc(s.status || '—')+'</span>'   /* the Galileo value as is (Eric 29/09: no renaming) */+(late ? ' <span class="cat c3">overdue</span>' : ''),
       '<span class="t-small">'+esc(s.owner || '—')+'</span>', '<span class="num">'+fdx(s.started_date)+'</span>', '<span class="num">'+fdx(s.target_date)+'</span>',
       '<span class="num">'+fdx(s.completed_date)+'</span>', '<span class="num">'+(dur == null ? '—' : dur+' d')+'</span>'];
   });
@@ -4882,18 +4881,22 @@ function auditKpiTiles(){
   const data = A.auditData().filter(a => a.is_qa_amo_scope && M.auditInPeriod(a));
   const S = M.auditSummary(data);
   const stageT = s => A.normalizeStageTitle(s.stage_type);
-  /* r177: active_stages = the stages running now (InProgress or PendingSignOff), loaded with the data. audit_stages
-     was always empty with > 50 audits, so CAR follow-up showed 0 and Bottleneck '—' whatever the data. A cache
-     from before r177 has no active_stages: show '—' until the background refresh lands, never a false 0. */
+  /* r177: active_stages = the audit's stages in InProgress or PendingSignOff, loaded with the data. audit_stages was
+     always empty with > 50 audits, so CAR follow-up showed 0 and Bottleneck '—' whatever the data. Definitions stay
+     as before (Eric 29/09: show what Galileo says, do not merge statuses): CAR follow-up = a 'Follow up CAR' /
+     'Finding follow up' stage InProgress; PendingSignOff is shown next to it under its own Galileo name. A cache
+     from before r177 has no active_stages: '—' until the background refresh lands, never a false 0. */
   const known = data.every(a => Array.isArray(a.active_stages));
-  const inCar = known ? data.filter(a => a.active_stages.some(s => /follow[\s-]*up/i.test(s.stage_type))).length : null;
-  const sc = {}; if(known) data.forEach(a => a.active_stages.forEach(s => { const t = stageT(s); sc[t] = (sc[t] || 0) + 1; }));
+  const carFu = s => ['Follow up CAR','Finding follow up'].includes(stageT(s));
+  const inCar = known ? data.filter(a => a.active_stages.some(s => carFu(s) && s.stage_status === 'InProgress')).length : null;
+  const carPso = known ? data.filter(a => a.active_stages.some(s => carFu(s) && s.stage_status === 'PendingSignOff')).length : 0;
+  const sc = {}; if(known) data.forEach(a => a.active_stages.forEach(s => { if(s.stage_status === 'InProgress'){ const t = stageT(s); sc[t] = (sc[t] || 0) + 1; } }));
   const top = Object.entries(sc).sort((a,b) => b[1] - a[1])[0];
   const years = [...new Set(data.map(a => a.sched_year).filter(Boolean))].sort();
   return tiles([stat('Total audits', String(S.total), 'MNT · '+periodLabel()), stat('Closed', String(S.closed), 'status Closed'),
     stat('Open', String(S.open), 'in progress, performed or scheduled'), stat('Closure rate', S.rate+'%', S.closed+' of '+S.total, S.total > 0 && S.rate < 50),
-    stat('CAR follow-up', inCar === null ? '—' : String(inCar), inCar === null ? 'loading…' : 'audits in a follow-up stage'),
-    stat('Bottleneck', top ? top[0] : '—', !known ? 'loading…' : top ? top[1]+' audits at this stage' : 'no stage in progress', false, true),
+    stat('CAR follow-up', inCar === null ? '—' : String(inCar), inCar === null ? 'loading…' : 'stage InProgress' + (carPso ? ' · ' + carPso + ' PendingSignOff' : '')),
+    stat('Bottleneck', top ? top[0] : '—', !known ? 'loading…' : top ? top[1]+' audits with this stage InProgress' : 'no stage InProgress', false, true),
     stat('Years', years.length ? (years.length <= 3 ? years.join(', ') : years[0]+'–'+years[years.length-1]) : '—', years.length+' year(s)', false, true)]);
 }
 
