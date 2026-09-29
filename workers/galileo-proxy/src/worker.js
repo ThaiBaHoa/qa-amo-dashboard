@@ -15,9 +15,7 @@
 //     token's own expiry), so a page load costs 2 Supabase calls, not 2 per Galileo request.
 //     AUTH_MODE (wrangler.jsonc vars): 'soft' = check and log, but still serve (rollout step 1, while
 //     browsers still run the old page); 'enforce' = refuse with 401/403.
-//  2. STREAMING. The body used to be read whole (`await response.text()`) before the reply started,
-//     so the browser got no headers until the last byte — its hedging (fetchHedged, r173-i1) could not
-//     tell "server silent" from "big body downloading". The body is now passed through as a stream.
+//  2. (Streaming the body was tried 28/09 and rolled back 29/09 — see the note at the fetch below.)
 const ALLOWED_ORIGINS = [
   'https://vjc-qa-amo.com',
   'https://www.vjc-qa-amo.com',
@@ -118,10 +116,13 @@ export default {
         signal: controller.signal,
         headers: { 'X-IdeagenDataAPIKey': apiKey, 'Content-Type': 'application/json' },
       });
-      // headers are in: the upstream answered. The body streams through; the browser applies its own
-      // body timeout (classic fetchOnce, r173-i1).
+      // Read the whole body here, inside the 90s timeout, then reply — as the worker always did.
+      // DO NOT stream `response.body` through: tried 28/09/2026 and it broke live on 29/09 — measured side
+      // by side, dwreporting_users (711 KB) took 1.8s buffered vs 47.6s streamed, audit/workflow >120s, and
+      // the dashboard hung at "[4/6]". Buffering stays until a streamed variant is proven on live-sized data.
+      const data = await response.arrayBuffer();
       clearTimeout(timeout);
-      return new Response(response.body, {
+      return new Response(data, {
         status: response.status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

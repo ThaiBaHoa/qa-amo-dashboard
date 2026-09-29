@@ -460,8 +460,9 @@ App có **3 Worker riêng** — đừng nhầm:
 > có hồ sơ → 403, không/sai token → 401; kết quả nhớ 5 phút/token (không quá hạn token). Công tắc `AUTH_MODE`
 > (`wrangler.jsonc` vars): `soft` = kiểm + log, vẫn trả; `enforce` = chặn. Chỉ kiểm `Origin` là không đủ: header ai cũng
 > giả được. App: mọi request G_URL đi qua `gFetch`/`gAuth` (classic.html), giao diện mới lấy token từ phiên của nó.
-> **(b) truyền dần thân response** (trước: `await response.text()` rồi mới trả → trình duyệt không có header tới byte cuối,
-> dự phòng r173-i1 vô tác dụng). Thử trước khi live: `npx.cmd wrangler dev --remote --port 8787 --var AUTH_MODE:enforce`
+> **(b) KHÔNG truyền dần thân response** — đã thử 28/09, làm live treo 29/09 ('[4/6] Audit plan'): đo song song
+> `dwreporting_users` 711 KB gom-đủ 1,8s vs truyền-dần 47,6s; audit/workflow >120s. Worker gom đủ thân trong hạn 90s
+> rồi mới trả, như trước. Hệ quả: dự phòng r173-i1 (ngừng khi có header) vẫn ít tác dụng trên live. Thử trước khi live: `npx.cmd wrangler dev --remote --port 8787 --var AUTH_MODE:enforce`
 > + preview `beta-local` với `?relay=http://127.0.0.1:5520/proxy-dev/&auth=1` (relay chuyển tiếp Authorization).
 
 ```javascript
