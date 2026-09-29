@@ -5,6 +5,12 @@
 
 ---
 
+## ⏳ r177 — Bước workflow đúng nguồn (29/09/2026, máy nhà — COMMIT 5e5e425, CHƯA PUSH)
+
+- Eric: modal MNT-1030 thiếu bước + sai thứ tự so với Coruson. Gốc: `dwreporting_*_workflow` trải phẳng theo task. Chi tiết + số probe: PROJECT_TECH_SPEC §14 r177, TECHNICAL_REFERENCE 'Bước workflow — dùng view nào'.
+- Kèm: ô CAR follow-up / Bottleneck trên Audit Plan xưa nay luôn 0 / '—' trên live (bước chỉ nạp khi ≤ 50 audit) — nay có số (2026: 11 · MCAR follow up 8, hoà Audit closure 8 — ô chỉ hiện một).
+- Còn: push → kiểm live; modal audit của classic.html chưa xem bằng mắt. Bottleneck hoà thì chỉ hiện 1 bước — có thể hiện cả hai nếu Eric muốn.
+
 ## ✅ Audit Plan địa điểm × tháng + thương hiệu 'Safety & Quality Assurance' (29/09/2026 — ĐÃ PUSH d4d7365, live 22:59)
 
 - Eric chọn phương án A (trong 3 bản nháp dựng trên dữ liệu thật): mỗi audit một chấm ở tháng dự kiến, hàng = địa điểm (+ năm khi chọn nhiều năm), lọc Loại / Hiển thị (`state.aud`, act `audf`). 237 audit 2026: 22.000 px → ~1 màn. Schedule list giữ nguyên. Guide + manual cập nhật.
