@@ -5,6 +5,34 @@
 
 ---
 
+## 📌 TỔNG KẾT PHIÊN 28–29/09/2026 (máy nhà) — đọc cái này trước
+
+**Live cuối phiên (29/09 23:41):** `APP_REV = 2026.09.29-r178` + màu trạng thái Audit Plan (`02c9cb4`). `main` = `origin/main`.
+Worker `galileo-proxy` = bản trong `workers/galileo-proxy/`, version `fc20ebb6`, **AUTH_MODE soft**.
+
+| Đã lên live | Nội dung |
+|---|---|
+| r173-i1 / i2 / UI (28/09 22:00) | fetch không treo khi thân đứng · mở cache chấm lại Overdue/CAT · giữ cuộn + focus |
+| r174 · first-paint · r175 · r176 (28/09 22:53) | rev mới không vứt cache (`CACHE_DATA_VER`) · lần đầu hiện màn sớm · CMR/ECAR chung lượt quét + RFI song song · app gửi token Supabase, Worker vào repo |
+| Worker fc20ebb6 (29/09 21:53) | sửa sự cố treo '[4/6]' do truyền dần — gom đủ như cũ |
+| Đợt 3 UI `f16a55c` (29/09 22:47) | sparkline 12 tháng · phân trang modal · tìm khi gõ · bộ lọc trong URL · AI · bàn phím modal |
+| `d4d7365` (22:59) | Audit Plan địa điểm × tháng (Eric chọn A) · thương hiệu "Safety & Quality Assurance" |
+| r177 (23:32) | bước workflow audit/report đúng nguồn (đủ + đúng thứ tự) · ô CAR follow-up / Top stage có số thật · Galileo nguyên văn |
+| r178 (23:36) · `02c9cb4` (23:41) | "Workflow stages" thay "Bottleneck analysis" · màu trạng thái 2 theme |
+
+**Luật mới (Eric 29/09):** giá trị Galileo hiện **nguyên văn** — không tự đổi tên, không gộp trạng thái, không mở rộng định nghĩa
+chỉ số (CLAUDE.md, mục Galileo values). **Worker:** thử bằng dữ liệu cỡ thật + so A/B với bản cũ trước khi deploy (sự cố 29/09).
+
+**Còn mở (theo thứ tự):**
+1. **Bật `AUTH_MODE: enforce`** cho `galileo-proxy` — trước đó F5 màn LED (`https://vjc-qa-amo.com/?kiosk=1`) + mọi máy đang mở;
+   xem log `npx.cmd wrangler tail galileo-proxy` không còn `soft-allow` từ trình duyệt. Lùi: đặt lại `soft`.
+2. Worker `galileo-ai` (khoá Anthropic) — chưa xem có kiểm đăng nhập không.
+3. Modal audit của `classic.html` (r177) chưa xem bằng mắt.
+4. Áp bộ màu trạng thái cho màn khác (Schedule list, biểu đồ) — Eric chưa quyết.
+5. Nhánh local `local-agent-tools` (máy nhà) giữ `325d3a4` — **không merge vào main** (lộ cách vượt proxy + số liệu thật).
+
+Chi tiết từng rev: PROJECT_TECH_SPEC §14. Việc ngoài git (quyết định, sự cố): workspace `GHI_NHAN_TUAN.md` tuần 2026-W40.
+
 ## ✅ r178 — Audit Plan › Workflow stages (29/09/2026 — ĐÃ PUSH 5ae2e49, live 23:36, curl APP_REV = r178) — thay 'Bottleneck analysis', xem §14
 
 ## ✅ r177 — Bước workflow đúng nguồn (29/09/2026 — ĐÃ PUSH, live 23:32)
