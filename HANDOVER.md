@@ -5,6 +5,11 @@
 
 ---
 
+## ✅ Audit Plan địa điểm × tháng + thương hiệu 'Safety & Quality Assurance' (29/09/2026 — ĐÃ PUSH d4d7365, live 22:59)
+
+- Eric chọn phương án A (trong 3 bản nháp dựng trên dữ liệu thật): mỗi audit một chấm ở tháng dự kiến, hàng = địa điểm (+ năm khi chọn nhiều năm), lọc Loại / Hiển thị (`state.aud`, act `audf`). 237 audit 2026: 22.000 px → ~1 màn. Schedule list giữ nguyên. Guide + manual cập nhật.
+- Thương hiệu: sidebar + thẻ đăng nhập (sửa ở `loader.js` — bản 26/09 chỉ sửa bản chép trong template nên đăng nhập vẫn 'Quality Assurance').
+
 ## ✅ Đợt 3 rà hiệu năng/UX — giao diện (29/09/2026 — ĐÃ PUSH f16a55c, live 22:47, curl index có writeUrlFilters/MODAL_REDRAW)
 
 - Chỉ `index.html` (nguồn `beta-src`: beta-template.html, screens.js, screens2.js), không bump rev. Backup nguồn: `rebuild UIUX/beta-src-bak-20260928/` (trước đợt 1).
