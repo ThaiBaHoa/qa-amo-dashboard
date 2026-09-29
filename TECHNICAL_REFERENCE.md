@@ -421,6 +421,16 @@ Luật chấm lấy từ `F088 GUIDEDANCE.docx` (Eric, 18/08/2026).
 
 ---
 
+## Bước workflow — dùng view nào (r177, probe 29/09/2026)
+
+| Cần | View | Vì sao |
+|---|---|---|
+| Danh sách bước của MỘT audit/report, đúng thứ tự | `dwanalytics_workflow_stage` — `context_id eq <audit_id / report_id> and valid_to eq null`, `$orderby=index` | Đủ mọi bước, cột `index` = thứ tự workflow, có `title` thật. Nhiều phiên bản → PHẢI lọc `valid_to eq null` (MNT-1030: 19 dòng, 5 hiện hành) |
+| Đếm / gom theo bước (Bottleneck), bước đang chạy | `dwreporting_audit_stage` (cột `status`, `stage_title`, `workflow_title`, `audit_id`) | Một dòng một bước; `$apply=groupby` chạy được (6s) |
+| ❌ Không dùng cho bước | `dwreporting_audit_workflow`, `dwreporting_report_workflow` | Trải phẳng theo TASK: bước không có task (Finding follow up, CAR follow up, … closure, bước chưa bắt đầu) KHÔNG có dòng; đếm ra số task; không có cột thứ tự. 237/237 audit 2026 thiếu bước (471 bước) |
+
+Trạng thái bước: `NotStarted` · `InProgress` · `PendingSignOff` (Coruson hiện là "In Progress" + nút Close stage) · `Completed` · `Withdrawn`/`Cancelled`.
+
 ## Giới hạn OData (KHÔNG được vượt qua)
 
 | Giới hạn | Giá trị | Lý do |

@@ -4493,7 +4493,7 @@ function showEis(id){
 const stageName = t => String(t || '—').replace(/([a-z])([A-Z])/g, '$1 $2');
 function showReport(id){
   const A = API(), rep = REPORTS.find(x => x.id === id); if(!rep) return;
-  MODAL_REDRAW = () => showReport(id);
+  MODAL_REDRAW = () => showReport(id); MODAL_KEY = 'rpt:'+id;
   if(rep.code === A.EIS_TITLE) return showEis(id);
   if(rep.code === A.QCS_TITLE) return showQcs(id);
   const src = rep.form === 'cmrcar' ? A.cmrData() : rep.form === 'ecar' ? A.ecarData() : A.allData();
@@ -4515,7 +4515,7 @@ function showReport(id){
         ['Raised date', fdx(r.raised_date)], ['Target date', fdx(r.Target_date)], ['Date completed', fdx(r.close_date)]])
       + (findings(rowsOf(r)) || block('Finding', r.finding_desc));
   } else {
-    const st = (r.wf_stages || []).slice().sort((a,b) => String(a.stage_target_date || a.stage_completed_date || '9').localeCompare(String(b.stage_target_date || b.stage_completed_date || '9')));
+    const st = wfStages(id, 'rpt:'+id);
     body = head + kv([['Form', r.report_title], ['Org unit', r.org_unit_name], ['Department', r.dept], ['Owner', r.owner_name],
         ['Issued to', r.issued_person], ['Finding level', r.finding_level], ['Repetitive', r.is_rep ? 'Yes' : 'No'],
         ['Audit', [r.audit_number, r.audit_title].filter(Boolean).join(' · ') || null], ['Source report', r.report_ref],
@@ -4527,10 +4527,8 @@ function showReport(id){
       + (A.eis().loaded ? caList(A.eis().ca[id] || [], caForms().has(r.report_title))
          : (MODAL_KEY = 'rpt:'+id, Promise.resolve(A.loadEis()).then(() => { if(MODAL_KEY === 'rpt:'+id) showReport(id); }),
             '<p class="t-small dim">Loading corrective actions…</p>'))
-      + (st.length ? '<div style="display:grid;gap:8px"><span class="t-micro">Workflow stages ('+st.length+')</span>'
-        + plainTable('rpt-stages', [{l:'Stage'},{l:'Status'},{l:'Target'},{l:'Completed'}],
-            st.map(s => ['<span class="t-small">'+esc(stageName(s.stage_type))+'</span>', '<span class="t-small">'+esc(s.stage_status || '—')+'</span>',
-              '<span class="num">'+fdx(s.stage_target_date)+'</span>', '<span class="num">'+fdx(s.stage_completed_date)+'</span>']), 50, 0, { compact:true }) + '</div>' : '');
+      + '<div style="display:grid;gap:8px"><span class="t-micro">Workflow stages'+(Array.isArray(st) && st.length ? ' ('+st.length+')' : '')+'</span>'
+        + stagesTable('rpt-stages', st) + '</div>';
   }
   openModal(r.report_number || rep.number, rep.code + (rep.auditTitle && rep.auditTitle !== '—' ? ' · ' + rep.auditTitle : ''), body);
 }
@@ -4611,41 +4609,56 @@ function showDoc(revId, tab){
 function dDayLocal(v){ const s = String(v).slice(0,10); return new Date(+s.slice(0,4), +s.slice(5,7)-1, +s.slice(8,10)).getTime(); }
 
 /* Audit detail — showAuditDetail 8256: stages (per audit_id, never the whole audit_workflow — I7) + findings */
-const AUD_STAGES = {};
+/* ---- workflow stages of one audit or report, as Coruson shows them (29/09/2026) ----
+   Source: dwanalytics_workflow_stage, context_id = the audit_id / report_id, current version only
+   (valid_to eq null), ordered by `index` — the stage order of the workflow. Probe MNT-1030: 5 stages
+   0 Preplanning · 1 Perform · 2 Inspection Notification · 3 Finding follow up (PendingSignOff) ·
+   4 Inspection closure (NotStarted), exactly the Coruson workflow page.
+   Before, the modals read dwreporting_audit_workflow / dwreporting_report_workflow: those views are
+   flattened per TASK, so a stage with no task (Finding follow up, a stage not started yet) had no row at
+   all, they carry no order column, and the report view only gives the stage type (Task /
+   ReportAcceptReject), not the stage title. One request per record, on opening its modal. */
+const WF_STAGES = {};
+const WF_STATUS = { NotStarted:'Not started', InProgress:'In progress', PendingSignOff:'Pending sign-off', Completed:'Completed', Cancelled:'Cancelled', Skipped:'Skipped' };
+function wfStages(ctxId, key){
+  const have = WF_STAGES[ctxId];
+  if(have !== undefined) return have;          /* array, { err }, or null while loading */
+  WF_STAGES[ctxId] = null;
+  const A = API();
+  A.fetchAll(A.G_URL + 'dwanalytics_workflow_stage?$select=title,index,status,owner,started_date,target_date,completed_date'
+      + '&$filter=' + encodeURIComponent('context_id eq ' + ctxId + ' and valid_to eq null') + '&$orderby=index')
+    .then(rows => { WF_STAGES[ctxId] = rows.slice().sort((a, b) => (a.index ?? 99) - (b.index ?? 99)); })
+    .catch(e => { WF_STAGES[ctxId] = { err: e && e.message ? e.message : String(e) }; })
+    .then(() => { if(MODAL_KEY === key && MODAL_REDRAW) MODAL_REDRAW(); });
+  return null;
+}
+function stagesTable(tableKey, stages){
+  if(stages === null) return '<p class="t-small dim">Loading workflow stages…</p>';
+  if(stages.err) return '<p class="t-sub red">Could not load workflow stages: '+esc(stages.err)+'</p>';
+  if(!stages.length) return '<p class="t-sub dim">No workflow stages recorded.</p>';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const rows = stages.map((s, i) => {
+    const late = !s.completed_date && s.target_date && s.status !== 'NotStarted' && s.status !== 'Cancelled' && dDayLocal(s.target_date) < today.getTime();
+    const dur = s.started_date && s.completed_date ? Math.round((dDayLocal(s.completed_date) - dDayLocal(s.started_date)) / 864e5) : null;
+    return ['<span class="t-small"><span class="dim num">'+(i+1)+'.</span> '+esc(s.title || '—')+'</span>',
+      '<span class="tag">'+esc(WF_STATUS[s.status] || s.status || '—')+'</span>'+(late ? ' <span class="cat c3">overdue</span>' : ''),
+      '<span class="t-small">'+esc(s.owner || '—')+'</span>', '<span class="num">'+fdx(s.started_date)+'</span>', '<span class="num">'+fdx(s.target_date)+'</span>',
+      '<span class="num">'+fdx(s.completed_date)+'</span>', '<span class="num">'+(dur == null ? '—' : dur+' d')+'</span>'];
+  });
+  return plainTable(tableKey, [{l:'Stage'},{l:'Status'},{l:'Owner'},{l:'Start'},{l:'Due'},{l:'Completed'},{l:'Duration',ar:true}], rows, 30, 760, { compact:true });
+}
+
 function showAudit(id){
   const A = API(); MODAL_KEY = 'aud:'+id; MODAL_REDRAW = () => showAudit(id);
   const a = A.auditData().find(x => x.audit_id === id); if(!a) return;
   const sub = [a.workflow_category, a.status, a.lead_auditor_name, a.location_name, 'scheduled '+fdx(a.scheduled_start_date)].filter(Boolean).join(' · ');
-  let stages = a.audit_stages && a.audit_stages.length ? a.audit_stages : AUD_STAGES[id];
-  if(!stages){
-    openModal(a.number+' — '+a.title, sub, '<div class="empty"><div class="beta-boot-spin"></div></div>');
-    A.fetchAll(A.G_URL + 'dwreporting_audit_workflow?$select=audit_id,stage_id,stage_title,stage_status,stage_owner,stage_target_date,stage_started_date,stage_completed_date&$filter=audit_id eq ' + id)
-      .then(rows => {
-        const by = {};   /* dedupe per stage, keep the latest completion (8270s) */
-        rows.forEach(r => { const k = r.stage_id || r.stage_title; const o = by[k];
-          if(!o || String(r.stage_completed_date || '') > String(o.stage_completed_date || '')) by[k] = r; });
-        AUD_STAGES[id] = Object.values(by).map(r => ({ stage_type:r.stage_title, stage_status:r.stage_status, stage_owner_name:r.stage_owner,
-          stage_target_date:r.stage_target_date, stage_completed_date:r.stage_completed_date, actual_start_date:r.stage_started_date }));
-      }).catch(e => { AUD_STAGES[id] = []; toast('Could not load audit stages', e.message); })
-      .then(() => { if(MODAL_KEY === 'aud:'+id) showAudit(id); });
-    return;
-  }
-  const today = new Date(); today.setHours(0,0,0,0);
-  const stageRows = stages.map(s => {
-    const late = !s.stage_completed_date && s.stage_target_date && dDayLocal(s.stage_target_date) < today.getTime();
-    const start = s.actual_start_date, end = s.actual_end_date || s.stage_completed_date;
-    const dur = start && end ? Math.round((dDayLocal(end) - dDayLocal(start)) / 864e5) : null;
-    return ['<span class="t-small">'+esc(s.stage_type || '—')+'</span>', '<span class="tag">'+esc(s.stage_status || '—')+'</span>'+(late ? ' <span class="cat c3">overdue</span>' : ''),
-      '<span class="t-small">'+esc(s.stage_owner_name || '—')+'</span>', '<span class="num">'+fdx(start)+'</span>', '<span class="num">'+fdx(s.stage_target_date)+'</span>',
-      '<span class="num">'+fdx(s.stage_completed_date)+'</span>', '<span class="num">'+(dur == null ? '—' : dur+' d')+'</span>'];
-  });
+  const stages = wfStages(id, 'aud:'+id);
   const f = M.qa(REPORTS).filter(r => r.auditId === id).sort((x,y) => String(x.number).localeCompare(String(y.number)));
   const S = M.summary(f);
   const body = '<div class="kpi-grid">' + stat('Findings', String(S.total), 'reports raised under this audit') + stat('Open', String(S.inTarget), 'inside target')
       + stat('Overdue', String(S.overdue), 'past target', S.overdue > 0) + stat('Closed', String(S.total - S.open), S.onTime+' on time · '+S.late+' late · '+S.ungraded+' no target', S.late > 0) + '</div>'
-    + '<div style="display:grid;gap:8px"><span class="t-micro">Workflow stages</span>'
-    + (stageRows.length ? plainTable('aud-st-'+id, [{l:'Stage'},{l:'Status'},{l:'Owner'},{l:'Start'},{l:'Due'},{l:'Completed'},{l:'Duration',ar:true}], stageRows, 30, 760)
-                        : '<p class="t-sub dim">No workflow stages recorded for this audit.</p>') + '</div>'
+    + '<div style="display:grid;gap:8px"><span class="t-micro">Workflow stages'+(Array.isArray(stages) && stages.length ? ' ('+stages.length+')' : '')+'</span>'
+    + stagesTable('aud-st-'+id, stages) + '</div>'
     + '<div style="display:grid;gap:8px"><span class="t-micro">Findings</span>'
     + (f.length ? plainTable('aud-f-'+id, [{l:'Report'},{l:'Form'},{l:'Status'},{l:'Raised'},{l:'Target'},{l:'Owner'}], f.map(r =>
         ['<span class="row-id">'+esc(r.number)+'</span>', '<span class="tag">'+esc(r.code)+'</span>', chip(r.status),
@@ -4869,13 +4882,18 @@ function auditKpiTiles(){
   const data = A.auditData().filter(a => a.is_qa_amo_scope && M.auditInPeriod(a));
   const S = M.auditSummary(data);
   const stageT = s => A.normalizeStageTitle(s.stage_type);
-  const inCar = data.filter(a => (a.audit_stages || []).some(s => ['Follow up CAR','Finding follow up'].includes(stageT(s)) && s.stage_status === 'InProgress')).length;
-  const sc = {}; data.forEach(a => (a.audit_stages || []).forEach(s => { if(s.stage_status === 'InProgress'){ const t = stageT(s); sc[t] = (sc[t] || 0) + 1; } }));
+  /* r177: active_stages = the stages running now (InProgress or PendingSignOff), loaded with the data. audit_stages
+     was always empty with > 50 audits, so CAR follow-up showed 0 and Bottleneck '—' whatever the data. A cache
+     from before r177 has no active_stages: show '—' until the background refresh lands, never a false 0. */
+  const known = data.every(a => Array.isArray(a.active_stages));
+  const inCar = known ? data.filter(a => a.active_stages.some(s => /follow[\s-]*up/i.test(s.stage_type))).length : null;
+  const sc = {}; if(known) data.forEach(a => a.active_stages.forEach(s => { const t = stageT(s); sc[t] = (sc[t] || 0) + 1; }));
   const top = Object.entries(sc).sort((a,b) => b[1] - a[1])[0];
   const years = [...new Set(data.map(a => a.sched_year).filter(Boolean))].sort();
   return tiles([stat('Total audits', String(S.total), 'MNT · '+periodLabel()), stat('Closed', String(S.closed), 'status Closed'),
     stat('Open', String(S.open), 'in progress, performed or scheduled'), stat('Closure rate', S.rate+'%', S.closed+' of '+S.total, S.total > 0 && S.rate < 50),
-    stat('CAR follow-up', String(inCar), 'stage in progress'), stat('Bottleneck', top ? top[0] : '—', top ? top[1]+' audits in progress' : 'no stage in progress', false, true),
+    stat('CAR follow-up', inCar === null ? '—' : String(inCar), inCar === null ? 'loading…' : 'audits in a follow-up stage'),
+    stat('Bottleneck', top ? top[0] : '—', !known ? 'loading…' : top ? top[1]+' audits at this stage' : 'no stage in progress', false, true),
     stat('Years', years.length ? (years.length <= 3 ? years.join(', ') : years[0]+'–'+years[years.length-1]) : '—', years.length+' year(s)', false, true)]);
 }
 

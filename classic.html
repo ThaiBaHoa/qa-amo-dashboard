@@ -2522,7 +2522,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.09.28-r176';
+const APP_REV = '2026.09.29-r177';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3337,7 +3337,7 @@ async function cacheLoad() {
     allData   = regradeRows(c.a);                          // [r173-i2] chấm lại theo hôm nay
     auditData = regradeAudits(c.b || [], allData);
     if (Array.isArray(c.ou) && c.ou.length) ORG_UNIT_IDS = c.ou;   // [r143] phiên mở từ cache không chạy loadData
-    if (c.sa) stageAggregate = c.sa;
+    if (c.sa2) stageAggregate = c.sa2;   // [r177] 'sa' cũ đếm theo task — bỏ
     if (c.dtf) {
       docTypeFlat = c.dtf;
       buildDocTypeTree();
@@ -3371,7 +3371,7 @@ async function cacheLoad() {
 // Không await ở người gọi: hàm tự nuốt mọi lỗi, không bao giờ ném ra ngoài.
 async function cacheSave() {
   const payload = {ts:Date.now(), rev:APP_REV, dv:CACHE_DATA_VER, a:allData, b:auditData,
-                   dtf:docTypeFlat, sa:stageAggregate, ou:ORG_UNIT_IDS};
+                   dtf:docTypeFlat, sa2:stageAggregate, ou:ORG_UNIT_IDS};   // [r177] sa2: đếm theo bước
   try {
     // structured clone — KHÔNG JSON.stringify: bỏ được bước dựng chuỗi ~6 MB mỗi lượt ghi.
     await idbSet(CACHE_KEY, payload);
@@ -3510,6 +3510,16 @@ async function loadData(forceRefresh=false, opts={}) {
     // [r173-i1] Chỉ 'Report summary' chờ cây org unit (qua promise bên dưới); 5 nguồn kia khởi
     // chạy ngay thay vì cùng xếp hàng sau nó. loadOrgUnitIds không bao giờ reject (tự lùi về QA AMO).
     const orgP = loadOrgUnitIds();
+    // [r177] Bước ĐANG CHẠY của mọi audit (InProgress / PendingSignOff — Coruson hiện cả hai là "In Progress"),
+    // mỗi bước một dòng từ dwreporting_audit_stage (~200 dòng, 38 KB). Chạy song song, đợi ở khối AUDIT PLAN.
+    // Trước r177 bước audit chỉ nạp khi ≤ 50 audit (thực tế 1.153 → luôn bỏ qua), nên ô "CAR follow-up" luôn 0
+    // và "Bottleneck" luôn '—'; nguồn cũ dwreporting_audit_workflow còn trải phẳng theo TASK nên bước không có
+    // task (Finding follow up, CAR follow up, … closure) không có dòng nào — probe 29/09/2026: cả 237 audit 2026
+    // thiếu bước, tổng 471 bước.
+    const activeStagesP = fetchAll(G_URL + 'dwreporting_audit_stage' +
+      '?$select=audit_id,stage_title,status,owner,target_date,completed_date' +
+      '&$filter=' + encodeURIComponent("status eq 'InProgress' or status eq 'PendingSignOff'"), true)
+      .catch(e => { loadFailures.push('Audit active stages: ' + (e && e.message ? e.message : String(e))); return null; });
 
     let summary = [], usersRaw = [], grpRaw = [], auRaw = [];
     let userMap = {}, wfMap = {}, wfAllMap = {}, fMap = {};
@@ -3702,51 +3712,20 @@ async function loadData(forceRefresh=false, opts={}) {
         )
       );
 
-      // Fetch audit workflow stages — chỉ fetch nếu số audit ít
-      // dwreporting_audit_workflow có 100,000+ records — quá lớn để fetch all
-      // Chỉ fetch khi cần (lazy load khi user mở Audit Detail modal)
-      let auditWfMap = {};
-      const MAX_AUDIT_WF_FETCH = 50; // chỉ fetch nếu ≤50 audits
-      try {
-        if (allAudits.length <= MAX_AUDIT_WF_FETCH) {
-          const auWfRaw = await fetchAll(
-            G_URL + 'dwreporting_audit_workflow' +
-            '?$select=audit_id,stage_id,stage_title,stage_status,stage_owner,' +
-            'stage_target_date,stage_started_date,stage_completed_date', bgLoad   // [r165]
-          );
-        // Group by audit_id → dedup by stage_id (giữ record mới nhất stage_completed_date)
-        // Nếu stage_id null (thường xảy ra với stages NotStarted/chưa assign), dùng stage_title làm key
-        const stageMap = {};
-        auWfRaw.forEach(s => {
-          const aid = s.audit_id;
-          if (!aid) return;
-          const sid = s.stage_id || ('_title_' + (s.stage_title || '?'));
-          const key = aid + '|' + sid;
-          const ex = stageMap[key];
-          if (!ex || new Date(s.stage_completed_date||0) > new Date(ex.stage_completed_date||0)) {
-            stageMap[key] = {
-              _audit_id:            aid,
-              stage_type:           s.stage_title || '?',
-              stage_status:         s.stage_status || 'NotStarted',
-              stage_owner_name:     s.stage_owner  || null,
-              stage_target_date:    s.stage_target_date    || null,
-              stage_completed_date: s.stage_completed_date || null,
-              actual_start_date:    s.stage_started_date   || null,
-              actual_end_date:      s.stage_completed_date || null,
-              scheduled_start_date: null,
-              scheduled_end_date:   null,
-            };
-          }
+      // [r177] active_stages = bước đang chạy của audit (xem activeStagesP ở đầu loadData). Trường RIÊNG, không
+      // đụng audit_stages: modal chi tiết audit vẫn tự nạp đủ mọi bước khi mở (auditStageCache).
+      // null (request hỏng) → màn hình hiện '—', không hiện 0.
+      const activeRaw = await activeStagesP;
+      const activeMap = activeRaw ? {} : null;
+      (activeRaw || []).forEach(s => {
+        if (!s.audit_id) return;
+        (activeMap[s.audit_id] ||= []).push({
+          stage_type: s.stage_title || '?', stage_status: s.status || 'InProgress',
+          stage_owner_name: s.owner || null, stage_target_date: s.target_date || null,
+          stage_completed_date: s.completed_date || null,
         });
-        Object.values(stageMap).forEach(s => {
-          const aid = s._audit_id;
-          if (!auditWfMap[aid]) auditWfMap[aid] = [];
-          auditWfMap[aid].push(s);
-        });
-        } else {
-          console.log('[AuditWF] Skipped — too many audits (', allAudits.length, '). Will load on-demand per audit.');
-        }
-      } catch(e) { console.warn('[AuditWF] Load error:',e.message); }
+      });
+      const auditWfMap = {};
 
       // Enrich audit với finding counts + audit workflow stages
       auditData = allAudits.map(a => {
@@ -3764,6 +3743,7 @@ async function loadData(forceRefresh=false, opts={}) {
           sched_year:    a.scheduled_start_date ? new Date(a.scheduled_start_date).getFullYear() : null,
           sched_ym:      a.scheduled_start_date ? a.scheduled_start_date.substring(0,7) : null,
           audit_stages:  stages,
+          active_stages: activeMap ? (activeMap[a.audit_id] || []) : null,   // [r177]
         };
       });
 
@@ -7928,22 +7908,18 @@ function renderAuditKpi(data) {
   const closed   = data.filter(a => a.status === 'Closed').length;
   const open     = data.filter(a => ['InProgress','Performed','Scheduled'].includes(a.status)).length;
   const rate     = total ? Math.round(closed/total*100) : 0;
-  const inCar    = data.filter(a => {
-    const stages = a.audit_stages || [];
-    return stages.some(s => {
-      const t = normalizeStageTitle(s.stage_type);
-      return (t === 'Follow up CAR' || t === 'Finding follow up') && s.stage_status === 'InProgress';
-    });
-  }).length;
+  // [r177] active_stages (bước đang chạy, nạp mỗi lượt) thay cho audit_stages (luôn rỗng khi > 50 audit).
+  // Đang chạy = InProgress hoặc PendingSignOff. Theo dõi CAR = mọi bước có "follow up" trong tên (CAR follow up,
+  // MCAR follow up, Finding follow up, Follow up CAR & Close Audit — tên khác nhau theo workflow).
+  const known    = data.every(a => Array.isArray(a.active_stages));
+  const inCar    = !known ? '—' : data.filter(a => a.active_stages.some(s => /follow[\s-]*up/i.test(s.stage_type))).length;
   // Bottleneck stage: most common InProgress stage across filtered data
   let bottleneckStage = '—';
   const stageCounts = {};
   data.forEach(a => {
-    (a.audit_stages||[]).forEach(s => {
-      if (s.stage_status === 'InProgress') {
-        const t = normalizeStageTitle(s.stage_type);
-        stageCounts[t] = (stageCounts[t]||0) + 1;
-      }
+    (a.active_stages||[]).forEach(s => {   // [r177]
+      const t = normalizeStageTitle(s.stage_type);
+      stageCounts[t] = (stageCounts[t]||0) + 1;
     });
   });
   const topStage = Object.entries(stageCounts).sort((a,b) => b[1]-a[1])[0];
@@ -7969,8 +7945,11 @@ async function loadStageAggregate() {
   if (stageAggregate) { renderBottleneckPanel(); return; }
   try {
     const rows = await fetchAll(
-      G_URL + 'dwreporting_audit_workflow' +
-      '?$apply=groupby((stage_title,stage_status,workflow_title),aggregate($count as cnt))',
+      // [r177] dwreporting_audit_stage: một dòng MỘT BƯỚC. Nguồn cũ (dwreporting_audit_workflow) đếm TASK — bước 3
+      // task bị tính 3 lần (Perform 9.440 thay vì 3.410) — và thiếu hẳn bước không có task (CAR follow up 6 thay
+      // vì 1.296 Completed; Inspection closure 50 thay vì 930). Đo 29/09/2026.
+      G_URL + 'dwreporting_audit_stage' +
+      '?$apply=groupby((stage_title,status,workflow_title),aggregate($count as cnt))',
       true  // skipOv
     );
     stageAggregate = buildStageAggregate(rows);
@@ -7987,7 +7966,7 @@ function buildStageAggregate(rows) {
   const agg = {};
   rows.forEach(r => {
     const title = normalizeStageTitle(r.stage_title || '?');
-    const status = r.stage_status || 'Unknown';
+    const status = r.status || r.stage_status || 'Unknown';   // [r177] audit_stage: status
     const cnt = Number(r.cnt) || 0;
     if (!agg[title]) agg[title] = { total:0, completed:0, inprogress:0, notStarted:0, deleted:0, pendingSignOff:0, byWorkflow:{} };
     agg[title].total += cnt;
@@ -8523,34 +8502,25 @@ async function showAuditDetail(auditId) {
   if (!audit.audit_stages || audit.audit_stages.length === 0) {
     g('adTimeline').innerHTML = '<div style="color:var(--muted);font-size:12px;padding:10px">⏳ Loading workflow...</div>';
     try {
+      // [r177] dwanalytics_workflow_stage: context_id = audit_id, bản hiện hành, thứ tự theo `index` — đủ mọi
+      // bước như trang workflow của Coruson (nguồn cũ thiếu bước không có task, không có thứ tự).
       const wfRaw = await fetchAll(
-        G_URL + 'dwreporting_audit_workflow' +
-        '?$select=audit_id,stage_id,stage_title,stage_status,stage_owner,' +
-        'stage_target_date,stage_started_date,stage_completed_date' +
-        '&$filter=audit_id eq ' + auditId,
+        G_URL + 'dwanalytics_workflow_stage' +
+        '?$select=title,index,status,owner,started_date,target_date,completed_date' +
+        '&$filter=' + encodeURIComponent('context_id eq ' + auditId + ' and valid_to eq null') + '&$orderby=index',
         true  // skipOv — don't show/leave main loading overlay from a modal fetch
       );
-      const stageMap = {};
-      wfRaw.forEach(s => {
-        if (!s.audit_id) return;
-        const sid = s.stage_id || ('_title_' + (s.stage_title || '?'));
-        const key = s.audit_id + '|' + sid;
-        const ex = stageMap[key];
-        if (!ex || new Date(s.stage_completed_date||0) > new Date(ex.stage_completed_date||0)) {
-          stageMap[key] = {
-            _audit_id: s.audit_id,
-            stage_type: s.stage_title || '?',
-            stage_status: s.stage_status || 'NotStarted',
-            stage_owner_name: s.stage_owner || null,
-            stage_target_date: s.stage_target_date || null,
-            stage_completed_date: s.stage_completed_date || null,
-            actual_start_date: s.stage_started_date || null,
-            actual_end_date: s.stage_completed_date || null,
-            scheduled_start_date: null, scheduled_end_date: null,
-          };
-        }
-      });
-      audit.audit_stages = Object.values(stageMap);
+      audit.audit_stages = wfRaw.slice().sort((x, y) => (x.index ?? 99) - (y.index ?? 99)).map(s => ({
+        _audit_id: auditId,
+        stage_type: s.title || '?',
+        stage_status: s.status || 'NotStarted',
+        stage_owner_name: s.owner || null,
+        stage_target_date: s.target_date || null,
+        stage_completed_date: s.completed_date || null,
+        actual_start_date: s.started_date || null,
+        actual_end_date: s.completed_date || null,
+        scheduled_start_date: null, scheduled_end_date: null,
+      }));
     } catch(e) {
       console.warn('[AuditDetail] workflow load error:', e.message);
       audit.audit_stages = [];
