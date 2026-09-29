@@ -5,7 +5,7 @@
 
 ---
 
-## ✅ r178 — Audit Plan › Workflow stages (29/09/2026) — thay 'Bottleneck analysis', xem §14
+## ✅ r178 — Audit Plan › Workflow stages (29/09/2026 — ĐÃ PUSH 5ae2e49, live 23:36, curl APP_REV = r178) — thay 'Bottleneck analysis', xem §14
 
 ## ✅ r177 — Bước workflow đúng nguồn (29/09/2026 — ĐÃ PUSH, live 23:32)
 
