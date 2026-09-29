@@ -28,7 +28,11 @@ chỉ số (CLAUDE.md, mục Galileo values). **Worker:** thử bằng dữ li�
    xem log `npx.cmd wrangler tail galileo-proxy` không còn `soft-allow` từ trình duyệt. Lùi: đặt lại `soft`.
 2. Worker `galileo-ai` (khoá Anthropic) — chưa xem có kiểm đăng nhập không.
 3. Modal audit của `classic.html` (r177) chưa xem bằng mắt.
-4. Áp bộ màu trạng thái cho màn khác (Schedule list, biểu đồ) — Eric chưa quyết.
+4. **VIỆC KẾ TIẾP (Eric, 30/09 trên laptop): áp bộ màu trạng thái cho các page còn lại.** Mẫu đã làm: Audit Plan (commit `02c9cb4`) —
+   token có sẵn 2 theme `--ok` (xanh lá, đạt/Closed) · `--info` (xanh dương) · `--warn` (vàng, đang làm) · `--accent` (đỏ, overdue) ·
+   `--text-2` (nét đứt, chưa bắt đầu); định nghĩa ở `beta-template.html` (khối `:root` dark + light). Tên trạng thái vẫn NGUYÊN VĂN Galileo.
+   Laptop: `git pull` repo `F:/App Build/GitHub/qa-amo-dashboard`; nguồn sửa ở vault `rebuild UIUX/beta-src`, build `node build.mjs` (mặc định đọc F:)
+   → chỉ chạy `node make-index.mjs` khi log có `BODY + UI SYNTAX OK`; xem thử preview `beta-local` ở cả 2 theme trước khi push.
 5. Nhánh local `local-agent-tools` (máy nhà) giữ `325d3a4` — **không merge vào main** (lộ cách vượt proxy + số liệu thật).
 
 Chi tiết từng rev: PROJECT_TECH_SPEC §14. Việc ngoài git (quyết định, sự cố): workspace `GHI_NHAN_TUAN.md` tuần 2026-W40.
