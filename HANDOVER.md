@@ -45,6 +45,12 @@
   23 có task; bổ sung `stageOwnerCell`: stage Completed không còn task → `completed_by` (PAVOI-397 "Nguyen Son Hai · completed by");
   stage InProgress không có task nào → "no acceptor assigned" (MOSR-0476, HAZARD LOG-27: Galileo chưa có acceptor); NotStarted → "—".
   Popup ECAR (TQA) không có bảng stage — có từ trước, chưa đụng.
+- Link sang Coruson (Eric 30/09 "gắn link cho các report hết"): `extLink` (↗ cạnh số) + `extBtn` ("Open in Coruson" đầu popup).
+  Mẫu kiểm trên Chrome đăng nhập: report `/Reporting/Report/Index/<report_id>` (AISC -0714), audit `/Audits/AuditRecord/Index/<audit_id>`
+  (MNT-1050). Gắn ở: cột Report mọi register (Work Queue, Findings theo form, All forms), EIS/QC Spot Check, OSR/MOSR, Report status
+  F-088/EIS (tra report_id theo số, cả linked report), Audit list, popup report/EIS/QCS/audit, report trong popup audit, audit trong popup
+  Workflow stages, đầu khung PAVOI/CAPA. Ô Overview là <button> nên không lồng link — mở popup rồi bấm nút. Bấm ↗ không mở popup dòng.
+  Sửa kèm: manual.js lỗi cú pháp do "month's" (chỉ ảnh hưởng file .docx).
 - Còn lại của email anh Ngọc: SPI chưa đạt + level, KPI chưa đạt.
 
 ## 📌 TỔNG KẾT PHIÊN 28–29/09/2026 (máy nhà) — đọc cái này trước

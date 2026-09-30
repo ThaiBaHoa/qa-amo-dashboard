@@ -356,6 +356,13 @@ select.ctl{min-width:168px;cursor:pointer}
 .fchip button:hover{background:var(--accent-20)}
 .link-b{font-size:14px;font-weight:650;color:var(--accent-fg);padding:6px 4px;border-radius:6px}
 .link-b:hover{text-decoration:underline}
+/* Coruson deep link (30/09/2026) — a small ↗ next to a record number, and the modal's "Open in Coruson" button */
+.ext-link{display:inline-flex;align-items:center;justify-content:center;min-width:22px;min-height:22px;margin-left:4px;padding:0 4px;
+  border-radius:6px;font-size:13px;font-weight:700;color:var(--info);text-decoration:none;vertical-align:middle}
+.ext-link:hover,.ext-link:focus-visible{background:var(--info-bg);text-decoration:none}
+.ext-btn{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:6px 10px;border:1px solid var(--border-strong);border-radius:var(--r-ctl);
+  font-size:13px;font-weight:600;color:var(--info);text-decoration:none}
+.ext-btn:hover,.ext-btn:focus-visible{background:var(--info-bg)}
 
 /* ---------- content ---------- */
 .content{overflow-y:auto;min-height:0;padding:var(--s5)}
@@ -928,6 +935,7 @@ body.kiosk .app{grid-template-columns:minmax(0,1fr) !important}
 <div class="beta-modal" id="betaModal" hidden>
   <div class="beta-modal-panel" role="dialog" aria-modal="true" aria-labelledby="betaModalTitle">
     <div class="beta-modal-head"><div class="od-fill" style="display:grid;gap:4px"><h2 id="betaModalTitle"></h2><span class="t-small dim" id="betaModalSub"></span></div>
+      <span id="betaModalLink"></span>
       <button class="icon-b" type="button" data-act="bmodalclose" aria-label="Close">✕</button></div>
     <div class="beta-modal-body" id="betaModalBody"></div>
   </div>
@@ -2642,6 +2650,19 @@ function mark(s){
   return '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(MARK[s]||'')+'</svg>';
 }
 function chip(s){ return '<span class="chip '+(SCLASS[s]||'s-neutral')+'">'+mark(s)+esc(s)+'</span>'; }
+/* Coruson deep links (Eric 30/09/2026). The Galileo ids open the record itself — verified in a logged-in browser:
+   report_id → /Reporting/Report/Index/<id> (AISC -0714), audit_id → /Audits/AuditRecord/Index/<id> (MNT-1050).
+   Mock data has no real ids, so no link. The viewer needs their own Coruson session (SSO). */
+const CORUSON = 'https://vietjet.gaelenlighten.com';
+const corusonUrl = (kind, id) => (REAL && id) ? CORUSON + (kind === 'audit' ? '/Audits/AuditRecord/Index/' : '/Reporting/Report/Index/') + encodeURIComponent(id) : '';
+function extLink(kind, id, label){
+  const u = corusonUrl(kind, id);
+  return u ? '<a class="ext-link" href="'+u+'" target="_blank" rel="noopener" title="Open in Coruson" aria-label="Open '+esc(label || 'record')+' in Coruson">↗</a>' : '';
+}
+function extBtn(kind, id){
+  const u = corusonUrl(kind, id);
+  return u ? '<a class="ext-btn" href="'+u+'" target="_blank" rel="noopener">Open in Coruson <span aria-hidden="true">↗</span></a>' : '';
+}
 function catChip(c){ return c ? '<span class="cat c'+({'I':1,'II':2,'III':3}[c])+'">CAT '+c+'</span>' : '<span class="dim">—</span>'; }
 function dueCell(r){
   if(r.closed) return '<span class="num dim">'+fmtShort(r.closed)+'</span>';
@@ -2961,7 +2982,7 @@ const PAGE_SIZE = 12;
 
 const COL = {
   number:{ l:'Report', main:true, v:r=>r.number,
-    c:r=>'<span class="row-main"><span class="row-id">'+esc(r.number)+'</span><span class="row-sub od-truncate">'+esc(r.auditTitle)+'</span></span>' },
+    c:r=>'<span class="row-main"><span class="row-id">'+esc(r.number)+extLink('report', r.id, r.number)+'</span><span class="row-sub od-truncate">'+esc(r.auditTitle)+'</span></span>' },
   form:{ l:'Form', v:r=>r.code, c:r=>'<span class="tag">'+esc(r.code)+'</span>' },
   status:{ l:'Status', v:r=>r.status, c:r=>chip(r.status) },
   cat:{ l:'CAT', v:r=>({'I':1,'II':2,'III':3}[r.cat]||0), c:r=>catChip(r.cat) },
@@ -3145,7 +3166,7 @@ function renderPavoi(){
       + '<span class="t-small dim od-fill">'+done+' of '+total+' assessed'+(wd?' · '+wd+' withdrawn excluded':'')+'</span></div>'
       + '<div class="rec-list">'+list+'</div></div>'
     + '<div class="card"><div class="card-head">'
-      + '<h2 class="mono">'+esc(r.number)+'</h2>'+chip(r.status)
+      + '<h2 class="mono">'+esc(r.number)+'</h2>'+chip(r.status)+extBtn('report', r.id)
       + (r.repetitive?'<span class="cat c1">Repeat finding</span>':'')
       + '<span class="od-fill"></span>'
       + '</div>'
@@ -3223,7 +3244,7 @@ function renderAuditList(){
   if(!AUD.length) return '<section class="sec"><div class="card">'+emptyState()+'</div></section>';
   const rows = AUD.slice().sort((a,b)=>(a.year||0)-(b.year||0) || a.start-b.start).map(a=>
     '<tr tabindex="0" data-act="'+(REAL?'baudit':'toast')+'" data-id="'+esc(a.id)+'" data-t="'+esc(a.number)+'" data-b="'+esc(a.title+' — '+a.status+', '+a.findings+' findings.')+'">'
-    + '<td class="t-main" data-l="Audit"><span class="row-main"><span class="row-id">'+esc(a.number)+'</span>'
+    + '<td class="t-main" data-l="Audit"><span class="row-main"><span class="row-id">'+esc(a.number)+extLink('audit', a.id, a.number)+'</span>'
       + '<span class="row-sub od-truncate">'+esc(a.title)+'</span></span></td>'
     + '<td data-l="Type"><span class="tag">'+esc(a.type)+'</span></td>'
     + '<td data-l="Status">'+chipAs(AUD_CHIP[a.status], a.status)+'</td>'
@@ -3667,12 +3688,14 @@ document.addEventListener('click', e=>{
     periodChanged(); return;
   }
   if(!e.target.closest('.msel')) closePickers();
+  if(e.target.closest('a.ext-link, a.ext-btn')) return;   /* a Coruson link opens its tab, not the row's detail */
   const el = e.target.closest('[data-act],[data-go]');
   if(el && handle(el, e)) e.preventDefault();
 });
 document.addEventListener('keydown', e=>{
   /* rows and timeline bars are focusable; Enter and Space activate them */
   if((e.key === 'Enter' || e.key === ' ') && document.activeElement){
+    if(document.activeElement.matches && document.activeElement.matches('a.ext-link, a.ext-btn')) return;
     const el = document.activeElement.closest && document.activeElement.closest('[data-act],[data-go]');
     if(el && el.tagName !== 'BUTTON' && el.tabIndex === 0){ if(handle(el, e)) e.preventDefault(); return; }
   }
@@ -4067,15 +4090,18 @@ function scrStatus(){
   const isEis = BS.rsTab === 'eis';
   const cols = [{l:'Report'},{l:'Incharge person'},{l:'Completion on Coruson'},{l:'Workflow / add task'},{l:'Linked report'},{l:'Final report'},{l:'Status'}]
     .concat(isEis ? [{l:'PAVOI'}] : []);
+  /* rows carry the report number only: the Coruson link needs its report_id from allData (linked reports too, when loaded) */
+  const idByNo = new Map(A.allData().map(d => [String(d.report_number).trim(), d.report_id]));
+  const noLink = n => esc(n) + extLink('report', idByNo.get(String(n).trim()), n);
   const body = rows.map(r => {
     const gaps = A.rsDone(r) ? '<span class="chip s-ontime">'+mark('On-time Closed')+'Completed</span>'
       : '<span class="chip s-overdue">'+mark('Overdue')+'Not completed</span><br>' + A.rsGaps(r).map(g => '<span class="t-small"><span class="strong">'+esc(g.k)+'</span> — '+esc(g.d)+'</span>').join('<br>');
     const wf = (A.rsOkF(r) ? 'Satis' : '<span class="red strong">Unsatis</span>') + '<br><span class="t-small dim">'
       + esc((r.rfi + r.task) > 0 ? r.rfi+' RFI · '+r.task+' Task' : (r.stage || 'no stage')) + '</span>';
     const files = A.rsOkH(r) ? 'Uploaded<br><span class="t-small dim">'+r.files.length+' file(s)</span>' : '<span class="red strong">Miss final report</span>';
-    const cells = ['<span class="row-main"><span class="row-id">'+esc(r.num)+'</span><span class="row-sub od-clamp-2">'+esc(r.subject)+'</span></span>',
+    const cells = ['<span class="row-main"><span class="row-id">'+noLink(r.num)+'</span><span class="row-sub od-clamp-2">'+esc(r.subject)+'</span></span>',
       '<span class="t-small">'+esc(r.owner || '—')+'</span>', gaps, wf,
-      '<span class="t-small">'+(r.links.length ? r.links.map(esc).join('<br>') : '—')+'</span>', files, statusChip(r.status === 'Closed' ? 'Closed' : 'Open')];   /* metrics-ok: Coruson report_status of EIS/F-088 (Report status screen) */
+      '<span class="t-small">'+(r.links.length ? r.links.map(noLink).join('<br>') : '—')+'</span>', files, statusChip(r.status === 'Closed' ? 'Closed' : 'Open')];   /* metrics-ok: Coruson report_status of EIS/F-088 (Report status screen) */
     if(isEis) cells.push('<span class="t-small">'+esc(r.links.filter(x => /^PAVOI/i.test(x)).join(', ') || '—')+'</span>');
     return cells;
   });
@@ -4210,7 +4236,7 @@ function scrCapa(titles){
     + '<section class="sec"><div class="split">'
     + '<div class="card"><div class="card-head"><h2>Additional Mitigation</h2><span class="od-fill"></span>'+head+'</div>'
       + '<div class="rec-list">'+list+'</div></div>'
-    + '<div class="card"><div class="card-head"><h2 class="mono">'+esc(r.number)+'</h2>'+chip(r.status)+'<span class="od-fill"></span></div>'
+    + '<div class="card"><div class="card-head"><h2 class="mono">'+esc(r.number)+'</h2>'+chip(r.status)+'<span class="od-fill"></span>'+extBtn('report', r.id)+'</div>'
       + '<div class="card-pad" style="display:grid;gap:24px">'
       + '<div class="meta">'+meta+'</div>'
       + '<div class="note '+flag.cls+'"><span class="note-hd">'+(flag.cls ? ic('alert',16) : ic('check',16))+esc(flag.t)+'</span><span class="t-small">'+esc(flag.b)+'</span></div>'
@@ -4235,7 +4261,7 @@ function scrFormDetail(titles){
   const cols = eis ? [{l:'Report'},{l:'Status'},{l:'Owner'},{l:'Primary source'},{l:'Raised'},{l:'Target (latest CA)'},{l:'CAs',ar:true},{l:'Departments'},{l:'Progress',ar:true}]
                    : [{l:'Report'},{l:'Aircraft'},{l:'A/C type'},{l:'Spot check type'},{l:'Status'},{l:'Findings',ar:true},{l:'Raised'},{l:'Target'},{l:'Audit ref'}];
   const rows = w ? [] : base.map(r => eis
-    ? [open(r.report_id)+esc(r.report_number)+'</button>', chip(r.semantic_status), '<span class="t-small">'+esc(r.owner_name || '—')+'</span>',
+    ? [open(r.report_id)+esc(r.report_number)+'</button>'+extLink('report', r.report_id, r.report_number), chip(r.semantic_status), '<span class="t-small">'+esc(r.owner_name || '—')+'</span>',
        '<span class="t-small">'+esc(r.eis_primary_source || '—')+'</span>', '<span class="num">'+fdx(r.raised_date)+'</span>', '<span class="num">'+fdx(r.Target_date)+'</span>',
        '<span class="num">'+r.eis_ca_total+(r.eis_ca_overdue ? ' <span class="cat c3">'+r.eis_ca_overdue+' overdue</span>' : '')+'</span>',
        '<span class="t-small">'+esc((r.eis_depts || []).join(', ') || '—')+'</span>', '<span class="num strong">'+r.eis_ca_done+'/'+r.eis_ca_total+'</span>']
@@ -4276,7 +4302,7 @@ function scrOsr(){
           .concat([...new Set(all.map(r => r.report_title))].sort().map(t => [t, t])), BS.osrForm)
       + sel('osrOu', [['','All org units']].concat(ous.map(o => [o, o])), BS.osrOu) + '</div>'
       + plainTable('osr', [{l:'Report'},{l:'Form'},{l:'Status'},{l:'Raised'},{l:'Org unit'},{l:'Last modified'}],
-          rows.map(r => ['<span class="row-id">'+esc(r.report_number)+'</span>', '<span class="tag">'+esc(r.report_title)+'</span>',
+          rows.map(r => ['<span class="row-id">'+esc(r.report_number)+extLink('report', r.report_id, r.report_number)+'</span>', '<span class="tag">'+esc(r.report_title)+'</span>',
             statusChip(r.report_status === 'Closed' ? 'Closed' : r.report_status),   /* metrics-ok: OSR/MOSR Coruson status */ '<span class="num">'+fdx(r.raised_date)+'</span>',
             '<span class="t-small">'+esc(r.org_unit_name || '—')+'</span>', '<span class="num dim">'+fdx(r.modified_date)+'</span>']), 25, 720)) + '</section>';
 }
@@ -4327,7 +4353,7 @@ function stageAuditList(stage, status){
   openModal(stage + ' · ' + status, list.length+' audits · '+periodLabel()+' · select an audit for its detail',
     plainTable('stg-'+stage+'-'+status, [{l:'Audit'},{l:'Location'},{l:'Owner'},{l:'Stage due'},{l:'Audit status'}], list.map(({ a, s }) => {
       const late = s.target_date && dDayLocal(s.target_date) < today.getTime();
-      return ['<button class="link-b" type="button" data-act="baudit" data-id="'+esc(a.audit_id)+'"><span class="row-id">'+esc(a.number)+'</span></button> <span class="t-small dim">'+esc(a.title || '')+'</span>',
+      return ['<button class="link-b" type="button" data-act="baudit" data-id="'+esc(a.audit_id)+'"><span class="row-id">'+esc(a.number)+'</span></button>'+extLink('audit', a.audit_id, a.number)+' <span class="t-small dim">'+esc(a.title || '')+'</span>',
         '<span class="t-small">'+esc(a.location_name || '—')+'</span>', '<span class="t-small">'+esc(s.owner || '—')+'</span>',
         '<span class="num">'+fdx(s.target_date)+'</span>'+(late ? ' <span class="cat c3">overdue</span>' : ''), '<span class="t-small">'+esc(a.status || '—')+'</span>'];
     }), 30, 720));
@@ -4550,10 +4576,11 @@ document.addEventListener('input', e => {
 /* Keyboard: opening remembers what had focus and closing gives it back (29/09/2026); Tab and Shift+Tab stay
    inside the open modal instead of walking the page behind it. */
 let MODAL_RETURN = null;
-function openModal(title, sub, body){
+function openModal(title, sub, body, link){
   if($('#betaModal').hidden) MODAL_RETURN = document.activeElement;   /* not on a redraw of the same modal */
   $('#betaModalTitle').textContent = title; $('#betaModalSub').textContent = sub || '';
   $('#betaModalBody').innerHTML = body; $('#betaModal').hidden = false;
+  $('#betaModalLink').innerHTML = link || '';   /* "Open in Coruson" for a report or an audit */
   const b = $('#betaModal .icon-b'); if(b) b.focus();
 }
 function closeModal(){
@@ -4632,7 +4659,7 @@ function showEis(id){
   const A = API(); MODAL_KEY = 'eis:'+id;
   const base = A.allData().find(r => r.report_id === id); if(!base) return;
   if(!A.eis().loaded){
-    openModal(base.report_number, 'Loading corrective actions…', '<div class="empty"><div class="beta-boot-spin"></div></div>');
+    openModal(base.report_number, 'Loading corrective actions…', '<div class="empty"><div class="beta-boot-spin"></div></div>', extBtn('report', id));
     Promise.resolve(A.loadEis()).then(() => { if(MODAL_KEY === 'eis:'+id) showEis(id); }); return;
   }
   const r = A.enrichEis(base), d = A.eis().desc[id] || {}, cas = A.eis().ca[id] || [];
@@ -4642,7 +4669,7 @@ function showEis(id){
     + (d.MEDA && d.MEDA.length ? '<div class="beta-block"><span class="t-micro">Contributing factors (MEDA)</span><span class="od-row" style="--od-gap:6px;flex-wrap:wrap">'
         + d.MEDA.map(m => '<span class="tag">'+esc(m)+'</span>').join('') + '</span></div>' : '')
     + caList(cas, true);
-  openModal(r.report_number, r.semantic_status+' · due (latest CA) '+fdx(r.Target_date)+' · '+r.eis_ca_done+'/'+r.eis_ca_total+' CA done', body);
+  openModal(r.report_number, r.semantic_status+' · due (latest CA) '+fdx(r.Target_date)+' · '+r.eis_ca_done+'/'+r.eis_ca_total+' CA done', body, extBtn('report', id));
 }
 /* Report detail — a register row opens the report itself (Eric 23/09/2026: a click only filtered the
    register down to that row). Status, CAT and days to due come from the REPORTS row the register shows;
@@ -4687,7 +4714,7 @@ function showReport(id){
       + '<div style="display:grid;gap:8px"><span class="t-micro">Workflow stages'+(Array.isArray(st) && st.length ? ' ('+st.length+')' : '')+'</span>'
         + stagesTable('rpt-stages', st) + '</div>';
   }
-  openModal(r.report_number || rep.number, rep.code + (rep.auditTitle && rep.auditTitle !== '—' ? ' · ' + rep.auditTitle : ''), body);
+  openModal(r.report_number || rep.number, rep.code + (rep.auditTitle && rep.auditTitle !== '—' ? ' · ' + rep.auditTitle : ''), body, extBtn('report', id));
 }
 
 /* QC Spot Check detail — showQcsDetail 6750–6806 */
@@ -4695,7 +4722,7 @@ function showQcs(id){
   const A = API(); MODAL_KEY = 'qcs:'+id;
   const r = A.allData().find(x => x.report_id === id); if(!r) return;
   if(!A.qcs().loaded){
-    openModal(r.report_number, 'Loading spot check findings…', '<div class="empty"><div class="beta-boot-spin"></div></div>');
+    openModal(r.report_number, 'Loading spot check findings…', '<div class="empty"><div class="beta-boot-spin"></div></div>', extBtn('report', id));
     Promise.resolve(A.loadQcs()).then(() => { if(MODAL_KEY === 'qcs:'+id) showQcs(id); }); return;
   }
   const q = A.qcs().map[id] || { header:{}, findings:[] }, h = q.header || {};
@@ -4712,7 +4739,7 @@ function showQcs(id){
         + '<span class="t-sub">'+esc(f.desc || '—')+'</span></div>').join('') : '<p class="t-sub dim">No findings recorded.</p>') + '</div>'
     + block('Immediate action(s)', h['Immediate action(s)']) + block('Verification of implementation (VOI)', h['Verification of implementation (VOI)'])
     + block('Reference details', h['Reference details']);
-  openModal(r.report_number, [h['Aircraft Registration'], h['A/C Type'], h['Spot Check Type']].filter(Boolean).join(' · '), body);
+  openModal(r.report_number, [h['Aircraft Registration'], h['A/C Type'], h['Spot Check Type']].filter(Boolean).join(' · '), body, extBtn('report', id));
 }
 /* Document detail — showDocDetail 9957, renderDocTaskTable 10030, workflow 10225–10270 */
 const DOC_CACHE = {};
@@ -4835,10 +4862,10 @@ function showAudit(id){
     + stagesTable('aud-st-'+id, stages) + '</div>'
     + '<div style="display:grid;gap:8px"><span class="t-micro">Findings</span>'
     + (f.length ? plainTable('aud-f-'+id, [{l:'Report'},{l:'Form'},{l:'Status'},{l:'Raised'},{l:'Target'},{l:'Owner'}], f.map(r =>
-        ['<span class="row-id">'+esc(r.number)+'</span>', '<span class="tag">'+esc(r.code)+'</span>', chip(r.status),
+        ['<span class="row-id">'+esc(r.number)+extLink('report', r.id, r.number)+'</span>', '<span class="tag">'+esc(r.code)+'</span>', chip(r.status),
          '<span class="num">'+fmtDate(r.raised)+'</span>', '<span class="num">'+fmtDate(r.target)+'</span>', '<span class="t-small">'+esc(r.owner)+'</span>']), 30, 720)
       : '<p class="t-sub dim">No findings raised under this audit.</p>') + '</div>';
-  openModal(a.number+' — '+a.title, sub, body);
+  openModal(a.number+' — '+a.title, sub, body, extBtn('audit', id));
 }
 
 /* PAVOI: RFI / Task list for the record open in the detail panel (loadPavoiRfi 5829, pavoiRfiCell) */
@@ -5108,7 +5135,8 @@ function scrGuideNew(){
     + '<tr><td>Library</td><td>Controlled documents and this guide.</td></tr>'
     + '<tr><td>Admin</td><td>User management, report export and pinned widgets (administrators).</td></tr></table>'
     + '<p><b>Filter bar.</b> <b>Year</b> and <b>Month</b> are multi-select (for example Jul–Sep, or 2025 and 2026 together; the Q1–Q4 buttons pick a quarter). The filter stays when you change section. The chips under the bar show what is filtered; <b>Clear all</b> returns to the current year.</p>'
-    + '<p><b>Search</b> (Ctrl K) finds report numbers, audit numbers and titles, aircraft and people. The moon/sun button switches dark and light theme.</p>')
+    + '<p><b>Search</b> (Ctrl K) finds report numbers, audit numbers and titles, aircraft and people. The moon/sun button switches dark and light theme.</p>'
+    + '<p><b>Open in Coruson.</b> The ↗ next to a report or audit number, and the <b>Open in Coruson</b> button at the top of a detail window, open that record on Coruson in a new tab (you need to be signed in to Coruson).</p>')
   + sec('terms','Status, CAT and forms',
     '<table><tr><th>Status</th><th>Meaning</th></tr>'
     + '<tr><td>Open</td><td>Not closed and still inside the target date.</td></tr>'
