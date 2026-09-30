@@ -36,6 +36,8 @@
   chú thích kèm số, khe 2px, tổng ở giữa). Màu = token trạng thái của chip (ok/info/warn/accent/text-3); validator dataviz báo
   warn↔accent khó phân biệt (protan) → không bao giờ đặt cạnh nhau + luôn có nhãn số. Kiểm 2026: Audit 163+17+0+57=237 ·
   PAVOI 42+13+8=63 · MCAR 52+19+3=74 · task 46+17+0+11+2=76 · F-088/IR 14+2+3=19 · Late 228+45+300=573; consistency 0.
+- Bỏ 2 khối cuối Overview (Eric 30/09: không có trong email anh Ngọc thì bỏ): "Reports raised vs closed" (mọi report QA AMO,
+  12 tháng) và "Recent report events" + hàm `linePair` (chỉ khối đó dùng). Giữ "Overdue reports by CAT" và "Open reports by form".
 - Còn lại của email anh Ngọc: SPI chưa đạt + level, KPI chưa đạt.
 
 ## 📌 TỔNG KẾT PHIÊN 28–29/09/2026 (máy nhà) — đọc cái này trước

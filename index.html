@@ -2677,26 +2677,6 @@ function trendTag(now, prev, goodDir, unit){
   const val = (up?'+':'−') + Math.abs(Math.round(d*10)/10) + (unit||'');
   return '<span class="trend '+(good?'good':'bad')+'">'+ic(up?'arrowUp':'arrowDown',13)+val+'</span>';
 }
-function linePair(a, b, labels){
-  const W = 640, H = 210, L = 34, R = 10, T = 14, B = 30;
-  const max = Math.max(4, ...a, ...b), iw = W-L-R, ih = H-T-B;
-  const x = i => L + (i/(labels.length-1))*iw;
-  const y = v => T + ih - (v/max)*ih;
-  const path = arr => 'M' + arr.map((v,i)=>x(i).toFixed(1)+' '+y(v).toFixed(1)).join(' L ');
-  let grid = '', ticks = '';
-  for(let g=0; g<=3; g++){
-    const gv = Math.round(max*g/3), gy = y(gv);
-    grid  += '<line x1="'+L+'" y1="'+gy.toFixed(1)+'" x2="'+(W-R)+'" y2="'+gy.toFixed(1)+'" stroke="var(--hairline)" stroke-width="1"/>';
-    ticks += '<text x="'+(L-8)+'" y="'+(gy+4).toFixed(1)+'" text-anchor="end" font-size="11" font-family="ui-monospace,monospace" fill="var(--text-3)">'+gv+'</text>';
-  }
-  const xlab = labels.map((l,i)=> '<text x="'+x(i).toFixed(1)+'" y="'+(H-10)+'" text-anchor="middle" font-size="11" font-family="ui-monospace,monospace" fill="var(--text-3)">'+l+'</text>').join('');
-  return '<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Findings raised versus closed over the last twelve months">'
-    + grid + ticks + xlab
-    + '<path d="'+path(b)+'" fill="none" stroke="var(--text-2)" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round" stroke-linecap="round"/>'
-    + '<path d="'+path(a)+'" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>'
-    + a.map((v,i)=>'<circle cx="'+x(i).toFixed(1)+'" cy="'+y(v).toFixed(1)+'" r="2.6" fill="var(--accent)"/>').join('')
-    + '</svg>';
-}
 function donut(parts){
   const total = parts.reduce((s,p)=>s+p.v,0) || 1;
   const R = 54, C = 2*Math.PI*R;
@@ -2929,26 +2909,6 @@ function renderOverview(){
   ].filter(m => m[0] !== 'In Progress' || !REAL);   /* live status has no In Progress */
   const mix = mixDefs.map(m=>({ k:m[0], c:m[1], v:rows.filter(r=>M.hasStatus(r, m[0])).length }));
 
-  /* ---- recent activity, derived from the register ---- */
-  const acts = [];
-  rows.forEach(r=>{
-    acts.push({ t:r.raised, hot:false, txt:'raised', r });
-    if(r.closed) acts.push({ t:r.closed, hot:false, txt:'closed '+(M.isOnTime(r)?'on time':M.isLate(r)?'late':'(no target)'), r });
-    r.rounds.forEach(v=> { if(v.date) acts.push({ t:v.date, hot:v.result!=='Satisfactory', txt:'verification — '+v.result.toLowerCase(), r }); });
-  });
-  overdue.forEach(r=> { if(r.target) acts.push({ t:r.target, hot:true, txt:'passed its target date', r }); });
-  const feed = acts.filter(a=>a.t<=TODAY).sort((a,b)=>b.t-a.t).slice(0,9).map(a=>{
-    const d = dayDiff(TODAY, a.t);
-    const when = d === 0 ? 'today' : d === 1 ? 'yesterday' : d < 30 ? d+'d ago' : fmtShort(a.t);
-    return '<button class="act-i" type="button" data-go="findings" data-tab="'+(a.r.form==='other'?'all':a.r.form)+'" data-id="'+a.r.id+'">'
-      + '<span class="act-dot'+(a.hot?' hot':'')+'"></span>'
-      + '<span class="act-body"><span class="row-id">'+esc(a.r.number)+' <span class="dim" style="font-weight:400">'+esc(a.txt)+'</span></span>'
-      + '<span class="row-sub od-truncate">'+esc(a.r.auditTitle)+'</span></span>'
-      + '<span class="num dim od-nowrap">'+when+'</span></button>';
-  }).join('');
-
-  const AS = M.auditSummary(auditsScoped()), liveAudits = AS.inProgress, sched = AS.scheduled;
-
   return '<section class="sec">'
     + '<div class="sec-head"><h2>Key indicators</h2><span class="t-small dim">'+esc(periodLabel())
     + ' · select a tile to open the report list</span></div>'
@@ -2968,17 +2928,7 @@ function renderOverview(){
     + '<div class="od-row" style="--od-gap:20px;flex-wrap:wrap">'+donut(mix)
     + '<div class="legend" style="flex-direction:column;gap:8px">'
     + mix.map(m=>'<span class="legend-i"><span class="swatch" style="background:'+m.c+'"></span>'+esc(m.k)+' <span class="num strong">'+m.v+'</span></span>').join('')
-    + '</div></div></div></div></section>'
-
-    + '<section class="sec cols cols-2">'
-    + '<div class="card"><div class="card-head"><h2>Reports raised vs closed</h2><span class="t-small dim">last 12 months</span></div>'
-    + '<div class="card-pad" style="display:grid;gap:12px">'+linePair(s.raised, s.closed, SERIES_MONTHS.map(m=>m.label))
-    + '<div class="legend"><span class="legend-i"><span class="swatch" style="background:var(--accent);border-color:var(--accent)"></span>Raised</span>'
-    + '<span class="legend-i"><span class="swatch" style="background:repeating-linear-gradient(90deg,var(--text-2) 0 4px,transparent 4px 7px)"></span>Closed</span>'
-    + '<span class="legend-i dim">'+liveAudits+' audits running · '+sched+' scheduled</span></div></div></div>'
-    + '<div class="card"><div class="card-head"><h2>Recent report events</h2><span class="t-small dim">newest first</span></div>'
-    + '<div class="card-pad"><div class="act">'+(feed || '<p class="t-sub dim">No activity in this range.</p>')+'</div></div></div>'
-    + '</section>';
+    + '</div></div></div></div></section>';
 }
 
 /* ==========================================================================
@@ -5139,7 +5089,7 @@ function scrGuideNew(){
     + '<tr><td>SPI trigger level</td><td>Consecutive latest months where the SPI rate is worse than the SPT approved by CAAV (or the form marks a trigger): 1, 2 or 3+ months = Level 1, 2, 3.</td></tr>'
     + '<tr><td>Completed on Coruson</td><td>EIS / F-088: all input fields filled, and an RFI or Task on the management stage (or the stage completed), and a final report file in the REPORT tab.</td></tr></table>')
   + sec('screens','Screens',
-    '<ul><li><b>Overview</b>: key indicators (including audits completed against the plan with those delayed past their scheduled month, open and overdue PAVOI, reports closed late, MCAR under extension, overdue mitigation tasks from HIRA / CAPA and F-088 / investigation reports overdue themselves or through a corrective action), overdue reports by CAT with the most overdue, open reports by form, reports raised vs closed over 12 months, recent report events.</li>'
+    '<ul><li><b>Overview</b>: key indicators (including audits completed against the plan with those delayed past their scheduled month, open and overdue PAVOI, reports closed late, MCAR under extension, overdue mitigation tasks from HIRA / CAPA and F-088 / investigation reports overdue themselves or through a corrective action), overdue reports by CAT with the most overdue, open reports by form.</li>'
     + '<li><b>Work Queue</b>: Open reports (nearest target first), Overdue (with CAT), Awaiting verification (open PAVOI with no verification round). Select a row to open the report.</li>'
     + '<li><b>Reports › All forms</b>: every report type. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings).</li>'
     + '<li><b>Reports › PAVOI</b>: register on the left, record on the right with the verification history and the RFI / Task list of open PAVOI.</li>'
