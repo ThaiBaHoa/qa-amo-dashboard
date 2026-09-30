@@ -33,7 +33,7 @@ chỉ số (CLAUDE.md, mục Galileo values). **Worker:** thử bằng dữ li�
    `--text-2` (nét đứt, chưa bắt đầu); định nghĩa ở `beta-template.html` (khối `:root` dark + light). Tên trạng thái vẫn NGUYÊN VĂN Galileo.
    Laptop: `git pull` repo `F:/App Build/GitHub/qa-amo-dashboard`; nguồn sửa ở vault `rebuild UIUX/beta-src`, build `node build.mjs` (mặc định đọc F:)
    → chỉ chạy `node make-index.mjs` khi log có `BODY + UI SYNTAX OK`; xem thử preview `beta-local` ở cả 2 theme trước khi push.
-   ✅ **30/09 (laptop): chip trạng thái mọi bảng đã tô màu, CHƯA commit `index.html`/push — chờ Eric.** Eric chọn "theo CA":
+   ✅ **30/09 (laptop): chip trạng thái mọi bảng đã tô màu, ĐÃ PUSH `e6bdd55`, live (curl), không bump rev.** Eric chọn "theo CA":
    Open/In Progress `--info` · On-time Closed `--ok` · Lately Closed `--warn` nét đứt · Overdue `--accent`. Kiểm preview dữ liệu thật
    2 theme, console sạch. ⚠️ Bẫy: `build.mjs` đọc `beta.html` — phải `cp beta-template.html beta.html` trước khi build.
 5. Nhánh local `local-agent-tools` (máy nhà) giữ `325d3a4` — **không merge vào main** (lộ cách vượt proxy + số liệu thật).
