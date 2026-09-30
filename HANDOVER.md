@@ -32,6 +32,10 @@
   (khớp Galileo: T9 có 20 audit, 3 xong). Tổng 237 đúng: MNT-1089 là 2 audit khác audit_id, tạo 2 lần trên Coruson 24/09 cách
   2 giây (DAD, T12) — lỗi dữ liệu Coruson, cần xoá 1 bản. (2) KPI 7 "−100pt": tháng không có PAVOI bị tính 0% → `M.kpi7In`
   trả null, `spark` bỏ điểm trống, `trendTag` bỏ khi tháng này null.
+- Donut trong 6 ô (Eric 30/09: "phải là donut, số tổng của năm, số hoàn thành… vẽ được thì vẽ"): `mixBlock` (donut 76px +
+  chú thích kèm số, khe 2px, tổng ở giữa). Màu = token trạng thái của chip (ok/info/warn/accent/text-3); validator dataviz báo
+  warn↔accent khó phân biệt (protan) → không bao giờ đặt cạnh nhau + luôn có nhãn số. Kiểm 2026: Audit 163+17+0+57=237 ·
+  PAVOI 42+13+8=63 · MCAR 52+19+3=74 · task 46+17+0+11+2=76 · F-088/IR 14+2+3=19 · Late 228+45+300=573; consistency 0.
 - Còn lại của email anh Ngọc: SPI chưa đạt + level, KPI chưa đạt.
 
 ## 📌 TỔNG KẾT PHIÊN 28–29/09/2026 (máy nhà) — đọc cái này trước

@@ -404,6 +404,13 @@ select.ctl{min-width:168px;cursor:pointer}
 .trend.flat{color:var(--text-3)}
 .kpi-note{font-size:13px;color:var(--text-3)}
 .spark{width:100%;height:32px;overflow:visible}
+/* tile breakdown (30/09/2026): mini donut + legend with counts — identity never by colour alone */
+.kpi-mix{display:grid;grid-template-columns:76px minmax(0,1fr);gap:var(--s3);align-items:center;margin-top:var(--s1)}
+.kpi-mix-l{display:grid;gap:3px;min-width:0}
+.kpi-mix-i{display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:6px;align-items:center;font-size:12.5px;color:var(--text-2);text-align:left}
+.kpi-mix-i .swatch{width:10px;height:10px;border-radius:2px}
+.kpi-mix-i .num{color:var(--text);font-weight:600}
+.kpi-mix-i .od-truncate{min-width:0}
 
 /* ---------- status chips ----------
    Status colours (Eric 30/09/2026, same meaning as the CA pills of r169-i1): blue = still open,
@@ -2226,7 +2233,9 @@ const M = {
     if(!A.eis().loaded) return null;
     const map = A.eis().ca || {}, reps = rows.filter(r => M.CA_FORMS.includes(r.code)), cas = r => map[r.id] || [];
     const overdue = reps.filter(r => M.isOverdue(r) || cas(r).some(M.isOverdue));
+    const ok = reps.filter(r => !overdue.includes(r));
     return { reports: reps.length, open: reps.filter(M.isOpen).length, overdue: overdue.length, reportsOverdue: overdue,
+             openOk: ok.filter(M.isOpen).length, closedOk: ok.filter(M.isClosed).length,
              byReport: overdue.filter(M.isOverdue).length, byCa: overdue.filter(r => cas(r).some(M.isOverdue)).length,
              ca: M.caSummary(reps.flatMap(cas)) };
   },
@@ -2251,7 +2260,7 @@ const M = {
      (First extension approved? + Second extension agreed?). open = still open inside its extension. */
   extension(rows){
     const ext = rows.filter(r => r.form === 'mcar' && (r.ext || 0) > 0);
-    return { granted: ext.length, second: ext.filter(r => r.ext >= 2).length,
+    return { mcar: rows.filter(r => r.form === 'mcar').length, granted: ext.length, second: ext.filter(r => r.ext >= 2).length,
              open: ext.filter(M.isOpen).length, overdue: ext.filter(M.isOverdue).length };
   },
   /* mitigation (anh Ngọc 30/09/2026: HIRA + CAPA) — HIRA reports whose Additional mitigation is Yes, the
@@ -2308,7 +2317,9 @@ const M = {
     return { plan: plan.length, done: plan.filter(done).length, due: due.length, dueDone: due.length - delayed.length,
              delayed: delayed.length, delayedList: delayed,
              toDate: toDate.length, toDateDone: toDate.filter(done).length,
-             thisMonth: thisMonth.length, thisMonthOpen: thisMonth.filter(a => !done(a)).length };
+             thisMonth: thisMonth.length, thisMonthOpen: thisMonth.filter(a => !done(a)).length,
+             /* the rest of the plan: later months, not yet performed (done + delayed + thisMonthOpen + upcoming = plan) */
+             upcoming: plan.filter(a => !done(a) && !M.auditStarted(a)).length };
   },
 
   /* classic records behind a set of reports (exports hand raw allData to the classic functions) */
@@ -2364,6 +2375,7 @@ M.consistency = function(){
   }
   const aud = A.auditData().filter(a => a.is_qa_amo_scope && M.auditInPeriod(a, f));
   say('Audit Plan rows vs audit KPI total', AUDITS.filter(a => M.auditInPeriod(a, f)).length, aud.length);
+  { const p = M.auditProgress(aud); say('Audit donut parts vs plan', p.done + p.delayed + p.thisMonthOpen + p.upcoming, p.plan); }
   say('Audits delayed (Overview) vs raw auditData', M.auditProgress(AUDITS.filter(a => M.auditInPeriod(a, f))).delayed, M.auditProgress(aud).delayed);
   say('PAVOI open (Overview) vs classic', M.summary(qa.filter(r => r.form === 'pavoi')).open,
       raw.filter(r => r.report_title === 'PAVOI' && !M.isClosed(r)).length);
@@ -2771,7 +2783,28 @@ function kpiTile(o){
     + '<span class="kpi-lbl">'+esc(o.label)+'</span>'
     + '<span class="kpi-val od-nowrap">'+esc(o.value)+'</span>'
     + '<span class="kpi-foot">'+(o.trend||'')+'<span class="kpi-note">'+esc(o.note)+'</span></span>'
-    + spark(o.series, !!o.alarm) + '</button>';
+    + (o.mix ? mixBlock(o.mix, o.mixSub) : spark(o.series, !!o.alarm)) + '</button>';
+}
+/* A tile's breakdown: parts [{k, v, c}] in a fixed order (status colours; warn and accent never adjacent,
+   CVD check 30/09/2026), 2px surface gap between segments, total in the centre, legend with every count. */
+function mixBlock(parts, sub){
+  const total = parts.reduce((s,p)=>s+p.v,0), R = 28, C = 2*Math.PI*R, shown = parts.filter(p=>p.v>0);
+  const gap = shown.length > 1 ? 2 : 0;
+  let off = 0;
+  const segs = total ? parts.map(p=>{
+    const len = p.v/total*C; if(!p.v) return '';
+    const d = Math.max(len-gap, 0.6);
+    const s = '<circle cx="38" cy="38" r="'+R+'" fill="none" stroke="'+p.c+'" stroke-width="10" stroke-dasharray="'+d.toFixed(2)+' '+(C-d).toFixed(2)+'"'
+      + ' stroke-dashoffset="'+(-off).toFixed(2)+'" transform="rotate(-90 38 38)"><title>'+esc(p.k+': '+p.v+' ('+M.pct(p.v,total)+'%)')+'</title></circle>';
+    off += len; return s;
+  }).join('') : '';
+  const svg = '<svg viewBox="0 0 76 76" width="76" height="76" role="img" aria-label="'+esc(parts.map(p=>p.k+' '+p.v).join(', ')+' of '+total)+'">'
+    + '<circle cx="38" cy="38" r="'+R+'" fill="none" stroke="var(--hairline)" stroke-width="10"/>'+segs
+    + '<text x="38" y="40" text-anchor="middle" font-size="16" font-weight="700" font-family="ui-monospace,monospace" fill="var(--text)">'+total+'</text>'
+    + '<text x="38" y="52" text-anchor="middle" font-size="7.5" letter-spacing=".8" fill="var(--text-3)">'+esc(sub||'')+'</text></svg>';
+  return '<span class="kpi-mix">'+svg+'<span class="kpi-mix-l">'
+    + parts.map(p=>'<span class="kpi-mix-i"><span class="swatch" style="background:'+p.c+';border-color:'+p.c+'"></span>'
+      + '<span class="od-truncate">'+esc(p.k)+'</span><span class="num">'+p.v+'</span></span>').join('') + '</span></span>';
 }
 /* Every number of the Overview, computed only through METRICS (M.consistency checks it).
    trend = the rows the 12-month sparklines count: the SAME scope and search, but NOT the Year × Month
@@ -2821,8 +2854,9 @@ function renderOverview(){
              series:s.overdue, alarm:overdue.length>0, trend:trendTag(s.overdue[11], s.overdue[10], 'down','')}),
     kpiTile({label:'On-time closure rate', value:rate+'%', note:'target ≥ 70% · '+S.onTime+' of '+S.graded, go:'analytics', tab:'kpi',
              series:rateSeries, alarm:rate<70, trend:trendTag(rateSeries[11], rateSeries[10], 'up','pt')}),
-    kpiTile({label:'Late closed', value:String(S.late), go:'analytics', tab:'kpi', series:[],
-             note:'closed after the target date · '+M.pct(S.late, S.graded)+'% of '+S.graded+' closed with a target · by quarter on KPI charts'}),
+    kpiTile({label:'Late closed', value:String(S.late), go:'analytics', tab:'kpi', mixSub:'CLOSED',
+             note:'closed after the target date · '+M.pct(S.late, S.graded)+'% of those with a target · by quarter on KPI charts',
+             mix:[{k:'On time', v:S.onTime, c:'var(--ok)'}, {k:'No target', v:S.ungraded, c:'var(--text-3)'}, {k:'Late', v:S.late, c:'var(--warn)'}]}),
     kpiTile({label:'Average closure time', value:avgClose+' d', note:'raised date to close date', go:'analytics', tab:'kpi',
              series:closeSeries, trend:trendTag(closeSeries[11], closeSeries[10], 'down','d')}),
     /* Same formula as the main dashboard's KPI 2 card on KPI Charts (buildKPI2 5257–5259):
@@ -2833,27 +2867,33 @@ function renderOverview(){
       ? kpiTile({label:'KPI 7 · PAVOI assessed', value:'—', note:REAL.partialError ? 'verification rounds not loaded' : 'loading verification rounds…', go:'findings', tab:'pavoi', series:[]}) :
     kpiTile({label:'KPI 7 · PAVOI assessed', value:(k7.rate === null ? '—' : k7.rate+'%'), note:k7.assessed+' of '+k7.total+' assessed (verification round recorded)', go:'findings', tab:'pavoi',
              series:k7Series, alarm:k7.rate !== null && k7.rate<50, trend:trendTag(k7Series[11], k7Series[10], 'up','pt')}),
-    kpiTile({label:'Audits completed vs plan', value:AP.toDateDone+' / '+AP.toDate, go:'audit', tab:'list', series:[], alarm:AP.delayed>0,
-             note:'performed or closed, of those scheduled up to this month · '
-               +(AP.delayed ? AP.delayed+' delayed (scheduled month passed)' : 'none delayed')
-               +(AP.thisMonthOpen ? ' · '+AP.thisMonthOpen+' of '+AP.thisMonth+' this month not yet performed' : '')
-               +' · '+AP.plan+' planned in range'}),
-    kpiTile({label:'PAVOI open', value:String(PV.open), go:'findings', tab:'pavoi', series:[], alarm:PV.overdue>0,
-             note:PV.overdue+' overdue · '+PV.inTarget+' within target · '+PV.total+' raised in range'}),
-    kpiTile({label:'Extension · MCAR', value:String(E.open), go:'findings', tab:'mcar', series:[], alarm:E.overdue>0,
-             note:'open within an approved extension · '+E.granted+' extended in range'+(E.second?' ('+E.second+' twice)':'')
-               +(E.overdue?' · '+E.overdue+' overdue after extension':'')+' · only MCAR records extensions on Coruson'}),
+    kpiTile({label:'Audits completed vs plan', value:AP.toDateDone+' / '+AP.toDate, go:'audit', tab:'list', alarm:AP.delayed>0,
+             note:'performed or closed, of those scheduled up to this month', mixSub:'PLANNED',
+             mix:[{k:'Performed / closed', v:AP.done, c:'var(--ok)'}, {k:'This month, not yet', v:AP.thisMonthOpen, c:'var(--info)'},
+                  {k:'Delayed', v:AP.delayed, c:'var(--accent)'}, {k:'Later months', v:AP.upcoming, c:'var(--text-3)'}]}),
+    kpiTile({label:'PAVOI open', value:String(PV.open), go:'findings', tab:'pavoi', alarm:PV.overdue>0,
+             note:'PAVOI raised in range', mixSub:'RAISED',
+             mix:[{k:'Closed', v:PV.total-PV.open, c:'var(--ok)'}, {k:'Open, within target', v:PV.inTarget, c:'var(--info)'},
+                  {k:'Overdue', v:PV.overdue, c:'var(--accent)'}]}),
+    kpiTile({label:'Extension · MCAR', value:String(E.open), go:'findings', tab:'mcar', alarm:E.overdue>0,
+             note:'open within an approved extension'+(E.overdue?' · '+E.overdue+' overdue after extension':'')+' · only MCAR records extensions on Coruson', mixSub:'MCAR',
+             mix:[{k:'No extension', v:E.mcar-E.granted, c:'var(--text-3)'}, {k:'Extended once', v:E.granted-E.second, c:'var(--info)'},
+                  {k:'Extended twice', v:E.second, c:'var(--warn)'}]}),
     REAL ? kpiTile({label:'Mitigation overdue · HIRA / CAPA', value:MI ? String(MI.tasks.overdue) : '—', go:'findings', tab:'all',
-             act:'bovform', f:API().CAPA_TITLE, series:[], alarm:!!MI && (MI.tasks.overdue>0 || MI.noCapa>0),
-             note:MI ? 'Additional Mitigation tasks past target · '+MI.tasks.open+' open of '+MI.tasks.total+' · '+MI.need+' HIRA need mitigation'
-                        +(MI.noCapa ? ', '+MI.noCapa+' with no CAPA' : '')
-                     : mitErr ? 'could not load HIRA / CAPA — open the register to retry' : 'loading HIRA / CAPA…'}) : '',
+             act:'bovform', f:API().CAPA_TITLE, series:[], alarm:!!MI && (MI.tasks.overdue>0 || MI.noCapa>0), mixSub:'TASKS',
+             note:MI ? 'Additional Mitigation tasks past target · '+MI.need+' HIRA need mitigation'+(MI.noCapa ? ', '+MI.noCapa+' with no CAPA' : '')
+                     : mitErr ? 'could not load HIRA / CAPA — open the register to retry' : 'loading HIRA / CAPA…',
+             mix:MI ? [{k:'Done on time', v:MI.tasks.onTime, c:'var(--ok)'}, {k:'Done late', v:MI.tasks.late, c:'var(--warn)'},
+                       {k:'Done, no target', v:MI.tasks.noTarget, c:'var(--text-3)'}, {k:'Open, within target', v:MI.tasks.open-MI.tasks.overdue, c:'var(--info)'},
+                       {k:'Overdue', v:MI.tasks.overdue, c:'var(--accent)'}] : null}) : '',
     REAL ? kpiTile({label:'F-088 / IR overdue', value:CA ? String(CA.overdue) : '—', go:'findings', tab:'all',
-             act:'bovform', f:CA && CA.reportsOverdue.length ? CA.reportsOverdue[0].code : M.CA_FORMS[0], series:[], alarm:!!CA && CA.overdue>0,
-             note:CA ? 'reports overdue or with a corrective action overdue'
+             act:'bovform', f:CA && CA.reportsOverdue.length ? CA.reportsOverdue[0].code : M.CA_FORMS[0], series:[], alarm:!!CA && CA.overdue>0, mixSub:'REPORTS',
+             note:CA ? 'report overdue or a corrective action overdue'
                         +(CA.overdue ? ' ('+CA.reportsOverdue.map(r => r.number).slice(0, 3).join(', ')+(CA.overdue > 3 ? '…' : '')+')' : '')
-                        +' · '+CA.open+' open of '+CA.reports+' reports · CA '+CA.ca.overdue+' overdue, '+CA.ca.open+' open of '+CA.ca.total
-                     : caErr ? 'could not load corrective actions — open a report to retry' : 'loading corrective actions…'}) : ''
+                        +' · CA '+CA.ca.overdue+' overdue, '+CA.ca.open+' open of '+CA.ca.total
+                     : caErr ? 'could not load corrective actions — open a report to retry' : 'loading corrective actions…',
+             mix:CA ? [{k:'Closed', v:CA.closedOk, c:'var(--ok)'}, {k:'Open, within target', v:CA.openOk, c:'var(--info)'},
+                       {k:'Overdue', v:CA.overdue, c:'var(--accent)'}] : null}) : ''
   ].join('');
 
   /* ---- overdue at a glance ---- */
