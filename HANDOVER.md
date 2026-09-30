@@ -24,6 +24,9 @@
   **Corrective actions overdue · F-088 / IR** (`M.caRisk`: CA của F-088 / EIS / Event Investigation Report, nạp `loadEis` khi
   mở Overview; AMO ECAR không tính; MQA Investigation Report không có nhóm CA). 2026: 0 quá hạn · 6 mở / 55 CA / 14 report ·
   9 hoàn thành trễ — khớp đếm thẳng eisCAMap. consistency 0 lệch.
+- Sửa ô CA (Eric 30/09, xem ảnh register F-088): đếm THEO REPORT — report F-088/EIS/IR tính quá hạn khi chính report Overdue
+  HOẶC có ≥1 CA Overdue (bản đầu chỉ đếm CA nên ra 0, sót RP-072/074). Ô đổi tên "F-088 / IR overdue". 2026: 3 report
+  (MQA-RP-072-2026, MQA-RP-074-2026, MQA-EIS-019 — cả 3 Overdue mà chưa nhập CA nào) = đúng danh sách Overdue của register.
 - Còn lại của email anh Ngọc: SPI chưa đạt + level, KPI chưa đạt.
 
 ## 📌 TỔNG KẾT PHIÊN 28–29/09/2026 (máy nhà) — đọc cái này trước
