@@ -4758,9 +4758,16 @@ function wfStages(ctxId, key){
   if(have !== undefined) return have;          /* array, { err }, or null while loading */
   WF_STAGES[ctxId] = null;
   const A = API();
-  A.fetchAll(A.G_URL + 'dwanalytics_workflow_stage?$select=title,index,status,owner,started_date,target_date,completed_date'
-      + '&$filter=' + encodeURIComponent('context_id eq ' + ctxId + ' and valid_to eq null') + '&$orderby=index')
-    .then(rows => { WF_STAGES[ctxId] = rows.slice().sort((a, b) => (a.index ?? 99) - (b.index ?? 99)); })
+  /* An accept / reject stage ('Approve for report closure') has no stage owner (owner_id all zeros); Coruson shows its
+     acceptor as the stage's task — "Response: Accepted · Assigned To". Probe 30/09/2026 (AISC -0714): dwanalytics_task,
+     current version (valid_to null), owner + report_acceptance_status, joined on stage_id. Shown verbatim. */
+  const flt = encodeURIComponent('context_id eq ' + ctxId + ' and valid_to eq null');
+  Promise.all([
+    A.fetchAll(A.G_URL + 'dwanalytics_workflow_stage?$select=stage_id,title,index,status,owner,started_date,target_date,completed_date&$filter=' + flt + '&$orderby=index'),
+    A.fetchAll(A.G_URL + 'dwanalytics_task?$select=stage_id,owner,status,report_acceptance_status&$filter=' + flt).catch(() => [])
+  ]).then(([rows, tasks]) => {
+      rows.forEach(s => { if(!s.owner) s.acceptors = tasks.filter(t => t.stage_id === s.stage_id && t.owner); });
+      WF_STAGES[ctxId] = rows.slice().sort((a, b) => (a.index ?? 99) - (b.index ?? 99)); })
     .catch(e => { WF_STAGES[ctxId] = { err: e && e.message ? e.message : String(e) }; })
     .then(() => { if(MODAL_KEY === key && MODAL_REDRAW) MODAL_REDRAW(); });
   return null;
@@ -4775,7 +4782,9 @@ function stagesTable(tableKey, stages){
     const dur = s.started_date && s.completed_date ? Math.round((dDayLocal(s.completed_date) - dDayLocal(s.started_date)) / 864e5) : null;
     return ['<span class="t-small"><span class="dim num">'+(i+1)+'.</span> '+esc(s.title || '—')+'</span>',
       '<span class="tag">'+esc(s.status || '—')+'</span>'   /* the Galileo value as is (Eric 29/09: no renaming) */+(late ? ' <span class="cat c3">overdue</span>' : ''),
-      '<span class="t-small">'+esc(s.owner || '—')+'</span>', '<span class="num">'+fdx(s.started_date)+'</span>', '<span class="num">'+fdx(s.target_date)+'</span>',
+      '<span class="t-small">'+(s.owner ? esc(s.owner) : (s.acceptors || []).length
+        ? s.acceptors.map(t => esc(t.owner)+' <span class="dim">· '+esc(t.report_acceptance_status || t.status || '')+'</span>').join('<br>') : '—')+'</span>',
+      '<span class="num">'+fdx(s.started_date)+'</span>', '<span class="num">'+fdx(s.target_date)+'</span>',
       '<span class="num">'+fdx(s.completed_date)+'</span>', '<span class="num">'+(dur == null ? '—' : dur+' d')+'</span>'];
   });
   return plainTable(tableKey, [{l:'Stage'},{l:'Status'},{l:'Owner'},{l:'Start'},{l:'Due'},{l:'Completed'},{l:'Duration',ar:true}], rows, 30, 760, { compact:true });

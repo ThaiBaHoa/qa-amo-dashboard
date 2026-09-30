@@ -38,6 +38,9 @@
   PAVOI 42+13+8=63 · MCAR 52+19+3=74 · task 46+17+0+11+2=76 · F-088/IR 14+2+3=19 · Late 228+45+300=573; consistency 0.
 - Bỏ 2 khối cuối Overview (Eric 30/09: không có trong email anh Ngọc thì bỏ): "Reports raised vs closed" (mọi report QA AMO,
   12 tháng) và "Recent report events" + hàm `linePair` (chỉ khối đó dùng). Giữ "Overdue reports by CAT" và "Open reports by form".
+- Popup report/audit › Workflow stages: stage Accept/Reject ("Approve for report closure") không có Stage Owner (owner_id = 0)
+  → hiện người duyệt từ `dwanalytics_task` (valid_to null, nối stage_id): owner + report_acceptance_status nguyên văn
+  (AISC -0714: "Ton That Thien · Accepted", khớp Coruson "Assigned To / Response: Accepted").
 - Còn lại của email anh Ngọc: SPI chưa đạt + level, KPI chưa đạt.
 
 ## 📌 TỔNG KẾT PHIÊN 28–29/09/2026 (máy nhà) — đọc cái này trước
