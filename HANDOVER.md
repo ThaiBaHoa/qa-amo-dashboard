@@ -5,6 +5,23 @@
 
 ---
 
+## ⏳ Overview: Extension · MCAR + Mitigation · HIRA / CAPA (30/09/2026, laptop — CHƯA COMMIT, chờ Eric duyệt push)
+
+- Nguồn: email anh Ngọc 30/09 (sửa Overview) + Eric: "trước mắt làm extension cho MCAR, mitigation lấy HIRA và CAPA".
+- `index.html` (nguồn vault `beta-src`: loader.js `o.ext = mcar_chk.n` · metrics.js `M.extension` / `M.mitigation` + 2 dòng
+  `M.consistency()` · beta-template.html `renderOverview` 2 ô mới, `kpiTile` nhận `act` · screens2.js action `bovform` · guide.js,
+  manual.js). Không đổi `classic.html`, không bump rev.
+- Kiểm local dữ liệu thật (beta-local, 2026): Extension · MCAR = 0 đang mở · 22 được gia hạn (3 lần 2) — khớp probe Galileo;
+  Mitigation overdue = 2 task · 13 mở / 76 · 1 HIRA cần mitigation — khớp màn AMO - Additional Mitigation; `M.consistency()` 0 lệch;
+  2 theme đạt; lint metrics-only OK.
+- Vì sao chỉ MCAR: Coruson chỉ có trường gia hạn ở MCAR / CAR / CMR CAR / VJGS-CAR (probe 30/09); rà quy trình ở vault
+  `02-Bao-Cao/Coruson/RS-2026-09-30-Gia-han-extension-theo-loai-report.md`.
+- Thêm (cùng lượt, chưa commit): ô **Audits completed vs plan** (`M.auditProgress`; Eric 30/09: audit chậm = hết tháng
+  kế hoạch mà chưa Performed/Closed; Cancelled/Deleted không tính) + ô **Delayed** trên Audit Plan cùng số; ô **PAVOI open**
+  (open / overdue qua `M.summary`). 2 dòng `M.consistency()` mới. Kiểm 30/09: 160/160 đến hạn đã xong, 0 chậm; nếu hôm nay
+  là 01/10 → 17 chậm (11 Scheduled + 6 In Progress tháng 9) — khớp probe Galileo. PAVOI 21 mở · 8 overdue.
+- Còn lại của email anh Ngọc: Late closed, CA F-088/IR overdue, SPI chưa đạt + level, KPI chưa đạt.
+
 ## 📌 TỔNG KẾT PHIÊN 28–29/09/2026 (máy nhà) — đọc cái này trước
 
 **Live cuối phiên (29/09 23:41):** `APP_REV = 2026.09.29-r178` + màu trạng thái Audit Plan (`02c9cb4`). `main` = `origin/main`.

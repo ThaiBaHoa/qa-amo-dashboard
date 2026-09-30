@@ -1492,6 +1492,7 @@ allData.forEach(r => {
   o.owner = orDash(r.issued_person || r.owner_name);
   o.dept = orDash(form === 'pavoi' ? r.owner_name : r.dept);
   o.repetitive = !!r.is_rep;
+  o.ext = r.mcar_chk ? r.mcar_chk.n : 0;   /* approved MCAR extensions (classic buildMcarDeadlineChk) */
   if(form === 'pavoi'){
     /* PAVOI carry no finding text, audit or level: their content is Request For Verification (rfv),
        the source report (report_ref) and the audited department (dept) — the PAVOI Detail columns of
@@ -2132,8 +2133,11 @@ function fromReal(r){
      closure time = mean days raised → close, closed reports with both dates.
      KPI 2 volume = MCAR count ÷ AMO-ECAR count (buildKPI2 5257–5259).
      KPI 7        = kpi7Stats (6191) with the same period rule; % withheld while pending.
+     extension    = MCAR with an approved extension (mcar_chk.n); open = still open. MCAR only.
+     mitigation   = HIRA with Additional mitigation = Yes · AMO - Additional Mitigation tasks (capaTaskStats).
      audits       = MNT scope; year = scheduled year, month = scheduled start month;
                     open = InProgress / Performed / Scheduled (renderAuditKpi 7676).
+                    delayed = scheduled month ended, not Performed / Closed (Eric 30/09/2026).
    ========================================================================== */
 const M = {
   CLOSED: new Set(['On-time Closed', 'Lately Closed', 'Closed']),
@@ -2222,6 +2226,28 @@ const M = {
   kpi2: rows => { const mcar = rows.filter(r => r.form === 'mcar').length, amo = rows.filter(r => r.form === 'amoecar').length;
                   return { mcar, amo, pct: M.pct(mcar, amo) }; },
 
+  /* extension (anh Ngọc email 30/09/2026) — only MCAR records extensions on Coruson (probe 30/09: the
+     extension fields exist on MCAR, CAR, CMR CAR, VJGS-CAR only; SR, PAVOI, AMO ECAR, corrective actions
+     and mitigation have none). ext = approved extensions of the report, classic buildMcarDeadlineChk
+     (First extension approved? + Second extension agreed?). open = still open inside its extension. */
+  extension(rows){
+    const ext = rows.filter(r => r.form === 'mcar' && (r.ext || 0) > 0);
+    return { granted: ext.length, second: ext.filter(r => r.ext >= 2).length,
+             open: ext.filter(M.isOpen).length, overdue: ext.filter(M.isOverdue).length };
+  },
+  /* mitigation (anh Ngọc 30/09/2026: HIRA + CAPA) — HIRA reports whose Additional mitigation is Yes, the
+     AMO - Additional Mitigation reports that name them (classic hiraCapaMap) and their workflow tasks
+     graded by classic capaTaskStats. null until loadHira and loadCapa have run. */
+  mitigation(rows){
+    const A = API();
+    if(!A.hira().loaded || !A.capa().loaded) return null;
+    const hm = A.hira().map, byHira = A.capa().byHira || {};
+    const need = rows.filter(r => r.code === A.HIRA_TITLE && (hm[r.id] || {}).mitig === 'Yes');
+    const capa = rows.filter(r => r.code === A.CAPA_TITLE);
+    return { need: need.length, noCapa: need.filter(r => !(byHira[r.id] || []).length).length,
+             capa: capa.length, tasks: A.capaTaskStats(capa.map(r => r.id)) };
+  },
+
   /* KPI 7 = the classic function itself, fed the same period rule */
   kpi7(f){
     const st = API().kpi7Stats(r => M.inPeriodDay(M.dayOf(r.raised_date), f));
@@ -2243,6 +2269,20 @@ const M = {
     const closed = list.filter(a => a.status === 'Closed').length, open = list.filter(a => M.AUDIT_OPEN.has(a.status)).length;
     return { total: list.length, closed, open, inProgress: list.filter(a => a.status === 'InProgress' || a.status === 'In Progress').length,
              scheduled: list.filter(a => a.status === 'Scheduled').length, rate: list.length ? Math.round(closed / list.length * 100) : 0 };
+  },
+
+  /* audit progress against the plan (anh Ngọc email 30/09/2026; Eric 30/09: "audit chậm là vượt quá tháng
+     được xếp theo schedule"). The plan is monthly (MOPM 4.14.7.3 a-3), so an audit is due once its scheduled
+     month has ended; done = Performed or Closed (the Perform stage is complete); delayed = due and not done.
+     Cancelled / Deleted audits are not part of the plan. Works on raw auditData and on the mapped AUDITS. */
+  AUDIT_DONE: new Set(['Performed', 'Closed']),
+  AUDIT_VOID: new Set(['Cancelled', 'Deleted']),
+  auditDue: a => new Date(M.auditYear(a), M.auditMonth(a) + 1, 0) < TODAY,
+  auditProgress(list){
+    const plan = list.filter(a => !M.AUDIT_VOID.has(a.status)), due = plan.filter(M.auditDue);
+    const done = a => M.AUDIT_DONE.has(a.status), delayed = due.filter(a => !done(a));
+    return { plan: plan.length, done: plan.filter(done).length, due: due.length, dueDone: due.length - delayed.length,
+             delayed: delayed.length, delayedList: delayed };
   },
 
   /* classic records behind a set of reports (exports hand raw allData to the classic functions) */
@@ -2282,6 +2322,11 @@ M.consistency = function(){
     say('Quarters: total vs year', bq.reduce((t, x) => t + x.s.total, 0), s.total);
     say('Quarters: late closed vs year', bq.reduce((t, x) => t + x.s.late, 0), s.late);
     say('Quarters: overdue vs year', bq.reduce((t, x) => t + x.s.overdue, 0), s.overdue); }
+  say('Extension (MCAR) vs classic mcar_chk', M.extension(qa).granted,
+      raw.filter(r => r.report_title === 'MCAR' && r.mcar_chk && r.mcar_chk.n > 0).length);
+  { const mi = M.mitigation(qa);
+    if(mi) say('Mitigation tasks overdue vs classic capaTaskStats', mi.tasks.overdue,
+      A.capaTaskStats(raw.filter(r => r.report_title === A.CAPA_TITLE).map(r => r.report_id)).overdue); }
   if(A.eis().loaded){
     const cr = M.caReports(f), all = cr.flatMap(x => x.cas), cs = M.caSummary(all);
     say('Corrective actions: closed + open vs total', cs.closed + cs.open, cs.total);
@@ -2291,6 +2336,9 @@ M.consistency = function(){
   }
   const aud = A.auditData().filter(a => a.is_qa_amo_scope && M.auditInPeriod(a, f));
   say('Audit Plan rows vs audit KPI total', AUDITS.filter(a => M.auditInPeriod(a, f)).length, aud.length);
+  say('Audits delayed (Overview) vs raw auditData', M.auditProgress(AUDITS.filter(a => M.auditInPeriod(a, f))).delayed, M.auditProgress(aud).delayed);
+  say('PAVOI open (Overview) vs classic', M.summary(qa.filter(r => r.form === 'pavoi')).open,
+      raw.filter(r => r.report_title === 'PAVOI' && !M.isClosed(r)).length);
   if(out.length) console.error('[metrics] consistency check failed:', out);
   else console.log('[metrics] consistency OK — every screen path matches the classic formulas (' + f.years[0] + ')');
   return out;
@@ -2689,6 +2737,7 @@ function renderFilterBar(){
 function pct(a,b){ return b ? Math.round(a/b*1000)/10 : 0; }
 function kpiTile(o){
   return '<button class="kpi'+(o.alarm?' alarm':'')+'" type="button" data-go="'+o.go+'" data-tab="'+(o.tab||'')+'"'
+    + (o.act ? ' data-act="'+o.act+'" data-f="'+esc(o.f||'')+'"' : '')
     + ' aria-label="'+esc(o.label+': '+o.value+'. '+o.note)+'">'
     + '<span class="kpi-lbl">'+esc(o.label)+'</span>'
     + '<span class="kpi-val od-nowrap">'+esc(o.value)+'</span>'
@@ -2723,6 +2772,15 @@ function renderOverview(){
   /* mock prototype (no live data) keeps its own KPI 7 source */
   const pav = rows.filter(r=>r.form==='pavoi' && !r.withdrawn), pavAssessed = pav.filter(assessed).length;
   const k7 = O.k7 || { rate: M.pct(pavAssessed, pav.length), assessed: pavAssessed, total: pav.length };
+  /* extension (MCAR only) and mitigation (HIRA + CAPA) — anh Ngọc email 30/09/2026. Mitigation needs the
+     HIRA classifications and CAPA tasks, loaded on demand with the same keys as the All forms registers. */
+  const E = M.extension(rows);
+  const PV = M.summary(rows.filter(r => r.form === 'pavoi'));
+  const AP = M.auditProgress(auditsScoped());
+  const mitLive = REAL && !REAL.partial;
+  if(mitLive){ lazy('hira', () => API().loadHira(), () => API().hira().loaded); lazy('capa', () => API().loadCapa(), () => API().capa().loaded); }
+  const MI = mitLive ? M.mitigation(rows) : null;
+  const mitErr = mitLive && !MI && ((LAZY.hira && LAZY.hira.err) || (LAZY.capa && LAZY.capa.err));
 
   const tiles = [
     kpiTile({label:'Open reports', value:String(open.length), note:REAL ? 'QA AMO reports (TQA CMR-CAR / ECAR on their own tabs)' : 'across all five forms', go:'work', tab:'open',
@@ -2740,7 +2798,20 @@ function renderOverview(){
     (REAL && REAL.partial)
       ? kpiTile({label:'KPI 7 · PAVOI assessed', value:'—', note:REAL.partialError ? 'verification rounds not loaded' : 'loading verification rounds…', go:'findings', tab:'pavoi', series:[]}) :
     kpiTile({label:'KPI 7 · PAVOI assessed', value:(k7.rate === null ? '—' : k7.rate+'%'), note:k7.assessed+' of '+k7.total+' assessed (verification round recorded)', go:'findings', tab:'pavoi',
-             series:k7Series, alarm:k7.rate !== null && k7.rate<50, trend:trendTag(k7Series[11], k7Series[10], 'up','pt')})
+             series:k7Series, alarm:k7.rate !== null && k7.rate<50, trend:trendTag(k7Series[11], k7Series[10], 'up','pt')}),
+    kpiTile({label:'Audits completed vs plan', value:AP.dueDone+' / '+AP.due, go:'audit', tab:'list', series:[], alarm:AP.delayed>0,
+             note:(AP.delayed ? AP.delayed+' delayed (scheduled month passed, not performed)' : 'none delayed')
+               +' · '+AP.done+' of '+AP.plan+' planned in range performed or closed'}),
+    kpiTile({label:'PAVOI open', value:String(PV.open), go:'findings', tab:'pavoi', series:[], alarm:PV.overdue>0,
+             note:PV.overdue+' overdue · '+PV.inTarget+' within target · '+PV.total+' raised in range'}),
+    kpiTile({label:'Extension · MCAR', value:String(E.open), go:'findings', tab:'mcar', series:[], alarm:E.overdue>0,
+             note:'open within an approved extension · '+E.granted+' extended in range'+(E.second?' ('+E.second+' twice)':'')
+               +(E.overdue?' · '+E.overdue+' overdue after extension':'')+' · only MCAR records extensions on Coruson'}),
+    REAL ? kpiTile({label:'Mitigation overdue · HIRA / CAPA', value:MI ? String(MI.tasks.overdue) : '—', go:'findings', tab:'all',
+             act:'bovform', f:API().CAPA_TITLE, series:[], alarm:!!MI && (MI.tasks.overdue>0 || MI.noCapa>0),
+             note:MI ? 'Additional Mitigation tasks past target · '+MI.tasks.open+' open of '+MI.tasks.total+' · '+MI.need+' HIRA need mitigation'
+                        +(MI.noCapa ? ', '+MI.noCapa+' with no CAPA' : '')
+                     : mitErr ? 'could not load HIRA / CAPA — open the register to retry' : 'loading HIRA / CAPA…'}) : ''
   ].join('');
 
   /* ---- overdue at a glance ---- */
@@ -4879,6 +4950,8 @@ Object.assign(BETA_ACT, {
   beis: el => showEis(el.dataset.id),
   bcapa: el => { BS.capaSel = el.dataset.id; render(); },
   bgocapa: el => { BS.afForm = API().CAPA_TITLE; BS.capaSel = el.dataset.id; render(); window.scrollTo(0, 0); },
+  /* an Overview tile that opens one form's register in Reports › All forms */
+  bovform: el => { BS.afForm = el.dataset.f; BS.capaSel = null; go('findings', 'all'); },
   bqcs: el => showQcs(el.dataset.id),
   breport: el => showReport(el.dataset.id),
   bdoc: el => showDoc(el.dataset.id),
@@ -4924,7 +4997,10 @@ function auditKpiTiles(){
   const sc = {}; if(known) data.forEach(a => a.active_stages.forEach(s => { if(s.stage_status === 'InProgress'){ const t = stageT(s); sc[t] = (sc[t] || 0) + 1; } }));
   const top = Object.entries(sc).sort((a,b) => b[1] - a[1])[0];
   const years = [...new Set(data.map(a => a.sched_year).filter(Boolean))].sort();
+  const P = M.auditProgress(data);   /* same figure as the Overview tile 'Audits completed vs plan' */
   return tiles([stat('Total audits', String(S.total), 'MNT · '+periodLabel()), stat('Closed', String(S.closed), 'status Closed'),
+    stat('Delayed', String(P.delayed), P.delayed ? P.delayedList.map(a => a.number).slice(0, 6).join(', ')+(P.delayed > 6 ? '…' : '')
+      : 'scheduled month passed, not performed', P.delayed > 0, true),
     stat('Open', String(S.open), 'in progress, performed or scheduled'), stat('Closure rate', S.rate+'%', S.closed+' of '+S.total, S.total > 0 && S.rate < 50),
     stat('CAR follow-up', inCar === null ? '—' : String(inCar), inCar === null ? 'loading…' : 'stage InProgress' + (carPso ? ' · ' + carPso + ' PendingSignOff' : '')),
     stat('Top stage InProgress', top ? top[0] : '—', !known ? 'loading…' : top ? top[1]+' audits with this stage InProgress' : 'no stage InProgress', false, true),
@@ -4981,7 +5057,7 @@ function scrGuideNew(){
     + '<tr><td>SPI trigger level</td><td>Consecutive latest months where the SPI rate is worse than the SPT approved by CAAV (or the form marks a trigger): 1, 2 or 3+ months = Level 1, 2, 3.</td></tr>'
     + '<tr><td>Completed on Coruson</td><td>EIS / F-088: all input fields filled, and an RFI or Task on the management stage (or the stage completed), and a final report file in the REPORT tab.</td></tr></table>')
   + sec('screens','Screens',
-    '<ul><li><b>Overview</b>: key indicators, overdue reports by CAT with the most overdue, open reports by form, reports raised vs closed over 12 months, recent report events.</li>'
+    '<ul><li><b>Overview</b>: key indicators (including audits completed against the plan with those delayed past their scheduled month, open and overdue PAVOI, MCAR under extension and overdue mitigation tasks from HIRA / CAPA), overdue reports by CAT with the most overdue, open reports by form, reports raised vs closed over 12 months, recent report events.</li>'
     + '<li><b>Work Queue</b>: Open reports (nearest target first), Overdue (with CAT), Awaiting verification (open PAVOI with no verification round). Select a row to open the report.</li>'
     + '<li><b>Reports › All forms</b>: every report type. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings).</li>'
     + '<li><b>Reports › PAVOI</b>: register on the left, record on the right with the verification history and the RFI / Task list of open PAVOI.</li>'
