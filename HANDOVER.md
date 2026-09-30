@@ -41,6 +41,10 @@
 - Popup report/audit › Workflow stages: stage Accept/Reject ("Approve for report closure") không có Stage Owner (owner_id = 0)
   → hiện người duyệt từ `dwanalytics_task` (valid_to null, nối stage_id): owner + report_acceptance_status nguyên văn
   (AISC -0714: "Ton That Thien · Accepted", khớp Coruson "Assigned To / Response: Accepted").
+- Eric 30/09: khôi phục "Recent report events" (cuối Overview, 1 cột). Người duyệt stage Accept/Reject: quét 39 report 2026 →
+  23 có task; bổ sung `stageOwnerCell`: stage Completed không còn task → `completed_by` (PAVOI-397 "Nguyen Son Hai · completed by");
+  stage InProgress không có task nào → "no acceptor assigned" (MOSR-0476, HAZARD LOG-27: Galileo chưa có acceptor); NotStarted → "—".
+  Popup ECAR (TQA) không có bảng stage — có từ trước, chưa đụng.
 - Còn lại của email anh Ngọc: SPI chưa đạt + level, KPI chưa đạt.
 
 ## 📌 TỔNG KẾT PHIÊN 28–29/09/2026 (máy nhà) — đọc cái này trước

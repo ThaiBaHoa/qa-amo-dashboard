@@ -2909,6 +2909,24 @@ function renderOverview(){
   ].filter(m => m[0] !== 'In Progress' || !REAL);   /* live status has no In Progress */
   const mix = mixDefs.map(m=>({ k:m[0], c:m[1], v:rows.filter(r=>M.hasStatus(r, m[0])).length }));
 
+  /* ---- recent activity, derived from the register (restored 30/09/2026 at Eric's request) ---- */
+  const acts = [];
+  rows.forEach(r=>{
+    acts.push({ t:r.raised, hot:false, txt:'raised', r });
+    if(r.closed) acts.push({ t:r.closed, hot:false, txt:'closed '+(M.isOnTime(r)?'on time':M.isLate(r)?'late':'(no target)'), r });
+    r.rounds.forEach(v=> { if(v.date) acts.push({ t:v.date, hot:v.result!=='Satisfactory', txt:'verification — '+v.result.toLowerCase(), r }); });
+  });
+  overdue.forEach(r=> { if(r.target) acts.push({ t:r.target, hot:true, txt:'passed its target date', r }); });
+  const feed = acts.filter(a=>a.t<=TODAY).sort((a,b)=>b.t-a.t).slice(0,9).map(a=>{
+    const d = dayDiff(TODAY, a.t);
+    const when = d === 0 ? 'today' : d === 1 ? 'yesterday' : d < 30 ? d+'d ago' : fmtShort(a.t);
+    return '<button class="act-i" type="button" data-go="findings" data-tab="'+(a.r.form==='other'?'all':a.r.form)+'" data-id="'+a.r.id+'">'
+      + '<span class="act-dot'+(a.hot?' hot':'')+'"></span>'
+      + '<span class="act-body"><span class="row-id">'+esc(a.r.number)+' <span class="dim" style="font-weight:400">'+esc(a.txt)+'</span></span>'
+      + '<span class="row-sub od-truncate">'+esc(a.r.auditTitle)+'</span></span>'
+      + '<span class="num dim od-nowrap">'+when+'</span></button>';
+  }).join('');
+
   return '<section class="sec">'
     + '<div class="sec-head"><h2>Key indicators</h2><span class="t-small dim">'+esc(periodLabel())
     + ' · select a tile to open the report list</span></div>'
@@ -2928,7 +2946,12 @@ function renderOverview(){
     + '<div class="od-row" style="--od-gap:20px;flex-wrap:wrap">'+donut(mix)
     + '<div class="legend" style="flex-direction:column;gap:8px">'
     + mix.map(m=>'<span class="legend-i"><span class="swatch" style="background:'+m.c+'"></span>'+esc(m.k)+' <span class="num strong">'+m.v+'</span></span>').join('')
-    + '</div></div></div></div></section>';
+    + '</div></div></div></div></section>'
+
+    + '<section class="sec">'
+    + '<div class="card"><div class="card-head"><h2>Recent report events</h2><span class="t-small dim">newest first</span></div>'
+    + '<div class="card-pad"><div class="act">'+(feed || '<p class="t-sub dim">No activity in this range.</p>')+'</div></div></div>'
+    + '</section>';
 }
 
 /* ==========================================================================
@@ -4763,7 +4786,7 @@ function wfStages(ctxId, key){
      current version (valid_to null), owner + report_acceptance_status, joined on stage_id. Shown verbatim. */
   const flt = encodeURIComponent('context_id eq ' + ctxId + ' and valid_to eq null');
   Promise.all([
-    A.fetchAll(A.G_URL + 'dwanalytics_workflow_stage?$select=stage_id,title,index,status,owner,started_date,target_date,completed_date&$filter=' + flt + '&$orderby=index'),
+    A.fetchAll(A.G_URL + 'dwanalytics_workflow_stage?$select=stage_id,stage_type,title,index,status,owner,completed_by,started_date,target_date,completed_date&$filter=' + flt + '&$orderby=index'),
     A.fetchAll(A.G_URL + 'dwanalytics_task?$select=stage_id,owner,status,report_acceptance_status&$filter=' + flt).catch(() => [])
   ]).then(([rows, tasks]) => {
       rows.forEach(s => { if(!s.owner) s.acceptors = tasks.filter(t => t.stage_id === s.stage_id && t.owner); });
@@ -4771,6 +4794,16 @@ function wfStages(ctxId, key){
     .catch(e => { WF_STAGES[ctxId] = { err: e && e.message ? e.message : String(e) }; })
     .then(() => { if(MODAL_KEY === key && MODAL_REDRAW) MODAL_REDRAW(); });
   return null;
+}
+/* Owner of a stage: the stage owner; else (accept / reject stage) its acceptor tasks with their acceptance status;
+   else who completed it — a completed accept stage whose task has no current version (VJC-ECAR-802, PAVOI-397);
+   an accept stage in progress with no task at all has no acceptor assigned yet (probe 30/09: MOSR-0476, HAZARD LOG-27). */
+function stageOwnerCell(s){
+  if(s.owner) return esc(s.owner);
+  if((s.acceptors || []).length) return s.acceptors.map(t => esc(t.owner)+' <span class="dim">· '+esc(t.report_acceptance_status || t.status || '')+'</span>').join('<br>');
+  if(s.completed_by) return esc(s.completed_by)+' <span class="dim">· completed by</span>';
+  if(s.stage_type === 'ReportAcceptReject' && s.status === 'InProgress') return '<span class="dim">no acceptor assigned</span>';
+  return '—';
 }
 function stagesTable(tableKey, stages){
   if(stages === null) return '<p class="t-small dim">Loading workflow stages…</p>';
@@ -4782,8 +4815,7 @@ function stagesTable(tableKey, stages){
     const dur = s.started_date && s.completed_date ? Math.round((dDayLocal(s.completed_date) - dDayLocal(s.started_date)) / 864e5) : null;
     return ['<span class="t-small"><span class="dim num">'+(i+1)+'.</span> '+esc(s.title || '—')+'</span>',
       '<span class="tag">'+esc(s.status || '—')+'</span>'   /* the Galileo value as is (Eric 29/09: no renaming) */+(late ? ' <span class="cat c3">overdue</span>' : ''),
-      '<span class="t-small">'+(s.owner ? esc(s.owner) : (s.acceptors || []).length
-        ? s.acceptors.map(t => esc(t.owner)+' <span class="dim">· '+esc(t.report_acceptance_status || t.status || '')+'</span>').join('<br>') : '—')+'</span>',
+      '<span class="t-small">'+stageOwnerCell(s)+'</span>',
       '<span class="num">'+fdx(s.started_date)+'</span>', '<span class="num">'+fdx(s.target_date)+'</span>',
       '<span class="num">'+fdx(s.completed_date)+'</span>', '<span class="num">'+(dur == null ? '—' : dur+' d')+'</span>'];
   });
@@ -5098,7 +5130,7 @@ function scrGuideNew(){
     + '<tr><td>SPI trigger level</td><td>Consecutive latest months where the SPI rate is worse than the SPT approved by CAAV (or the form marks a trigger): 1, 2 or 3+ months = Level 1, 2, 3.</td></tr>'
     + '<tr><td>Completed on Coruson</td><td>EIS / F-088: all input fields filled, and an RFI or Task on the management stage (or the stage completed), and a final report file in the REPORT tab.</td></tr></table>')
   + sec('screens','Screens',
-    '<ul><li><b>Overview</b>: key indicators (including audits completed against the plan with those delayed past their scheduled month, open and overdue PAVOI, reports closed late, MCAR under extension, overdue mitigation tasks from HIRA / CAPA and F-088 / investigation reports overdue themselves or through a corrective action), overdue reports by CAT with the most overdue, open reports by form.</li>'
+    '<ul><li><b>Overview</b>: key indicators (including audits completed against the plan with those delayed past their scheduled month, open and overdue PAVOI, reports closed late, MCAR under extension, overdue mitigation tasks from HIRA / CAPA and F-088 / investigation reports overdue themselves or through a corrective action), overdue reports by CAT with the most overdue, open reports by form, recent report events.</li>'
     + '<li><b>Work Queue</b>: Open reports (nearest target first), Overdue (with CAT), Awaiting verification (open PAVOI with no verification round). Select a row to open the report.</li>'
     + '<li><b>Reports › All forms</b>: every report type. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings).</li>'
     + '<li><b>Reports › PAVOI</b>: register on the left, record on the right with the verification history and the RFI / Task list of open PAVOI.</li>'
