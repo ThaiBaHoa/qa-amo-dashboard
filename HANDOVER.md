@@ -20,7 +20,11 @@
   kế hoạch mà chưa Performed/Closed; Cancelled/Deleted không tính) + ô **Delayed** trên Audit Plan cùng số; ô **PAVOI open**
   (open / overdue qua `M.summary`). 2 dòng `M.consistency()` mới. Kiểm 30/09: 160/160 đến hạn đã xong, 0 chậm; nếu hôm nay
   là 01/10 → 17 chậm (11 Scheduled + 6 In Progress tháng 9) — khớp probe Galileo. PAVOI 21 mở · 8 overdue.
-- Còn lại của email anh Ngọc: Late closed, CA F-088/IR overdue, SPI chưa đạt + level, KPI chưa đạt.
+- ✅ ĐÃ PUSH `0d9d4b2` (live). Lượt 2 (30/09 tối): ô **Late closed** (`summary.late`, = KPI charts = tổng quý = 300) và
+  **Corrective actions overdue · F-088 / IR** (`M.caRisk`: CA của F-088 / EIS / Event Investigation Report, nạp `loadEis` khi
+  mở Overview; AMO ECAR không tính; MQA Investigation Report không có nhóm CA). 2026: 0 quá hạn · 6 mở / 55 CA / 14 report ·
+  9 hoàn thành trễ — khớp đếm thẳng eisCAMap. consistency 0 lệch.
+- Còn lại của email anh Ngọc: SPI chưa đạt + level, KPI chưa đạt.
 
 ## 📌 TỔNG KẾT PHIÊN 28–29/09/2026 (máy nhà) — đọc cái này trước
 

@@ -2134,6 +2134,8 @@ function fromReal(r){
      KPI 2 volume = MCAR count ÷ AMO-ECAR count (buildKPI2 5257–5259).
      KPI 7        = kpi7Stats (6191) with the same period rule; % withheld while pending.
      extension    = MCAR with an approved extension (mcar_chk.n); open = still open. MCAR only.
+     late closed  = Lately Closed (summary.late).
+     CA risk      = corrective actions of F-088 / EIS / Event Investigation Report (caRisk).
      mitigation   = HIRA with Additional mitigation = Yes · AMO - Additional Mitigation tasks (capaTaskStats).
      audits       = MNT scope; year = scheduled year, month = scheduled start month;
                     open = InProgress / Performed / Scheduled (renderAuditKpi 7676).
@@ -2210,6 +2212,19 @@ const M = {
   caReports(f){
     const A = API(), map = A.eis().ca || {};
     return A.allData().filter(r => map[r.report_id] && M.inPeriod(r, f)).map(r => ({ r, cas: map[r.report_id] }));
+  },
+
+  /* corrective actions of occurrence / investigation reports (anh Ngọc email 30/09/2026: "corrective action
+     từ các báo cáo F-88, IR đang overdue ... rủi ro cần ưu tiên"). Forms whose CORRECTIVE ACTIONS group
+     classic loadEisDetail reads; AMO ECAR also carries CAs but is an authority finding, tracked as a report.
+     MQA Investigation Report has no CA group (probe 30/09). rows = the screen's reports; null until loadEis. */
+  CA_FORMS: ['MQA Event Report F-088', 'MQA Event Investigation Summary', 'MQA Event Investigation Report'],
+  caRisk(rows){
+    const A = API();
+    if(!A.eis().loaded) return null;
+    const map = A.eis().ca || {}, reps = rows.filter(r => M.CA_FORMS.includes(r.code) && map[r.id]);
+    return Object.assign(M.caSummary(reps.flatMap(r => map[r.id])),
+      { reports: reps.length, reportsOverdue: reps.filter(r => map[r.id].some(M.isOverdue)) });
   },
 
   /* closure health by quarter (r170, anh Ngọc 24/09/2026: a quarter must show how many reports
@@ -2332,6 +2347,8 @@ M.consistency = function(){
     say('Corrective actions: closed + open vs total', cs.closed + cs.open, cs.total);
     say('Corrective actions: per-report sum vs total', cr.reduce((t, x) => t + M.caSummary(x.cas).overdue, 0), cs.overdue);
     const eis = cr.filter(x => x.r.report_title === A.EIS_TITLE);
+    say('Corrective actions F-088 / IR (Overview) vs caReports', M.caRisk(qa).overdue,
+        M.caSummary(cr.filter(x => M.CA_FORMS.includes(x.r.report_title)).flatMap(x => x.cas)).overdue);
     say('Corrective actions: EIS register overdue vs tracker', eis.reduce((t, x) => t + A.enrichEis(x.r).eis_ca_overdue, 0), M.caSummary(eis.flatMap(x => x.cas)).overdue);
   }
   const aud = A.auditData().filter(a => a.is_qa_amo_scope && M.auditInPeriod(a, f));
@@ -2781,6 +2798,9 @@ function renderOverview(){
   if(mitLive){ lazy('hira', () => API().loadHira(), () => API().hira().loaded); lazy('capa', () => API().loadCapa(), () => API().capa().loaded); }
   const MI = mitLive ? M.mitigation(rows) : null;
   const mitErr = mitLive && !MI && ((LAZY.hira && LAZY.hira.err) || (LAZY.capa && LAZY.capa.err));
+  if(mitLive) lazy('eis', () => API().loadEis(), () => API().eis().loaded);
+  const CA = mitLive ? M.caRisk(rows) : null;
+  const caErr = mitLive && !CA && LAZY.eis && LAZY.eis.err;
 
   const tiles = [
     kpiTile({label:'Open reports', value:String(open.length), note:REAL ? 'QA AMO reports (TQA CMR-CAR / ECAR on their own tabs)' : 'across all five forms', go:'work', tab:'open',
@@ -2789,6 +2809,8 @@ function renderOverview(){
              series:s.overdue, alarm:overdue.length>0, trend:trendTag(s.overdue[11], s.overdue[10], 'down','')}),
     kpiTile({label:'On-time closure rate', value:rate+'%', note:'target ≥ 70% · '+S.onTime+' of '+S.graded, go:'analytics', tab:'kpi',
              series:rateSeries, alarm:rate<70, trend:trendTag(rateSeries[11], rateSeries[10], 'up','pt')}),
+    kpiTile({label:'Late closed', value:String(S.late), go:'analytics', tab:'kpi', series:[],
+             note:'closed after the target date · '+M.pct(S.late, S.graded)+'% of '+S.graded+' closed with a target · by quarter on KPI charts'}),
     kpiTile({label:'Average closure time', value:avgClose+' d', note:'raised date to close date', go:'analytics', tab:'kpi',
              series:closeSeries, trend:trendTag(closeSeries[11], closeSeries[10], 'down','d')}),
     /* Same formula as the main dashboard's KPI 2 card on KPI Charts (buildKPI2 5257–5259):
@@ -2811,7 +2833,12 @@ function renderOverview(){
              act:'bovform', f:API().CAPA_TITLE, series:[], alarm:!!MI && (MI.tasks.overdue>0 || MI.noCapa>0),
              note:MI ? 'Additional Mitigation tasks past target · '+MI.tasks.open+' open of '+MI.tasks.total+' · '+MI.need+' HIRA need mitigation'
                         +(MI.noCapa ? ', '+MI.noCapa+' with no CAPA' : '')
-                     : mitErr ? 'could not load HIRA / CAPA — open the register to retry' : 'loading HIRA / CAPA…'}) : ''
+                     : mitErr ? 'could not load HIRA / CAPA — open the register to retry' : 'loading HIRA / CAPA…'}) : '',
+    REAL ? kpiTile({label:'Corrective actions overdue · F-088 / IR', value:CA ? String(CA.overdue) : '—', go:'findings', tab:'all',
+             act:'bovform', f:CA && CA.reportsOverdue.length ? CA.reportsOverdue[0].code : M.CA_FORMS[0], series:[], alarm:!!CA && CA.overdue>0,
+             note:CA ? 'past target, not completed · '+CA.open+' open of '+CA.total+' in '+CA.reports+' reports'
+                        +(CA.overdue ? ' ('+CA.reportsOverdue.map(r => r.number).slice(0, 3).join(', ')+')' : '')+' · '+CA.late+' completed late'
+                     : caErr ? 'could not load corrective actions — open a report to retry' : 'loading corrective actions…'}) : ''
   ].join('');
 
   /* ---- overdue at a glance ---- */
@@ -5057,7 +5084,7 @@ function scrGuideNew(){
     + '<tr><td>SPI trigger level</td><td>Consecutive latest months where the SPI rate is worse than the SPT approved by CAAV (or the form marks a trigger): 1, 2 or 3+ months = Level 1, 2, 3.</td></tr>'
     + '<tr><td>Completed on Coruson</td><td>EIS / F-088: all input fields filled, and an RFI or Task on the management stage (or the stage completed), and a final report file in the REPORT tab.</td></tr></table>')
   + sec('screens','Screens',
-    '<ul><li><b>Overview</b>: key indicators (including audits completed against the plan with those delayed past their scheduled month, open and overdue PAVOI, MCAR under extension and overdue mitigation tasks from HIRA / CAPA), overdue reports by CAT with the most overdue, open reports by form, reports raised vs closed over 12 months, recent report events.</li>'
+    '<ul><li><b>Overview</b>: key indicators (including audits completed against the plan with those delayed past their scheduled month, open and overdue PAVOI, reports closed late, MCAR under extension, overdue mitigation tasks from HIRA / CAPA and overdue corrective actions of F-088 / investigation reports), overdue reports by CAT with the most overdue, open reports by form, reports raised vs closed over 12 months, recent report events.</li>'
     + '<li><b>Work Queue</b>: Open reports (nearest target first), Overdue (with CAT), Awaiting verification (open PAVOI with no verification round). Select a row to open the report.</li>'
     + '<li><b>Reports › All forms</b>: every report type. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings).</li>'
     + '<li><b>Reports › PAVOI</b>: register on the left, record on the right with the verification history and the RFI / Task list of open PAVOI.</li>'
