@@ -2274,7 +2274,8 @@ const M = {
     return { stats: st, total: t.total, assessed: t.assessed, notAssessed: t.notAssessed, pending: t.pending, withdrawn: t.withdrawn,
              rate: (t.total && !t.pending) ? M.pct(t.assessed, t.total) : null };
   },
-  kpi7In(pass){ const t = API().kpi7Stats(pass).tot; return (t.total && !t.pending) ? M.pct(t.assessed, t.total) : 0; },
+  /* null = no PAVOI in the window (or rounds pending), not 0 % — a month with no PAVOI showed KPI 7 "−100pt" (30/09/2026) */
+  kpi7In(pass){ const t = API().kpi7Stats(pass).tot; return (t.total && !t.pending) ? M.pct(t.assessed, t.total) : null; },
 
   /* audits (MNT) — same period rule shape for both raw auditData and the mapped AUDITS */
   auditYear: a => a.year !== undefined ? a.year : +a.sched_year,
@@ -2297,11 +2298,17 @@ const M = {
   AUDIT_DONE: new Set(['Performed', 'Closed']),
   AUDIT_VOID: new Set(['Cancelled', 'Deleted']),
   auditDue: a => new Date(M.auditYear(a), M.auditMonth(a) + 1, 0) < TODAY,
+  /* plan to date = scheduled month has started (includes the current month). Eric 30/09/2026: "160 / 160"
+     over ended months only hid 17 September audits not yet performed and showed 163 done > 160 planned. */
+  auditStarted: a => new Date(M.auditYear(a), M.auditMonth(a), 1) <= TODAY,
   auditProgress(list){
     const plan = list.filter(a => !M.AUDIT_VOID.has(a.status)), due = plan.filter(M.auditDue);
     const done = a => M.AUDIT_DONE.has(a.status), delayed = due.filter(a => !done(a));
+    const toDate = plan.filter(M.auditStarted), thisMonth = toDate.filter(a => !M.auditDue(a));
     return { plan: plan.length, done: plan.filter(done).length, due: due.length, dueDone: due.length - delayed.length,
-             delayed: delayed.length, delayedList: delayed };
+             delayed: delayed.length, delayedList: delayed,
+             toDate: toDate.length, toDateDone: toDate.filter(done).length,
+             thisMonth: thisMonth.length, thisMonthOpen: thisMonth.filter(a => !done(a)).length };
   },
 
   /* classic records behind a set of reports (exports hand raw allData to the classic functions) */
@@ -2636,9 +2643,10 @@ function dueCell(r){
 
 /* ---- hand-drawn charts: sparkline, line pair, donut, stacked bar ---- */
 function spark(vals, hot){
-  if(!vals.length) return '';
-  const w = 120, h = 30, min = Math.min(...vals), max = Math.max(...vals), rng = (max-min) || 1;
-  const pts = vals.map((v,i)=>[ (i/(vals.length-1))*w, h - ((v-min)/rng)*(h-6) - 3 ]);
+  const nums = vals.filter(v => v !== null && v !== undefined);   /* a month with no data is a gap, not 0 */
+  if(nums.length < 2) return '';
+  const w = 120, h = 30, min = Math.min(...nums), max = Math.max(...nums), rng = (max-min) || 1;
+  const pts = vals.map((v,i)=> v === null || v === undefined ? null : [ (i/(vals.length-1))*w, h - ((v-min)/rng)*(h-6) - 3 ]).filter(Boolean);
   const line = 'M' + pts.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L ');
   const area = line + ' L '+w+' '+h+' L 0 '+h+' Z';
   const col  = hot ? 'var(--accent)' : 'var(--text-2)';
@@ -2649,7 +2657,7 @@ function spark(vals, hot){
     + '<circle cx="'+last[0].toFixed(1)+'" cy="'+last[1].toFixed(1)+'" r="2.4" fill="'+col+'"/></svg>';
 }
 function trendTag(now, prev, goodDir, unit){
-  if(prev === null || prev === undefined) return '';
+  if(prev === null || prev === undefined || now === null || now === undefined) return '';
   const d = now - prev;
   if(Math.abs(d) < 0.5) return '<span class="trend flat">'+ic('more',13)+' no change</span>';
   const up  = d > 0;
@@ -2825,9 +2833,11 @@ function renderOverview(){
       ? kpiTile({label:'KPI 7 · PAVOI assessed', value:'—', note:REAL.partialError ? 'verification rounds not loaded' : 'loading verification rounds…', go:'findings', tab:'pavoi', series:[]}) :
     kpiTile({label:'KPI 7 · PAVOI assessed', value:(k7.rate === null ? '—' : k7.rate+'%'), note:k7.assessed+' of '+k7.total+' assessed (verification round recorded)', go:'findings', tab:'pavoi',
              series:k7Series, alarm:k7.rate !== null && k7.rate<50, trend:trendTag(k7Series[11], k7Series[10], 'up','pt')}),
-    kpiTile({label:'Audits completed vs plan', value:AP.dueDone+' / '+AP.due, go:'audit', tab:'list', series:[], alarm:AP.delayed>0,
-             note:(AP.delayed ? AP.delayed+' delayed (scheduled month passed, not performed)' : 'none delayed')
-               +' · '+AP.done+' of '+AP.plan+' planned in range performed or closed'}),
+    kpiTile({label:'Audits completed vs plan', value:AP.toDateDone+' / '+AP.toDate, go:'audit', tab:'list', series:[], alarm:AP.delayed>0,
+             note:'performed or closed, of those scheduled up to this month · '
+               +(AP.delayed ? AP.delayed+' delayed (scheduled month passed)' : 'none delayed')
+               +(AP.thisMonthOpen ? ' · '+AP.thisMonthOpen+' of '+AP.thisMonth+' this month not yet performed' : '')
+               +' · '+AP.plan+' planned in range'}),
     kpiTile({label:'PAVOI open', value:String(PV.open), go:'findings', tab:'pavoi', series:[], alarm:PV.overdue>0,
              note:PV.overdue+' overdue · '+PV.inTarget+' within target · '+PV.total+' raised in range'}),
     kpiTile({label:'Extension · MCAR', value:String(E.open), go:'findings', tab:'mcar', series:[], alarm:E.overdue>0,

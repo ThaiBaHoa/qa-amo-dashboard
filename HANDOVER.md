@@ -27,6 +27,11 @@
 - Sửa ô CA (Eric 30/09, xem ảnh register F-088): đếm THEO REPORT — report F-088/EIS/IR tính quá hạn khi chính report Overdue
   HOẶC có ≥1 CA Overdue (bản đầu chỉ đếm CA nên ra 0, sót RP-072/074). Ô đổi tên "F-088 / IR overdue". 2026: 3 report
   (MQA-RP-072-2026, MQA-RP-074-2026, MQA-EIS-019 — cả 3 Overdue mà chưa nhập CA nào) = đúng danh sách Overdue của register.
+- Rà lại ảnh Overview (Eric 30/09 "có vẻ sai"): (1) ô Audit trước ghi 160 / 160 chỉ tính tháng đã hết → giấu 17 audit tháng 9
+  chưa làm và 163 > 160; nay = hoàn thành / kế hoạch TÍNH ĐẾN THÁNG NÀY = 163 / 180 + "17 of 20 this month not yet performed"
+  (khớp Galileo: T9 có 20 audit, 3 xong). Tổng 237 đúng: MNT-1089 là 2 audit khác audit_id, tạo 2 lần trên Coruson 24/09 cách
+  2 giây (DAD, T12) — lỗi dữ liệu Coruson, cần xoá 1 bản. (2) KPI 7 "−100pt": tháng không có PAVOI bị tính 0% → `M.kpi7In`
+  trả null, `spark` bỏ điểm trống, `trendTag` bỏ khi tháng này null.
 - Còn lại của email anh Ngọc: SPI chưa đạt + level, KPI chưa đạt.
 
 ## 📌 TỔNG KẾT PHIÊN 28–29/09/2026 (máy nhà) — đọc cái này trước
