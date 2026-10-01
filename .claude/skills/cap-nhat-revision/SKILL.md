@@ -11,7 +11,9 @@ description: >-
 
 # Cập nhật revision (APP_REV) + commit
 
-App có một biến `APP_REV = 'YYYY.MM.DD-rNN[-iM]'` trong `index.html` — đây là số
+App có một biến `APP_REV = 'YYYY.MM.DD-rNN[-iM]'` — từ r167 nằm trong `classic.html`,
+không phải `index.html`. Thay đổi CHỈ ở `index.html` (giao diện) vẫn bump đúng luật dưới,
+không có ngoại lệ "no rev bump" (Eric 01/10/2026). Đây là số
 phiên bản hiển thị. Mỗi lần giao một thay đổi, cập nhật nó **đúng luật** rồi commit
 với **đúng định dạng message**, vì `scripts/gen-changelog.sh` bóc `r###` từ đầu
 commit message để dựng nhật ký cho báo cáo tuần.

@@ -274,6 +274,10 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
 - **Versioning** (`APP_REV = YYYY.MM.DD-rNN[-iM]`):
   - New feature / layout change / removed functionality → bump `rNN → r(NN+1)`
   - Pure bug fix → keep `rNN`, bump issue suffix (`r107-i1`, `r107-i2`)
+  - **A change to `index.html` only (the new UI) follows the same rule.** The rev lives in
+    `classic.html`, so bump `APP_REV` there in the same commit. Never ship "(no rev bump)".
+    Eric 01/10/2026: no decision ever dropped the rule; 12 UI commits of 29/09–01/10 went out
+    as r178 and were labelled afterwards as r179–r182-i1. Bumping costs no cold load since r174.
   - Log fixes as "Issue 1/2/3" under that rev. Next feature resets issue counter.
   - **Never reserve rev numbers ahead of time.** A rev number is assigned **when the change
     ships**, in ship order. Planning docs must use neutral labels ("Việc 1/2/3/4"), never
