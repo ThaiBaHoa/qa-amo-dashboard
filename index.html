@@ -1483,6 +1483,12 @@ const CAT = { 'CAT I': 'I', 'CAT II': 'II', 'CAT III': 'III' };
 const CLOSED = new Set(['On-time Closed', 'Lately Closed', 'Closed']);
 const FORM_OF = { 'PAVOI': 'pavoi', 'MCAR': 'mcar', 'AMO ECAR': 'amoecar' };
 const CODE = { pavoi: 'PAVOI', mcar: 'MCAR', amoecar: 'AMO-ECAR', ecar: 'ECAR', cmrcar: 'CMR-CAR' };
+/* Audit location = the station's 3-letter code (Eric 01/10/2026). Coruson admins attached the
+   department ('SGN Line Maintenance Station', 'VTE Base Maintenance Station') instead of the
+   station ('X Stations / SGN'); open audits were fixed on Coruson, closed ones are shown here as
+   the station, so every screen and export reads the same value. Anything else stays verbatim. */
+const stationOf = v => { const m = String(v || '').match(/^([A-Z]{3}) (?:Line|Base) Maintenance Station$/); return m ? m[1] : v; };
+auditData.forEach(a => { a.location_name = stationOf(a.location_name); });
 const auById = {}; auditData.forEach(a => { auById[a.audit_id] = a; });
 function base(r, form){
   return {
