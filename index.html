@@ -3778,10 +3778,13 @@ function card(title, sub, body, pad){
     + (sub ? '<span class="t-small dim od-fill">'+sub+'</span>' : '') + '</div>'
     + (pad === false ? body : '<div class="card-pad" style="display:grid;gap:14px">'+body+'</div>') + '</div>';
 }
-function stat(label, value, note, alarm, wrap){
-  return '<div class="kpi'+(alarm?' alarm':'')+'" style="cursor:default">'
-    + '<span class="kpi-lbl">'+esc(label)+'</span><span class="kpi-val '+(wrap ? 'beta-wrap' : 'od-nowrap')+'">'+esc(value)+'</span>'
-    + '<span class="kpi-foot"><span class="kpi-note">'+esc(note || '')+'</span></span></div>';
+/* act: a BETA_ACT name — the tile becomes a button that runs it (e.g. opens the list behind the count) */
+function stat(label, value, note, alarm, wrap, act){
+  const inner = '<span class="kpi-lbl">'+esc(label)+'</span><span class="kpi-val '+(wrap ? 'beta-wrap' : 'od-nowrap')+'">'+esc(value)+'</span>'
+    + '<span class="kpi-foot"><span class="kpi-note">'+esc(note || '')+'</span></span>';
+  return act
+    ? '<button class="kpi'+(alarm?' alarm':'')+'" type="button" data-act="'+act+'" aria-label="'+esc(label+': '+value+'. '+(note || '')+'. Select for the list')+'">'+inner+'</button>'
+    : '<div class="kpi'+(alarm?' alarm':'')+'" style="cursor:default">'+inner+'</div>';
 }
 const tiles = list => '<section class="sec"><div class="kpi-grid">'+list.join('')+'</div></section>';
 function segs(key, opts, cur){
@@ -5062,6 +5065,7 @@ Object.assign(BETA_ACT, {
   bdoc: el => showDoc(el.dataset.id),
   bdoctab: el => showDoc(el.dataset.id, el.dataset.t),
   baudit: el => showAudit(el.dataset.id),
+  bdelayed: () => delayedAuditList(),
   bsignout: () => { if(confirm('Sign out of the QA AMO Dashboard?')) window.betaSignOut(); },
   bpassword: () => changePasswordModal(),
   bpwsave: () => savePassword(),
@@ -5105,11 +5109,26 @@ function auditKpiTiles(){
   const P = M.auditProgress(data);   /* same figure as the Overview tile 'Audits completed vs plan' */
   return tiles([stat('Total audits', String(S.total), 'MNT · '+periodLabel()), stat('Closed', String(S.closed), 'status Closed'),
     stat('Delayed', String(P.delayed), P.delayed ? P.delayedList.map(a => a.number).slice(0, 6).join(', ')+(P.delayed > 6 ? '…' : '')
-      : 'scheduled month passed, not performed', P.delayed > 0, true),
+      : 'scheduled month passed, not performed', P.delayed > 0, true, P.delayed ? 'bdelayed' : null),
     stat('Open', String(S.open), 'in progress, performed or scheduled'), stat('Closure rate', S.rate+'%', S.closed+' of '+S.total, S.total > 0 && S.rate < 50),
     stat('CAR follow-up', inCar === null ? '—' : String(inCar), inCar === null ? 'loading…' : 'stage InProgress' + (carPso ? ' · ' + carPso + ' PendingSignOff' : '')),
     stat('Top stage InProgress', top ? top[0] : '—', !known ? 'loading…' : top ? top[1]+' audits with this stage InProgress' : 'no stage InProgress', false, true),
     stat('Years', years.length ? (years.length <= 3 ? years.join(', ') : years[0]+'–'+years[years.length-1]) : '—', years.length+' year(s)', false, true)]);
+}
+/* the audits behind the Delayed tile — the same M.auditProgress list, oldest scheduled month first */
+function delayedAuditList(){
+  const A = API();
+  const list = M.auditProgress(A.auditData().filter(a => a.is_qa_amo_scope && M.auditInPeriod(a))).delayedList.slice()
+    .sort((x, y) => String(x.scheduled_start_date || '').localeCompare(String(y.scheduled_start_date || '')) || String(x.number).localeCompare(String(y.number)));
+  MODAL_KEY = 'delayed'; MODAL_REDRAW = () => delayedAuditList();
+  openModal('Delayed audits', list.length+' audits · '+periodLabel()+' · scheduled month passed, not Performed / Closed · select an audit for its detail',
+    plainTable('aud-delayed', [{l:'Audit'},{l:'Location'},{l:'Scheduled'},{l:'Lead auditor'},{l:'Status'}], list.map(a => [
+      '<button class="link-b" type="button" data-act="baudit" data-id="'+esc(a.audit_id)+'"><span class="row-id">'+esc(a.number)+'</span></button>'+extLink('audit', a.audit_id, a.number)+' <span class="t-small dim">'+esc(a.title || '')+'</span>',
+      '<span class="t-small">'+esc(a.location_name || '—')+'</span>',
+      '<span class="num">'+fdx(a.scheduled_start_date)+'</span>',
+      '<span class="t-small">'+esc(a.lead_auditor_name || '—')+'</span>',
+      '<span class="t-small">'+esc(a.status || '—')+'</span>'
+    ]), 30, 720));
 }
 
 
