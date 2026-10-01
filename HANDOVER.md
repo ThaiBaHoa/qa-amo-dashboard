@@ -249,6 +249,8 @@ beta.html    = chuyển hướng về ./
 - ⚠ Self-check "KPI 7 drill-down contamination" (3 cảnh báo) là kiểm tra cũ của classic, lệch công thức r155 — classic cũng báo; chờ Eric quyết.
 - Tài liệu: `MQA dashboard website/HuongDan_SuDung_QA_AMO_Dashboard_r167.docx` (13 trang), email nháp song ngữ
   `MQA dashboard website/mail/Email-thong-bao-giao-dien-moi-QA-AMO-Dashboard-2026-09-22.md`.
+  → 01/10/2026: thay bằng `HuongDan_SuDung_QA_AMO_Dashboard_r186.docx` (hình đánh số + bảng giải thích), slide `TrinhBay_QA_AMO_Dashboard_r186.pptx`,
+  email `mail/Email-thong-bao-giao-dien-moi-QA-AMO-Dashboard-2026-10-01.md`; bản r167 / r128 / email 22-09 đã xoá. Nguồn dựng: `rebuild UIUX/beta-src/manual.js`, `deck.js`, ảnh `rebuild UIUX/manual-shots-r186/`.
 - Lùi: `git revert <commit r167>` (đưa classic.html về index.html).
 
 ---
