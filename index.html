@@ -5103,8 +5103,7 @@ function auditKpiTiles(){
   const carFu = s => ['Follow up CAR','Finding follow up'].includes(stageT(s));
   const inCar = known ? data.filter(a => a.active_stages.some(s => carFu(s) && s.stage_status === 'InProgress')).length : null;
   const carPso = known ? data.filter(a => a.active_stages.some(s => carFu(s) && s.stage_status === 'PendingSignOff')).length : 0;
-  const sc = {}; if(known) data.forEach(a => a.active_stages.forEach(s => { if(s.stage_status === 'InProgress'){ const t = stageT(s); sc[t] = (sc[t] || 0) + 1; } }));
-  const top = Object.entries(sc).sort((a,b) => b[1] - a[1])[0];
+  /* 'Top stage InProgress' tile dropped (Eric 01/10/2026): Audit Plan › Workflow stages shows every stage × status */
   const years = [...new Set(data.map(a => a.sched_year).filter(Boolean))].sort();
   const P = M.auditProgress(data);   /* same figure as the Overview tile 'Audits completed vs plan' */
   return tiles([stat('Total audits', String(S.total), 'MNT · '+periodLabel()), stat('Closed', String(S.closed), 'status Closed'),
@@ -5112,7 +5111,6 @@ function auditKpiTiles(){
       : 'scheduled month passed, not performed', P.delayed > 0, true, P.delayed ? 'bdelayed' : null),
     stat('Open', String(S.open), 'in progress, performed or scheduled'), stat('Closure rate', S.rate+'%', S.closed+' of '+S.total, S.total > 0 && S.rate < 50),
     stat('CAR follow-up', inCar === null ? '—' : String(inCar), inCar === null ? 'loading…' : 'stage InProgress' + (carPso ? ' · ' + carPso + ' PendingSignOff' : '')),
-    stat('Top stage InProgress', top ? top[0] : '—', !known ? 'loading…' : top ? top[1]+' audits with this stage InProgress' : 'no stage InProgress', false, true),
     stat('Years', years.length ? (years.length <= 3 ? years.join(', ') : years[0]+'–'+years[years.length-1]) : '—', years.length+' year(s)', false, true)]);
 }
 /* the audits behind the Delayed tile — the same M.auditProgress list, oldest scheduled month first */
