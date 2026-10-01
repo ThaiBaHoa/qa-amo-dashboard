@@ -4094,19 +4094,18 @@ function scrStatus(){
     .filter(r => !q || [r.num, r.subject, r.owner, r.links.join(' ')].join(' ').toLowerCase().includes(q));
   const cnt = fn => scope.filter(fn).length;
   const isEis = BS.rsTab === 'eis';
-  const cols = [{l:'Report'},{l:'Incharge person'},{l:'Completion on Coruson'},{l:'Workflow / add task'},{l:'Linked report'},{l:'Final report'},{l:'Status'}]
+  /* 'Completion on Coruson' column dropped (Eric 01/10/2026); the 'Completed on Coruson' tile keeps the count */
+  const cols = [{l:'Report'},{l:'Incharge person'},{l:'Workflow / add task'},{l:'Linked report'},{l:'Final report'},{l:'Status'}]
     .concat(isEis ? [{l:'PAVOI'}] : []);
   /* rows carry the report number only: the Coruson link needs its report_id from allData (linked reports too, when loaded) */
   const idByNo = new Map(A.allData().map(d => [String(d.report_number).trim(), d.report_id]));
   const noLink = n => esc(n) + extLink('report', idByNo.get(String(n).trim()), n);
   const body = rows.map(r => {
-    const gaps = A.rsDone(r) ? '<span class="chip s-ontime">'+mark('On-time Closed')+'Completed</span>'
-      : '<span class="chip s-overdue">'+mark('Overdue')+'Not completed</span><br>' + A.rsGaps(r).map(g => '<span class="t-small"><span class="strong">'+esc(g.k)+'</span> — '+esc(g.d)+'</span>').join('<br>');
     const wf = (A.rsOkF(r) ? 'Satis' : '<span class="red strong">Unsatis</span>') + '<br><span class="t-small dim">'
       + esc((r.rfi + r.task) > 0 ? r.rfi+' RFI · '+r.task+' Task' : (r.stage || 'no stage')) + '</span>';
     const files = A.rsOkH(r) ? 'Uploaded<br><span class="t-small dim">'+r.files.length+' file(s)</span>' : '<span class="red strong">Miss final report</span>';
     const cells = ['<span class="row-main"><span class="row-id">'+noLink(r.num)+'</span><span class="row-sub od-clamp-2">'+esc(r.subject)+'</span></span>',
-      '<span class="t-small">'+esc(r.owner || '—')+'</span>', gaps, wf,
+      '<span class="t-small">'+esc(r.owner || '—')+'</span>', wf,
       '<span class="t-small">'+(r.links.length ? r.links.map(noLink).join('<br>') : '—')+'</span>', files, statusChip(r.status === 'Closed' ? 'Closed' : 'Open')];   /* metrics-ok: Coruson report_status of EIS/F-088 (Report status screen) */
     if(isEis) cells.push('<span class="t-small">'+esc(r.links.filter(x => /^PAVOI/i.test(x)).join(', ') || '—')+'</span>');
     return cells;
@@ -5169,7 +5168,7 @@ function scrGuideNew(){
     + '<li><b>Reports › All forms</b>: every report type. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings).</li>'
     + '<li><b>Reports › PAVOI</b>: register on the left, record on the right with the verification history and the RFI / Task list of open PAVOI.</li>'
     + '<li><b>Reports › OSR / MOSR</b>: OSR and MOSR of AMO and MQA : QA AMO, Open or Closed from Coruson.</li>'
-    + '<li><b>Analytics › Event/IR report status</b>: EIS and F-088 completeness on Coruson; each row lists what is missing.</li>'
+    + '<li><b>Analytics › Event/IR report status</b>: EIS and F-088 completeness on Coruson; the tiles count the reports complete on each check, the table shows workflow, linked reports, final report and status per report.</li>'
     + '<li><b>Audit Plan</b>: KPI tiles, a location × month view (one dot per audit in its scheduled month; filter by type or show only upcoming / with overdue findings), and a schedule list. Select a dot or a row for its workflow stages and findings. <b>Workflow stages</b>: for the QA AMO audits in the selected period, how many stages of each name are in each Galileo status; select an InProgress or PendingSignOff count for the audits concerned.</li>'
     + '<li><b>Library › Documents</b>: browse by document type; the document number opens copyholders (on time, late, overdue) and the workflow.</li></ul>')
   + sec('export','Exports',
