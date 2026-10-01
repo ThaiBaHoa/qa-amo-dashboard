@@ -2,7 +2,7 @@
 
 **File:** `index.html` (single-file SPA, không build step)
 **Repo:** `ThaiBaHoa/qa-amo-dashboard` · **Domain:** `vjc-qa-amo.com` (GitHub Pages)
-**Version hiện tại:** `2026.10.01-r186`
+**Version hiện tại:** `2026.10.01-r186-i1`
 **Cập nhật spec:** 2026-07-22 — phản ánh code thực tế (gồm r81–r118-i3; **r113–r118 = phân hệ Export/Login, KHÔNG đổi luồng dữ liệu chính** — xem §14; **delta luồng duy nhất từ r112: bước [5/6] `loadData` thêm field `Issued to (person)` → `issued_person`, tổng 16 field**), **r110: cập nhật roster `QA_AMO_AUDITORS`; r111: nút Feedback / Bug Report (Google Form) ở sidebar; r112: AI Assistant chat — hỏi-đáp dữ liệu qua Worker `galileo-ai` (tool-use client-side) — xem §8.9; r112-i1: AI Assistant fuzzy form matching + alias (SR/EIS/QC)**; r104: User delete qua Edge Function + EIS form-specific schema/roll-up ở All Forms; r105: fix EIS per-CA load — revert về field_name + post-filter Set (I3); r106: EIS đóng/mở theo cấp report (không suy từ CA Date completed); r107: QC Spot Check Report detail ở All Forms (+ hotfix TDZ thứ tự khai báo & timeout report_field — xem §8.8, I11); r108: KPI ATA = (CMR-CAR + QC Spot Check)÷ECAR lệch tháng N−1/N (§6.4c); r109: tử số CMR-CAR chỉ tính report gán cờ "QC MQA Physical Finding" (category_id), MCAR cột Raised by, Target_date lấy từ Report, MCAR deadline check, copyholder on-time so theo ngày, lọc Cancelled/Deleted, auto-refresh kiosk, multi-year filter, admin export, SPI, KPI2, PAVOI RFI)
 
 > Tài liệu này mô tả TOÀN BỘ kiến trúc, dữ liệu, logic và quy ước của dashboard. Dùng làm nguồn tham chiếu chuẩn khi sửa code. Số dòng (Lxxxx) là tương đối, dùng để định vị nhanh.
@@ -556,6 +556,7 @@ Supabase thật, mà worker chỉ nhận origin `vjc-qa-amo.com` nên localhost 
 
 | Rev | Nội dung |
 |---|---|
+| r186-i1 | **Issue 1 — bảng Delayed audits dính cột (01/10/2026).** Modal của r185 in ngày đủ (01 Sep 2026) nên xuống dòng và tiêu đề Location/Scheduled dính nhau. Cột Scheduled in tháng kế hoạch ('Sep 2026', `M.auditMonth`/`M.auditYear`), cột Location 92px, Scheduled 112px. Kiểm bằng ảnh chụp Chrome headless 1280×800 dữ liệu thật. |
 | r186 | **Audit Plan: bỏ ô 'Top stage InProgress' (01/10/2026).** Eric: không cần thiết. Màn Audit Plan › Workflow stages vẫn hiện đủ bước × trạng thái. Hàng ô còn Total audits · Closed · Delayed · Open · Closure rate · CAR follow-up · Years. Kiểm local dữ liệu thật: 7 ô, `M.consistency()` 0, console sạch. |
 | r185 | **Audit Plan: ô Delayed mở danh sách (01/10/2026).** Eric: ô Delayed phải bấm được ra danh sách. `stat()` nhận thêm tham số `act` (ô thành nút); `bdelayed` → `delayedAuditList()`: modal 'Delayed audits' = đúng `M.auditProgress(...).delayedList` của ô (cùng bộ lọc Năm × Tháng), xếp tháng kế hoạch cũ trước; cột Audit (bấm mở chi tiết, ↗ Coruson) · Location · Scheduled · Lead auditor · Status. Kiểm local dữ liệu thật: ô 12 = 12 dòng. |
 | r184 | **Event/IR report status: bỏ cột 'Completion on Coruson' (01/10/2026).** Eric yêu cầu bỏ cột (chip Completed / Not completed + danh sách thiếu từng mục). Ô 'Completed on Coruson' và các ô Fill / Workflow / Final report / Linked vẫn đếm như cũ. Bảng còn Report · Incharge person · Workflow / add task · Linked report · Final report · Status (+ PAVOI ở tab EIS). Guide cập nhật câu mô tả. Kiểm local dữ liệu thật: F-088 6 cột, mỗi dòng 6 ô. |

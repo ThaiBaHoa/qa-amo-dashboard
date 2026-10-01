@@ -5120,10 +5120,11 @@ function delayedAuditList(){
     .sort((x, y) => String(x.scheduled_start_date || '').localeCompare(String(y.scheduled_start_date || '')) || String(x.number).localeCompare(String(y.number)));
   MODAL_KEY = 'delayed'; MODAL_REDRAW = () => delayedAuditList();
   openModal('Delayed audits', list.length+' audits · '+periodLabel()+' · scheduled month passed, not Performed / Closed · select an audit for its detail',
-    plainTable('aud-delayed', [{l:'Audit'},{l:'Location'},{l:'Scheduled'},{l:'Lead auditor'},{l:'Status'}], list.map(a => [
+    plainTable('aud-delayed', [{l:'Audit'},{l:'Location',w:'92px'},{l:'Scheduled',w:'112px'},{l:'Lead auditor'},{l:'Status'}], list.map(a => [
       '<button class="link-b" type="button" data-act="baudit" data-id="'+esc(a.audit_id)+'"><span class="row-id">'+esc(a.number)+'</span></button>'+extLink('audit', a.audit_id, a.number)+' <span class="t-small dim">'+esc(a.title || '')+'</span>',
       '<span class="t-small">'+esc(a.location_name || '—')+'</span>',
-      '<span class="num">'+fdx(a.scheduled_start_date)+'</span>',
+      /* the plan is by month: 'Sep 2026' (a full date wrapped and ran into the Location header) */
+      '<span class="num od-nowrap">'+(a.scheduled_start_date ? MONTHS[M.auditMonth(a)]+' '+M.auditYear(a) : '—')+'</span>',
       '<span class="t-small">'+esc(a.lead_auditor_name || '—')+'</span>',
       '<span class="t-small">'+esc(a.status || '—')+'</span>'
     ]), 30, 720));
