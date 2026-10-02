@@ -5,6 +5,13 @@
 
 ---
 
+## ⏳ r187 — bố cục màn LED / Overview (02/10/2026, EricThai) — ĐÃ PUSH `cb0c9e2`, live r187
+
+- Eric gửi ảnh màn trình chiếu: bố cục không đều. Sửa trong `beta-src/beta-template.html`: biểu đồ ghim đáy ô KPI; 12 ô Overview
+  chỉ 2/3/4/6 cột (container query `.kpi-box`); `body.kiosk .wrap{max-width:none}`.
+- Kiểm trên trang thử cùng CSS (1920 LED 6 cột, đáy biểu đồ thẳng, 0 nhãn donut bị cắt). **Chưa kiểm dữ liệu thật / màn chiếu thật.**
+- Còn mở: bảng Event/IR report status cuộn bên trong card → trên LED không thấy dòng dưới; chờ Eric quyết có cho bảng hiện hết ở kiosk không.
+
 ## ⏳ Overview: Extension · MCAR + Mitigation · HIRA / CAPA (30/09/2026, laptop — CHƯA COMMIT, chờ Eric duyệt push)
 
 - Nguồn: email anh Ngọc 30/09 (sửa Overview) + Eric: "trước mắt làm extension cho MCAR, mitigation lấy HIRA và CAPA".
