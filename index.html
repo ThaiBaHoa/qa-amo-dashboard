@@ -394,8 +394,16 @@ select.ctl{min-width:168px;cursor:pointer}
 
 /* ---------- KPI tile ---------- */
 .kpi-grid{display:grid;gap:var(--s3);grid-template-columns:repeat(auto-fit,minmax(228px,1fr))}
+/* Overview's 12 tiles: 2 / 3 / 4 / 6 columns only, so the rows are always full (auto-fit gave 5 + 5 + 2
+   at 1188-1428px and 7 + 5 on the LED wall, 02/10/2026). The box is the query container, nothing else. */
+.kpi-box{container-type:inline-size}
+@container (min-width:708px){.kpi-grid.kpi-12{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@container (min-width:948px){.kpi-grid.kpi-12{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@container (min-width:1428px){.kpi-grid.kpi-12{grid-template-columns:repeat(6,minmax(0,1fr))}}
+/* label / value / note on top, sparkline or donut pinned to the bottom: a note on one line or two no
+   longer moves the chart up or down between neighbouring tiles */
 .kpi{
-  display:grid;gap:var(--s2);align-content:start;width:100%;text-align:left;
+  display:grid;gap:var(--s2);align-content:start;grid-template-rows:auto auto 1fr;width:100%;text-align:left;
   background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card);padding:var(--s4);
   transition:background var(--dur-in) var(--ease-out),border-color var(--dur-in) var(--ease-out);
 }
@@ -404,7 +412,7 @@ select.ctl{min-width:168px;cursor:pointer}
 .kpi-lbl{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);font-weight:650}
 .kpi-val{font-family:var(--mono);font-size:clamp(28px,3vw,38px);font-weight:700;line-height:1.05;letter-spacing:-.03em;color:var(--text)}
 .kpi.alarm .kpi-val{color:var(--accent-fg)}
-.kpi-foot{display:flex;align-items:center;gap:var(--s2);flex-wrap:wrap}
+.kpi-foot{display:flex;align-items:center;align-self:start;gap:var(--s2);flex-wrap:wrap}
 .trend{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:13px;font-weight:700;white-space:nowrap}
 .trend.bad{color:var(--accent-fg)}
 .trend.good{color:var(--text)}
@@ -776,6 +784,8 @@ body.rail .beta-account{display:none}
 /* LED wall (?kiosk=): no sidebar, no bottom bar, no assistant — same as classic body.kiosk */
 body.kiosk .sidebar, body.kiosk .botnav, body.kiosk #betaAiBtn, body.kiosk .beta-ai, body.kiosk .filterbar{display:none !important}
 body.kiosk .app{grid-template-columns:minmax(0,1fr) !important}
+/* the wall is viewed from across the room: use its full width (1560px left 180px empty bands at 1920) */
+body.kiosk .wrap{max-width:none}
 .beta-guide{max-width:96ch}
 .beta-sel{min-width:0;max-width:100%}
 .beta-sel select.ctl{min-width:0;width:min(280px,100%);text-overflow:ellipsis}
@@ -2957,7 +2967,7 @@ function renderOverview(){
   return '<section class="sec">'
     + '<div class="sec-head"><h2>Key indicators</h2><span class="t-small dim">'+esc(periodLabel())
     + ' · select a tile to open the report list</span></div>'
-    + '<div class="kpi-grid">'+tiles+'</div></section>'
+    + '<div class="kpi-box"><div class="kpi-grid kpi-12">'+tiles+'</div></div></section>'
 
     + '<section class="sec cols cols-32">'
     + '<div class="card"><div class="card-head"><h2>Overdue reports by CAT</h2>'
