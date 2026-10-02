@@ -400,6 +400,9 @@ select.ctl{min-width:168px;cursor:pointer}
 @container (min-width:708px){.kpi-grid.kpi-12{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @container (min-width:948px){.kpi-grid.kpi-12{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @container (min-width:1428px){.kpi-grid.kpi-12{grid-template-columns:repeat(6,minmax(0,1fr))}}
+/* Audit Plan's 6 tiles: one row from 948px, else 3 + 3 (Eric 02/10/2026) */
+@container (min-width:548px){.kpi-grid.kpi-6{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@container (min-width:948px){.kpi-grid.kpi-6{grid-template-columns:repeat(6,minmax(0,1fr))}}
 /* label / value / note on top, sparkline or donut pinned to the bottom: a note on one line or two no
    longer moves the chart up or down between neighbouring tiles */
 .kpi{
@@ -5037,13 +5040,14 @@ function kioskParam(){
   const n = parseInt(v, 10);
   return (n >= 5 && n <= 600) ? n : 30;   /* ?kiosk, =1, =true → 30 s (classic kioskParam 3228) */
 }
-/* same five steps as classic KIOSK_STEPS 3215 */
+/* classic KIOSK_STEPS 3215, plus Audit Plan › Timeline (Eric 02/10/2026) */
 const KIOSK_STEPS = [
   { l:'Overview', go:() => go('overview') },
   { l:'Report status · EIS', go:() => { BS.rsTab = 'eis'; go('analytics','status'); } },
   { l:'Report status · F-088', go:() => { BS.rsTab = 'f088'; go('analytics','status'); } },
   { l:'SPI', go:() => go('analytics','spi') },
-  { l:'Safety · MSAG', go:() => go('analytics','safety') }
+  { l:'Safety · MSAG', go:() => go('analytics','safety') },
+  { l:'Audit Plan · Timeline', go:() => go('audit','timeline') }
 ];
 function startKiosk(){
   KIOSK.sec = kioskParam(); if(!KIOSK.sec) return;
@@ -5099,28 +5103,20 @@ function topExtras(){
 }
 
 /* Audit Plan KPI tiles — renderAuditKpi 7672–7712, on the MNT audits inside the Year × Month filter */
+/* six tiles: 3 / 6 columns by the width of the card (.kpi-6 in the template CSS), never a 4 + 2 row */
+const tiles6 = list => '<section class="sec"><div class="kpi-box"><div class="kpi-grid kpi-6">'+list.join('')+'</div></div></section>';
 function auditKpiTiles(){
   const A = API();
   const data = A.auditData().filter(a => a.is_qa_amo_scope && M.auditInPeriod(a));
   const S = M.auditSummary(data);
-  const stageT = s => A.normalizeStageTitle(s.stage_type);
-  /* r177: active_stages = the audit's stages in InProgress or PendingSignOff, loaded with the data. audit_stages was
-     always empty with > 50 audits, so CAR follow-up showed 0 and Bottleneck '—' whatever the data. Definitions stay
-     as before (Eric 29/09: show what Galileo says, do not merge statuses): CAR follow-up = a 'Follow up CAR' /
-     'Finding follow up' stage InProgress; PendingSignOff is shown next to it under its own Galileo name. A cache
-     from before r177 has no active_stages: '—' until the background refresh lands, never a false 0. */
-  const known = data.every(a => Array.isArray(a.active_stages));
-  const carFu = s => ['Follow up CAR','Finding follow up'].includes(stageT(s));
-  const inCar = known ? data.filter(a => a.active_stages.some(s => carFu(s) && s.stage_status === 'InProgress')).length : null;
-  const carPso = known ? data.filter(a => a.active_stages.some(s => carFu(s) && s.stage_status === 'PendingSignOff')).length : 0;
-  /* 'Top stage InProgress' tile dropped (Eric 01/10/2026): Audit Plan › Workflow stages shows every stage × status */
+  /* 'Top stage InProgress' tile dropped (Eric 01/10/2026) and 'CAR follow-up' (Eric 02/10/2026, six tiles on one row):
+     Audit Plan › Workflow stages shows every stage × status */
   const years = [...new Set(data.map(a => a.sched_year).filter(Boolean))].sort();
   const P = M.auditProgress(data);   /* same figure as the Overview tile 'Audits completed vs plan' */
-  return tiles([stat('Total audits', String(S.total), 'MNT · '+periodLabel()), stat('Closed', String(S.closed), 'status Closed'),
+  return tiles6([stat('Total audits', String(S.total), 'MNT · '+periodLabel()), stat('Closed', String(S.closed), 'status Closed'),
     stat('Delayed', String(P.delayed), P.delayed ? P.delayedList.map(a => a.number).slice(0, 6).join(', ')+(P.delayed > 6 ? '…' : '')
       : 'scheduled month passed, not performed', P.delayed > 0, true, P.delayed ? 'bdelayed' : null),
     stat('Open', String(S.open), 'in progress, performed or scheduled'), stat('Closure rate', S.rate+'%', S.closed+' of '+S.total, S.total > 0 && S.rate < 50),
-    stat('CAR follow-up', inCar === null ? '—' : String(inCar), inCar === null ? 'loading…' : 'stage InProgress' + (carPso ? ' · ' + carPso + ' PendingSignOff' : '')),
     stat('Years', years.length ? (years.length <= 3 ? years.join(', ') : years[0]+'–'+years[years.length-1]) : '—', years.length+' year(s)', false, true)]);
 }
 /* the audits behind the Delayed tile — the same M.auditProgress list, oldest scheduled month first */
@@ -5212,7 +5208,7 @@ function scrGuideNew(){
     + '<li>A tile or table that shows a dash or "Loading…" is waiting for its data; it never shows 0 for data that has not arrived.</li>'
     + '<li>If a number looks wrong, check the record in Coruson first: the dashboard shows what Coruson holds.</li></ul>')
   + sec('led','LED wall mode',
-    '<p>Open the dashboard with <b>?kiosk=1</b> at the end of the address (or <b>?kiosk=60</b> for 60 seconds per page). The screen rotates Overview → Report status EIS → Report status F-088 → SPI → Safety (MSAG), without the navigation. Press Esc to stop. Use one browser window; the data refreshes itself every 12 hours without reloading the page.</p>')
+    '<p>Open the dashboard with <b>?kiosk=1</b> at the end of the address (or <b>?kiosk=60</b> for 60 seconds per page). The screen rotates Overview → Report status EIS → Report status F-088 → SPI → Safety (MSAG) → Audit Plan timeline, without the navigation. Press Esc to stop. Use one browser window; the data refreshes itself every 12 hours without reloading the page.</p>')
   + sec('faq','Questions',
     '<p><b>The first opening is slow.</b> The first load of the day on a computer fetches everything from Galileo. Later openings use the saved copy.</p>'
     + '<p><b>I cannot see Admin screens.</b> They are for administrators. Ask an administrator to change your role.</p>'

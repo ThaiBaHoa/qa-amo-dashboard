@@ -5,6 +5,12 @@
 
 ---
 
+## ✅ r188 — Audit Plan 6 ô một hàng + LED thêm Audit Plan › Timeline (02/10/2026, EricThai)
+
+- Bỏ ô CAR follow-up; 6 ô còn lại 1 hàng (khung ≥ 948 px), 3 + 3 khi hẹp. `KIOSK_STEPS` bước 6 = Audit Plan · Timeline.
+- Nguồn: vault `rebuild UIUX/beta-src` (screens2.js, beta-template.html, guide.js, manual.js) → build → make-index.
+- Kiểm beta-local dữ liệu thật 1536 / 1920 / 1024 + `?kiosk=5` đủ 6 bước, console sạch. Chưa xem trên màn LED thật.
+
 ## ⏳ r187 — bố cục màn LED / Overview (02/10/2026, EricThai) — ĐÃ PUSH `cb0c9e2`, live r187
 
 - Eric gửi ảnh màn trình chiếu: bố cục không đều. Sửa trong `beta-src/beta-template.html`: biểu đồ ghim đáy ô KPI; 12 ô Overview
