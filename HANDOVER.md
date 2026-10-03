@@ -5,6 +5,13 @@
 
 ---
 
+## ✅ r191 — Summary + RFI, lọc form Work Queue, sort OSR/MOSR (03/10/2026, THAIBAHOA-HOME) — ĐÃ PUSH `6459af3`, live (curl APP_REV r191)
+
+- Cột Summary (Coruson summary, lùi về finding mờ) + RFI ở Work Queue Open/Overdue, Reports All forms/MCAR/AMO-ECAR — `loadRfiSum` (screens2.js),
+  `M.rfiSummary`, `API.orgUnitIds`; tải theo năm đang lọc (RFI ~0,9 MB, summary 55 KB nhờ `length(summary) lt 30000`). TECHNICAL_REFERENCE §9.
+- Work Queue Open/Overdue: ô Form (`BS.wqForm_<tab>`). `plainTable` + `opt.sortVals` (action `bsort`), bật cho OSR/MOSR.
+- Kiểm local dữ liệu thật. Chưa xem live đã đăng nhập. Summary hầu như trống trên Coruson → nên đưa vào phụ lục SOP-009 App.3.
+
 ## ✅ r190 — lý do gia hạn MCAR (03/10/2026, THAIBAHOA-HOME) — ĐÃ PUSH `7cb1091`, live (curl APP_REV r190)
 
 - `CF_FIELDS` + `Reason for extension`, `Extension denied reason` → `ext_reason` / `ext_denied`; `cfRaw` lưu chữ ký `fields`, khác thì nạp đầy.
