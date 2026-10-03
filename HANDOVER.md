@@ -5,6 +5,19 @@
 
 ---
 
+## ✅ r189 — khôi phục 3 tính năng classic bị sót ở UI r167 (03/10/2026, THAIBAHOA-HOME) — ĐÃ PUSH `f9a5425`, live (curl APP_REV r189)
+
+- Việc 3 họp anh Ngọc 24/09: rà r188 so với họp 07/08 → vault `02-Bao-Cao/RS-2026-10-03-Ra-soat-dashboard-r188-vs-yeu-cau-hop-07-08.md`.
+- Khôi phục: cột **Response due** (MCAR, luật r101 `mcar_chk`, nhãn `Target ≠ rule`) + 2 dòng trong popup · ô **Repetitive rate** (KPI charts,
+  `M.summary().repetitiveRate` + 1 dòng `M.consistency()`; MCAR không có trường Repetitive → 0%) · **Instructions · Response** RFI/Task PAVOI.
+- Nguồn vault `beta-src`: loader.js, metrics.js, screens.js, screens2.js, beta-template.html (đã build lại từ nguồn = r188 trước khi sửa).
+- Kiểm local dữ liệu thật: MCAR-0385, PAVOI-446. Chưa xem live đã đăng nhập / màn LED.
+- Eric chốt: KPI QC · ATA comparison = KPI 3; Extension chỉ MCAR.
+- **HOLD:** danh sách auditor tự quản + màn Auditor performance (vault `Auditor_Performance_Spec.md`) — chờ ICT phân công; không Databricks;
+  hạ tầng công ty sẽ dùng SSO Microsoft ⇒ chưa tạo bảng Supabase. `QA_AMO_AUDITORS` vẫn viết cứng.
+- Còn từ rà soát 07/08: Report Summary, ngày trả lời RFI, cờ `has_been_rescheduled` + `reschedule_reason` cho Audit Plan, xuất BC quý Audit Plan;
+  Overview: SPI chưa đạt + level, KPI chưa đạt; RFI PAVOI đã đóng chưa xem được (bản cũ xem được).
+
 ## ✅ r188 — Audit Plan 6 ô một hàng + LED thêm Audit Plan › Timeline (02/10/2026, EricThai)
 
 - Bỏ ô CAR follow-up; 6 ô còn lại 1 hàng (khung ≥ 948 px), 3 + 3 khi hẹp. `KIOSK_STEPS` bước 6 = Audit Plan · Timeline.
