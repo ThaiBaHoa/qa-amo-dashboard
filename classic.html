@@ -2522,7 +2522,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.10.03-r191';
+const APP_REV = '2026.10.03-r192';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -9021,15 +9021,16 @@ async function exportOverdueReport(){
     };
 
     const {week,year}=isoWeekNum(new Date());
-    const headers=['Audit No.','MCAR / PAVOI / SR No.','Date Raised','Finding Summary','Department','Deadline','Extension 1','Extension 2','Overdue (days)','Status'];
-    const NC=headers.length, AGE_C=8;
+    // [r192] + Owner (owner_name = owner của report trên Coruson, nguyên văn: người hoặc nhóm) — Eric 03/10: cần để gửi nhắc
+    const headers=['Audit No.','MCAR / PAVOI / SR No.','Date Raised','Finding Summary','Department','Owner','Deadline','Extension 1','Extension 2','Overdue (days)','Status'];
+    const NC=headers.length, AGE_C=9;
     // Audit No.: MCAR/ECAR carry it in audit_number (MNT-####); PAVOI leaves that
     // null and stores the ref in report_ref (e.g. MQA-EIS-001-2025). audit_ref is
     // unreliable (can differ from audit_number) so it sits between the two as a fallback.
     // Finding Summary: MCAR/ECAR use finding_desc; PAVOI leaves it null and puts the
     // text in rfv (Request For Verification).
     const rowOf=r=>[r.audit_number||r.audit_ref||r.report_ref||'',r.report_number||'',fdShort(r.raised_date),
-      r.finding_desc||r.rfv||'',deptOf(r),fdShort(r.Target_date),fdShort(r.ext1_date),fdShort(r.ext2_date),
+      r.finding_desc||r.rfv||'',deptOf(r),r.owner_name||'',fdShort(r.Target_date),fdShort(r.ext1_date),fdShort(r.ext2_date),
       r.report_ageing??'',r.semantic_status||''];
     const aoa=[],merges=[],secs=[];
     const pushSection=(title,rows)=>{
@@ -9047,7 +9048,7 @@ async function exportOverdueReport(){
 
     const ws=XLSX.utils.aoa_to_sheet(aoa);
     ws['!merges']=merges;
-    ws['!cols']=[{wch:16},{wch:16},{wch:12},{wch:60},{wch:22},{wch:12},{wch:12},{wch:12},{wch:11},{wch:16}];
+    ws['!cols']=[{wch:16},{wch:16},{wch:12},{wch:60},{wch:22},{wch:22},{wch:12},{wch:12},{wch:12},{wch:11},{wch:16}];
     const B={style:'thin',color:{rgb:'808080'}}, border={top:B,bottom:B,left:B,right:B};
     const bannerStyle={fill:{fgColor:{rgb:'8EAADB'}},font:{bold:true,sz:12,color:{rgb:'1F3864'}},alignment:{vertical:'center'},border};
     const headStyle  ={fill:{fgColor:{rgb:'BDD7EE'}},font:{bold:true,sz:10,color:{rgb:'1F3864'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border};
@@ -9117,19 +9118,19 @@ async function exportOverduePDF(){
     let bodyFont='helvetica';
     if(window.VJ_FONT){ try{ doc.addFileToVFS('Roboto-Regular.ttf',VJ_FONT); doc.addFont('Roboto-Regular.ttf','Roboto','normal'); bodyFont='Roboto'; }catch(e){ console.warn('VJ font load failed:',e); } }
 
-    const colHead=['Audit No.','MCAR / PAVOI / SR No.','Date Raised','Finding Summary','Department','Deadline','Extension 1','Extension 2','Overdue (days)','Status'];
-    const bannerRow=t=>[{content:t,colSpan:10,styles:{halign:'left',fillColor:[142,170,219],textColor:[31,56,100],fontStyle:'bold',fontSize:11,font:'helvetica'}}];
+    const colHead=['Audit No.','MCAR / PAVOI / SR No.','Date Raised','Finding Summary','Department','Owner','Deadline','Extension 1','Extension 2','Overdue (days)','Status'];   // [r192] + Owner
+    const bannerRow=t=>[{content:t,colSpan:11,styles:{halign:'left',fillColor:[142,170,219],textColor:[31,56,100],fontStyle:'bold',fontSize:11,font:'helvetica'}}];
     const bodyOf=list=>list.length?list.map(r=>[
       r.audit_number||r.audit_ref||r.report_ref||'', r.report_number||'', fdShort(r.raised_date),
-      r.finding_desc||r.rfv||'', deptOf(r), fdShort(r.Target_date), fdShort(r.ext1_date), fdShort(r.ext2_date),
+      r.finding_desc||r.rfv||'', deptOf(r), r.owner_name||'', fdShort(r.Target_date), fdShort(r.ext1_date), fdShort(r.ext2_date),
       (r.report_ageing??'')+'', r.semantic_status||''
-    ]):[[{content:'No findings.',colSpan:10,styles:{halign:'center',textColor:[120,120,120]}}]];
+    ]):[[{content:'No findings.',colSpan:11,styles:{halign:'center',textColor:[120,120,120]}}]];
     const topH=26, botH=34, C=(w,h)=>({cellWidth:w,halign:h||'left'});
     const opts=(title,body,startY)=>({
       startY, head:[bannerRow(title), colHead], body,
       styles:{font:bodyFont,fontStyle:'normal',fontSize:8,cellPadding:1.4,overflow:'linebreak',valign:'top',lineColor:[130,130,130],lineWidth:0.1,textColor:[0,0,0]},
       headStyles:{font:'helvetica',fontStyle:'bold',fillColor:[189,215,238],textColor:[31,56,100],halign:'center',fontSize:8,lineColor:[130,130,130],lineWidth:0.1},
-      columnStyles:{0:C(26),1:C(28),2:C(16,'center'),3:C('auto'),4:C(28),5:C(16,'center'),6:C(16,'center'),7:C(16,'center'),8:C(15,'center'),9:C(18,'center')},
+      columnStyles:{0:C(24),1:C(26),2:C(16,'center'),3:C('auto'),4:C(26),5:C(26),6:C(16,'center'),7:C(16,'center'),8:C(16,'center'),9:C(15,'center'),10:C(18,'center')},
       margin:{top:topH,bottom:botH,left:8,right:8}, rowPageBreak:'avoid'
     });
 
