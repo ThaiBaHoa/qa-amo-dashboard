@@ -5,6 +5,12 @@
 
 ---
 
+## ✅ r193 — Overdue report: Department thật + Pending with + cờ Verified Satisfactory (03/10/2026, THAIBAHOA-HOME)
+
+- Từ r113-i2 cột Department của PAVOI chứa owner RFI đang mở → nay Department = phòng ban, cột Pending with = RFI/Task mở + hạn (mọi form, `ovrFetchPending`).
+- Status + "Verified Satisfactory, not closed"; dashboard `M.verifiedOpen` → note ở panel PAVOI + popup. W40: PAVOI-384/437/450/451.
+- Kiểm local dữ liệu thật (PDF chặn save). Excel cùng logic, chưa xuất thử (UI mới chỉ có nút Overdue PDF).
+
 ## ✅ r192 — Overdue report thêm cột Owner (03/10/2026, THAIBAHOA-HOME) — ĐÃ PUSH `bc71f18`, live (curl APP_REV r192)
 
 - `exportOverdueReport` / `exportOverduePDF`: cột Owner = `owner_name` nguyên văn (người hoặc nhóm), sau Department. Kiểm local W40.

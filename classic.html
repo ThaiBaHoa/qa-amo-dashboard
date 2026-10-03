@@ -2522,7 +2522,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.10.03-r192';
+const APP_REV = '2026.10.03-r193';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -8971,28 +8971,28 @@ function fdShort(d){
   const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return String(dt.getUTCDate()).padStart(2,'0')+'-'+M[dt.getUTCMonth()]+'-'+String(dt.getUTCFullYear()).slice(-2);
 }
-// Người phụ trách trả lời của PAVOI KHÔNG nằm trong allData — nó là task_owner của
-// các RFI (dwreporting_report_task, task_title='Request For Information'). Fetch theo
-// batch report_id cho đúng các PAVOI trong báo cáo; tái dùng pavoiRfiMap nếu đã có.
-async function ovrFetchPavoiOwners(reportIds){
+// [r193] "Pending with" = người đang giữ RFI / Task còn MỞ của report (dwreporting_report_task), kèm hạn của
+// item đó — cho MỌI form trong báo cáo (trước r193 chỉ PAVOI, và ghi vào cột Department → đọc nhầm là phòng ban,
+// vd PAVOI-450: Department thật AMO Tech Training, RFI theo dõi do Nguy Hoang Thinh giữ, hạn 19/11). Fetch theo
+// batch report_id; tái dùng pavoiRfiMap nếu đã có. Mở = chưa Completed & chưa có completed_date; bỏ Deleted/placeholder.
+async function ovrFetchPending(reportIds){
   const map={}, todo=[];
-  // "Chưa trả lời" = owner của RFI đang MỞ (chưa Completed & chưa có completed_date; bỏ Deleted).
-  // Bỏ qua các RFI đã hoàn thành (kể cả của QC Inspector) để cột chỉ còn người đang nợ trả lời.
   const distinct=list=>[...new Set((list||[])
-    .filter(t=>isPavoiItem(t)&&t.task_status!=='Completed'&&!t.task_completed_date)   // RFI + Task đang mở, bỏ placeholder/Deleted
-    .map(t=>t.task_owner).filter(Boolean))];
+    .filter(t=>isPavoiItem(t)&&t.task_status!=='Completed'&&t.task_status!=='Cancelled'&&!t.task_completed_date)
+    .sort((a,b)=>String(a.task_target_date||'9').localeCompare(String(b.task_target_date||'9')))
+    .map(t=>t.task_owner?(t.task_owner+' ('+(isPavoiRfi(t)?'RFI':'task')+(t.task_target_date?' due '+fdShort(t.task_target_date):'')+')'):'').filter(Boolean))];
   reportIds.forEach(id=>{ if(pavoiRfiMap[id]) map[id]=distinct(pavoiRfiMap[id]); else todo.push(id); });
   const CHUNK=15;
   for(let i=0;i<todo.length;i+=CHUNK){
     const ids=todo.slice(i,i+CHUNK);
     const orClause=ids.map(id=>'report_id eq '+id).join(' or ');            // GUID không bọc nháy
-    const url=G_URL+'dwreporting_report_task?$select=report_id,task_owner,task_status,task_completed_date,task_title&$filter='+
+    const url=G_URL+'dwreporting_report_task?$select=report_id,task_owner,task_status,task_completed_date,task_target_date,task_title&$filter='+
       encodeURIComponent('('+orClause+')');   // mọi task (RFI + Task); distinct() lọc bằng isPavoiItem
     try{
       const raw=await fetchAll(url,true);
       const byId={}; raw.forEach(t=>{ (byId[t.report_id] ||= []).push(t); });
       ids.forEach(id=>{ map[id]=distinct(byId[id]); });
-    }catch(e){ console.warn('[OverdueReport] RFI owner fetch failed:',e.message); }
+    }catch(e){ console.warn('[OverdueReport] pending RFI/task fetch failed:',e.message); }
   }
   return map;
 }
@@ -9008,30 +9008,26 @@ async function exportOverdueReport(){
     const soon=allData.filter(r=>r.semantic_status==='Open'&&r.report_ageing!=null&&r.report_ageing>=0&&r.report_ageing<=7&&inScope(r))
       .sort((a,b)=>(a.report_ageing??0)-(b.report_ageing??0));               // soonest due first
 
-    // PAVOI: lấy người phụ trách (RFI task_owner) cho các report trong phạm vi
-    const pavIds=[...new Set([...overdue,...soon].filter(r=>r.report_title==='PAVOI'&&r.report_id).map(r=>r.report_id))];
-    const pavOwners=pavIds.length?await ovrFetchPavoiOwners(pavIds):{};
-
-    // Department: MCAR/ECAR = 'Department - Issued to (person)'; PAVOI = người CHƯA trả lời
-    // = owner của RFI đang mở (pavOwners đã lọc open-only). Nếu PAVOI đã trả lời hết RFI
-    // (nhưng report vẫn Overdue) → không có ai đang nợ → để trống.
-    const deptOf=r=>{
-      if(r.report_title==='PAVOI'){ const o=pavOwners[r.report_id]; return (o&&o.length)?o.join(', '):''; }   // trống nếu không còn RFI open (đã trả lời hết)
-      const p=r.issued_person; return (r.dept||'')+(p?((r.dept?' - ':'')+p):'');
-    };
+    // [r193] Pending with = RFI/Task đang mở của MỌI report trong báo cáo (ovrFetchPending)
+    const pend=await ovrFetchPending([...new Set([...overdue,...soon].map(r=>r.report_id).filter(Boolean))]);
+    const pendOf=r=>(pend[r.report_id]||[]).join('; ');
+    // Department: phòng ban trên Coruson; MCAR/ECAR kèm 'Issued to (person)'. PAVOI: r.dept = Department của PAVOI.
+    const deptOf=r=>{ const p=r.report_title==='PAVOI'?null:r.issued_person; return (r.dept||'')+(p?((r.dept?' - ':'')+p):''); };
+    // [r193] đã xác minh Satisfactory mà report chưa đóng (quên đóng / chưa dời hạn trên Coruson)
+    const statusOf=r=>(r.semantic_status||'')+(String(r.verif_result||'').trim().toLowerCase()==='satisfactory'?' — Verified Satisfactory, not closed':'');
 
     const {week,year}=isoWeekNum(new Date());
     // [r192] + Owner (owner_name = owner của report trên Coruson, nguyên văn: người hoặc nhóm) — Eric 03/10: cần để gửi nhắc
-    const headers=['Audit No.','MCAR / PAVOI / SR No.','Date Raised','Finding Summary','Department','Owner','Deadline','Extension 1','Extension 2','Overdue (days)','Status'];
-    const NC=headers.length, AGE_C=9;
+    const headers=['Audit No.','MCAR / PAVOI / SR No.','Date Raised','Finding Summary','Department','Owner','Pending with','Deadline','Extension 1','Extension 2','Overdue (days)','Status'];
+    const NC=headers.length, AGE_C=10;
     // Audit No.: MCAR/ECAR carry it in audit_number (MNT-####); PAVOI leaves that
     // null and stores the ref in report_ref (e.g. MQA-EIS-001-2025). audit_ref is
     // unreliable (can differ from audit_number) so it sits between the two as a fallback.
     // Finding Summary: MCAR/ECAR use finding_desc; PAVOI leaves it null and puts the
     // text in rfv (Request For Verification).
     const rowOf=r=>[r.audit_number||r.audit_ref||r.report_ref||'',r.report_number||'',fdShort(r.raised_date),
-      r.finding_desc||r.rfv||'',deptOf(r),r.owner_name||'',fdShort(r.Target_date),fdShort(r.ext1_date),fdShort(r.ext2_date),
-      r.report_ageing??'',r.semantic_status||''];
+      r.finding_desc||r.rfv||'',deptOf(r),r.owner_name||'',pendOf(r),fdShort(r.Target_date),fdShort(r.ext1_date),fdShort(r.ext2_date),
+      r.report_ageing??'',statusOf(r)];
     const aoa=[],merges=[],secs=[];
     const pushSection=(title,rows)=>{
       const banner=aoa.length; aoa.push([title,...Array(NC-1).fill('')]);
@@ -9048,7 +9044,7 @@ async function exportOverdueReport(){
 
     const ws=XLSX.utils.aoa_to_sheet(aoa);
     ws['!merges']=merges;
-    ws['!cols']=[{wch:16},{wch:16},{wch:12},{wch:60},{wch:22},{wch:22},{wch:12},{wch:12},{wch:12},{wch:11},{wch:16}];
+    ws['!cols']=[{wch:16},{wch:16},{wch:12},{wch:55},{wch:22},{wch:22},{wch:28},{wch:12},{wch:12},{wch:12},{wch:11},{wch:20}];
     const B={style:'thin',color:{rgb:'808080'}}, border={top:B,bottom:B,left:B,right:B};
     const bannerStyle={fill:{fgColor:{rgb:'8EAADB'}},font:{bold:true,sz:12,color:{rgb:'1F3864'}},alignment:{vertical:'center'},border};
     const headStyle  ={fill:{fgColor:{rgb:'BDD7EE'}},font:{bold:true,sz:10,color:{rgb:'1F3864'}},alignment:{horizontal:'center',vertical:'center',wrapText:true},border};
@@ -9107,9 +9103,11 @@ async function exportOverduePDF(){
     const inScope=r=>!forms.length||forms.includes(r.report_title);
     const overdue=allData.filter(r=>r.semantic_status==='Overdue'&&inScope(r)).sort((a,b)=>(a.report_ageing??0)-(b.report_ageing??0));
     const soon=allData.filter(r=>r.semantic_status==='Open'&&r.report_ageing!=null&&r.report_ageing>=0&&r.report_ageing<=7&&inScope(r)).sort((a,b)=>(a.report_ageing??0)-(b.report_ageing??0));
-    const pavIds=[...new Set([...overdue,...soon].filter(r=>r.report_title==='PAVOI'&&r.report_id).map(r=>r.report_id))];
-    const pavOwners=pavIds.length?await ovrFetchPavoiOwners(pavIds):{};
-    const deptOf=r=>{ if(r.report_title==='PAVOI'){const o=pavOwners[r.report_id];return (o&&o.length)?o.join(', '):'';} const p=r.issued_person; return (r.dept||'')+(p?((r.dept?' - ':'')+p):''); };
+    // [r193] như exportOverdueReport: Department = phòng ban thật, Pending with = RFI/Task đang mở, cờ Verified Satisfactory
+    const pend=await ovrFetchPending([...new Set([...overdue,...soon].map(r=>r.report_id).filter(Boolean))]);
+    const pendOf=r=>(pend[r.report_id]||[]).join('\n');
+    const deptOf=r=>{ const p=r.report_title==='PAVOI'?null:r.issued_person; return (r.dept||'')+(p?((r.dept?' - ':'')+p):''); };
+    const statusOf=r=>(r.semantic_status||'')+(String(r.verif_result||'').trim().toLowerCase()==='satisfactory'?'\nVerified Satisfactory, not closed':'');
     const {week,year}=isoWeekNum(new Date());
 
     const {jsPDF}=window.jspdf;
@@ -9118,19 +9116,19 @@ async function exportOverduePDF(){
     let bodyFont='helvetica';
     if(window.VJ_FONT){ try{ doc.addFileToVFS('Roboto-Regular.ttf',VJ_FONT); doc.addFont('Roboto-Regular.ttf','Roboto','normal'); bodyFont='Roboto'; }catch(e){ console.warn('VJ font load failed:',e); } }
 
-    const colHead=['Audit No.','MCAR / PAVOI / SR No.','Date Raised','Finding Summary','Department','Owner','Deadline','Extension 1','Extension 2','Overdue (days)','Status'];   // [r192] + Owner
-    const bannerRow=t=>[{content:t,colSpan:11,styles:{halign:'left',fillColor:[142,170,219],textColor:[31,56,100],fontStyle:'bold',fontSize:11,font:'helvetica'}}];
+    const colHead=['Audit No.','MCAR / PAVOI / SR No.','Date Raised','Finding Summary','Department','Owner','Pending with','Deadline','Extension 1','Extension 2','Overdue (days)','Status'];   // [r192] + Owner · [r193] + Pending with
+    const bannerRow=t=>[{content:t,colSpan:12,styles:{halign:'left',fillColor:[142,170,219],textColor:[31,56,100],fontStyle:'bold',fontSize:11,font:'helvetica'}}];
     const bodyOf=list=>list.length?list.map(r=>[
       r.audit_number||r.audit_ref||r.report_ref||'', r.report_number||'', fdShort(r.raised_date),
-      r.finding_desc||r.rfv||'', deptOf(r), r.owner_name||'', fdShort(r.Target_date), fdShort(r.ext1_date), fdShort(r.ext2_date),
-      (r.report_ageing??'')+'', r.semantic_status||''
-    ]):[[{content:'No findings.',colSpan:11,styles:{halign:'center',textColor:[120,120,120]}}]];
+      r.finding_desc||r.rfv||'', deptOf(r), r.owner_name||'', pendOf(r), fdShort(r.Target_date), fdShort(r.ext1_date), fdShort(r.ext2_date),
+      (r.report_ageing??'')+'', statusOf(r)
+    ]):[[{content:'No findings.',colSpan:12,styles:{halign:'center',textColor:[120,120,120]}}]];
     const topH=26, botH=34, C=(w,h)=>({cellWidth:w,halign:h||'left'});
     const opts=(title,body,startY)=>({
       startY, head:[bannerRow(title), colHead], body,
       styles:{font:bodyFont,fontStyle:'normal',fontSize:8,cellPadding:1.4,overflow:'linebreak',valign:'top',lineColor:[130,130,130],lineWidth:0.1,textColor:[0,0,0]},
       headStyles:{font:'helvetica',fontStyle:'bold',fillColor:[189,215,238],textColor:[31,56,100],halign:'center',fontSize:8,lineColor:[130,130,130],lineWidth:0.1},
-      columnStyles:{0:C(24),1:C(26),2:C(16,'center'),3:C('auto'),4:C(26),5:C(26),6:C(16,'center'),7:C(16,'center'),8:C(16,'center'),9:C(15,'center'),10:C(18,'center')},
+      columnStyles:{0:C(20),1:C(24),2:C(15,'center'),3:C('auto'),4:C(24),5:C(24),6:C(28),7:C(15,'center'),8:C(15,'center'),9:C(15,'center'),10:C(13,'center'),11:C(22,'center')},
       margin:{top:topH,bottom:botH,left:8,right:8}, rowPageBreak:'avoid'
     });
 

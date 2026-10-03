@@ -2251,6 +2251,9 @@ const M = {
     const last = done.map(t => String(t.task_completed_date).slice(0, 10)).sort().pop() || null;
     return { total: list.length, answered: done.length, open: open.length, overdue: overdue.length, lastAnswered: last };
   },
+  /* r193: verification result 'Satisfactory' recorded but the report is not closed on Coruson — overdue only
+     because nobody closed it (or moved its target). Value as Galileo returns it, compared case-insensitively. */
+  verifiedOpen: (r, verif) => M.isOpen(r) && String(verif || '').trim().toLowerCase() === 'satisfactory',
   caSummary(cas){
     const n = p => cas.filter(p).length;
     const onTime = n(M.isOnTime), late = n(M.isLate);
@@ -3235,6 +3238,9 @@ function renderPavoi(){
       + '<div class="meta">'+meta+'</div>'
       + '<div class="note '+flag.cls+'"><span class="note-hd">'+(flag.cls?ic('alert',16):ic('check',16))+esc(flag.t)+'</span>'
         + '<span class="t-small">'+esc(flag.b)+'</span></div>'
+      /* r193: verified Satisfactory but still open on Coruson (Eric 03/10, PAVOI-450) */
+      + (REAL && M.verifiedOpen(r, r.verifResult) ? '<div class="note warn"><span class="note-hd">'+ic('alert',16)+'Verified Satisfactory — not closed</span>'
+        + '<span class="t-small">The verification result is Satisfactory but the report is still '+esc(r.status)+' on Coruson. Close it there, or move its target date if follow-up continues.</span></div>' : '')
       + '<div style="display:grid;gap:8px"><span class="t-micro">'+(REAL ? 'Request for verification' : 'Finding')+'</span><p class="t-sub">'+esc(r.finding)+'</p></div>'
       + '<div style="display:grid;gap:12px"><span class="t-micro">Verification history</span><div class="vt">'+rounds+'</div></div>'
       + (REAL ? pavoiTasksHTML(r) : '')
@@ -4802,6 +4808,8 @@ function showReport(id){
       /* r190: MCAR extension reason / denial reason as entered on the form (Extension applies to MCAR only) */
       + block('Reason for extension', r.ext_reason) + block('Extension denied reason', r.ext_denied)
       + block('Verification result', r.verif_result)
+      /* r193: verified Satisfactory but still open on Coruson */
+      + (M.verifiedOpen(rep, r.verif_result) ? block('Verified Satisfactory — not closed', 'The verification result is Satisfactory but the report is still '+rep.status+' on Coruson. Close it there, or move its target date if follow-up continues.', true) : '')
       /* r169: corrective actions of this report (F-088, investigation reports, AMO ECAR…); load once, then re-open */
       + (A.eis().loaded ? caList(A.eis().ca[id] || [], caForms().has(r.report_title))
          : (MODAL_KEY = 'rpt:'+id, Promise.resolve(A.loadEis()).then(() => { if(MODAL_KEY === 'rpt:'+id) showReport(id); }),
@@ -5078,7 +5086,7 @@ function scrExportsFull(){
         + '<span class="od-row" style="--od-gap:8px"><button class="btn primary" type="button" data-act="bexp" data-k="pdf"'+busy+'>Export PDF</button>'
         + '<button class="btn" type="button" data-act="bexp" data-k="xlsx"'+busy+'>Export Excel</button></span>')
     + card('Weekly overdue report', 'overdue now + open and due within 7 days',
-        '<p class="t-sub">Lists every overdue report and every open report due within 7 days, with department, owner, deadline and extensions. It ignores the year and month filters; only the form applies.</p>'
+        '<p class="t-sub">Lists every overdue report and every open report due within 7 days, with department, owner, who it is pending with (open RFI / task), deadline and extensions, and flags reports verified Satisfactory but not closed. It ignores the year and month filters; only the form applies.</p>'
         + '<span class="od-row" style="--od-gap:8px"><button class="btn primary" type="button" data-act="bexp" data-k="ovx"'+busy+'>Overdue workbook (.xlsx)</button>'
         + '<button class="btn" type="button" data-act="bexp" data-k="ovp"'+busy+'>Overdue PDF</button></span>')
     + '</section>';
