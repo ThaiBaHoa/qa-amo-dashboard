@@ -1527,6 +1527,7 @@ allData.forEach(r => {
   o.dept = orDash(form === 'pavoi' ? r.owner_name : r.dept);
   o.repetitive = !!r.is_rep;
   o.ext = r.mcar_chk ? r.mcar_chk.n : 0;   /* approved MCAR extensions (classic buildMcarDeadlineChk) */
+  o.mcarRule = r.mcar_chk || null;          /* r189: MCAR deadline rule r101 — response due, target by rule (classic mcarWarnCell) */
   if(form === 'pavoi'){
     /* PAVOI carry no finding text, audit or level: their content is Request For Verification (rfv),
        the source report (report_ref) and the audited department (dept) — the PAVOI Detail columns of
@@ -2226,6 +2227,8 @@ const M = {
       onTime, late, ungraded: n(M.isUngraded), graded: onTime + late, onTimeRate: M.pct(onTime, onTime + late),
       avgCloseDays: closedDated.length ? Math.round(closedDated.reduce((t, r) => t + dayDiff(r.closed, r.raised), 0) / closedDated.length) : 0,
       closedDated: closedDated.length, cat, repetitive: n(r => r.repetitive),
+      /* r189: classic mc-rep — repeated findings ÷ all reports in scope (target ≤ 10%) */
+      repetitiveRate: M.pct(n(r => r.repetitive), rows.length),
       audits: new Set(rows.map(r => r.auditId).filter(Boolean)).size
     };
   },
@@ -2371,6 +2374,7 @@ M.consistency = function(){
   say('lately closed vs classic', s.late, cls('Lately Closed'));
   say('in-target open (KPI charts) vs classic kk-open', s.inTarget, cls('Open'));
   say('CAT III vs classic', s.cat.III, raw.filter(r => r.overdue_cat === 'CAT III').length);
+  say('Repetitive vs classic is_rep', s.repetitive, raw.filter(r => r.is_rep).length);
   say('Work Queue › Open lane vs open', LANES['work/open'].rows(qa).length, s.open);
   say('Work Queue › Overdue lane vs overdue', LANES['work/overdue'].rows(qa).length, s.overdue);
   if(typeof overviewStats === 'function'){ const o = overviewStats(qa); say('Overview on-time vs summary', o.s.onTimeRate, s.onTimeRate); say('Overview open vs summary', o.s.open, s.open); }
@@ -3013,6 +3017,12 @@ const COL = {
   raised:{ l:'Raised', v:r=>r.raised ? r.raised.getTime() : 0, c:r=>'<span class="num dim od-nowrap">'+fmtShort(r.raised)+'</span>' },
   target:{ l:'Target', v:r=>r.target ? r.target.getTime() : 0, c:r=>'<span class="num od-nowrap">'+fmtShort(r.target)+'</span>' },
   dtd:{ l:'Days to due', ar:true, v:r=>r.closed?99999:r.dtd, c:dueCell },
+  /* r189: MCAR deadline rule r101 restored from classic mcarWarnCell — response due = raised + 14 d,
+     target = raised + 45 d + 30 d per approved extension; flags a stored Target date that differs */
+  rule:{ l:'Response due', v:r=>r.mcarRule ? r.mcarRule.exp_resp : '', c:r=>{ const c = r.mcarRule; if(!c) return '<span class="dim">—</span>';
+      const tip = 'Response due (raised + 14 d): '+fdx(c.exp_resp)+' · Target by rule (raised + 45 d'+(c.n ? ' + '+(30*c.n)+' d, '+c.n+' extension'+(c.n > 1 ? 's' : '') : '')+'): '+fdx(c.exp_target);
+      return '<span class="od-row" style="--od-gap:6px" title="'+esc(tip)+'"><span class="num od-nowrap">'+fdx(c.exp_resp)+'</span>'
+        + (c.target_warn ? '<span class="cat c3">Target ≠ rule '+fdx(c.exp_target)+'</span>' : '') + '</span>'; } },
   level:{ l:'Finding level', v:r=>r.level, c:r=>'<span class="tag">'+esc(r.level)+'</span>' },
   repetitive:{ l:'Repetitive', v:r=>r.repetitive?1:0, c:r=> r.repetitive ? '<span class="cat c1">Repeat</span>' : '<span class="dim">—</span>' },
   finding:{ l:'Finding', v:r=>r.finding, c:r=>'<span class="t-small od-clamp-2">'+esc(r.finding)+'</span>' },
@@ -3035,7 +3045,7 @@ const LANES = {
   'findings/cmrcar':  { cols:['number','aircraft','status','dept','raised','target','dtd'], rows:rs=>rs.filter(r=>r.form==='cmrcar') },
   'findings/ecar':    { cols:['number','aircraft','status','finding','raised','dtd'], rows:rs=>rs.filter(r=>r.form==='ecar') },
   'findings/amoecar': { cols:['number','status','raised','target','dtd','cat','audit'], rows:rs=>rs.filter(r=>r.form==='amoecar') },
-  'findings/mcar':    { cols:['number','status','raised','owner','target','dtd','cat','repetitive'], rows:rs=>rs.filter(r=>r.form==='mcar') }
+  'findings/mcar':    { cols:['number','status','raised','owner','rule','target','dtd','cat','repetitive'], rows:rs=>rs.filter(r=>r.form==='mcar') }
 };
 
 function sortRows(rows, key){
@@ -3879,6 +3889,10 @@ function scrKpi(){
     stat('Overdue', String(S.overdue), 'past target date', S.overdue > 0),
     stat('On-time closure rate', S.graded ? S.onTimeRate+'%' : '—', S.onTime+' of '+S.graded+' closed with a target'),
     stat('CAT III', String(S.cat.III), 'overdue > 60 days', S.cat.III > 0),
+    /* r189: restored from classic (mc-rep) — anh Ngọc 07/08: repeated findings feed risk-based planning.
+       Probe 03/10/2026: Coruson field 'Repetitive' exists on CAR / ECAR / AMO ECAR only — MCAR has none, so the
+       rate stays near 0 until the form carries it (07/08 mục I: field + definition still to agree). */
+    stat('Repetitive rate', S.total ? S.repetitiveRate+'%' : '—', S.repetitive+' of '+S.total+' marked Repetitive = Yes · target ≤ 10% · MCAR form has no Repetitive field', S.repetitiveRate > 10),
     stat('Audits', String(S.audits), 'distinct audits behind these reports')
   ]);
 
@@ -4724,7 +4738,12 @@ function showReport(id){
     body = head + kv([['Form', r.report_title], ['Org unit', r.org_unit_name], ['Department', r.dept], ['Owner', r.owner_name],
         ['Issued to', r.issued_person], ['Finding level', r.finding_level], ['Repetitive', r.is_rep ? 'Yes' : 'No'],
         ['Audit', [r.audit_number, r.audit_title].filter(Boolean).join(' · ') || null], ['Source report', r.report_ref],
-        ['Raised date', fdx(r.raised_date)], ['Target date', fdx(r.Target_date)], ['Extension 1', r.ext1_date ? fdx(r.ext1_date) : undefined],
+        ['Raised date', fdx(r.raised_date)], ['Target date', fdx(r.Target_date)],
+        /* r189: MCAR deadline rule r101 (classic mcarWarnCell) — anh Ngọc 07/08 mục D */
+        ['Response due (raised + 14 d)', r.mcar_chk ? fdx(r.mcar_chk.exp_resp) : undefined],
+        ['Target by rule (raised + 45 d + 30 d per extension)', r.mcar_chk ? fdx(r.mcar_chk.exp_target) + ' · ' + r.mcar_chk.n + ' extension' + (r.mcar_chk.n === 1 ? '' : 's')
+          + (r.mcar_chk.target_warn ? ' <span class="cat c3">differs from Target date</span>' : '') : undefined, true],
+        ['Extension 1', r.ext1_date ? fdx(r.ext1_date) : undefined],
         ['Extension 2', r.ext2_date ? fdx(r.ext2_date) : undefined], ['Date completed', fdx(r.completed_date)], ['Date closed', fdx(r.close_date)]])
       + block(rep.form === 'pavoi' ? 'Request for verification' : 'Finding', rep.form === 'pavoi' ? r.rfv : r.finding_desc)
       + block('Verification result', r.verif_result)
@@ -4900,7 +4919,13 @@ function pavoiTasksHTML(r){
   return '<div style="display:grid;gap:8px"><span class="t-micro">RFI / Task ('+items.length+')</span>'
     + (items.length ? plainTable('pv-'+r.id, [{l:'Item'},{l:'Owner'},{l:'Status'},{l:'Target'},{l:'Completed'}], items.map(t => {
         const late = !t.task_completed_date && t.task_target_date && dDayLocal(t.task_target_date) < today.getTime();
-        return ['<span class="t-small">'+esc(t.task_title)+'</span>', '<span class="t-small">'+esc(t.task_owner || '—')+'</span>',
+        /* r189: Instructions + Response of each RFI / task, restored from classic showRfiDetail (rfiModal) */
+        const instr = String(t.task_instructions || '').trim(), resp = String(t.task_response || '').trim();
+        return ['<span class="t-small">'+esc(t.task_title)+'</span>'+(t.task_related_section_name ? ' <span class="tag">'+esc(t.task_related_section_name)+'</span>' : '')
+          + '<details><summary class="t-small strong" style="cursor:pointer">Instructions · Response'+(resp ? '' : ' <span class="dim">(no response yet)</span>')+'</summary>'
+          + '<span class="t-micro">Instructions</span><p class="t-small" style="white-space:pre-wrap;margin:2px 0 8px">'+(instr ? esc(instr) : '<span class="dim">No instructions</span>')+'</p>'
+          + '<span class="t-micro">Response</span><p class="t-small" style="white-space:pre-wrap;margin:2px 0 0">'+(resp ? esc(resp) : '<span class="dim">No response yet</span>')+'</p></details>',
+          '<span class="t-small">'+esc(t.task_owner || '—')+'</span>',
           '<span class="tag">'+esc(t.task_status || '—')+'</span>'+(late ? ' <span class="cat c3">overdue</span>' : ''),
           '<span class="num">'+fdx(t.task_target_date)+'</span>', '<span class="num">'+fdx(t.task_completed_date)+'</span>'];
       }), 20) : '<p class="t-sub dim">No RFI or task raised.</p>') + '</div>';
