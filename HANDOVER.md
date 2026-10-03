@@ -5,6 +5,11 @@
 
 ---
 
+## ✅ r195 — cờ Verified Satisfactory của PAVOI chỉ theo Final Conclusion (03/10/2026, THAIBAHOA-HOME) — ĐÃ PUSH `818d5c3`, live (curl APP_REV r195)
+
+- `loadPavoiFinal()` (classic, gọi trong `loadKpi7Tasks`) → `r.verif_final` = section Final Conclusion level 0; cache phần 2 có `fin`.
+- r193 dùng `verif_result` (không phân biệt section) → sai (PAVOI-437). W40 cờ đúng: PAVOI-099, 363, 365, 384, 430, 450, 451, 465.
+
 ## ✅ r194 — Owner đúng owner, tách cột Issued to (03/10/2026, THAIBAHOA-HOME) — ĐÃ PUSH `d140f38`, live (curl APP_REV r194)
 
 - Gốc lỗi (từ r167): loader `o.owner = issued_person || owner_name`, PAVOI `o.dept = owner_name`. Nay mỗi cột = đúng 1 trường Galileo; trống → "—".
