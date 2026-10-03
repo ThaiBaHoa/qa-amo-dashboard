@@ -1622,6 +1622,7 @@ const SCREEN_API = {
   getDocsInBranch, reviewDueCategory, lastTwoLevels,
   /* My dashboard widgets fetch through the same proxy */
   fetchAll: u => fetchAll(u, true), G_URL,
+  orgUnitIds: () => ORG_UNIT_IDS.slice(),   /* r191: report summary query */
   /* PAVOI RFI / Task (loadPavoiRfi 5829: open PAVOI only, chunks of 15 GUIDs) */
   loadPavoiRfi: () => loadPavoiRfi(), pavoiRfi: () => ({ loaded: pavoiRfiLoaded, map: pavoiRfiMap, done: pavoiRfiDone }), pavoiRfiSummary, isPavoiItem,
   /* Data self-check (runSelfChecks 4226), shown to admins */
@@ -2240,6 +2241,16 @@ const M = {
      departments, tracked like findings (anh Ngọc 24/09/2026). Each CA carries the classic semCalc
      status (loadEisDetail): On-time Closed / Lately Closed by Date completed vs Target date,
      Open / Overdue while not completed, Closed (ungraded) when the report closed with no date. */
+  /* r191: Request For Information tasks of one report (dwreporting_report_task, task_title 'Request For
+     Information'; Deleted / Cancelled dropped at load). Answered = completed; open past its target = overdue. */
+  rfiSummary(list){
+    const today = M.dayOf(TODAY);
+    const done = list.filter(t => t.task_completed_date);
+    const open = list.filter(t => !t.task_completed_date);
+    const overdue = open.filter(t => t.task_target_date && M.dayOf(t.task_target_date) < today);
+    const last = done.map(t => String(t.task_completed_date).slice(0, 10)).sort().pop() || null;
+    return { total: list.length, answered: done.length, open: open.length, overdue: overdue.length, lastAnswered: last };
+  },
   caSummary(cas){
     const n = p => cas.filter(p).length;
     const onTime = n(M.isOnTime), late = n(M.isLate);
@@ -3029,6 +3040,9 @@ const COL = {
       ? '<span class="od-row" style="--od-gap:6px;flex-wrap:wrap"><span class="tag">'+r.ext+' ext</span>'
         + (r.extReason ? '<span class="t-small dim od-clamp-2" title="'+esc(r.extReason)+'">'+esc(r.extReason)+'</span>' : '<span class="t-small dim">no reason entered</span>')+'</span>'
       : '<span class="dim">—</span>' },
+  /* r191: Report Summary (Coruson summary, else the finding text, marked) + RFI state — anh Ngọc 07/08 mục D/E */
+  summary:{ l:'Summary', v:r=>(RX.sum && RX.sum[r.id]) || r.finding || '', c:r=>summaryCell(r) },
+  rfi:{ l:'RFI', v:r=>{ const l = RX.rfi && RX.rfi[r.id]; if(!l || !l.length) return -1; const s = M.rfiSummary(l); return s.overdue*10000 + s.open*100 + s.total; }, c:r=>rfiCell(r) },
   level:{ l:'Finding level', v:r=>r.level, c:r=>'<span class="tag">'+esc(r.level)+'</span>' },
   repetitive:{ l:'Repetitive', v:r=>r.repetitive?1:0, c:r=> r.repetitive ? '<span class="cat c1">Repeat</span>' : '<span class="dim">—</span>' },
   finding:{ l:'Finding', v:r=>r.finding, c:r=>'<span class="t-small od-clamp-2">'+esc(r.finding)+'</span>' },
@@ -3040,9 +3054,9 @@ const COL = {
 };
 
 const LANES = {
-  'work/open':    { cols:['number','form','status','owner','raised','target','dtd','level'],
+  'work/open':    { cols:['number','form','status','summary','owner','raised','target','dtd','rfi','level'],
                     rows:rs=>rs.filter(isOpen), title:'Open reports', lead:'Open and overdue reports, nearest target date first.' },
-  'work/overdue': { cols:['number','form','cat','dtd','owner','dept','target','level'],
+  'work/overdue': { cols:['number','form','cat','dtd','summary','owner','dept','target','rfi','level'],
                     rows:rs=>rs.filter(M.isOverdue), title:'Overdue', lead:'Reports past their target date. CAT I ≤ 30 days, CAT II 31–60 days, CAT III > 60 days overdue.' },
   'work/verify':  { cols:['number','status','owner','raised','verified','dtd'],
                     rows:rs=>rs.filter(r=>r.form==='pavoi' && isOpen(r) && !assessed(r)),
@@ -3050,8 +3064,8 @@ const LANES = {
   'findings/all':     { cols:['number','form','status','owner','aircraft','raised','dtd','cat'], rows:rs=>rs },
   'findings/cmrcar':  { cols:['number','aircraft','status','dept','raised','target','dtd'], rows:rs=>rs.filter(r=>r.form==='cmrcar') },
   'findings/ecar':    { cols:['number','aircraft','status','finding','raised','dtd'], rows:rs=>rs.filter(r=>r.form==='ecar') },
-  'findings/amoecar': { cols:['number','status','raised','target','dtd','cat','audit'], rows:rs=>rs.filter(r=>r.form==='amoecar') },
-  'findings/mcar':    { cols:['number','status','raised','owner','rule','target','dtd','ext','cat','repetitive'], rows:rs=>rs.filter(r=>r.form==='mcar') }
+  'findings/amoecar': { cols:['number','status','summary','raised','target','dtd','cat','rfi','audit'], rows:rs=>rs.filter(r=>r.form==='amoecar') },
+  'findings/mcar':    { cols:['number','status','summary','raised','owner','rule','target','dtd','rfi','ext','cat','repetitive'], rows:rs=>rs.filter(r=>r.form==='mcar') }
 };
 
 function sortRows(rows, key){
@@ -3122,6 +3136,18 @@ function renderLane(screen, tab){
 
   let rows = cfg.rows(screen === 'work' ? qaScope(scoped()) : scoped());
   if(state.cat) rows = rows.filter(r=>r.cat === state.cat);
+  /* r191: Summary / RFI columns load once, on the first register that shows them */
+  if(REAL && cfg.cols.some(c => c === 'rfi' || c === 'summary')) lazy('rfisum:'+rxFrom(), loadRfiSum, rxReady);
+  /* r191: form filter on Work Queue › Open / Overdue (Eric 03/10) — BS.wqForm_<tab>, counts per form code */
+  let formSel = '';
+  if(screen === 'work' && (tab === 'open' || tab === 'overdue')){
+    const fk = 'wqForm_'+tab, cnt = {};
+    rows.forEach(r => { cnt[r.code] = (cnt[r.code] || 0) + 1; });
+    if(BS[fk] && !cnt[BS[fk]]) BS[fk] = '';
+    if(BS[fk+'_last'] !== (BS[fk] || '')){ state.page[key] = 1; BS[fk+'_last'] = BS[fk] || ''; }
+    formSel = sel(fk, [['', 'All forms ('+rows.length+')']].concat(Object.keys(cnt).sort().map(c => [c, c+' ('+cnt[c]+')'])), BS[fk] || '', 'Form');
+    if(BS[fk]) rows = rows.filter(r => r.code === BS[fk]);
+  }
 
   const form = FORM_BY_ID[tab];
   const title = cfg.title || (form ? form.code : 'All forms');
@@ -3135,7 +3161,7 @@ function renderLane(screen, tab){
 
   return '<section class="sec"><div class="card">'
     + '<div class="card-head"><h2>'+esc(title)+'</h2>'
-    + '<span class="t-small dim od-fill">'+esc(lead)+'</span>'+catNote+'</div>'
+    + '<span class="t-small dim od-fill">'+esc(lead)+'</span>'+formSel+catNote+'</div>'
     + tableHTML(key, cfg, rows) + '</div></section>';
 }
 
@@ -3832,15 +3858,30 @@ function searchBox(key, cur, ph){
 }
 /* A plain table: cols = [{l, ar?}], rows = arrays of cell HTML. Paged like the design's lanes. */
 /* opt.full: no height cap (whole table in one view) · opt.compact: tighter rows · col.ac: centred column · col.w: column width
-   · col.raw: header text exactly as given (no upper-casing) — for Galileo values such as InProgress */
+   · col.raw: header text exactly as given (no upper-casing) — for Galileo values such as InProgress
+   · opt.sortVals (r191): one array of raw values per row, same order as cols — headers become sort buttons
+     (BS.sort[key] = {c, dir}); a column with col.nosort stays plain */
 function plainTable(key, cols, rows, size, minW, opt){
   opt = opt || {};
   const al = c => c.ac ? 'ac' : c.ar ? 'ar' : '';
   size = size || 25;
   if(!rows.length) return '<div class="empty"><h3>No records</h3><p class="t-sub">Nothing matches the current filters.</p></div>';
+  const so = opt.sortVals && BS.sort && BS.sort[key];
+  if(so){
+    const sv = opt.sortVals, cmp = (a, b) => { const x = sv[a][so.c], y = sv[b][so.c];
+      if(x == null || x === '') return (y == null || y === '') ? 0 : 1;   /* empty values last, either direction */
+      if(y == null || y === '') return -1;
+      const r = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric:true });
+      return so.dir === 'asc' ? r : -r; };
+    rows = rows.map((r, i) => i).sort(cmp).map(i => rows[i]);
+  }
   const pages = Math.max(1, Math.ceil(rows.length/size));
   const p = Math.min(BS.pg[key] || 1, pages);
-  const head = cols.map(c => '<th scope="col"'+(al(c)?' class="'+al(c)+'"':'')+((c.w||c.raw)?' style="'+(c.w?'width:'+c.w+';':'')+(c.raw?'text-transform:none':'')+'"':'')+'>'+esc(c.l)+'</th>').join('');
+  const head = cols.map((c, ci) => '<th scope="col"'+(al(c)?' class="'+al(c)+'"':'')+((c.w||c.raw)?' style="'+(c.w?'width:'+c.w+';':'')+(c.raw?'text-transform:none':'')+'"':'')
+    + (opt.sortVals && so && so.c === ci ? ' aria-sort="'+(so.dir === 'asc' ? 'ascending' : 'descending')+'"' : '')+'>'
+    + (opt.sortVals && !c.nosort
+        ? '<button type="button" data-act="bsort" data-k="'+key+'" data-c="'+ci+'">'+esc(c.l)+ic(so && so.c === ci ? (so.dir === 'asc' ? 'sortUp' : 'sortDown') : 'sortNone', 13, 'sort-ic')+'</button>'
+        : esc(c.l))+'</th>').join('');
   const body = rows.slice((p-1)*size, p*size).map(r => '<tr>'+r.map((cell,i) =>
     '<td data-l="'+esc(cols[i].l)+'"'+(i===0?' class="t-main"':(al(cols[i])?' class="'+al(cols[i])+'"':''))+'>'+cell+'</td>').join('')+'</tr>').join('');
   let pager = '';
@@ -4176,8 +4217,9 @@ function scrAllForms(){
     || lazyState('capa', () => A.loadCapa(), () => A.capa().loaded, 'Additional Mitigation (CAPA) links'));
   if(w) return w;
   const cfg = { cols: hira ? ['number','status','hiraMethod','hazardType','addMitig','owner','raised','target','dtd']
-                           : ['number','form','status','owner','raised','target','dtd','cat'],
+                           : ['number','form','status','summary','owner','raised','target','dtd','cat','rfi'],   /* r191: + Summary, RFI */
                 rows: rs => BS.afForm ? rs.filter(r => r.code === BS.afForm) : rs };
+  if(REAL && !hira) lazy('rfisum:'+rxFrom(), loadRfiSum, rxReady);
   let rows = cfg.rows(scoped());
   if(state.cat) rows = rows.filter(r => r.cat === state.cat);
   return '<section class="sec"><div class="card'+(hira ? ' af-hira' : '')+'"><div class="card-head"><h2>All forms</h2>'
@@ -4345,7 +4387,9 @@ function scrOsr(){
       + plainTable('osr', [{l:'Report'},{l:'Form'},{l:'Status'},{l:'Raised'},{l:'Org unit'},{l:'Last modified'}],
           rows.map(r => ['<span class="row-id">'+esc(r.report_number)+extLink('report', r.report_id, r.report_number)+'</span>', '<span class="tag">'+esc(r.report_title)+'</span>',
             statusChip(r.report_status === 'Closed' ? 'Closed' : r.report_status),   /* metrics-ok: OSR/MOSR Coruson status */ '<span class="num">'+fdx(r.raised_date)+'</span>',
-            '<span class="t-small">'+esc(r.org_unit_name || '—')+'</span>', '<span class="num dim">'+fdx(r.modified_date)+'</span>']), 25, 720)) + '</section>';
+            '<span class="t-small">'+esc(r.org_unit_name || '—')+'</span>', '<span class="num dim">'+fdx(r.modified_date)+'</span>']), 25, 720,
+          /* r191: sortable (Eric 03/10) — raw values per column */
+          { sortVals: rows.map(r => [r.report_number, r.report_title, r.report_status, String(r.raised_date || '').slice(0, 10), r.org_unit_name, String(r.modified_date || '').slice(0, 10)]) })) + '</section>';
 }
 
 /* ==========================================================================
@@ -4588,6 +4632,9 @@ const BETA_ACT = {
   bpage: el => { BS.pg[el.dataset.k] = Number(el.dataset.p);
     if(el.closest('#betaModal') && MODAL_REDRAW) redrawModal(el); else render(); },
   bretry: el => { delete LAZY[el.dataset.k]; render(); },
+  /* r191: sortable plainTable headers — first click ascending, then toggles */
+  bsort: el => { const k = el.dataset.k, c = +el.dataset.c; BS.sort = BS.sort || {}; const cur = BS.sort[k];
+    BS.sort[k] = { c, dir: cur && cur.c === c && cur.dir === 'asc' ? 'desc' : 'asc' }; BS.pg[k] = 1; render(); },
   buser: el => { userAction(el); },
   bfeedback: () => { sendFeedback(); },
   bfbopen: () => { feedbackModal(); },
@@ -4914,6 +4961,61 @@ function showAudit(id){
          '<span class="num">'+fmtDate(r.raised)+'</span>', '<span class="num">'+fmtDate(r.target)+'</span>', '<span class="t-small">'+esc(r.owner)+'</span>']), 30, 720)
       : '<p class="t-sub dim">No findings raised under this audit.</p>') + '</div>';
   openModal(a.number+' — '+a.title, sub, body, extBtn('audit', id));
+}
+
+/* r191 — Report Summary + RFI columns (anh Ngọc 07/08, mục D/E; Eric 03/10).
+   Summary: Coruson 'summary' (dwanalytics_report_users, current version) — rarely filled (probe 03/10: MCAR 5/97,
+   SR 12/265), so the column falls back to the finding text the register already carries, marked as such.
+   RFI: every 'Request For Information' task of the reports in scope, one query per 8 form titles. Loaded once,
+   on the first register that shows these columns. */
+const RX = { rfi: null, sum: null, from: null };
+/* only the years in view: from 1 Jan of the earliest selected year (no year filter = everything) */
+const rxFrom = () => state.filters.years.length ? Math.min(...state.filters.years) + '-01-01' : '2000-01-01';
+function plainText(h){
+  const d = document.createElement('textarea'); let s = String(h || '');
+  for(let i = 0; i < 2; i++){ d.innerHTML = s; s = d.value; }   /* Galileo returns the HTML escaped once more */
+  s = s.replace(/<br\s*\/?>|<\/p>|<\/li>|<\/div>/gi, '\n').replace(/<[^>]+>/g, '');
+  d.innerHTML = s;
+  return d.value.replace(/ /g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n{2,}/g, '\n').trim();
+}
+async function loadRfiSum(){
+  const A = API(), ids = new Set(M.qa(REPORTS).map(r => r.id)), from = rxFrom(), since = from + 'T00:00:00Z';
+  const titles = [...new Set(A.allData().filter(r => ids.has(r.report_id)).map(r => r.report_title).filter(Boolean))];
+  const chunks = []; for(let i = 0; i < titles.length; i += 8) chunks.push(titles.slice(i, i + 8));
+  const q = s => "'" + String(s).replace(/'/g, "''") + "'";
+  const ouF = '(' + A.orgUnitIds().map(i => 'organisational_unit_id eq ' + i).join(' or ') + ') and valid_to eq null and summary ne null and raised_date ge ' + since;
+  /* a few summaries carry pasted images (~1 MB each, probe 03/10): text-sized ones only, the rest by id */
+  const [parts, sums, big] = await Promise.all([
+    Promise.all(chunks.map(c => A.fetchAll(A.G_URL + 'dwreporting_report_task?$select=report_id,task_id,task_owner,task_status,task_target_date,task_completed_date'
+      + '&$filter=' + encodeURIComponent("task_title eq 'Request For Information' and report_created_date ge " + since + " and (" + c.map(t => 'report_title eq ' + q(t)).join(' or ') + ')')))),
+    A.fetchAll(A.G_URL + 'dwanalytics_report_users?$select=report_id,summary&$filter=' + encodeURIComponent(ouF + ' and length(summary) lt 30000')),
+    A.fetchAll(A.G_URL + 'dwanalytics_report_users?$select=report_id&$filter=' + encodeURIComponent(ouF + ' and length(summary) ge 30000'))
+  ]);
+  const rfi = {};
+  parts.flat().forEach(t => { if(!ids.has(t.report_id) || t.task_status === 'Deleted' || t.task_status === 'Cancelled') return; (rfi[t.report_id] = rfi[t.report_id] || []).push(t); });
+  const sum = {};
+  sums.forEach(x => { const s = plainText(x.summary); if(s && ids.has(x.report_id)) sum[x.report_id] = s; });
+  RX.big = new Set(big.map(x => x.report_id).filter(id => ids.has(id)));
+  RX.rfi = rfi; RX.sum = sum; RX.from = from;
+}
+const rxReady = () => !!RX.rfi && RX.from <= rxFrom();
+function rfiCell(r){
+  if(!RX.rfi) return '<span class="dim">…</span>';
+  const list = RX.rfi[r.id] || []; if(!list.length) return '<span class="dim">—</span>';
+  const s = M.rfiSummary(list);
+  const tip = list.map(t => (t.task_owner || '—') + ' · target ' + fdx(t.task_target_date) + ' · ' + (t.task_completed_date ? 'answered ' + fdx(t.task_completed_date) : 'open')).join('\n');
+  return '<span class="od-row" style="--od-gap:6px;flex-wrap:wrap" title="' + esc(tip) + '"><span class="tag">' + s.total + ' RFI</span>'
+    + (s.overdue ? '<span class="cat c3">' + s.overdue + ' overdue</span>' : s.open ? '<span class="cat c1">' + s.open + ' open</span>' : '')
+    + (s.lastAnswered ? '<span class="t-small dim od-nowrap">answered ' + fdx(s.lastAnswered) + '</span>' : '') + '</span>';
+}
+function summaryCell(r){
+  const s = RX.sum && RX.sum[r.id];
+  const W = ' style="min-width:220px;max-width:360px"';   /* readable at any table width (the table scrolls) */
+  if(s) return '<span class="t-small od-clamp-3"' + W + ' title="' + esc(s) + '">' + esc(s) + '</span>';
+  const f = r.finding && r.finding !== '—' ? r.finding : '';
+  const why = RX.big && RX.big.has(r.id) ? 'Summary on Coruson holds pictures — open the report there' : 'No summary on Coruson';
+  return f ? '<span class="t-small dim od-clamp-3"' + W + ' title="' + why + ' — finding text: ' + esc(f) + '">' + esc(f) + '</span>'
+    : RX.big && RX.big.has(r.id) ? '<span class="t-small dim">' + why + '</span>' : '<span class="dim">—</span>';
 }
 
 /* PAVOI: RFI / Task list for the record open in the detail panel (loadPavoiRfi 5829, pavoiRfiCell) */

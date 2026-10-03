@@ -425,6 +425,18 @@ Luật chấm lấy từ `F088 GUIDEDANCE.docx` (Eric, 18/08/2026).
 
 ---
 
+### 9. Summary + RFI của register (r191, chỉ ở `index.html` — `loadRfiSum`, screens2.js)
+
+Tải 1 lần khi mở register có cột Summary / RFI (Work Queue › Open/Overdue, Reports › All forms / MCAR / AMO-ECAR), chỉ các
+năm đang lọc (từ 1/1 của năm nhỏ nhất; không lọc năm = toàn bộ; chọn năm cũ hơn thì tải lại).
+- **RFI:** `dwreporting_report_task?$select=report_id,task_id,task_owner,task_status,task_target_date,task_completed_date`,
+  `task_title eq 'Request For Information' and report_created_date ge <năm> and (report_title eq … ×8)` — mỗi request 8 tên form
+  (tránh MaxNodeCount); lọc client theo report_id trong phạm vi QA, bỏ `Deleted`/`Cancelled`. Đo 03/10 (năm 2026): ~0,9 MB.
+- **Summary:** `dwanalytics_report_users?$select=report_id,summary` theo org unit QA AMO + `valid_to eq null and summary ne null and
+  raised_date ge <năm> and length(summary) lt 30000`; summary là HTML bị escape 2 lần → `plainText()`. Vài summary dán ảnh (~1 MB/cái):
+  chỉ lấy id (`length(summary) ge 30000`) để ghi chú "xem trên Coruson". Đo 03/10: 3,9 MB → 55 KB. Summary hầu như không được nhập
+  (MCAR 5/97, SR 12/265) → cột lùi về finding text (chữ mờ, tooltip ghi rõ).
+
 ## Bước workflow — dùng view nào (r177, probe 29/09/2026)
 
 | Cần | View | Vì sao |
