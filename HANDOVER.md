@@ -5,6 +5,11 @@
 
 ---
 
+## ✅ r192 — Overdue report thêm cột Owner (03/10/2026, THAIBAHOA-HOME) — ĐÃ PUSH `bc71f18`, live (curl APP_REV r192)
+
+- `exportOverdueReport` / `exportOverduePDF`: cột Owner = `owner_name` nguyên văn (người hoặc nhóm), sau Department. Kiểm local W40.
+- Gợi ý chờ Eric: Finding Summary trống với form không có finding (OSR, MOM, MCCF, F-088) — có thể lùi về Coruson summary như r191.
+
 ## ✅ r191 — Summary + RFI, lọc form Work Queue, sort OSR/MOSR (03/10/2026, THAIBAHOA-HOME) — ĐÃ PUSH `6459af3`, live (curl APP_REV r191)
 
 - Cột Summary (Coruson summary, lùi về finding mờ) + RFI ở Work Queue Open/Overdue, Reports All forms/MCAR/AMO-ECAR — `loadRfiSum` (screens2.js),
