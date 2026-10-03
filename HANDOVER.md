@@ -5,6 +5,13 @@
 
 ---
 
+## ✅ r190 — lý do gia hạn MCAR (03/10/2026, THAIBAHOA-HOME) — ĐÃ PUSH `7cb1091`, live (curl APP_REV r190)
+
+- `CF_FIELDS` + `Reason for extension`, `Extension denied reason` → `ext_reason` / `ext_denied`; `cfRaw` lưu chữ ký `fields`, khác thì nạp đầy.
+- Reports › MCAR thêm cột Extension (số lần + lý do); popup thêm 2 khối. Không cần sửa form (Eric: Extension chỉ MCAR).
+- Kiểm local dữ liệu thật từ cache r189 cũ: MCAR-0326/0328/0331. Chưa xem live đã đăng nhập.
+- Phụ lục SOP-009 Appendix 3 (nhập liệu Coruson) đang soạn ở phiên riêng.
+
 ## ✅ r189 — khôi phục 3 tính năng classic bị sót ở UI r167 (03/10/2026, THAIBAHOA-HOME) — ĐÃ PUSH `f9a5425`, live (curl APP_REV r189)
 
 - Việc 3 họp anh Ngọc 24/09: rà r188 so với họp 07/08 → vault `02-Bao-Cao/RS-2026-10-03-Ra-soat-dashboard-r188-vs-yeu-cau-hop-07-08.md`.
