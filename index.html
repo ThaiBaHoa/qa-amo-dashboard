@@ -1523,8 +1523,12 @@ allData.forEach(r => {
   const o = base(r, form);
   if(form === 'other') o.code = r.report_title;
   o.finding = orDash(r.finding_desc);
-  o.owner = orDash(r.issued_person || r.owner_name);
-  o.dept = orDash(form === 'pavoi' ? r.owner_name : r.dept);
+  /* r194 (Eric 03/10: "Owner" showed the Issued-to person, MCAR-0402): every column shows the Galileo field it is
+     named after. Owner = owner_name (person or group, e.g. a PAVOI '… Section'); Issued to = 'Issued to (person)';
+     Department = 'Department' — before, a PAVOI's Department column held its owner section. */
+  o.owner = orDash(r.owner_name);
+  o.issuedTo = orDash(r.issued_person);
+  o.dept = orDash(r.dept);
   o.repetitive = !!r.is_rep;
   o.ext = r.mcar_chk ? r.mcar_chk.n : 0;   /* approved MCAR extensions (classic buildMcarDeadlineChk) */
   o.mcarRule = r.mcar_chk || null;
@@ -1551,8 +1555,9 @@ function aircraft(o, v){
   o.acReg = 'MSN ' + m[2];
   o.acType = m[1].toUpperCase() + (m[3] ? 'neo' : '');
 }
-cmrData.forEach(r => { const o = base(r, 'cmrcar'); o.finding = orDash(r.finding_desc); o.owner = orDash(r.issued_to); o.dept = orDash(r.dept); aircraft(o, r.aircraft_reg); reports.push(o); });
-ecarData.forEach(r => { const o = base(r, 'ecar'); o.finding = orDash(r.finding_desc); o.owner = orDash(r.issued_by); o.dept = '—'; aircraft(o, r.aircraft_reg); reports.push(o); });
+/* r194: CMR-CAR / ECAR carry no owner field in their loaders — Owner '—', the person goes where it belongs */
+cmrData.forEach(r => { const o = base(r, 'cmrcar'); o.finding = orDash(r.finding_desc); o.owner = '—'; o.issuedTo = orDash(r.issued_to); o.dept = orDash(r.dept); aircraft(o, r.aircraft_reg); reports.push(o); });
+ecarData.forEach(r => { const o = base(r, 'ecar'); o.finding = orDash(r.finding_desc); o.owner = '—'; o.issuedTo = '—'; o.issuedBy = orDash(r.issued_by); o.dept = '—'; aircraft(o, r.aircraft_reg); reports.push(o); });
 
 const YEAR = String(new Date().getFullYear());
 const AUD_STATUS = { InProgress: 'In Progress' };
@@ -2437,7 +2442,7 @@ const REPORTS = REAL ? REAL.reports.map(fromReal) : buildReports();
 function refLists(depts){
   DEPTS.length = 0; depts.forEach(d => DEPTS.push(d));
   const people = {};
-  REPORTS.forEach(r => { if(r.owner !== '—' && !people[r.owner]) people[r.owner] = r.dept; });
+  REPORTS.forEach(r => { [r.owner, r.issuedTo].forEach(p => { if(p && p !== '—' && !people[p]) people[p] = r.dept; }); });   /* r194: + Issued to */
   PEOPLE.length = 0; Object.keys(people).sort().forEach(n => PEOPLE.push({ n, d: people[n] }));
   const regs = new Set(REPORTS.map(r => r.acReg).filter(Boolean));
   FLEET.length = 0; [...regs].sort().forEach(reg => FLEET.push({ reg, t: '' }));
@@ -2528,7 +2533,7 @@ function buildIndex(){
   const idx = [];
   REPORTS.forEach(r=> idx.push({
     kind:'Report', key:r.number, sub:r.code+' · '+r.auditTitle,
-    hay:(r.number+' '+r.auditTitle+' '+r.finding+' '+r.owner+' '+(r.acReg||'')+' '+r.dept).toLowerCase(),
+    hay:(r.number+' '+r.auditTitle+' '+r.finding+' '+r.owner+' '+(r.issuedTo||'')+' '+(r.acReg||'')+' '+r.dept).toLowerCase(),
     go:{screen:'findings', tab:(r.form==='other'?'all':r.form), id:r.id}, meta:r.status
   }));
   AUDITS.forEach(a=> idx.push({
@@ -2542,7 +2547,7 @@ function buildIndex(){
       hay:(f.reg+' '+f.t).toLowerCase(), go:{screen:'findings', tab:'all', q:f.reg}, meta:f.t });
   });
   PEOPLE.forEach(p=>{
-    const n = REPORTS.filter(r=>r.owner===p.n && isOpen(r)).length;
+    const n = REPORTS.filter(r=>(r.owner===p.n || r.issuedTo===p.n) && isOpen(r)).length;
     idx.push({ kind:'Person', key:p.n, sub:p.d+' · '+n+' open',
       hay:(p.n+' '+p.d).toLowerCase(), go:{screen:'work', tab:'open', q:p.n}, meta:n+' open' });
   });
@@ -2612,7 +2617,7 @@ function applyFilters(rows){
 function applyQuery(rows){
   const q = state.rowQuery.trim().toLowerCase();
   if(!q) return rows;
-  return rows.filter(r => (r.number+' '+r.auditTitle+' '+r.finding+' '+r.owner+' '+(r.acReg||'')+' '+r.dept+' '+r.status).toLowerCase().includes(q));
+  return rows.filter(r => (r.number+' '+r.auditTitle+' '+r.finding+' '+r.owner+' '+(r.issuedTo||'')+' '+(r.acReg||'')+' '+r.dept+' '+r.status).toLowerCase().includes(q));
 }
 const scoped = () => applyQuery(applyFilters(REPORTS));
 /* QA AMO scope — what classic Open Reports / Overdue / KPI charts count (allData). CMR-CAR and ECAR
@@ -3026,6 +3031,8 @@ const COL = {
   cat:{ l:'CAT', v:r=>({'I':1,'II':2,'III':3}[r.cat]||0), c:r=>catChip(r.cat) },
   owner:{ l:'Owner', v:r=>r.owner, c:r=>'<span class="od-truncate">'+esc(r.owner)+'</span>' },
   dept:{ l:'Department', v:r=>r.dept, c:r=>'<span class="od-truncate t-small">'+esc(r.dept)+'</span>' },
+  /* r194: 'Issued to (person)' — the auditee, no longer shown under Owner */
+  issued:{ l:'Issued to', v:r=>r.issuedTo || '', c:r=>'<span class="od-truncate">'+esc(r.issuedTo || '—')+'</span>' },
   aircraft:{ l:'Aircraft', v:r=>r.acReg||'zzz',
     c:r=> r.acReg ? '<span class="od-row" style="--od-gap:6px"><span class="mono strong">'+esc(r.acReg)+'</span>'+(r.acType?'<span class="tag">'+esc(r.acType)+'</span>':'')+'</span>'
                   : '<span class="dim">'+(REAL ? '—' : 'Fleet-wide')+'</span>' },
@@ -3037,7 +3044,8 @@ const COL = {
   rule:{ l:'Response due', v:r=>r.mcarRule ? r.mcarRule.exp_resp : '', c:r=>{ const c = r.mcarRule; if(!c) return '<span class="dim">—</span>';
       const tip = 'Response due (raised + 14 d): '+fdx(c.exp_resp)+' · Target by rule (raised + 45 d'+(c.n ? ' + '+(30*c.n)+' d, '+c.n+' extension'+(c.n > 1 ? 's' : '') : '')+'): '+fdx(c.exp_target);
       return '<span class="od-row" style="--od-gap:6px" title="'+esc(tip)+'"><span class="num od-nowrap">'+fdx(c.exp_resp)+'</span>'
-        + (c.target_warn ? '<span class="cat c3">Target ≠ rule '+fdx(c.exp_target)+'</span>' : '') + '</span>'; } },
+        /* r194: a quiet note, not an alarm — Coruson targets are typed by the auditor (probe 03/10: 31–48 days after raise) */
+        + (c.target_warn ? '<span class="t-small dim od-nowrap">rule '+fdx(c.exp_target)+'</span>' : '') + '</span>'; } },
   /* r190: approved MCAR extensions with the reason entered on the form ('Reason for extension') */
   ext:{ l:'Extension', v:r=>r.ext || 0, c:r=> r.ext
       ? '<span class="od-row" style="--od-gap:6px;flex-wrap:wrap"><span class="tag">'+r.ext+' ext</span>'
@@ -3057,9 +3065,9 @@ const COL = {
 };
 
 const LANES = {
-  'work/open':    { cols:['number','form','status','summary','owner','raised','target','dtd','rfi','level'],
+  'work/open':    { cols:['number','form','status','summary','owner','issued','raised','target','dtd','rfi','level'],
                     rows:rs=>rs.filter(isOpen), title:'Open reports', lead:'Open and overdue reports, nearest target date first.' },
-  'work/overdue': { cols:['number','form','cat','dtd','summary','owner','dept','target','rfi','level'],
+  'work/overdue': { cols:['number','form','cat','dtd','summary','owner','issued','dept','target','rfi','level'],
                     rows:rs=>rs.filter(M.isOverdue), title:'Overdue', lead:'Reports past their target date. CAT I ≤ 30 days, CAT II 31–60 days, CAT III > 60 days overdue.' },
   'work/verify':  { cols:['number','status','owner','raised','verified','dtd'],
                     rows:rs=>rs.filter(r=>r.form==='pavoi' && isOpen(r) && !assessed(r)),
@@ -3068,7 +3076,7 @@ const LANES = {
   'findings/cmrcar':  { cols:['number','aircraft','status','dept','raised','target','dtd'], rows:rs=>rs.filter(r=>r.form==='cmrcar') },
   'findings/ecar':    { cols:['number','aircraft','status','finding','raised','dtd'], rows:rs=>rs.filter(r=>r.form==='ecar') },
   'findings/amoecar': { cols:['number','status','summary','raised','target','dtd','cat','rfi','audit'], rows:rs=>rs.filter(r=>r.form==='amoecar') },
-  'findings/mcar':    { cols:['number','status','summary','raised','owner','rule','target','dtd','rfi','ext','cat','repetitive'], rows:rs=>rs.filter(r=>r.form==='mcar') }
+  'findings/mcar':    { cols:['number','status','summary','raised','owner','issued','rule','target','dtd','rfi','ext','cat','repetitive'], rows:rs=>rs.filter(r=>r.form==='mcar') }
 };
 
 function sortRows(rows, key){
@@ -3217,7 +3225,7 @@ function renderPavoi(){
     : '<p class="t-sub dim">No verification round has been recorded against this report yet.</p>';
 
   const meta = [
-    ['Form','PAVOI'], ['Status', null], ['Owner section', r.dept], ['Owner', r.owner],
+    ['Form','PAVOI'], ['Status', null], ['Owner section', r.owner], ['Issued to', r.issuedTo],   /* r194: was dept / owner (same value twice) */
     ['Raised', fmtDate(r.raised)], ['Target', fmtDate(r.target)],
     ['Days to due', r.closed ? 'closed '+fmtDate(r.closed) : (r.dtd<0 ? Math.abs(r.dtd)+' days over' : r.dtd+' days left')],
   ].concat(REAL ? [['Department', r.pvDept], ['Source report', r.auditTitle], ['Verification result', r.verifResult]]
@@ -4223,7 +4231,7 @@ function scrAllForms(){
     || lazyState('capa', () => A.loadCapa(), () => A.capa().loaded, 'Additional Mitigation (CAPA) links'));
   if(w) return w;
   const cfg = { cols: hira ? ['number','status','hiraMethod','hazardType','addMitig','owner','raised','target','dtd']
-                           : ['number','form','status','summary','owner','raised','target','dtd','cat','rfi'],   /* r191: + Summary, RFI */
+                           : ['number','form','status','summary','owner','issued','raised','target','dtd','cat','rfi'],   /* r191: + Summary, RFI · r194: + Issued to */
                 rows: rs => BS.afForm ? rs.filter(r => r.code === BS.afForm) : rs };
   if(REAL && !hira) lazy('rfisum:'+rxFrom(), loadRfiSum, rxReady);
   let rows = cfg.rows(scoped());
@@ -4801,7 +4809,7 @@ function showReport(id){
         /* r189: MCAR deadline rule r101 (classic mcarWarnCell) — anh Ngọc 07/08 mục D */
         ['Response due (raised + 14 d)', r.mcar_chk ? fdx(r.mcar_chk.exp_resp) : undefined],
         ['Target by rule (raised + 45 d + 30 d per extension)', r.mcar_chk ? fdx(r.mcar_chk.exp_target) + ' · ' + r.mcar_chk.n + ' extension' + (r.mcar_chk.n === 1 ? '' : 's')
-          + (r.mcar_chk.target_warn ? ' <span class="cat c3">differs from Target date</span>' : '') : undefined, true],
+          + (r.mcar_chk.target_warn ? ' <span class="t-small dim">(Target date on Coruson differs)</span>' : '') : undefined, true],
         ['Extension 1', r.ext1_date ? fdx(r.ext1_date) : undefined],
         ['Extension 2', r.ext2_date ? fdx(r.ext2_date) : undefined], ['Date completed', fdx(r.completed_date)], ['Date closed', fdx(r.close_date)]])
       + block(rep.form === 'pavoi' ? 'Request for verification' : 'Finding', rep.form === 'pavoi' ? r.rfv : r.finding_desc)
