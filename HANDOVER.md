@@ -5,6 +5,12 @@
 
 ---
 
+## ✅ r194 — Owner đúng owner, tách cột Issued to (03/10/2026, THAIBAHOA-HOME) — ĐÃ PUSH `d140f38`, live (curl APP_REV r194)
+
+- Gốc lỗi (từ r167): loader `o.owner = issued_person || owner_name`, PAVOI `o.dept = owner_name`. Nay mỗi cột = đúng 1 trường Galileo; trống → "—".
+- Kiểm tự động mọi trang 7 register (1.917 dòng) đối chiếu ô với trường Galileo: 0 lệch. Chạy lại sau mỗi lần sửa mapping trong loader.js (om memory).
+- Nhãn "Target ≠ rule" → ghi chú mờ (Target MCAR do auditor nhập, 31–48 ngày sau raise).
+
 ## ✅ r193 — Overdue report: Department thật + Pending with + cờ Verified Satisfactory (03/10/2026, THAIBAHOA-HOME)
 
 - Từ r113-i2 cột Department của PAVOI chứa owner RFI đang mở → nay Department = phòng ban, cột Pending with = RFI/Task mở + hạn (mọi form, `ovrFetchPending`).
