@@ -151,8 +151,12 @@ GET dwanalytics_report_form_section_field
         or field_name eq 'Issued to (person)'
         or field_name eq 'First extension approved?'
         or field_name eq 'Second extension agreed?'
+        or field_name eq 'Reason for extension'
+        or field_name eq 'Extension denied reason'
 ```
-→ 16 field (2 cờ `…approved?`/`…agreed?` thêm r101 cho MCAR deadline check; `Issued to (person)` → `issued_person`).
+→ 18 field (2 cờ `…approved?`/`…agreed?` thêm r101 cho MCAR deadline check; `Issued to (person)` → `issued_person`;
+r190: `Reason for extension` → `ext_reason`, `Extension denied reason` → `ext_denied`). Bản thô `cfRaw` lưu `fields`
+(chữ ký CF_FIELDS) — đổi danh sách trường thì lượt sau tự nạp đầy.
 → Build `fMap[report_id][field_name] = text_value`. Giữ giá trị đầu tiên (không ghi đè).
 → `Finding description` → `r.finding_desc`, `Nature of finding` → `r.nature_raw` (dùng cho KPI 2 và cột mô tả ở 2 trang AMO-ECAR/MCAR). Xem [§7 KPI 2](#7-kpi-2--early-detection-tự-động).
 

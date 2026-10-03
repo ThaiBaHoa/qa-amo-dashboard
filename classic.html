@@ -2522,7 +2522,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.10.03-r189';
+const APP_REV = '2026.10.03-r190';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3661,6 +3661,8 @@ async function loadData(forceRefresh=false, opts={}) {
         repetitive:    f['Repetitive']                || null,
         ext1_date:     f['First extension agreed date']  || null,
         ext2_date:     f['Second extension agreed date'] || null,
+        ext_reason:    f['Reason for extension']      || null,   // [r190]
+        ext_denied:    f['Extension denied reason']   || null,   // [r190]
         mcar_chk:      mcarChk,
         audit_ref:     f['Audit Ref. No']             || null,
         // PAVOI-specific fields
@@ -4100,7 +4102,9 @@ const CF_MAX_CHUNKS = 10;                         // >150 report đổi thì n�
 const CF_FIELDS = ['Target date','Issue Date','Finding level','Repetitive','First extension agreed date',
   'Second extension agreed date','Audit Ref. No','Request For Verification','Report Reference',
   'Verification Result','Department','Finding description','Nature of finding','Issued to (person)',
-  'First extension approved?','Second extension agreed?'];
+  'First extension approved?','Second extension agreed?',
+  // [r190] lý do gia hạn MCAR (1 ô chung cho cả 2 lần) + lý do từ chối — Eric 03/10: Extension chỉ MCAR, form đã có trường
+  'Reason for extension','Extension denied reason'];
 const CF_FIELD_SET = new Set(CF_FIELDS);
 const CF_URL = G_URL + 'dwanalytics_report_form_section_field';
 
@@ -4117,7 +4121,7 @@ async function fetchCustomFieldRows(forceFull){
     wmP.catch(()=>{});
     const rows = await fetchAll(CF_URL + '?$select=report_id,field_name,text_value&$filter=' +
       encodeURIComponent(CF_FIELDS.map(f => "field_name eq '" + f + "'").join(' or ')), true);
-    try{ await idbSet(CF_RAW_KEY, {syncedAt: await wmP, fetchedAt: Date.now(), rows}); }
+    try{ await idbSet(CF_RAW_KEY, {syncedAt: await wmP, fetchedAt: Date.now(), fields: CF_FIELDS.join('|'), rows}); }
     catch(e){ console.warn('[cf] không lưu được bản thô (' + (e && e.name) + ') — lượt sau lại phải nạp đầy:', e && e.message); }
     console.log('%c[cf] NẠP ĐẦY (' + why + ') — ' + rows.length + ' dòng trong ' +
       ((Date.now()-t0)/1000).toFixed(1) + 's', 'color:#D29922');
@@ -4127,6 +4131,8 @@ async function fetchCustomFieldRows(forceFull){
   if(forceFull)                                                  return fullLoad('bấm ↻ Refresh');
   if(!cached || !Array.isArray(cached.rows) || !cached.syncedAt) return fullLoad('chưa có bản thô');
   if(Date.now() - (cached.fetchedAt || 0) > CF_MAX_AGE)          return fullLoad('bản thô quá 7 ngày');
+  // [r190] Thêm trường vào CF_FIELDS thì bản thô cũ không có trường đó và delta chỉ hỏi report ĐỔI → phải nạp đầy.
+  if(cached.fields !== CF_FIELDS.join('|'))                      return fullLoad('danh sách trường đổi');
 
   let changed;
   try{
@@ -4155,7 +4161,7 @@ async function fetchCustomFieldRows(forceFull){
   const rows = cached.rows.filter(r => !dropIds.has(r.report_id)).concat(fresh);
   const newWm = changed.reduce((m, r) =>
     (r.modified_date && r.modified_date > m) ? r.modified_date : m, cached.syncedAt);
-  try{ await idbSet(CF_RAW_KEY, {syncedAt: newWm, fetchedAt: cached.fetchedAt || Date.now(), rows}); }
+  try{ await idbSet(CF_RAW_KEY, {syncedAt: newWm, fetchedAt: cached.fetchedAt || Date.now(), fields: cached.fields, rows}); }
   catch(e){ console.warn('[cf] không lưu được bản thô sau delta:', e && e.message); }
   console.log('%c[cf] DELTA — ' + ids.length + ' report đổi (' + changed.length + ' dòng), ' +
     Math.ceil(ids.length / CF_CHUNK) + ' request, tổng ' + rows.length + ' dòng trong ' +

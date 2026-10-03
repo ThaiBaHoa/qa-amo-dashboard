@@ -1527,7 +1527,8 @@ allData.forEach(r => {
   o.dept = orDash(form === 'pavoi' ? r.owner_name : r.dept);
   o.repetitive = !!r.is_rep;
   o.ext = r.mcar_chk ? r.mcar_chk.n : 0;   /* approved MCAR extensions (classic buildMcarDeadlineChk) */
-  o.mcarRule = r.mcar_chk || null;          /* r189: MCAR deadline rule r101 — response due, target by rule (classic mcarWarnCell) */
+  o.mcarRule = r.mcar_chk || null;
+  o.extReason = r.ext_reason || null;       /* r190: MCAR 'Reason for extension' (one field for both extensions) */          /* r189: MCAR deadline rule r101 — response due, target by rule (classic mcarWarnCell) */
   if(form === 'pavoi'){
     /* PAVOI carry no finding text, audit or level: their content is Request For Verification (rfv),
        the source report (report_ref) and the audited department (dept) — the PAVOI Detail columns of
@@ -3023,6 +3024,11 @@ const COL = {
       const tip = 'Response due (raised + 14 d): '+fdx(c.exp_resp)+' · Target by rule (raised + 45 d'+(c.n ? ' + '+(30*c.n)+' d, '+c.n+' extension'+(c.n > 1 ? 's' : '') : '')+'): '+fdx(c.exp_target);
       return '<span class="od-row" style="--od-gap:6px" title="'+esc(tip)+'"><span class="num od-nowrap">'+fdx(c.exp_resp)+'</span>'
         + (c.target_warn ? '<span class="cat c3">Target ≠ rule '+fdx(c.exp_target)+'</span>' : '') + '</span>'; } },
+  /* r190: approved MCAR extensions with the reason entered on the form ('Reason for extension') */
+  ext:{ l:'Extension', v:r=>r.ext || 0, c:r=> r.ext
+      ? '<span class="od-row" style="--od-gap:6px;flex-wrap:wrap"><span class="tag">'+r.ext+' ext</span>'
+        + (r.extReason ? '<span class="t-small dim od-clamp-2" title="'+esc(r.extReason)+'">'+esc(r.extReason)+'</span>' : '<span class="t-small dim">no reason entered</span>')+'</span>'
+      : '<span class="dim">—</span>' },
   level:{ l:'Finding level', v:r=>r.level, c:r=>'<span class="tag">'+esc(r.level)+'</span>' },
   repetitive:{ l:'Repetitive', v:r=>r.repetitive?1:0, c:r=> r.repetitive ? '<span class="cat c1">Repeat</span>' : '<span class="dim">—</span>' },
   finding:{ l:'Finding', v:r=>r.finding, c:r=>'<span class="t-small od-clamp-2">'+esc(r.finding)+'</span>' },
@@ -3045,7 +3051,7 @@ const LANES = {
   'findings/cmrcar':  { cols:['number','aircraft','status','dept','raised','target','dtd'], rows:rs=>rs.filter(r=>r.form==='cmrcar') },
   'findings/ecar':    { cols:['number','aircraft','status','finding','raised','dtd'], rows:rs=>rs.filter(r=>r.form==='ecar') },
   'findings/amoecar': { cols:['number','status','raised','target','dtd','cat','audit'], rows:rs=>rs.filter(r=>r.form==='amoecar') },
-  'findings/mcar':    { cols:['number','status','raised','owner','rule','target','dtd','cat','repetitive'], rows:rs=>rs.filter(r=>r.form==='mcar') }
+  'findings/mcar':    { cols:['number','status','raised','owner','rule','target','dtd','ext','cat','repetitive'], rows:rs=>rs.filter(r=>r.form==='mcar') }
 };
 
 function sortRows(rows, key){
@@ -4746,6 +4752,8 @@ function showReport(id){
         ['Extension 1', r.ext1_date ? fdx(r.ext1_date) : undefined],
         ['Extension 2', r.ext2_date ? fdx(r.ext2_date) : undefined], ['Date completed', fdx(r.completed_date)], ['Date closed', fdx(r.close_date)]])
       + block(rep.form === 'pavoi' ? 'Request for verification' : 'Finding', rep.form === 'pavoi' ? r.rfv : r.finding_desc)
+      /* r190: MCAR extension reason / denial reason as entered on the form (Extension applies to MCAR only) */
+      + block('Reason for extension', r.ext_reason) + block('Extension denied reason', r.ext_denied)
       + block('Verification result', r.verif_result)
       /* r169: corrective actions of this report (F-088, investigation reports, AMO ECAR…); load once, then re-open */
       + (A.eis().loaded ? caList(A.eis().ca[id] || [], caForms().has(r.report_title))
