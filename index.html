@@ -1461,6 +1461,9 @@ if(!HOOK.lite && X2 && X2.v === 1){
   cmrData = regradeRows(X2.cmr); cmrLoaded = true; ecarData = regradeRows(X2.ecar); ecarLoaded = true;
   kpi7Cnt = X2.k7c; kpi7Ver = X2.k7v; kpi7Done = new Set(Object.keys(X2.k7c)); kpi7Loaded = true;
   verRaw = X2.ver;
+  /* r195: PAVOI final conclusion (classic loadPavoiFinal) rides in the same cache; a cache written before r195 fetches it once */
+  if(X2.fin){ allData.forEach(r => { if(r.report_title === 'PAVOI') r.verif_final = X2.fin[r.report_id] || null; }); loadPavoiFinal.done = true; }
+  else await loadPavoiFinal();
 } else if(!HOOK.lite){
   const err0 = TOASTS.filter(t => t.kind === 'err').length;
   const got = await Promise.all([loadCmr(), loadEcar(), loadKpi7Tasks(), fetchAll(VER_URL, true).catch(e => { toast('PAVOI verification rounds: ' + e.message, 'err'); return []; })]);
@@ -1469,7 +1472,8 @@ if(!HOOK.lite && X2 && X2.v === 1){
   secondOk = cmrLoaded && ecarLoaded && kpi7Loaded && TOASTS.filter(t => t.kind === 'err').length === err0;
 }
 const second = () => { const pv = new Set(allData.filter(r => r.report_title === 'PAVOI').map(r => r.report_id));
-  return { v: 1, cmr: cmrData, ecar: ecarData, k7c: kpi7Cnt, k7v: kpi7Ver, ver: verRaw.filter(f => f.section_id && pv.has(f.report_id)) }; };
+  const fin = {}; allData.forEach(r => { if(r.report_title === 'PAVOI' && r.verif_final) fin[r.report_id] = r.verif_final; });
+  return { v: 1, cmr: cmrData, ecar: ecarData, k7c: kpi7Cnt, k7v: kpi7Ver, ver: verRaw.filter(f => f.section_id && pv.has(f.report_id)), fin }; };
 /* a cache that lacks the second-pass part (written by a lite first paint, or before r168) gets it added
    once the second pass comes back clean — same entry, same ts — so the next open paints everything at once */
 const entry = saveCache ? Object.assign({}, mem, secondOk ? { x: second() } : {})
@@ -1540,7 +1544,7 @@ allData.forEach(r => {
     o.finding = orDash(r.rfv);
     o.auditTitle = orDash(r.report_ref);
     o.pvDept = orDash(r.dept);
-    o.verifResult = orDash(r.verif_result);
+    o.verifResult = orDash(r.verif_final);   /* r195: Final Conclusion only (Eric 03/10) — not one verification round */
     o.withdrawn = kpi7Withdrawn(r);
     o.firstVerified = kpi7Ver[r.report_id] || null;
     o.rounds = Object.values(secMap[r.report_id] || {})
@@ -2257,7 +2261,8 @@ const M = {
     return { total: list.length, answered: done.length, open: open.length, overdue: overdue.length, lastAnswered: last };
   },
   /* r193: verification result 'Satisfactory' recorded but the report is not closed on Coruson — overdue only
-     because nobody closed it (or moved its target). Value as Galileo returns it, compared case-insensitively. */
+     because nobody closed it (or moved its target). Value as Galileo returns it, compared case-insensitively.
+     r195: callers pass the PAVOI FINAL CONCLUSION (section 'Final Conclusion'), never one verification round. */
   verifiedOpen: (r, verif) => M.isOpen(r) && String(verif || '').trim().toLowerCase() === 'satisfactory',
   caSummary(cas){
     const n = p => cas.filter(p).length;
@@ -3228,7 +3233,7 @@ function renderPavoi(){
     ['Form','PAVOI'], ['Status', null], ['Owner section', r.owner], ['Issued to', r.issuedTo],   /* r194: was dept / owner (same value twice) */
     ['Raised', fmtDate(r.raised)], ['Target', fmtDate(r.target)],
     ['Days to due', r.closed ? 'closed '+fmtDate(r.closed) : (r.dtd<0 ? Math.abs(r.dtd)+' days over' : r.dtd+' days left')],
-  ].concat(REAL ? [['Department', r.pvDept], ['Source report', r.auditTitle], ['Verification result', r.verifResult]]
+  ].concat(REAL ? [['Department', r.pvDept], ['Source report', r.auditTitle], ['Final verification', r.verifResult]]
                 : [['Finding level', r.level], ['Audit', r.auditTitle+' · '+r.location]]
   ).map(m=>'<div class="meta-i"><span class="meta-k">'+esc(m[0])+'</span>'
     + (m[1]===null ? '<span class="meta-v">'+chip(r.status)+'</span>' : '<span class="meta-v od-truncate">'+esc(m[1])+'</span>')+'</div>').join('');
@@ -4815,9 +4820,9 @@ function showReport(id){
       + block(rep.form === 'pavoi' ? 'Request for verification' : 'Finding', rep.form === 'pavoi' ? r.rfv : r.finding_desc)
       /* r190: MCAR extension reason / denial reason as entered on the form (Extension applies to MCAR only) */
       + block('Reason for extension', r.ext_reason) + block('Extension denied reason', r.ext_denied)
-      + block('Verification result', r.verif_result)
-      /* r193: verified Satisfactory but still open on Coruson */
-      + (M.verifiedOpen(rep, r.verif_result) ? block('Verified Satisfactory — not closed', 'The verification result is Satisfactory but the report is still '+rep.status+' on Coruson. Close it there, or move its target date if follow-up continues.', true) : '')
+      + (rep.form === 'pavoi' ? block('Final verification', r.verif_final) : block('Verification result', r.verif_result))
+      /* r193: verified Satisfactory but still open on Coruson — r195: PAVOI only, Final Conclusion only */
+      + (rep.form === 'pavoi' && M.verifiedOpen(rep, r.verif_final) ? block('Verified Satisfactory — not closed', 'The verification result is Satisfactory but the report is still '+rep.status+' on Coruson. Close it there, or move its target date if follow-up continues.', true) : '')
       /* r169: corrective actions of this report (F-088, investigation reports, AMO ECAR…); load once, then re-open */
       + (A.eis().loaded ? caList(A.eis().ca[id] || [], caForms().has(r.report_title))
          : (MODAL_KEY = 'rpt:'+id, Promise.resolve(A.loadEis()).then(() => { if(MODAL_KEY === 'rpt:'+id) showReport(id); }),

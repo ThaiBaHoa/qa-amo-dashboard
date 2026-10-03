@@ -2522,7 +2522,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.10.03-r194';
+const APP_REV = '2026.10.03-r195';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -6321,8 +6321,25 @@ function kpi7CacheSave(){
 // Fetch MỘT LƯỢT TOÀN CỤC rồi post-filter client-side theo report_id của PAVOI — không nhồi
 // report_id vào $filter. Đo 08/09/2026: cả section này chỉ có 4.036 dòng cho MỌI loại report
 // (977 dòng `Date verified`), một request là đủ; chunk theo report_id chỉ tốn thêm vòng.
+// [r195] KẾT LUẬN CUỐI của PAVOI = 'Verification Result' ở section 'Final Conclusion' (section_level 0) — Eric 03/10:
+// chỉ field cuối (final verification) mới tính là hoàn thành. r.verif_result (custom field, KHÔNG phân biệt section)
+// lấy nhầm kết quả một lượt xác minh: PAVOI-437 Final Conclusion trống nhưng lượt 1 Satisfactory → r193 gắn cờ sai.
+// Một request toàn cục (vài nghìn dòng), post-filter theo PAVOI; ghi r.verif_final lên allData. loadPavoiFinal.done = đã nạp.
+async function loadPavoiFinal(){
+  const ids = new Set(allData.filter(r=>r.report_title==='PAVOI' && r.report_id).map(r=>r.report_id));
+  if(!ids.size){ loadPavoiFinal.done = true; return; }
+  try{
+    const raw = await fetchAll(G_URL + 'dwanalytics_report_field?$select=report_id,value_text' +
+      '&$filter=' + encodeURIComponent("section_name eq 'Final Conclusion' and section_level eq 0 and field_name eq 'Verification Result'"), true);
+    const fin = {};
+    raw.forEach(f=>{ if(ids.has(f.report_id) && f.value_text && String(f.value_text).trim()) fin[f.report_id] = String(f.value_text).trim(); });
+    allData.forEach(r=>{ if(r.report_title==='PAVOI') r.verif_final = fin[r.report_id] || null; });
+    loadPavoiFinal.done = true;
+  }catch(e){ console.warn('[PAVOI final] Final Conclusion fetch failed:', e.message); }
+}
 async function loadKpi7Tasks(force=false){
   if(kpi7Busy) return;                    // [r155] trang PAVOI + trang KPI cùng gọi → chỉ nạp một lượt
+  if(!loadPavoiFinal.done || force) await loadPavoiFinal();   // [r195]
   if(force){
     kpi7Loaded=false; kpi7Cnt={}; kpi7Ver={}; kpi7Done=new Set();
     try{ localStorage.removeItem(KPI7_CACHE_KEY); }catch{}
@@ -9014,7 +9031,9 @@ async function exportOverdueReport(){
     // Department: phòng ban trên Coruson; MCAR/ECAR kèm 'Issued to (person)'. PAVOI: r.dept = Department của PAVOI.
     const deptOf=r=>{ const p=r.report_title==='PAVOI'?null:r.issued_person; return (r.dept||'')+(p?((r.dept?' - ':'')+p):''); };
     // [r193] đã xác minh Satisfactory mà report chưa đóng (quên đóng / chưa dời hạn trên Coruson)
-    const statusOf=r=>(r.semantic_status||'')+(String(r.verif_result||'').trim().toLowerCase()==='satisfactory'?' — Verified Satisfactory, not closed':'');
+    // [r195] chỉ PAVOI, theo KẾT LUẬN CUỐI (section Final Conclusion), không theo một lượt xác minh
+    if(!loadPavoiFinal.done) await loadPavoiFinal();
+    const statusOf=r=>(r.semantic_status||'')+(r.report_title==='PAVOI'&&String(r.verif_final||'').trim().toLowerCase()==='satisfactory'?' — Verified Satisfactory, not closed':'');
 
     const {week,year}=isoWeekNum(new Date());
     // [r192] + Owner (owner_name = owner của report trên Coruson, nguyên văn: người hoặc nhóm) — Eric 03/10: cần để gửi nhắc
@@ -9107,7 +9126,8 @@ async function exportOverduePDF(){
     const pend=await ovrFetchPending([...new Set([...overdue,...soon].map(r=>r.report_id).filter(Boolean))]);
     const pendOf=r=>(pend[r.report_id]||[]).join('\n');
     const deptOf=r=>{ const p=r.report_title==='PAVOI'?null:r.issued_person; return (r.dept||'')+(p?((r.dept?' - ':'')+p):''); };
-    const statusOf=r=>(r.semantic_status||'')+(String(r.verif_result||'').trim().toLowerCase()==='satisfactory'?'\nVerified Satisfactory, not closed':'');
+    if(!loadPavoiFinal.done) await loadPavoiFinal();   // [r195] PAVOI, kết luận cuối
+    const statusOf=r=>(r.semantic_status||'')+(r.report_title==='PAVOI'&&String(r.verif_final||'').trim().toLowerCase()==='satisfactory'?'\nVerified Satisfactory, not closed':'');
     const {week,year}=isoWeekNum(new Date());
 
     const {jsPDF}=window.jspdf;
