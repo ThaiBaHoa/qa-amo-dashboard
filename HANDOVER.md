@@ -5,6 +5,11 @@
 
 ---
 
+## ✅ r196 — Audit Plan › Schedule list: lọc Audit / Inspection / Other + sort cột (07/10/2026, ERICTHAI) — ĐÃ PUSH `7e44505`, live (curl APP_REV r196)
+
+- Nguồn: `beta-src/beta-template.html` `renderAuditList` + `AUD_COLS`. Nút Type dùng chung `state.aud.type` với Timeline; sort qua `data-act="sort"` sẵn có (`state.sort.auditlist`), chưa chọn thì theo tháng.
+- Chỉ giao diện, không đổi METRICS. Kiểm local dữ liệu thật: 236 = Audit 48 + Inspection 179 + Other 9; sort Findings/Window 2 chiều, console sạch. Eric chưa nhìn live.
+
 ## ✅ r195 — cờ Verified Satisfactory của PAVOI chỉ theo Final Conclusion (03/10/2026, THAIBAHOA-HOME) — ĐÃ PUSH `818d5c3`, live (curl APP_REV r195)
 
 - `loadPavoiFinal()` (classic, gọi trong `loadKpi7Tasks`) → `r.verif_final` = section Final Conclusion level 0; cache phần 2 có `fin`.
