@@ -3319,10 +3319,30 @@ function renderAudit(tab){
     + '<div class="tbl-foot">'+counts.map(c=>'<span class="t-small dim">'+c.s+' <span class="num strong">'+c.n+'</span></span>').join('')+'</div>'
     + '</div></section>';
 }
+/* Schedule list: split by type (shares state.aud.type with the timeline) + sortable headers (Eric 07/10/2026) */
+const AUD_COLS = [
+  {l:'Audit',    v:a=>a.number},
+  {l:'Type',     v:a=>a.type},
+  {l:'Status',   v:a=>a.status},
+  {l:'Window',   v:a=>(a.year||0)*100 + a.start},
+  {l:'Lead',     v:a=>String(a.lead||'')},
+  {l:'Location', v:a=>String(a.location||'')},
+  {l:'Findings', v:a=>a.findings, ar:1},
+  {l:'Open',     v:a=>a.open, ar:1},
+  {l:'Overdue',  v:a=>a.overdue, ar:1}
+];
 function renderAuditList(){
-  const AUD = auditsScoped();
-  if(!AUD.length) return '<section class="sec"><div class="card">'+emptyState()+'</div></section>';
-  const rows = AUD.slice().sort((a,b)=>(a.year||0)-(b.year||0) || a.start-b.start).map(a=>
+  const ALL = auditsScoped();
+  if(!ALL.length) return '<section class="sec"><div class="card">'+emptyState()+'</div></section>';
+  const f = state.aud, st = state.sort.auditlist;
+  const typeN = t => ALL.filter(a => a.type === t).length;
+  const AUD = ALL.filter(a => !f.type || a.type === f.type);
+  const seg = (v, label) => '<button class="btn'+(f.type===v?' primary':'')+'" type="button" data-act="audf" data-k="type" data-v="'+v+'" aria-pressed="'+(f.type===v)+'">'+esc(label)+'</button>';
+  const filters = '<div class="card-pad" style="padding-bottom:0"><div class="od-row" style="--od-gap:6px;flex-wrap:wrap"><span class="t-small dim">Type</span>'
+    + seg('', 'All '+ALL.length) + ['Audit','Inspection','Other'].filter(typeN).map(t => seg(t, t+' '+typeN(t))).join('') + '</div></div>';
+  const cmp = st ? (a,b) => { const c = AUD_COLS[st.k], av = c.v(a), bv = c.v(b), r = av < bv ? -1 : av > bv ? 1 : 0; return st.dir === 'asc' ? r : -r; }
+                 : (a,b) => (a.year||0)-(b.year||0) || a.start-b.start;
+  const rows = AUD.slice().sort(cmp).map(a=>
     '<tr tabindex="0" data-act="'+(REAL?'baudit':'toast')+'" data-id="'+esc(a.id)+'" data-t="'+esc(a.number)+'" data-b="'+esc(a.title+' — '+a.status+', '+a.findings+' findings.')+'">'
     + '<td class="t-main" data-l="Audit"><span class="row-main"><span class="row-id">'+esc(a.number)+extLink('audit', a.id, a.number)+'</span>'
       + '<span class="row-sub od-truncate">'+esc(a.title)+'</span></span></td>'
@@ -3335,11 +3355,13 @@ function renderAuditList(){
     + '<td class="ar" data-l="Open"><span class="num'+(a.open?' strong':' dim')+'">'+a.open+'</span></td>'
     + '<td class="ar" data-l="Overdue">'+(a.overdue?'<span class="cat c3">'+a.overdue+'</span>':'<span class="dim">—</span>')+'</td></tr>').join('');
   return '<section class="sec"><div class="card">'
-    + '<div class="card-head"><h2>Schedule list</h2><span class="t-small dim od-fill">'+AUD.length+' audits · '+esc(periodLabel())+' · the same programme as a flat list.</span></div>'
+    + '<div class="card-head"><h2>Schedule list</h2><span class="t-small dim od-fill">'+AUD.length+(AUD.length !== ALL.length ? ' of '+ALL.length : '')+' audits · '+esc(periodLabel())+' · the same programme as a flat list.</span></div>'
+    + filters
     + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
-    + ['Audit','Type','Status','Window','Lead','Location','Findings','Open','Overdue']
-        .map((h,i)=>'<th scope="col"'+(i>5?' class="ar"':'')+'><span>'+h+'</span></th>').join('')
-    + '</tr></thead><tbody>'+rows+'</tbody></table></div></div></section>';
+    + AUD_COLS.map((c,i)=>{ const on = st && String(st.k) === String(i);
+        return '<th scope="col"'+(on?' aria-sort="'+(st.dir==='asc'?'ascending':'descending')+'"':'')+(c.ar?' class="ar"':'')+'>'
+          + '<button type="button" data-act="sort" data-key="auditlist" data-col="'+i+'">'+esc(c.l)+ic(on?(st.dir==='asc'?'sortUp':'sortDown'):'sortNone',13,'sort-ic')+'</button></th>'; }).join('')
+    + '</tr></thead><tbody>'+(rows || '<tr><td colspan="9">'+emptyState()+'</td></tr>')+'</tbody></table></div></div></section>';
 }
 
 /* ==========================================================================
