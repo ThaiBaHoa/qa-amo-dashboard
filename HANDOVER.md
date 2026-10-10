@@ -5,6 +5,11 @@
 
 ---
 
+## ⏳ r197 — Analytics: tab "Safety (MSAG)" → "OSR/MOSR Status" (10/10/2026, ERICTHAI)
+
+- Nguồn: `beta-src/beta-template.html` (nhãn tab + bảng what-moved), `screens2.js` (bước kiosk), `guide.js`; `manual.js` / `deck.js` đã đổi chữ nhưng CHƯA dựng lại .docx / deck.
+- Chỉ đổi nhãn: id tab vẫn `safety`, thẻ "MSAG report status" và tên nhóm MSAG giữ nguyên. Classic (`classic.html`) vẫn ghi "Safety — MSAG Report Status".
+
 ## ✅ r196 — Audit Plan › Schedule list: lọc Audit / Inspection / Other + sort cột (07/10/2026, ERICTHAI) — ĐÃ PUSH `7e44505`, live (curl APP_REV r196)
 
 - Nguồn: `beta-src/beta-template.html` `renderAuditList` + `AUD_COLS`. Nút Type dùng chung `state.aud.type` với Timeline; sort qua `data-act="sort"` sẵn có (`state.sort.auditlist`), chưa chọn thì theo tháng.

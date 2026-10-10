@@ -1943,7 +1943,7 @@ const NAV = [
     tabs:[
       {id:'kpi',    label:'KPI charts'},
       {id:'spi',    label:'SPI'},
-      {id:'safety', label:'Safety (MSAG)'},
+      {id:'safety', label:'OSR/MOSR Status'},
       {id:'early',  label:'Early detection'},
       {id:'status', label:'Event/IR report status'}
     ]},
@@ -3424,7 +3424,7 @@ const IA_MAP = [
   ['Main','Overdue','Work Queue › Overdue','Was a separate destination; overdue is the same list with one more condition. It also surfaces on Overview, so it no longer needs to be hunted for.'],
   ['Main','KPI Charts','Analytics › KPI charts','Trends over time are a different job from clearing a queue. Grouping them stops the two modes competing in one sidebar.'],
   ['Main','SPI','Analytics › SPI','Same reason. SPI is read monthly, not daily.'],
-  ['Main','Safety','Analytics › Safety (MSAG)','MSAG report status is a monitoring view, not an action list for the QA team.'],
+  ['Main','Safety','Analytics › OSR/MOSR Status','MSAG report status is a monitoring view, not an action list for the QA team.'],
   ['Main','Report Status','Analytics › Event/IR report status','An extract view of a source system. It belongs with the other read-and-compare screens.'],
   ['Main','Audit Plan','Audit Plan › Timeline','Promoted to its own top-level entry: the annual programme is its own planning job, and it now opens on a timeline rather than a table.'],
   ['Detail','All Forms','Findings › All forms','The register, unfiltered.'],
@@ -5224,7 +5224,7 @@ const KIOSK_STEPS = [
   { l:'Report status · EIS', go:() => { BS.rsTab = 'eis'; go('analytics','status'); } },
   { l:'Report status · F-088', go:() => { BS.rsTab = 'f088'; go('analytics','status'); } },
   { l:'SPI', go:() => go('analytics','spi') },
-  { l:'Safety · MSAG', go:() => go('analytics','safety') },
+  { l:'OSR/MOSR Status', go:() => go('analytics','safety') },
   { l:'Audit Plan · Timeline', go:() => go('audit','timeline') }
 ];
 function startKiosk(){
@@ -5337,7 +5337,7 @@ function scrGuideNew(){
     + '<tr><td>Overview</td><td>See key indicators for the selected period. Every tile opens the report list behind it.</td></tr>'
     + '<tr><td>Work Queue</td><td>Act on reports: Open reports, Overdue, and PAVOI awaiting verification.</td></tr>'
     + '<tr><td>Findings</td><td>Read the register by form: All forms, PAVOI, CMR-CAR, ECAR, AMO-ECAR, MCAR, OSR / MOSR.</td></tr>'
-    + '<tr><td>Analytics</td><td>KPI charts, SPI, Safety (MSAG), Early detection (KPI 2) and Event/IR report status on Coruson.</td></tr>'
+    + '<tr><td>Analytics</td><td>KPI charts, SPI, OSR/MOSR Status, Early detection (KPI 2) and Event/IR report status on Coruson.</td></tr>'
     + '<tr><td>Audit Plan</td><td>The audit and inspection programme: timeline, schedule list and workflow stages.</td></tr>'
     + '<tr><td>Library</td><td>Controlled documents and this guide.</td></tr>'
     + '<tr><td>Admin</td><td>User management, report export and pinned widgets (administrators).</td></tr></table>'
@@ -5386,7 +5386,7 @@ function scrGuideNew(){
     + '<li>A tile or table that shows a dash or "Loading…" is waiting for its data; it never shows 0 for data that has not arrived.</li>'
     + '<li>If a number looks wrong, check the record in Coruson first: the dashboard shows what Coruson holds.</li></ul>')
   + sec('led','LED wall mode',
-    '<p>Open the dashboard with <b>?kiosk=1</b> at the end of the address (or <b>?kiosk=60</b> for 60 seconds per page). The screen rotates Overview → Report status EIS → Report status F-088 → SPI → Safety (MSAG) → Audit Plan timeline, without the navigation. Press Esc to stop. Use one browser window; the data refreshes itself every 12 hours without reloading the page.</p>')
+    '<p>Open the dashboard with <b>?kiosk=1</b> at the end of the address (or <b>?kiosk=60</b> for 60 seconds per page). The screen rotates Overview → Report status EIS → Report status F-088 → SPI → OSR/MOSR Status → Audit Plan timeline, without the navigation. Press Esc to stop. Use one browser window; the data refreshes itself every 12 hours without reloading the page.</p>')
   + sec('faq','Questions',
     '<p><b>The first opening is slow.</b> The first load of the day on a computer fetches everything from Galileo. Later openings use the saved copy.</p>'
     + '<p><b>I cannot see Admin screens.</b> They are for administrators. Ask an administrator to change your role.</p>'
