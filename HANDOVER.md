@@ -5,7 +5,7 @@
 
 ---
 
-## ⏳ r197 — Analytics: tab "Safety (MSAG)" → "OSR/MOSR Status" (10/10/2026, ERICTHAI)
+## ✅ r197 — Analytics: tab "Safety (MSAG)" → "OSR/MOSR Status" (10/10/2026, ERICTHAI) — ĐÃ PUSH `c68e0ca`, live (curl APP_REV r197)
 
 - Nguồn: `beta-src/beta-template.html` (nhãn tab + bảng what-moved), `screens2.js` (bước kiosk), `guide.js`; `manual.js` / `deck.js` đã đổi chữ nhưng CHƯA dựng lại .docx / deck.
 - Chỉ đổi nhãn: id tab vẫn `safety`, thẻ "MSAG report status" và tên nhóm MSAG giữ nguyên. Classic (`classic.html`) vẫn ghi "Safety — MSAG Report Status".
