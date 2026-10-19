@@ -5,7 +5,7 @@
 
 ---
 
-## ⏳ r198 — Form MVOI vào chung tab PAVOI (19/10/2026, THAIBAHOA-HOME) — CHƯA COMMIT / CHƯA PUSH
+## ✅ r198 — Form MVOI vào chung tab PAVOI (19/10/2026, THAIBAHOA-HOME) — ĐÃ PUSH `cb3723c`, live (curl APP_REV r198)
 
 - Nguồn: `classic.html` (CF_FIELDS + delta `in`, loadPavoiFinal, loadPavoiRfi, APP_REV) + vault `beta-src`: loader.js (FORM_OF/CODE `mvoi`, PV_TITLES), beta-template.html (tab "PAVOI / MVOI", `formTab`/`isPvForm`, renderPavoi lọc Form), screens2.js (hộp chi tiết), guide.js.
 - Kiểm local dữ liệu thật (beta-local 19/10): 3 MVOI, số vòng khớp probe (001: 4 · 002: 1 · 003: 2), MVOI Type / Responsible Department hiện đúng; KPI 7 giữ 51/59 · 4 withdrawn; loadWarnings rỗng, self-check sạch.
