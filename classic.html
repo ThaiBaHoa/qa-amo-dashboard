@@ -552,7 +552,7 @@ body.kiosk .mob-menu{display:none!important}
         <div class="nav-sec" style="margin-top:6px">Detail</div>
         <button class="nav-item" onclick="showPage('allforms',this)"><span class="nav-ic" data-ic="list"></span>All Forms</button>
         <button class="nav-item" onclick="showPage('osrmosr',this)"><span class="nav-ic" data-ic="shield"></span>OSR / MOSR</button>
-        <button class="nav-item" onclick="showPage('pavoi',this)"><span class="nav-ic" data-ic="doc"></span>PAVOI Detail</button>
+        <button class="nav-item" onclick="showPage('pavoi',this)"><span class="nav-ic" data-ic="doc"></span>PAVOI / MVOI Detail</button>
         <button class="nav-item" onclick="showPage('cmrcar',this)"><span class="nav-ic" data-ic="shield"></span>CMR-CAR</button>
         <button class="nav-item" onclick="showPage('ecar',this)"><span class="nav-ic" data-ic="shield"></span>ECAR</button>
         <button class="nav-item" onclick="showPage('amoecar',this)"><span class="nav-ic" data-ic="shield"></span>AMO-ECAR</button>
@@ -668,7 +668,7 @@ body.kiosk .mob-menu{display:none!important}
 
           <!-- SECTION 3: PAVOI Assessment — KPI 7  [r150] -->
           <!-- Dùng bộ lọc năm sẵn có ở đầu trang (#ovYearFilter) — một trang một bộ lọc năm. -->
-          <div class="sec-title" style="margin-top:16px">PAVOI Assessment &middot; KPI 7</div>
+          <div class="sec-title" style="margin-top:16px">PAVOI / MVOI Assessment &middot; KPI 7</div>
           <div id="ovKpi7Warn" style="display:none;font-size:11px;color:var(--yellow);margin-bottom:8px"></div>
           <!-- [r158] Bỏ chart "Monthly" theo yêu cầu Eric 09/09/2026 — chỉ còn "By section",
                chiếm trọn chiều ngang. Chart tháng có một bẫy đã biết và chưa xử: tử số và mẫu số
@@ -677,7 +677,7 @@ body.kiosk .mob-menu{display:none!important}
           <div style="display:grid;grid-template-columns:1fr;gap:8px">
             <div class="chart-card">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-                <div style="font-size:13px;font-weight:600" title="Assessed &divide; Total PAVOI &times; 100% &middot; assessed = has at least 1 verification round">By section <span style="font-size:11px;color:var(--muted);font-weight:400">&middot; higher is better</span></div>
+                <div style="font-size:13px;font-weight:600" title="Assessed &divide; Total PAVOI / MVOI &times; 100% &middot; assessed = has at least 1 verification round">By section <span style="font-size:11px;color:var(--muted);font-weight:400">&middot; higher is better</span></div>
                 <div style="font-size:11px;color:var(--muted)" id="ov-kpi7-cnt"></div>
               </div>
               <div style="height:230px;position:relative"><canvas id="ovKpi7Sec"></canvas></div>
@@ -932,13 +932,13 @@ body.kiosk .mob-menu{display:none!important}
           <div class="chart-card" style="flex-shrink:0;margin-top:8px">
             <div class="chart-head" style="margin-bottom:10px">
               <div>
-                <div class="chart-title">KPI 7 — PAVOI KPI (assessment rate)</div>
+                <div class="chart-title">KPI 7 — PAVOI / MVOI KPI (assessment rate)</div>
                 <div class="chart-sub" id="kpi7Sub">Assessed ÷ Total × 100% · assessed = has ≥1 verification round · higher is better</div>
               </div>
               <div style="display:flex;gap:6px;align-items:center">
                 <div class="ymulti" id="kpi7Year"></div>
                 <div class="ymulti" id="kpi7Month"></div>
-                <button class="btn-sm" onclick="loadKpi7Tasks(true)" title="Re-fetch verification rounds for every PAVOI" style="white-space:nowrap;flex-shrink:0">↻</button>
+                <button class="btn-sm" onclick="loadKpi7Tasks(true)" title="Re-fetch verification rounds for every PAVOI / MVOI" style="white-space:nowrap;flex-shrink:0">↻</button>
                 <div style="text-align:right;min-width:108px">
                   <div class="kpi-val" id="kpi7-val" style="font-size:20px">—</div>
                   <div class="kpi-lbl" id="kpi7-frac">—</div>
@@ -949,12 +949,12 @@ body.kiosk .mob-menu{display:none!important}
             <div style="overflow-x:auto">
               <table class="stat-tbl" id="kpi7Table">
                 <thead><tr>
-                  <th>Section (PAVOI owner)</th>
+                  <th>Section (PAVOI / MVOI owner)</th>
                   <th style="text-align:center;color:var(--green)">Assessed</th>
                   <th style="text-align:center;color:#ff6b6b">No verification</th>
                   <th style="text-align:center;color:var(--muted)">Closed</th>
-                  <th style="text-align:center">Total PAVOI</th>
-                  <th style="text-align:center" title="Assessed ÷ Total PAVOI — assessed = has at least 1 verification round — higher is better">KPI % ↑</th>
+                  <th style="text-align:center">Total PAVOI / MVOI</th>
+                  <th style="text-align:center" title="Assessed ÷ Total PAVOI / MVOI — assessed = has at least 1 verification round — higher is better">KPI % ↑</th>
                 </tr></thead>
                 <tbody id="kpi7Body"></tbody>
               </table>
@@ -1021,7 +1021,7 @@ body.kiosk .mob-menu{display:none!important}
         <div class="page" id="page-pavoi">
           <div class="tbl-card">
             <div class="tbl-bar">
-              <div><div class="tbl-title">PAVOI Detail</div><div class="tbl-count" id="pavoiCnt">—</div></div>
+              <div><div class="tbl-title">PAVOI / MVOI Detail</div><div class="tbl-count" id="pavoiCnt">—</div></div>
               <!-- [r158] Ba nút này phải KHỚP đúng cột Status. Từ r157 cột Status hiện `report_status`
                    (Open / Closed), nên bộ lọc cũ theo `semantic_status` (Overdue / On-time / Lately) lọc
                    ra thứ không còn nhìn thấy trên bảng — bấm Overdue mà cột Status vẫn ghi "Open" thì
@@ -1030,6 +1030,12 @@ body.kiosk .mob-menu{display:none!important}
               <button class="pill" onclick="setPAV('Open',this)">Open</button>
               <button class="pill" onclick="setPAV('Closed',this)">Closed</button>
               <div class="ymulti" id="pavoiYearF"></div>
+              <!-- [r200] MVOI (form mới 10/2026, cùng khuôn PAVOI) chung trang này -->
+              <select class="sel" id="pavoiFormF" onchange="TS.pavoi.page=1;renderPavoi()" title="Form">
+                <option value="">All forms</option>
+                <option value="PAVOI">PAVOI</option>
+                <option value="MVOI">MVOI</option>
+              </select>
               <select class="sel" id="pavoiSectF" onchange="TS.pavoi.page=1;renderPavoi()" title="Lọc theo Owner = nhóm Section (Galileo đang chuyển owner PAVOI về 4 nhóm này)">
                 <option value="">All owners</option>
                 <option value="MQA - Licensing and Authorization Section">MQA - Licensing and Authorization Section</option>
@@ -1722,14 +1728,14 @@ body.kiosk .mob-menu{display:none!important}
 
                 <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
                   <div style="background:rgba(88,166,255,0.06);padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
-                    <span>🔍</span><span style="font-size:13px;font-weight:600">PAVOI Detail</span>
+                    <span>🔍</span><span style="font-size:13px;font-weight:600">PAVOI / MVOI Detail</span>
                   </div>
                   <div style="padding:12px 14px;font-size:12px;color:var(--muted);line-height:1.7">
-                    Shows only <b>PAVOI</b> forms with full verification details.<br>
+                    Shows <b>PAVOI</b> and <b>MVOI</b> forms with full verification details (Form filter to show one).<br>
                     • <b style="color:var(--text)">Request For Verification:</b> Content of the verification request for implementation<br>
                     • <b style="color:var(--text)">Report Reference:</b> Original report number that the PAVOI is tracking (e.g. MCAR-0086)<br>
                     • <b style="color:var(--text)">Verification Result:</b> <span style="color:var(--green)">Satisfactory</span> = passed / <span style="color:#ff6b6b">Not Satisfactory</span> = not yet passed<br>
-                    • <b style="color:var(--text)">Department:</b> Department responsible for implementation
+                    • <b style="color:var(--text)">Department:</b> Department responsible for implementation (MVOI: Responsible Department)
                   </div>
                 </div>
 
@@ -2365,7 +2371,7 @@ body.kiosk .mob-menu{display:none!important}
   <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:95%;max-width:820px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
     <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0">
       <div>
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">PAVOI Detail · RFI &amp; Task Monitor</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">PAVOI / MVOI Detail · RFI &amp; Task Monitor</div>
         <div style="font-size:15px;font-weight:700;color:var(--text);margin-top:2px" id="pavoiMTitle">—</div>
         <div style="font-size:11px;color:var(--muted);margin-top:3px" id="pavoiMSub">—</div>
       </div>
@@ -2419,7 +2425,7 @@ body.kiosk .mob-menu{display:none!important}
   <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:95%;max-width:860px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column" onclick="event.stopPropagation()">
     <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0">
       <div>
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">KPI 7 · PAVOI not assessed (no RFI, no Task)</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em">KPI 7 · PAVOI / MVOI not assessed (no RFI, no Task)</div>
         <div style="font-size:15px;font-weight:700;color:var(--text);margin-top:2px" id="kpi7MTitle">—</div>
         <div style="font-size:11px;color:var(--muted);margin-top:3px" id="kpi7MSub">—</div>
       </div>
@@ -2522,7 +2528,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.10.19-r199';
+const APP_REV = '2026.10.19-r200';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -6025,17 +6031,18 @@ function pavOwnerShort(v){
 function renderPavoi() {
   const srch=(g('pavoiSrch')?.value||'').toLowerCase();
   const sect=g('pavoiSectF')?.value||'';               // '' = All; else lọc theo OWNER = nhóm Section (owner_name)
+  const form=g('pavoiFormF')?.value||'';               // [r200] '' = PAVOI + MVOI
   const ts=TS.pavoi;
 
   let data=allData.filter(r=>{
-    if(r.report_title!=='PAVOI') return false;
+    if(!isPvReport(r) || (form && r.report_title!==form)) return false;   // [r200] + MVOI
     // [r158] Lọc theo `report_status` cho khớp cột Status (r157), KHÔNG theo `semantic_status`.
     if(ts.sf!=='all' && r.report_status!==ts.sf) return false;
     if(sect && r.owner_name!==sect) return false;      // owner của PAVOI trùng đúng tên nhóm Section
     if(!ymHas('pavoiYearF', r.raised_year)) return false;
     if(srch){
       const t=[r.report_number,r.semantic_status,r.audit_title,
-               r.audit_number,r.rfv,r.report_ref,r.verif_result,r.dept,r.owner_name].join(' ').toLowerCase();
+               r.audit_number,r.rfv,r.report_ref,r.verif_result,r.dept,r.resp_dept,r.owner_name].join(' ').toLowerCase();
       if(!t.includes(srch))return false;
     }
     return true;
@@ -6053,7 +6060,7 @@ function renderPavoi() {
       <td class="pav-long" title="${esc(r.rfv)||''}">${esc(r.rfv)||'—'}</td>
       <td>${r.verif_result?`<span style="color:${r.verif_result==='Satisfactory'?'var(--green)':'#ff6b6b'}">${esc(r.verif_result)}</span>`:'—'}</td>
       <td>${pavoiVerCell(r)}</td>
-      <td>${esc(r.dept)||'—'}</td>
+      <td>${esc(r.report_title==='MVOI'?r.resp_dept:r.dept)||'—'}</td>
       <td>${pavoiRfiCell(r.report_id)}</td>
     </tr>`);
 }
@@ -6076,7 +6083,7 @@ async function loadPavoiRfi(force=false){
   const openIds = [...new Set(allPavoi.filter(r=>r.report_status==='Open').map(r=>r.report_id).filter(Boolean))];
   const todo = openIds.filter(id => !pavoiRfiDone.has(id));
   if(!todo.length){ pavoiRfiLoaded=true; renderPavoi(); return; }
-  setOv(true,'Loading PAVOI RFI...','');
+  setOv(true,'Loading PAVOI / MVOI RFI...','');
   // [r175] Các chunk chạy SONG SONG từng đợt PAR (trước: tuần tự), và bỏ vòng thử lại bên ngoài — fetchAll
   // đã tự thử lại 3 lần có dự phòng, chồng thêm 3 lần nữa là tới 9 lần × 90s cho một chunk hỏng.
   // Chunk hỏng vẫn để pavoiRfiLoaded=false → mở lại trang thử đúng các report còn thiếu.
@@ -6102,12 +6109,12 @@ async function loadPavoiRfi(force=false){
       console.warn('[PAVOI RFI] chunk failed (' + ids.length + ' reports):', e.message);
     }
     doneN += ids.length;
-    setOv(true,'Loading PAVOI RFI/Task...',`${doneN}/${todo.length} reports`);
+    setOv(true,'Loading PAVOI / MVOI RFI/Task...',`${doneN}/${todo.length} reports`);
   };
   for(let i=0;i<chunks.length;i+=PAR) await Promise.all(chunks.slice(i,i+PAR).map(one));
   if(failed){
     pavoiRfiLoaded = false;   // còn chunk lỗi → mở lại trang sẽ thử lại đúng các report còn thiếu
-    toast(`PAVOI RFI/Task: ${failed} group(s) failed to load — reopen the page to retry`,'err');
+    toast(`PAVOI / MVOI RFI/Task: ${failed} group(s) failed to load — reopen the page to retry`,'err');
   }else{
     pavoiRfiLoaded = true;
   }
@@ -6164,10 +6171,10 @@ function pavoiRfiCell(report_id){
 }
 
 async function showPavoiDetail(report_id){
-  const r = allData.find(x=>x.report_id===report_id && x.report_title==='PAVOI');
+  const r = allData.find(x=>x.report_id===report_id && isPvReport(x));   // [r200] + MVOI
   if(!r) return;
   s('pavoiMTitle', r.report_number||'—');
-  s('pavoiMSub', [r.report_ref?('Ref: '+r.report_ref):null, r.dept, fd(r.raised_date)].filter(Boolean).join(' · '));
+  s('pavoiMSub', [r.report_title, r.report_ref?('Ref: '+r.report_ref):null, r.report_title==='MVOI'?r.resp_dept:r.dept, fd(r.raised_date)].filter(Boolean).join(' · '));
   g('pavoiModal').style.display='flex';
   s('pvk-total','…'); s('pvk-open','…'); s('pvk-over','…'); s('pvk-done','…');
   g('pavoiRfiBody').innerHTML='<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">Loading RFI / Task…</td></tr>';
@@ -6360,7 +6367,7 @@ async function loadKpi7Tasks(force=false){
   if(ids.every(id=>kpi7Done.has(id))){ kpi7Loaded=true; kpi7CacheSave(); kpi7RenderAll(); runSelfChecks(); return; }
 
   kpi7Busy = true;
-  setOv(true,'Loading PAVOI verification (KPI 7)...','',0);
+  setOv(true,'Loading PAVOI / MVOI verification (KPI 7)...','',0);
   const MAX_TRY = 3;
   const url = G_URL + 'dwanalytics_report_field' +
     '?$select=report_id,section_id,field_name,value_text' +
@@ -6395,7 +6402,7 @@ async function loadKpi7Tasks(force=false){
   kpi7Loaded = ok;   // hỏng thì mở lại trang KPI sẽ thử lại
   kpi7CacheSave();
   setOv(false);
-  if(!ok) toast('KPI 7: could not load PAVOI verification rounds — reopen the KPI page to retry','err');
+  if(!ok) toast('KPI 7: could not load PAVOI / MVOI verification rounds — reopen the KPI page to retry','err');
   kpi7RenderAll();
   renderPavoi();          // [r155] cờ 30 ngày trên trang PAVOI Detail phụ thuộc kho này
   runSelfChecks();
@@ -6542,9 +6549,9 @@ function renderKpi7(){
     const nameStyle = un ? ' style="color:var(--muted);font-style:italic"' : '';
     const pend = r.pending ? ` <span style="font-size:10px;color:var(--muted)">(${r.pending} not loaded)</span>` : '';
     // [r152] Hồ sơ bị loại vì đang Withdrawn — bấm vào xem được đúng danh sách.
-    const wdr = r.withdrawn ? ` <span style="font-size:10px;color:var(--yellow);cursor:pointer;text-decoration:underline dotted" onclick="showKpi7Withdrawn(${i})" title="List the ${r.withdrawn} PAVOI excluded because they are withdrawn on Coruson">(${r.withdrawn} withdrawn, excluded)</span>` : '';
+    const wdr = r.withdrawn ? ` <span style="font-size:10px;color:var(--yellow);cursor:pointer;text-decoration:underline dotted" onclick="showKpi7Withdrawn(${i})" title="List the ${r.withdrawn} PAVOI / MVOI excluded because they are withdrawn on Coruson">(${r.withdrawn} withdrawn, excluded)</span>` : '';
     const naCell = (noData || openBlind) ? dash : (r.notAssessed
-      ? `<span style="cursor:pointer;text-decoration:underline dotted;color:#ff6b6b" onclick="showKpi7NotAssessed(${i})" title="List the ${r.notAssessed} PAVOI with no verification round">${r.notAssessed}</span>`
+      ? `<span style="cursor:pointer;text-decoration:underline dotted;color:#ff6b6b" onclick="showKpi7NotAssessed(${i})" title="List the ${r.notAssessed} PAVOI / MVOI with no verification round">${r.notAssessed}</span>`
       : '<span style="color:var(--muted)">0</span>');
     return `<tr>
       <td${nameStyle}>${esc(label(k))}${pend}${wdr}</td>
@@ -6570,13 +6577,13 @@ function renderKpi7(){
 
   const v = g('kpi7-val');
   if(v){ v.textContent = kpi7Fmt(pT); v.style.color = kpi7Color(pT); }
-  s('kpi7-frac', !st.tot.total ? 'no PAVOI'
+  s('kpi7-frac', !st.tot.total ? 'no PAVOI / MVOI'
                : st.tot.pending ? `${st.tot.pending} not loaded`
                : `${st.tot.assessed} / ${st.tot.total} assessed · ${st.tot.notAssessed} with no verification round${
                    st.tot.lags.length ? ` · median ${st.tot.lags.slice().sort((a,b)=>a-b)[Math.floor(st.tot.lags.length/2)]}d to first verification` : ''}`);
   // ⚠ s() ghi bằng textContent, KHÔNG phải innerHTML — entity HTML ở đây hiện ra nguyên xi
   // ("&amp;" đã lọt lên màn hình suốt r142–r148). Viết ký tự thật, đừng escape.
-  s('kpi7Sub', `Assessed ÷ Total PAVOI × 100% · assessed = has ≥1 verification round (open or closed alike) · assessment date = earliest Date verified · the 30-day rule is a flag on PAVOI Detail, not part of this KPI · withdrawn PAVOI excluded entirely · year ${ymText('kpi7Year')} · month ${ymText('kpi7Month')} · higher is better`);
+  s('kpi7Sub', `Assessed ÷ Total PAVOI / MVOI × 100% · assessed = has ≥1 verification round (open or closed alike) · assessment date = earliest Date verified · the 30-day rule is a flag on PAVOI / MVOI Detail, not part of this KPI · withdrawn PAVOI / MVOI excluded entirely · year ${ymText('kpi7Year')} · month ${ymText('kpi7Month')} · higher is better`);
 
   // Cảnh báo hiện trạng (PA1): owner đang được Galileo chuyển từ cá nhân sang User Group.
   const w = g('kpi7Warn');
@@ -6585,13 +6592,13 @@ function renderKpi7(){
     // [r152] Nói rõ mẫu số đã bị rút bớt bao nhiêu — con số này là VIỆC PHẢI SỬA trên Coruson,
     // không phải nhiễu kỹ thuật, nên để ở dòng cảnh báo chứ không giấu trong tooltip.
     if(st.tot.withdrawn)
-      msgs.push(`${st.tot.withdrawn} PAVOI excluded — currently withdrawn on Coruson (report closed while a workflow stage was still open). They return to the KPI automatically once the stage is closed properly.`);
+      msgs.push(`${st.tot.withdrawn} PAVOI / MVOI excluded — currently withdrawn on Coruson (report closed while a workflow stage was still open). They return to the KPI automatically once the stage is closed properly.`);
     if(st.tot.all && st.tot.inGroup < st.tot.all)
-      msgs.push(`Owner migration in progress — ${st.tot.inGroup}/${st.tot.all} PAVOI already owned by a Section group; the rest are counted under "Unassigned owner".`);
+      msgs.push(`Owner migration in progress — ${st.tot.inGroup}/${st.tot.all} PAVOI / MVOI already owned by a Section group; the rest are counted under "Unassigned owner".`);
     if(st.tot.pending)
       msgs.push(openBlindT
-        ? `Could not load verification rounds for any of the ${st.tot.pending} PAVOI — the KPI is NOT low, it is unknown. Press ↻ to retry.`
-        : `${st.tot.pending} PAVOI not loaded yet — the KPI % is withheld until they are, because the numerator would be understated.`);
+        ? `Could not load verification rounds for any of the ${st.tot.pending} PAVOI / MVOI — the KPI is NOT low, it is unknown. Press ↻ to retry.`
+        : `${st.tot.pending} PAVOI / MVOI not loaded yet — the KPI % is withheld until they are, because the numerator would be understated.`);
     w.innerHTML = msgs.length ? '⚠ ' + msgs.map(esc).join('  ·  ') : '';
     w.style.display = msgs.length ? '' : 'none';
     w.style.color = openBlindT ? '#ff6b6b' : 'var(--yellow)';   // [r142-i1] hỏng hoàn toàn → đỏ, đừng để lẫn với cảnh báo thường
@@ -6656,16 +6663,16 @@ function renderOvKpi7(){
   // ⚠ Còn pending thì KHÔNG in "x / y assessed": tử số lúc đó chắc chắn thiếu,
   // đọc lên thành một con số đã chốt trong khi chart bên dưới cố tình để trống. Đúng bài học
   // r142-i1 — "bằng 0" (hay "mới có một phần") KHÁC "không có dữ liệu". Cùng khuôn kpi7-frac.
-  s('ov-kpi7-cnt', !st.tot.total ? 'no PAVOI'
+  s('ov-kpi7-cnt', !st.tot.total ? 'no PAVOI / MVOI'
                  : st.tot.pending ? `${st.tot.pending} not loaded`
                  : `${st.tot.assessed} / ${st.tot.total} assessed`);
   const w = g('ovKpi7Warn');
   if(w){
     const msgs = [];
     if(!kpi7Loaded && !kpi7Done.size)
-      msgs.push('PAVOI assessment is still loading — bars appear once it finishes.');
+      msgs.push('PAVOI / MVOI assessment is still loading — bars appear once it finishes.');
     else if(st.tot.pending)
-      msgs.push(`${st.tot.pending} PAVOI not loaded yet — any period containing them is left blank, because its numerator would be understated.`);
+      msgs.push(`${st.tot.pending} PAVOI / MVOI not loaded yet — any period containing them is left blank, because its numerator would be understated.`);
     w.innerHTML = msgs.length ? '⚠ ' + msgs.map(esc).join('  ·  ') : '';
     w.style.display = msgs.length ? '' : 'none';
   }
@@ -6682,18 +6689,18 @@ function showKpi7NotAssessed(idx){
   const k = st.order[idx]; if(!k) return;
   const r = st.rows[k];
   s('kpi7MTitle', k===KPI7_UNASSIGNED ? 'Unassigned owner' : k);
-  s('kpi7MSub', `${r.notAssessed} PAVOI with no verification round — open or closed alike · year ${ymText('kpi7Year')} · month ${ymText('kpi7Month')}`);
+  s('kpi7MSub', `${r.notAssessed} PAVOI / MVOI with no verification round — open or closed alike · year ${ymText('kpi7Year')} · month ${ymText('kpi7Month')}`);
   const td = 'padding:8px 10px;border-bottom:1px solid var(--border)';
   const list = r.notList.slice().sort((a,b)=>String(b.raised_date||'').localeCompare(String(a.raised_date||'')));
   g('kpi7ModalBody').innerHTML = list.length
-    ? list.map(x=>`<tr style="cursor:pointer" title="Open PAVOI Detail" onclick="showPavoiDetail('${x.report_id}')">
+    ? list.map(x=>`<tr style="cursor:pointer" title="Open PAVOI / MVOI Detail" onclick="showPavoiDetail('${x.report_id}')">
         <td style="${td}"><b>${esc(x.report_number)||'—'}</b></td>
         <td style="${td};font-size:11px;color:var(--muted)">${fd(x.raised_date)}</td>
         <td style="${td};font-size:11px">${esc(x.owner_name)||'—'}</td>
         <td style="${td}">${sBadge(x.semantic_status)}</td>
         <td style="${td};font-size:11px;color:var(--muted)">${esc(x.dept)||'—'}</td>
       </tr>`).join('')
-    : '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">No open PAVOI without RFI or Task</td></tr>';
+    : '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">No open PAVOI / MVOI without RFI or Task</td></tr>';
   g('kpi7Modal').style.display='flex';
 }
 function closeKpi7Modal(e){ if(e&&e.target!==g('kpi7Modal'))return; g('kpi7Modal').style.display='none'; }
@@ -6705,12 +6712,12 @@ function showKpi7Withdrawn(idx){
   const k = st.order[idx]; if(!k) return;
   const r = st.rows[k];
   s('kpi7MTitle', (k===KPI7_UNASSIGNED ? 'Unassigned owner' : k) + ' — excluded (withdrawn)');
-  s('kpi7MSub', `${r.withdrawn} PAVOI excluded from KPI 7 because they are currently withdrawn on Coruson · they come back automatically once the workflow stage is closed properly · year ${ymText('kpi7Year')} · month ${ymText('kpi7Month')}`);
+  s('kpi7MSub', `${r.withdrawn} PAVOI / MVOI excluded from KPI 7 because they are currently withdrawn on Coruson · they come back automatically once the workflow stage is closed properly · year ${ymText('kpi7Year')} · month ${ymText('kpi7Month')}`);
   const td = 'padding:8px 10px;border-bottom:1px solid var(--border)';
   const list = r.wdList.slice().sort((a,b)=>String(b.raised_date||'').localeCompare(String(a.raised_date||'')));
   const stg = x => (x.wf_stages||[]).map(w=>w.stage_type+':'+w.stage_status).join(' · ') || '—';
   g('kpi7ModalBody').innerHTML = list.length
-    ? list.map(x=>`<tr style="cursor:pointer" title="Open PAVOI Detail" onclick="showPavoiDetail('${x.report_id}')">
+    ? list.map(x=>`<tr style="cursor:pointer" title="Open PAVOI / MVOI Detail" onclick="showPavoiDetail('${x.report_id}')">
         <td style="${td}"><b>${esc(x.report_number)||'—'}</b></td>
         <td style="${td};font-size:11px;color:var(--muted)">${fd(x.raised_date)}</td>
         <td style="${td};font-size:11px">${esc(x.owner_name)||'—'}</td>
@@ -9235,7 +9242,7 @@ async function deleteUser(id,email,role){
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────
-const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',spi:'SPI — Safety Performance Indicators',allforms:'All Forms Detail',pavoi:'PAVOI Detail',cmrcar:'CMR-CAR',ecar:'ECAR Detail',amoecar:'AMO-ECAR',mcar:'MCAR',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management',querybuilder:'Query Builder',mydashboard:'My Dashboard',kpi2:'KPI 2 — Early Detection',safety:'Safety — MSAG Report Status (OSR / MOSR)',osrmosr:'OSR / MOSR — AMO + QA AMO',rptstatus:'Report Status on Coruson — EIS & F-088'};
+const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI Charts',spi:'SPI — Safety Performance Indicators',allforms:'All Forms Detail',pavoi:'PAVOI / MVOI Detail',cmrcar:'CMR-CAR',ecar:'ECAR Detail',amoecar:'AMO-ECAR',mcar:'MCAR',auditplan:'Audit Plan',docs:'Documents',reports:'Export Reports',help:'User Guide',admin:'User Management',querybuilder:'Query Builder',mydashboard:'My Dashboard',kpi2:'KPI 2 — Early Detection',safety:'Safety — MSAG Report Status (OSR / MOSR)',osrmosr:'OSR / MOSR — AMO + QA AMO',rptstatus:'Report Status on Coruson — EIS & F-088'};
 // ── SAFETY — MSAG Report Status (OSR / MOSR) ─────────────────
 // Owner ∈ nhóm MSAG = report thuộc ban MQA (MOSR mặc nhiên thuộc MQA;
 // OSR là báo cáo chung nên phải lọc theo owner). Mỗi report 1 status →

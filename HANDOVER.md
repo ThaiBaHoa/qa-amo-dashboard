@@ -5,6 +5,11 @@
 
 ---
 
+## ⏳ r200 — classic + hướng dẫn sử dụng có MVOI (19/10/2026, THAIBAHOA-HOME) — CHƯA PUSH
+
+- classic: trang PAVOI / MVOI Detail + lọc Form, nhãn KPI 7. Nguồn manual: vault `beta-src/manual.js` → `HuongDan_SuDung_QA_AMO_Dashboard_r200.docx` (cài `docx@9` tạm ngoài vault; ảnh r186 cũ, tab vẫn ghi "PAVOI").
+- Chưa làm: `deck.js` (slide), chụp lại ảnh hướng dẫn, dòng MVOI trong bảng thuật ngữ classic (chờ tên đầy đủ).
+
 ## ✅ r199 — MVOI tính chung KPI 7 (19/10/2026, THAIBAHOA-HOME) — ĐÃ PUSH `76b14c0`, live (curl APP_REV r199)
 
 - Eric chốt 19/10: MVOI vào KPI 7 + Withdrawn + cờ 30 ngày + ô Overview + Awaiting verification. Nguồn: `classic.html` (`isPvReport`), vault `beta-src` loader.js / metrics.js / screens.js / beta-template.html / guide.js.
