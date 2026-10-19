@@ -2522,7 +2522,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.10.19-r198';
+const APP_REV = '2026.10.19-r199';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2779,6 +2779,9 @@ const KPI7_SECTIONS = [                      // phải khớp TUYỆT ĐỐI own
   'AMO - Safety Section',
   'MQA - Standard and Compliance Section'
 ];
+// [r199] MVOI (form mới 10/2026, cùng khuôn PAVOI) tính CHUNG KPI 7, luật Withdrawn, cờ 30 ngày — Eric chốt 19/10/2026.
+// Chia ban vẫn theo owner_name như PAVOI: owner MVOI đang là cá nhân → rơi vào Unassigned cho tới khi Coruson chuyển về Section.
+const isPvReport = r => r.report_title==='PAVOI' || r.report_title==='MVOI';
 const KPI7_UNASSIGNED = '__unassigned__';    // bucket owner cá nhân / rỗng (Galileo đang chuyển owner sang User Group)
 const KPI7_CACHE_KEY  = 'qaAmoKpi7V3';   // [r155] V3: kho đổi sang LƯỢT XÁC MINH → cache V1/V2 phải chết
 // [r155] Biên bản họp 07/09/2026 (anh Phan Anh Đức gửi các Trưởng ban): PAVOI phải được
@@ -6065,7 +6068,7 @@ function renderPavoi() {
 async function loadPavoiRfi(force=false){
   if(pavoiRfiLoaded && !force){ renderPavoi(); return; }
   // [r198] MVOI (form mới trên Coruson, 10/2026) cùng khuôn PAVOI: RFI/Task nạp chung một kho.
-  const allPavoi = allData.filter(r=>r.report_title==='PAVOI' || r.report_title==='MVOI');
+  const allPavoi = allData.filter(isPvReport);
   // PAVOI đã đóng → RFI đã hoàn tất hết, KHÔNG fetch lúc load trang (đánh dấu done-rỗng để cell hiện '—');
   // lịch sử RFI của report đã đóng vẫn xem được vì modal fetch tươi on-demand khi click.
   allPavoi.forEach(r=>{ if(r.report_id && r.report_status!=='Open') pavoiRfiDone.add(r.report_id); });
@@ -6332,15 +6335,14 @@ function kpi7CacheSave(){
 // lấy nhầm kết quả một lượt xác minh: PAVOI-437 Final Conclusion trống nhưng lượt 1 Satisfactory → r193 gắn cờ sai.
 // Một request toàn cục (vài nghìn dòng), post-filter theo PAVOI; ghi r.verif_final lên allData. loadPavoiFinal.done = đã nạp.
 async function loadPavoiFinal(){
-  const isPv = r => r.report_title==='PAVOI' || r.report_title==='MVOI';   // [r198] MVOI có cùng section Final Conclusion
-  const ids = new Set(allData.filter(r=>isPv(r) && r.report_id).map(r=>r.report_id));
+  const ids = new Set(allData.filter(r=>isPvReport(r) && r.report_id).map(r=>r.report_id));
   if(!ids.size){ loadPavoiFinal.done = true; return; }
   try{
     const raw = await fetchAll(G_URL + 'dwanalytics_report_field?$select=report_id,value_text' +
       '&$filter=' + encodeURIComponent("section_name eq 'Final Conclusion' and section_level eq 0 and field_name eq 'Verification Result'"), true);
     const fin = {};
     raw.forEach(f=>{ if(ids.has(f.report_id) && f.value_text && String(f.value_text).trim()) fin[f.report_id] = String(f.value_text).trim(); });
-    allData.forEach(r=>{ if(isPv(r)) r.verif_final = fin[r.report_id] || null; });
+    allData.forEach(r=>{ if(isPvReport(r)) r.verif_final = fin[r.report_id] || null; });
     loadPavoiFinal.done = true;
   }catch(e){ console.warn('[PAVOI final] Final Conclusion fetch failed:', e.message); }
 }
@@ -6352,7 +6354,7 @@ async function loadKpi7Tasks(force=false){
     try{ localStorage.removeItem(KPI7_CACHE_KEY); }catch{}
   }
   if(kpi7Loaded && !force){ kpi7RenderAll(); return; }
-  const ids = [...new Set(allData.filter(r=>r.report_title==='PAVOI' && r.report_id).map(r=>r.report_id))];
+  const ids = [...new Set(allData.filter(r=>isPvReport(r) && r.report_id).map(r=>r.report_id))];   // [r199] + MVOI
   if(!ids.length){ kpi7Loaded=true; kpi7RenderAll(); return; }
   if(!force && !kpi7Done.size) kpi7CacheLoad();
   if(ids.every(id=>kpi7Done.has(id))){ kpi7Loaded=true; kpi7CacheSave(); kpi7RenderAll(); runSelfChecks(); return; }
@@ -6452,7 +6454,7 @@ function kpi7Stats(pass){
   order.forEach(k=>{ rows[k] = {key:k, assessed:0, notAssessed:0, pending:0, open:0, closed:0, total:0, withdrawn:0, wdList:[], notList:[], lags:[]}; });
   const tot = {assessed:0, notAssessed:0, pending:0, open:0, closed:0, total:0, withdrawn:0, inGroup:0, all:0, lags:[]};
   allData.forEach(r=>{
-    if(r.report_title!=='PAVOI' || !r.report_id) return;
+    if(!isPvReport(r) || !r.report_id) return;          // [r199] PAVOI + MVOI
     // [r149] Lọc tháng đọc lại raised_ym ("YYYY-MM") — KHÔNG thêm field mới vào allData để
     // khỏi đụng shape của cache IndexedDB. raised_ym rỗng → bị loại khi có tháng được chọn
     // (đúng: không có ngày phát hành thì không thuộc tháng nào), nhưng vẫn vào khi "All months".
@@ -9036,11 +9038,11 @@ async function exportOverdueReport(){
     const pend=await ovrFetchPending([...new Set([...overdue,...soon].map(r=>r.report_id).filter(Boolean))]);
     const pendOf=r=>(pend[r.report_id]||[]).join('; ');
     // Department: phòng ban trên Coruson; MCAR/ECAR kèm 'Issued to (person)'. PAVOI: r.dept = Department của PAVOI.
-    const deptOf=r=>{ const p=r.report_title==='PAVOI'?null:r.issued_person; return (r.dept||'')+(p?((r.dept?' - ':'')+p):''); };
+    const deptOf=r=>{ const p=isPvReport(r)?null:r.issued_person, d=(r.report_title==='MVOI'?r.resp_dept:r.dept)||''; return d+(p?((d?' - ':'')+p):''); };
     // [r193] đã xác minh Satisfactory mà report chưa đóng (quên đóng / chưa dời hạn trên Coruson)
     // [r195] chỉ PAVOI, theo KẾT LUẬN CUỐI (section Final Conclusion), không theo một lượt xác minh
     if(!loadPavoiFinal.done) await loadPavoiFinal();
-    const statusOf=r=>(r.semantic_status||'')+(r.report_title==='PAVOI'&&String(r.verif_final||'').trim().toLowerCase()==='satisfactory'?' — Verified Satisfactory, not closed':'');
+    const statusOf=r=>(r.semantic_status||'')+(isPvReport(r)&&String(r.verif_final||'').trim().toLowerCase()==='satisfactory'?' — Verified Satisfactory, not closed':'');
 
     const {week,year}=isoWeekNum(new Date());
     // [r192] + Owner (owner_name = owner của report trên Coruson, nguyên văn: người hoặc nhóm) — Eric 03/10: cần để gửi nhắc
@@ -9132,9 +9134,9 @@ async function exportOverduePDF(){
     // [r193] như exportOverdueReport: Department = phòng ban thật, Pending with = RFI/Task đang mở, cờ Verified Satisfactory
     const pend=await ovrFetchPending([...new Set([...overdue,...soon].map(r=>r.report_id).filter(Boolean))]);
     const pendOf=r=>(pend[r.report_id]||[]).join('\n');
-    const deptOf=r=>{ const p=r.report_title==='PAVOI'?null:r.issued_person; return (r.dept||'')+(p?((r.dept?' - ':'')+p):''); };
+    const deptOf=r=>{ const p=isPvReport(r)?null:r.issued_person, d=(r.report_title==='MVOI'?r.resp_dept:r.dept)||''; return d+(p?((d?' - ':'')+p):''); };
     if(!loadPavoiFinal.done) await loadPavoiFinal();   // [r195] PAVOI, kết luận cuối
-    const statusOf=r=>(r.semantic_status||'')+(r.report_title==='PAVOI'&&String(r.verif_final||'').trim().toLowerCase()==='satisfactory'?'\nVerified Satisfactory, not closed':'');
+    const statusOf=r=>(r.semantic_status||'')+(isPvReport(r)&&String(r.verif_final||'').trim().toLowerCase()==='satisfactory'?'\nVerified Satisfactory, not closed':'');
     const {week,year}=isoWeekNum(new Date());
 
     const {jsPDF}=window.jspdf;

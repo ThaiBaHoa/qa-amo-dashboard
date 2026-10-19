@@ -5,6 +5,12 @@
 
 ---
 
+## ⏳ r199 — MVOI tính chung KPI 7 (19/10/2026, THAIBAHOA-HOME) — PUSH 19/10
+
+- Eric chốt 19/10: MVOI vào KPI 7 + Withdrawn + cờ 30 ngày + ô Overview + Awaiting verification. Nguồn: `classic.html` (`isPvReport`), vault `beta-src` loader.js / metrics.js / screens.js / beta-template.html / guide.js.
+- Chia ban theo owner_name như PAVOI → MVOI-001/002 (owner cá nhân) ở Unassigned, MVOI-003 ở QC Section.
+- Local dữ liệu thật: KPI 7 2026 54/62 (87,1 %), PAVOI / MVOI open 21; loadWarnings rỗng, self-check sạch, không lỗi console.
+
 ## ✅ r198 — Form MVOI vào chung tab PAVOI (19/10/2026, THAIBAHOA-HOME) — ĐÃ PUSH `cb3723c`, live (curl APP_REV r198)
 
 - Nguồn: `classic.html` (CF_FIELDS + delta `in`, loadPavoiFinal, loadPavoiRfi, APP_REV) + vault `beta-src`: loader.js (FORM_OF/CODE `mvoi`, PV_TITLES), beta-template.html (tab "PAVOI / MVOI", `formTab`/`isPvForm`, renderPavoi lọc Form), screens2.js (hộp chi tiết), guide.js.

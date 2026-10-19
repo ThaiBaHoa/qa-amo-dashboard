@@ -1553,9 +1553,7 @@ allData.forEach(r => {
     o.rounds = Object.values(secMap[r.report_id] || {})
       .sort((a, b) => (a.date || '9999') < (b.date || '9999') ? -1 : 1)
       .map(v => ({ date: v.date, by: orDash(v.by), result: orDash(v.result) }));
-    /* KPI 7 (kpi7Ver) covers PAVOI only; an MVOI takes its first dated round */
-    o.firstVerified = form === 'pavoi' ? (kpi7Ver[r.report_id] || null)
-      : (o.rounds.map(v => v.date).filter(Boolean)[0] || null);
+    o.firstVerified = kpi7Ver[r.report_id] || null;   /* r199: KPI 7 covers PAVOI + MVOI */
   }
   reports.push(o);
 });
@@ -1593,9 +1591,10 @@ ok(byForm('pavoi').length === allData.filter(r => r.report_title === 'PAVOI').le
 ok(byForm('mvoi').length === allData.filter(r => r.report_title === 'MVOI').length, 'MVOI count differs from allData');
 ok(reports.length === allData.length + cmrData.length + ecarData.length, 'report count differs from allData + CMR-CAR + ECAR');
 ok(byForm('cmrcar').length === cmrData.length && byForm('ecar').length === ecarData.length, 'CMR-CAR / ECAR count differs');
-if(kpi7Loaded) ok(byForm('pavoi').every(r => r.rounds.length === (kpi7Cnt[r.id] || 0)), 'PAVOI verification rounds differ from kpi7Cnt');
+const pvRows = reports.filter(r => r.form === 'pavoi' || r.form === 'mvoi');   /* r199: KPI 7 = PAVOI + MVOI */
+if(kpi7Loaded) ok(pvRows.every(r => r.rounds.length === (kpi7Cnt[r.id] || 0)), 'PAVOI / MVOI verification rounds differ from kpi7Cnt');
 const st = kpi7Stats(r => r.raised_year === Number(YEAR)).tot;
-const mine = byForm('pavoi').filter(r => r.raised && r.raised.startsWith(YEAR) && !r.withdrawn);
+const mine = pvRows.filter(r => r.raised && r.raised.startsWith(YEAR) && !r.withdrawn);
 if(kpi7Loaded) ok(mine.length === st.total && mine.filter(r => r.rounds.length > 0).length === st.assessed, 'KPI 7 differs from kpi7Stats()');
 ok(reports.every(r => r.status && r.number), 'a report is missing status or number');
 
@@ -2416,8 +2415,8 @@ M.consistency = function(){
   if(typeof overviewStats === 'function'){ const o = overviewStats(qa); say('Overview on-time vs summary', o.s.onTimeRate, s.onTimeRate); say('Overview open vs summary', o.s.open, s.open); }
   if(typeof kpiChartStats === 'function'){ const k = kpiChartStats(f); say('KPI charts on-time vs Overview', k.s.onTimeRate, s.onTimeRate); say('KPI charts total vs Overview', k.s.total, s.total); }
   if(typeof exportRowsFor === 'function') say('Export rows vs QA period', exportRowsFor(f, '', '').length, qa.length);
-  const k7 = M.kpi7(f), pav = qa.filter(r => r.form === 'pavoi' && !r.withdrawn);
-  say('KPI 7 total (kpi7Stats) vs PAVOI in period', k7.total, pav.length);
+  const k7 = M.kpi7(f), pav = qa.filter(r => (r.form === 'pavoi' || r.form === 'mvoi') && !r.withdrawn);   /* r199: + MVOI */
+  say('KPI 7 total (kpi7Stats) vs PAVOI / MVOI in period', k7.total, pav.length);
   say('KPI 7 assessed (kpi7Stats) vs verification rounds', k7.assessed, pav.filter(r => r.rounds.length > 0).length);
   const k2 = M.kpi2(qa);
   say('KPI 2 MCAR vs classic', k2.mcar, raw.filter(r => r.report_title === 'MCAR').length);
@@ -2444,8 +2443,8 @@ M.consistency = function(){
   say('Audit Plan rows vs audit KPI total', AUDITS.filter(a => M.auditInPeriod(a, f)).length, aud.length);
   { const p = M.auditProgress(aud); say('Audit donut parts vs plan', p.done + p.delayed + p.thisMonthOpen + p.upcoming, p.plan); }
   say('Audits delayed (Overview) vs raw auditData', M.auditProgress(AUDITS.filter(a => M.auditInPeriod(a, f))).delayed, M.auditProgress(aud).delayed);
-  say('PAVOI open (Overview) vs classic', M.summary(qa.filter(r => r.form === 'pavoi')).open,
-      raw.filter(r => r.report_title === 'PAVOI' && !M.isClosed(r)).length);
+  say('PAVOI / MVOI open (Overview) vs classic', M.summary(qa.filter(r => r.form === 'pavoi' || r.form === 'mvoi')).open,
+      raw.filter(r => (r.report_title === 'PAVOI' || r.report_title === 'MVOI') && !M.isClosed(r)).length);
   if(out.length) console.error('[metrics] consistency check failed:', out);
   else console.log('[metrics] consistency OK — every screen path matches the classic formulas (' + f.years[0] + ')');
   return out;
@@ -2892,12 +2891,12 @@ function renderOverview(){
   const rate = S.onTimeRate, avgClose = S.avgCloseDays, rateSeries = O.rateSeries, closeSeries = O.closeSeries;
   const k2Series = O.k2Series, k7Series = O.k7Series;
   /* mock prototype (no live data) keeps its own KPI 7 source */
-  const pav = rows.filter(r=>r.form==='pavoi' && !r.withdrawn), pavAssessed = pav.filter(assessed).length;
+  const pav = rows.filter(r=>isPvForm(r.form) && !r.withdrawn), pavAssessed = pav.filter(assessed).length;
   const k7 = O.k7 || { rate: M.pct(pavAssessed, pav.length), assessed: pavAssessed, total: pav.length };
   /* extension (MCAR only) and mitigation (HIRA + CAPA) — anh Ngọc email 30/09/2026. Mitigation needs the
      HIRA classifications and CAPA tasks, loaded on demand with the same keys as the All forms registers. */
   const E = M.extension(rows);
-  const PV = M.summary(rows.filter(r => r.form === 'pavoi'));
+  const PV = M.summary(rows.filter(r => isPvForm(r.form)));   /* r199: PAVOI + MVOI */
   const AP = M.auditProgress(auditsScoped());
   const mitLive = REAL && !REAL.partial;
   if(mitLive){ lazy('hira', () => API().loadHira(), () => API().hira().loaded); lazy('capa', () => API().loadCapa(), () => API().capa().loaded); }
@@ -2924,15 +2923,15 @@ function renderOverview(){
     kpiTile({label:'KPI 2 · MCAR ÷ AMO-ECAR', value:O.k2.pct+'%', note:O.k2.mcar+' MCAR ÷ '+O.k2.amo+' AMO-ECAR', go:'analytics', tab:'kpi',
              series:k2Series, trend:trendTag(k2Series[11], k2Series[10], 'up','pt')}),
     (REAL && REAL.partial)
-      ? kpiTile({label:'KPI 7 · PAVOI assessed', value:'—', note:REAL.partialError ? 'verification rounds not loaded' : 'loading verification rounds…', go:'findings', tab:'pavoi', series:[]}) :
-    kpiTile({label:'KPI 7 · PAVOI assessed', value:(k7.rate === null ? '—' : k7.rate+'%'), note:k7.assessed+' of '+k7.total+' assessed (verification round recorded)', go:'findings', tab:'pavoi',
+      ? kpiTile({label:'KPI 7 · PAVOI / MVOI assessed', value:'—', note:REAL.partialError ? 'verification rounds not loaded' : 'loading verification rounds…', go:'findings', tab:'pavoi', series:[]}) :
+    kpiTile({label:'KPI 7 · PAVOI / MVOI assessed', value:(k7.rate === null ? '—' : k7.rate+'%'), note:k7.assessed+' of '+k7.total+' assessed (verification round recorded)', go:'findings', tab:'pavoi',
              series:k7Series, alarm:k7.rate !== null && k7.rate<50, trend:trendTag(k7Series[11], k7Series[10], 'up','pt')}),
     kpiTile({label:'Audits completed vs plan', value:AP.toDateDone+' / '+AP.toDate, go:'audit', tab:'list', alarm:AP.delayed>0,
              note:'performed or closed, of those scheduled up to this month', mixSub:'PLANNED',
              mix:[{k:'Performed / closed', v:AP.done, c:'var(--ok)'}, {k:'This month, not yet', v:AP.thisMonthOpen, c:'var(--info)'},
                   {k:'Delayed', v:AP.delayed, c:'var(--accent)'}, {k:'Later months', v:AP.upcoming, c:'var(--text-3)'}]}),
-    kpiTile({label:'PAVOI open', value:String(PV.open), go:'findings', tab:'pavoi', alarm:PV.overdue>0,
-             note:'PAVOI raised in range', mixSub:'RAISED',
+    kpiTile({label:'PAVOI / MVOI open', value:String(PV.open), go:'findings', tab:'pavoi', alarm:PV.overdue>0,
+             note:'PAVOI and MVOI raised in range', mixSub:'RAISED',
              mix:[{k:'Closed', v:PV.total-PV.open, c:'var(--ok)'}, {k:'Open, within target', v:PV.inTarget, c:'var(--info)'},
                   {k:'Overdue', v:PV.overdue, c:'var(--accent)'}]}),
     kpiTile({label:'Extension · MCAR', value:String(E.open), go:'findings', tab:'mcar', alarm:E.overdue>0,
@@ -3086,8 +3085,8 @@ const LANES = {
   'work/overdue': { cols:['number','form','cat','dtd','summary','owner','issued','dept','target','rfi','level'],
                     rows:rs=>rs.filter(M.isOverdue), title:'Overdue', lead:'Reports past their target date. CAT I ≤ 30 days, CAT II 31–60 days, CAT III > 60 days overdue.' },
   'work/verify':  { cols:['number','status','owner','raised','verified','dtd'],
-                    rows:rs=>rs.filter(r=>r.form==='pavoi' && isOpen(r) && !assessed(r)),
-                    title:'Awaiting verification', lead:'Open PAVOI with no verification round recorded — not yet counted as assessed in KPI 7.' },
+                    rows:rs=>rs.filter(r=>isPvForm(r.form) && isOpen(r) && !assessed(r)),
+                    title:'Awaiting verification', lead:'Open PAVOI / MVOI with no verification round recorded — not yet counted as assessed in KPI 7.' },
   'findings/all':     { cols:['number','form','status','owner','aircraft','raised','dtd','cat'], rows:rs=>rs },
   'findings/cmrcar':  { cols:['number','aircraft','status','dept','raised','target','dtd'], rows:rs=>rs.filter(r=>r.form==='cmrcar') },
   'findings/ecar':    { cols:['number','aircraft','status','finding','raised','dtd'], rows:rs=>rs.filter(r=>r.form==='ecar') },
@@ -3197,7 +3196,7 @@ function renderLane(screen, tab){
    ========================================================================== */
 function renderPavoi(){
   /* r198: MVOI shares this tab and its layout; the Form filter narrows the register.
-     KPI 7, its Withdrawn rule and the 30-day window stay PAVOI only. */
+     r199: KPI 7, its Withdrawn rule and the 30-day window cover MVOI too (Eric 19/10/2026). */
   const all = scoped().filter(r=>isPvForm(r.form));
   const nOf = f => all.filter(r=>r.form===f).length;
   if(BS.pvForm && !nOf(BS.pvForm)) BS.pvForm = '';
@@ -3210,8 +3209,8 @@ function renderPavoi(){
   const r = rows.find(x=>x.id===state.sel.pavoi);
   const mv = r.form === 'mvoi';
 
-  const kpiRows = rows.filter(x=>x.form==='pavoi' && !x.withdrawn);
-  const total = kpiRows.length, done = kpiRows.filter(assessed).length, wd = rows.filter(x=>x.form==='pavoi' && x.withdrawn).length;
+  const kpiRows = rows.filter(x=>!x.withdrawn);
+  const total = kpiRows.length, done = kpiRows.filter(assessed).length, wd = rows.length - kpiRows.length;
   const list = rows.map(x=>
     '<button class="rec" type="button" data-act="selpavoi" data-id="'+x.id+'"'+(x.id===r.id?' aria-current="true"':'')+'>'
     + '<span class="rec-top"><span class="row-id">'+esc(x.number)+'</span>'+(x.withdrawn?'<span class="tag">Withdrawn</span>':'')+chip(x.status)+'</span>'
@@ -3224,15 +3223,9 @@ function renderPavoi(){
 
   const fv = firstVerDate(r);
   const sinceIssue = dayDiff(TODAY, r.raised);
-  const flag = mv
-    ? (!assessed(r)
-      ? { cls:'warn', t:'No verification round recorded',
-          b:'No verification round has been recorded against this MVOI yet. Raised '+sinceIssue+' days ago.' }
-      : { cls:'', t:r.rounds.length+' verification round'+(r.rounds.length>1?'s':'')+' recorded',
-          b: fv ? 'First verified '+dayDiff(fv, r.raised)+' days after issue. MVOI is not part of KPI 7.' : 'Date verified is empty on the recorded rounds. MVOI is not part of KPI 7.' })
-    : r.withdrawn
+  const flag = r.withdrawn
     ? { cls:'warn', t:'Withdrawn — outside KPI 7',
-        b:'This PAVOI has a Withdrawn stage and no completed accept/reject stage, so it is excluded from both the numerator and the denominator until it is closed properly.' }
+        b:'This '+r.code+' has a Withdrawn stage and no completed accept/reject stage, so it is excluded from both the numerator and the denominator until it is closed properly.' }
     : !assessed(r)
     ? { cls:'warn', t:'No verification round recorded',
         b: sinceIssue > 30
@@ -3265,7 +3258,7 @@ function renderPavoi(){
 
   return '<section class="sec"><div class="split">'
     + '<div class="card"><div class="card-head"><h2>'+(BS.pvForm==='mvoi' ? 'MVOI' : BS.pvForm==='pavoi' ? 'PAVOI' : 'PAVOI / MVOI')+' register</h2>'
-      + '<span class="t-small dim od-fill">'+(total ? 'PAVOI '+done+' of '+total+' assessed'+(wd?' · '+wd+' withdrawn excluded':'') : '')+'</span>'+formSel+'</div>'
+      + '<span class="t-small dim od-fill">'+done+' of '+total+' assessed'+(wd?' · '+wd+' withdrawn excluded':'')+'</span>'+formSel+'</div>'
       + '<div class="rec-list">'+list+'</div></div>'
     + '<div class="card"><div class="card-head">'
       + '<h2 class="mono">'+esc(r.number)+'</h2>'+chip(r.status)+extBtn('report', r.id)
@@ -4060,11 +4053,11 @@ function scrKpi(){
   const lags = st.tot.lags.slice().sort((a,b) => a-b);
   const k7note = st.tot.total ? st.tot.assessed+' / '+st.tot.total+' assessed · '+st.tot.notAssessed+' with no verification round'
     + (lags.length ? ' · median '+lags[Math.floor(lags.length/2)]+'d to first verification' : '')
-    + (st.tot.withdrawn ? ' · '+st.tot.withdrawn+' withdrawn excluded' : '') : 'no PAVOI in this period';
+    + (st.tot.withdrawn ? ' · '+st.tot.withdrawn+' withdrawn excluded' : '') : 'no PAVOI / MVOI in this period';
 
   html += '<section class="sec cols cols-2">'
     + card('KPI 2 · MCAR ÷ AMO-ECAR', 'volume ratio by Nature of finding · '+esc(periodLabel()), k2body)
-    + card('KPI 7 · PAVOI assessed', esc(k7note),
+    + card('KPI 7 · PAVOI / MVOI assessed', esc(k7note),
         plainTable('k7', [{l:'Section'},{l:'Assessed',ar:true},{l:'No verif.',ar:true},{l:'Closed',ar:true},{l:'Total',ar:true},{l:'KPI %',ar:true}], k7rows, 10))
     + '</section>';
   html += '<section class="sec">'+scrAta()+'</section>';
@@ -4685,8 +4678,8 @@ const BETA_SCREENS = REAL ? {
   'findings/all': scrAllForms, 'findings/osr': scrOsr,
   'findings/cmrcar': whenFull('CMR-CAR', () => renderLane('findings','cmrcar')),
   'findings/ecar':   whenFull('ECAR', () => renderLane('findings','ecar')),
-  'findings/pavoi':  whenFull('PAVOI verification rounds', () => renderPavoi()),
-  'work/verify':     whenFull('PAVOI verification rounds', () => renderLane('work','verify')),
+  'findings/pavoi':  whenFull('PAVOI / MVOI verification rounds', () => renderPavoi()),
+  'work/verify':     whenFull('PAVOI / MVOI verification rounds', () => renderLane('work','verify')),
   'analytics/kpi': scrKpi, 'analytics/spi': scrSpi, 'analytics/safety': scrSafety,
   'analytics/early': scrEarly, 'analytics/status': scrStatus,
   'audit/bottleneck': scrBottleneck,
@@ -5385,15 +5378,15 @@ function scrGuideNew(){
     + '<tr><td>Average closure time</td><td>Mean days from raised date to close date, closed reports in the period.</td></tr>'
     + '<tr><td>KPI 2 · MCAR ÷ AMO-ECAR</td><td>Number of MCAR divided by number of AMO-ECAR raised in the period (volume ratio, also by Nature of finding on KPI charts).</td></tr>'
     + '<tr><td>KPI 2 · Early-detection rate</td><td>Share of AMO-ECAR already found earlier by an MCAR: same Nature of finding group, or finding text overlapping at least 50%.</td></tr>'
-    + '<tr><td>KPI 7 · PAVOI assessed</td><td>PAVOI with at least one verification round ÷ all PAVOI in the period. Withdrawn PAVOI are excluded from both. The percentage is withheld while verification rounds are still loading. Green ≥ 75%, amber ≥ 50%, red below 50%. The 30-day verification window is a warning flag only, not part of the formula.</td></tr>'
+    + '<tr><td>KPI 7 · PAVOI / MVOI assessed</td><td>PAVOI and MVOI with at least one verification round ÷ all PAVOI and MVOI in the period. Withdrawn records are excluded from both. The percentage is withheld while verification rounds are still loading. Green ≥ 75%, amber ≥ 50%, red below 50%. The 30-day verification window is a warning flag only, not part of the formula.</td></tr>'
     + '<tr><td>KPI QC · ATA ratio</td><td>Internal QC findings of month N−1 (CMR-CAR flagged QC + QC PI Report) ÷ ECAR of month N, by ATA chapter. Effective when internal ≥ ECAR.</td></tr>'
     + '<tr><td>SPI trigger level</td><td>Consecutive latest months where the SPI rate is worse than the SPT approved by CAAV (or the form marks a trigger): 1, 2 or 3+ months = Level 1, 2, 3.</td></tr>'
     + '<tr><td>Completed on Coruson</td><td>EIS / F-088: all input fields filled, and an RFI or Task on the management stage (or the stage completed), and a final report file in the REPORT tab.</td></tr></table>')
   + sec('screens','Screens',
-    '<ul><li><b>Overview</b>: key indicators (including audits completed against the plan with those delayed past their scheduled month, open and overdue PAVOI, reports closed late, MCAR under extension, overdue mitigation tasks from HIRA / CAPA and F-088 / investigation reports overdue themselves or through a corrective action), overdue reports by CAT with the most overdue, open reports by form, recent report events.</li>'
-    + '<li><b>Work Queue</b>: Open reports (nearest target first), Overdue (with CAT), Awaiting verification (open PAVOI with no verification round). Select a row to open the report.</li>'
+    '<ul><li><b>Overview</b>: key indicators (including audits completed against the plan with those delayed past their scheduled month, open and overdue PAVOI / MVOI, reports closed late, MCAR under extension, overdue mitigation tasks from HIRA / CAPA and F-088 / investigation reports overdue themselves or through a corrective action), overdue reports by CAT with the most overdue, open reports by form, recent report events.</li>'
+    + '<li><b>Work Queue</b>: Open reports (nearest target first), Overdue (with CAT), Awaiting verification (open PAVOI / MVOI with no verification round). Select a row to open the report.</li>'
     + '<li><b>Reports › All forms</b>: every report type. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings).</li>'
-    + '<li><b>Reports › PAVOI / MVOI</b>: register on the left (Form filter: PAVOI or MVOI), record on the right with the verification history and the RFI / Task list of open records. KPI 7 counts PAVOI only.</li>'
+    + '<li><b>Reports › PAVOI / MVOI</b>: register on the left (Form filter: PAVOI or MVOI), record on the right with the verification history and the RFI / Task list of open records. KPI 7 counts PAVOI and MVOI.</li>'
     + '<li><b>Reports › OSR / MOSR</b>: OSR and MOSR of AMO and MQA : QA AMO, Open or Closed from Coruson.</li>'
     + '<li><b>Analytics › Event/IR report status</b>: EIS and F-088 completeness on Coruson; the tiles count the reports complete on each check, the table shows workflow, linked reports, final report and status per report.</li>'
     + '<li><b>Audit Plan</b>: KPI tiles, a location × month view (one dot per audit in its scheduled month; filter by type or show only upcoming / with overdue findings), and a schedule list. Select a dot or a row for its workflow stages and findings. <b>Workflow stages</b>: for the QA AMO audits in the selected period, how many stages of each name are in each Galileo status; select an InProgress or PendingSignOff count for the audits concerned.</li>'
