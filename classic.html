@@ -2522,7 +2522,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.10.10-r197';
+const APP_REV = '2026.10.19-r198';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3670,6 +3670,8 @@ async function loadData(forceRefresh=false, opts={}) {
         report_ref:    f['Report Reference']          || null,
         verif_result:  f['Verification Result']       || null,
         dept:          f['Department']                || null,
+        resp_dept:     f['Responsible Department']    || null,   // [r198] MVOI: phòng ban của MVOI nằm ở field này
+        mvoi_type:     f['MVOI Type']                 || null,   // [r198] MVOI
         issued_person: f['Issued to (person)']        || null,
         finding_desc:  f['Finding description']        || null,
         nature_raw:    f['Nature of finding']          || null,
@@ -4104,7 +4106,9 @@ const CF_FIELDS = ['Target date','Issue Date','Finding level','Repetitive','Firs
   'Verification Result','Department','Finding description','Nature of finding','Issued to (person)',
   'First extension approved?','Second extension agreed?',
   // [r190] lý do gia hạn MCAR (1 ô chung cho cả 2 lần) + lý do từ chối — Eric 03/10: Extension chỉ MCAR, form đã có trường
-  'Reason for extension','Extension denied reason'];
+  'Reason for extension','Extension denied reason',
+  // [r198] MVOI (form mới, cùng khuôn PAVOI): phòng ban + loại MVOI
+  'Responsible Department','MVOI Type'];
 const CF_FIELD_SET = new Set(CF_FIELDS);
 const CF_URL = G_URL + 'dwanalytics_report_form_section_field';
 
@@ -4136,8 +4140,9 @@ async function fetchCustomFieldRows(forceFull){
 
   let changed;
   try{
+    // [r198] 'in' thay chuỗi 'or': 20 trường + mốc modified_date vượt giới hạn 100 node của OData (HTTP 400, đo 19/10/2026).
     changed = await fetchAll(CF_URL + '?$select=report_id,modified_date&$filter=' +
-      encodeURIComponent('modified_date gt ' + cached.syncedAt + ' and (' + CF_FIELDS.map(f => "field_name eq '" + f + "'").join(' or ') + ')'), true);
+      encodeURIComponent('modified_date gt ' + cached.syncedAt + ' and field_name in (' + CF_FIELDS.map(f => "'" + f + "'").join(',') + ')'), true);
   }catch(e){
     console.warn('[cf] hỏi phần thay đổi lỗi, lùi về nạp đầy:', e && e.message);
     return fullLoad('hỏi delta lỗi');
@@ -6059,7 +6064,8 @@ function renderPavoi() {
 // thì để loaded=false để lần mở trang sau tự thử lại (tránh "lúc được lúc không").
 async function loadPavoiRfi(force=false){
   if(pavoiRfiLoaded && !force){ renderPavoi(); return; }
-  const allPavoi = allData.filter(r=>r.report_title==='PAVOI');
+  // [r198] MVOI (form mới trên Coruson, 10/2026) cùng khuôn PAVOI: RFI/Task nạp chung một kho.
+  const allPavoi = allData.filter(r=>r.report_title==='PAVOI' || r.report_title==='MVOI');
   // PAVOI đã đóng → RFI đã hoàn tất hết, KHÔNG fetch lúc load trang (đánh dấu done-rỗng để cell hiện '—');
   // lịch sử RFI của report đã đóng vẫn xem được vì modal fetch tươi on-demand khi click.
   allPavoi.forEach(r=>{ if(r.report_id && r.report_status!=='Open') pavoiRfiDone.add(r.report_id); });
@@ -6326,14 +6332,15 @@ function kpi7CacheSave(){
 // lấy nhầm kết quả một lượt xác minh: PAVOI-437 Final Conclusion trống nhưng lượt 1 Satisfactory → r193 gắn cờ sai.
 // Một request toàn cục (vài nghìn dòng), post-filter theo PAVOI; ghi r.verif_final lên allData. loadPavoiFinal.done = đã nạp.
 async function loadPavoiFinal(){
-  const ids = new Set(allData.filter(r=>r.report_title==='PAVOI' && r.report_id).map(r=>r.report_id));
+  const isPv = r => r.report_title==='PAVOI' || r.report_title==='MVOI';   // [r198] MVOI có cùng section Final Conclusion
+  const ids = new Set(allData.filter(r=>isPv(r) && r.report_id).map(r=>r.report_id));
   if(!ids.size){ loadPavoiFinal.done = true; return; }
   try{
     const raw = await fetchAll(G_URL + 'dwanalytics_report_field?$select=report_id,value_text' +
       '&$filter=' + encodeURIComponent("section_name eq 'Final Conclusion' and section_level eq 0 and field_name eq 'Verification Result'"), true);
     const fin = {};
     raw.forEach(f=>{ if(ids.has(f.report_id) && f.value_text && String(f.value_text).trim()) fin[f.report_id] = String(f.value_text).trim(); });
-    allData.forEach(r=>{ if(r.report_title==='PAVOI') r.verif_final = fin[r.report_id] || null; });
+    allData.forEach(r=>{ if(isPv(r)) r.verif_final = fin[r.report_id] || null; });
     loadPavoiFinal.done = true;
   }catch(e){ console.warn('[PAVOI final] Final Conclusion fetch failed:', e.message); }
 }

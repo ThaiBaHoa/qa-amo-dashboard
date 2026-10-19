@@ -5,6 +5,12 @@
 
 ---
 
+## ⏳ r198 — Form MVOI vào chung tab PAVOI (19/10/2026, THAIBAHOA-HOME) — CHƯA COMMIT / CHƯA PUSH
+
+- Nguồn: `classic.html` (CF_FIELDS + delta `in`, loadPavoiFinal, loadPavoiRfi, APP_REV) + vault `beta-src`: loader.js (FORM_OF/CODE `mvoi`, PV_TITLES), beta-template.html (tab "PAVOI / MVOI", `formTab`/`isPvForm`, renderPavoi lọc Form), screens2.js (hộp chi tiết), guide.js.
+- Kiểm local dữ liệu thật (beta-local 19/10): 3 MVOI, số vòng khớp probe (001: 4 · 002: 1 · 003: 2), MVOI Type / Responsible Department hiện đúng; KPI 7 giữ 51/59 · 4 withdrawn; loadWarnings rỗng, self-check sạch.
+- KPI 7 / cờ 30 ngày / ô PAVOI open / Awaiting verification vẫn chỉ PAVOI — chờ Eric chốt có tính MVOI không.
+
 ## ✅ r197 — Analytics: tab "Safety (MSAG)" → "OSR/MOSR Status" (10/10/2026, ERICTHAI) — ĐÃ PUSH `c68e0ca`, live (curl APP_REV r197)
 
 - Nguồn: `beta-src/beta-template.html` (nhãn tab + bảng what-moved), `screens2.js` (bước kiosk), `guide.js`; `manual.js` / `deck.js` đã đổi chữ nhưng CHƯA dựng lại .docx / deck.

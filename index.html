@@ -1449,6 +1449,8 @@ HOOK.say('Loading CMR-CAR, ECAR and PAVOI verification…', allData.length + ' r
 const VER_URL = G_URL + 'dwanalytics_report_field' +
   '?$select=report_id,section_id,field_name,value_text' +
   '&$filter=' + encodeURIComponent("section_name eq 'Verification Result' and section_level eq 1");
+/* r198: forms with verification rounds + Final Conclusion — MVOI has the same sections as PAVOI */
+const PV_TITLES = new Set(['PAVOI', 'MVOI']);
 /* HOOK.lite: first paint from the cache only — CMR-CAR, ECAR, KPI 7 and verification rounds follow
    in a second pass, so a slow Galileo (90s timeouts measured 22/09) does not hold the whole screen. */
 let verRaw = [], secondOk = false;
@@ -1462,7 +1464,7 @@ if(!HOOK.lite && X2 && X2.v === 1){
   kpi7Cnt = X2.k7c; kpi7Ver = X2.k7v; kpi7Done = new Set(Object.keys(X2.k7c)); kpi7Loaded = true;
   verRaw = X2.ver;
   /* r195: PAVOI final conclusion (classic loadPavoiFinal) rides in the same cache; a cache written before r195 fetches it once */
-  if(X2.fin){ allData.forEach(r => { if(r.report_title === 'PAVOI') r.verif_final = X2.fin[r.report_id] || null; }); loadPavoiFinal.done = true; }
+  if(X2.fin){ allData.forEach(r => { if(PV_TITLES.has(r.report_title)) r.verif_final = X2.fin[r.report_id] || null; }); loadPavoiFinal.done = true; }
   else await loadPavoiFinal();
 } else if(!HOOK.lite){
   const err0 = TOASTS.filter(t => t.kind === 'err').length;
@@ -1471,8 +1473,8 @@ if(!HOOK.lite && X2 && X2.v === 1){
   /* cached only when all four came back clean — a partial CMR-CAR must not be frozen for 4 hours */
   secondOk = cmrLoaded && ecarLoaded && kpi7Loaded && TOASTS.filter(t => t.kind === 'err').length === err0;
 }
-const second = () => { const pv = new Set(allData.filter(r => r.report_title === 'PAVOI').map(r => r.report_id));
-  const fin = {}; allData.forEach(r => { if(r.report_title === 'PAVOI' && r.verif_final) fin[r.report_id] = r.verif_final; });
+const second = () => { const pv = new Set(allData.filter(r => PV_TITLES.has(r.report_title)).map(r => r.report_id));
+  const fin = {}; allData.forEach(r => { if(PV_TITLES.has(r.report_title) && r.verif_final) fin[r.report_id] = r.verif_final; });
   return { v: 1, cmr: cmrData, ecar: ecarData, k7c: kpi7Cnt, k7v: kpi7Ver, ver: verRaw.filter(f => f.section_id && pv.has(f.report_id)), fin }; };
 /* a cache that lacks the second-pass part (written by a lite first paint, or before r168) gets it added
    once the second pass comes back clean — same entry, same ts — so the next open paints everything at once */
@@ -1483,7 +1485,7 @@ if(entry){
   catch(e){ console.warn('[cache] save failed:', e && e.name, e && e.message); toast('Cache could not be saved: ' + (e && e.message), 'cache'); }
 }
 
-const pavIds = new Set(allData.filter(r => r.report_title === 'PAVOI').map(r => r.report_id));
+const pavIds = new Set(allData.filter(r => PV_TITLES.has(r.report_title)).map(r => r.report_id));
 const secMap = {};
 verRaw.forEach(f => {
   if(!f.section_id || !pavIds.has(f.report_id)) return;
@@ -1498,8 +1500,8 @@ const day = s => { const d = dDay(s); return d ? ymd(d) : null; };
 const orDash = v => (v === null || v === undefined || String(v).trim() === '') ? '—' : String(v);
 const CAT = { 'CAT I': 'I', 'CAT II': 'II', 'CAT III': 'III' };
 const CLOSED = new Set(['On-time Closed', 'Lately Closed', 'Closed']);
-const FORM_OF = { 'PAVOI': 'pavoi', 'MCAR': 'mcar', 'AMO ECAR': 'amoecar' };
-const CODE = { pavoi: 'PAVOI', mcar: 'MCAR', amoecar: 'AMO-ECAR', ecar: 'ECAR', cmrcar: 'CMR-CAR' };
+const FORM_OF = { 'PAVOI': 'pavoi', 'MVOI': 'mvoi', 'MCAR': 'mcar', 'AMO ECAR': 'amoecar' };
+const CODE = { pavoi: 'PAVOI', mvoi: 'MVOI', mcar: 'MCAR', amoecar: 'AMO-ECAR', ecar: 'ECAR', cmrcar: 'CMR-CAR' };
 /* Audit location = the station's 3-letter code (Eric 01/10/2026). Coruson admins attached the
    department ('SGN Line Maintenance Station', 'VTE Base Maintenance Station') instead of the
    station ('X Stations / SGN'); open audits were fixed on Coruson, closed ones are shown here as
@@ -1537,19 +1539,23 @@ allData.forEach(r => {
   o.ext = r.mcar_chk ? r.mcar_chk.n : 0;   /* approved MCAR extensions (classic buildMcarDeadlineChk) */
   o.mcarRule = r.mcar_chk || null;
   o.extReason = r.ext_reason || null;       /* r190: MCAR 'Reason for extension' (one field for both extensions) */          /* r189: MCAR deadline rule r101 — response due, target by rule (classic mcarWarnCell) */
-  if(form === 'pavoi'){
+  if(form === 'pavoi' || form === 'mvoi'){
     /* PAVOI carry no finding text, audit or level: their content is Request For Verification (rfv),
        the source report (report_ref) and the audited department (dept) — the PAVOI Detail columns of
-       classic (5737–5990). owner_name stays the owner section. */
+       classic (5737–5990). owner_name stays the owner section.
+       r198: MVOI (new Coruson form, 10/2026) has the same sections; its department is 'Responsible Department'. */
     o.finding = orDash(r.rfv);
     o.auditTitle = orDash(r.report_ref);
-    o.pvDept = orDash(r.dept);
+    o.pvDept = orDash(form === 'mvoi' ? r.resp_dept : r.dept);
+    o.mvoiType = form === 'mvoi' ? orDash(r.mvoi_type) : null;
     o.verifResult = orDash(r.verif_final);   /* r195: Final Conclusion only (Eric 03/10) — not one verification round */
     o.withdrawn = kpi7Withdrawn(r);
-    o.firstVerified = kpi7Ver[r.report_id] || null;
     o.rounds = Object.values(secMap[r.report_id] || {})
       .sort((a, b) => (a.date || '9999') < (b.date || '9999') ? -1 : 1)
       .map(v => ({ date: v.date, by: orDash(v.by), result: orDash(v.result) }));
+    /* KPI 7 (kpi7Ver) covers PAVOI only; an MVOI takes its first dated round */
+    o.firstVerified = form === 'pavoi' ? (kpi7Ver[r.report_id] || null)
+      : (o.rounds.map(v => v.date).filter(Boolean)[0] || null);
   }
   reports.push(o);
 });
@@ -1584,6 +1590,7 @@ const checks = [];
 const ok = (c, m) => { if(!c) checks.push(m); };
 const byForm = f => reports.filter(r => r.form === f);
 ok(byForm('pavoi').length === allData.filter(r => r.report_title === 'PAVOI').length, 'PAVOI count differs from allData');
+ok(byForm('mvoi').length === allData.filter(r => r.report_title === 'MVOI').length, 'MVOI count differs from allData');
 ok(reports.length === allData.length + cmrData.length + ecarData.length, 'report count differs from allData + CMR-CAR + ECAR');
 ok(byForm('cmrcar').length === cmrData.length && byForm('ecar').length === ecarData.length, 'CMR-CAR / ECAR count differs');
 if(kpi7Loaded) ok(byForm('pavoi').every(r => r.rounds.length === (kpi7Cnt[r.id] || 0)), 'PAVOI verification rounds differ from kpi7Cnt');
@@ -1931,7 +1938,7 @@ const NAV = [
     lead:'Report register by form type.',
     tabs:[
       {id:'all',    label:'All forms'},
-      {id:'pavoi',  label:'PAVOI'},
+      {id:'pavoi',  label:'PAVOI / MVOI'},
       {id:'cmrcar', label:'CMR-CAR'},
       {id:'ecar',   label:'ECAR'},
       {id:'amoecar',label:'AMO-ECAR'},
@@ -2034,9 +2041,13 @@ const FORMS = [
   {id:'mcar',   code:'MCAR',     desc:'Internal audit findings',    n:20},
   {id:'amoecar',code:'AMO-ECAR', desc:'Authority findings issued to AMO', n:13},
   {id:'ecar',   code:'ECAR',     desc:'',                           n:12},
-  {id:'cmrcar', code:'CMR-CAR',  desc:'',                           n:11}
+  {id:'cmrcar', code:'CMR-CAR',  desc:'',                           n:11},
+  {id:'mvoi',   code:'MVOI',     desc:'',                           n:0}    /* r198: real data only, shown on the PAVOI tab */
 ];
 const FORM_BY_ID = Object.fromEntries(FORMS.map(f=>[f.id,f]));
+/* Reports tab of a form: forms without their own tab live under All forms; MVOI shares the PAVOI tab (r198) */
+const formTab = f => f === 'other' ? 'all' : f === 'mvoi' ? 'pavoi' : f;
+const isPvForm = f => f === 'pavoi' || f === 'mvoi';
 
 const AUDIT_TITLES = [
   ['Line maintenance station audit','TSN'],
@@ -2155,7 +2166,7 @@ function buildReports(){
 function fromReal(r){
   return Object.assign({}, r, {
     raised: realDay(r.raised), target: realDay(r.target), closed: realDay(r.closed),
-    firstVerified: r.form === 'pavoi' ? realDay(r.firstVerified) : undefined,
+    firstVerified: (r.form === 'pavoi' || r.form === 'mvoi') ? realDay(r.firstVerified) : undefined,
     rounds: (r.rounds || []).map(v => Object.assign({}, v, { date: realDay(v.date) }))
   });
 }
@@ -2539,7 +2550,7 @@ function buildIndex(){
   REPORTS.forEach(r=> idx.push({
     kind:'Report', key:r.number, sub:r.code+' · '+r.auditTitle,
     hay:(r.number+' '+r.auditTitle+' '+r.finding+' '+r.owner+' '+(r.issuedTo||'')+' '+(r.acReg||'')+' '+r.dept).toLowerCase(),
-    go:{screen:'findings', tab:(r.form==='other'?'all':r.form), id:r.id}, meta:r.status
+    go:{screen:'findings', tab:formTab(r.form), id:r.id}, meta:r.status
   }));
   AUDITS.forEach(a=> idx.push({
     kind:'Audit', key:a.number, sub:a.title+' · '+a.location,
@@ -2955,7 +2966,7 @@ function renderOverview(){
     + '<span class="bar-track"><span class="bar-fill'+(i===2?' hot':'')+'" style="width:'+(catTotal?x.n/catTotal*100:0)+'%;background:'+['var(--accent-28)','var(--accent-62)','var(--accent)'][i]+'"></span></span>'
     + '<span class="num strong od-nowrap">'+x.n+'</span></button>').join('');
   const oldest = overdue.slice().sort((a,b)=>a.dtd-b.dtd).slice(0,3).map(r=>
-    '<button class="act-i" type="button" data-go="findings" data-tab="'+(r.form==='other'?'all':r.form)+'" data-id="'+esc(r.id)+'">'
+    '<button class="act-i" type="button" data-go="findings" data-tab="'+formTab(r.form)+'" data-id="'+esc(r.id)+'">'
     + '<span class="act-dot hot"></span>'
     + '<span class="act-body"><span class="row-id">'+esc(r.number)+'</span>'
     + '<span class="row-sub od-truncate">'+esc(r.auditTitle)+' · '+esc(r.owner)+'</span></span>'
@@ -2966,7 +2977,7 @@ function renderOverview(){
   if(REAL) byForm.push({ f:{ id:'all', code:'Other forms' }, n: open.filter(r=>r.form==='other').length });
   const maxForm = Math.max(1, ...byForm.map(x=>x.n));
   const formBars = byForm.map(x=>
-    '<button class="bar-row" type="button" data-go="findings" data-tab="'+x.f.id+'">'
+    '<button class="bar-row" type="button" data-go="findings" data-tab="'+formTab(x.f.id)+'">'
     + '<span class="mono strong">'+esc(x.f.code)+'</span>'
     + '<span class="bar-track"><span class="bar-fill" style="width:'+(x.n/maxForm*100)+'%"></span></span>'
     + '<span class="num strong od-nowrap">'+x.n+'</span></button>').join('');
@@ -2989,7 +3000,7 @@ function renderOverview(){
   const feed = acts.filter(a=>a.t<=TODAY).sort((a,b)=>b.t-a.t).slice(0,9).map(a=>{
     const d = dayDiff(TODAY, a.t);
     const when = d === 0 ? 'today' : d === 1 ? 'yesterday' : d < 30 ? d+'d ago' : fmtShort(a.t);
-    return '<button class="act-i" type="button" data-go="findings" data-tab="'+(a.r.form==='other'?'all':a.r.form)+'" data-id="'+a.r.id+'">'
+    return '<button class="act-i" type="button" data-go="findings" data-tab="'+formTab(a.r.form)+'" data-id="'+a.r.id+'">'
       + '<span class="act-dot'+(a.hot?' hot':'')+'"></span>'
       + '<span class="act-body"><span class="row-id">'+esc(a.r.number)+' <span class="dim" style="font-weight:400">'+esc(a.txt)+'</span></span>'
       + '<span class="row-sub od-truncate">'+esc(a.r.auditTitle)+'</span></span>'
@@ -3113,7 +3124,7 @@ function tableHTML(key, cfg, rows){
   const slice = sorted.slice((p-1)*PAGE_SIZE, p*PAGE_SIZE);
 
   /* a row opens the report itself (detail dialog); PAVOI keeps its list + record screen */
-  const body = slice.map(r=>'<tr tabindex="0" '+(REAL && r.form!=='pavoi' ? 'data-act="breport"' : 'data-go="findings" data-tab="'+(r.form==='other'?'all':r.form)+'"')+' data-id="'+r.id+'">'
+  const body = slice.map(r=>'<tr tabindex="0" '+(REAL && !isPvForm(r.form) ? 'data-act="breport"' : 'data-go="findings" data-tab="'+formTab(r.form)+'"')+' data-id="'+r.id+'">'
     + cfg.cols.map(c=>{
         const col = COL[c];
         return '<td data-l="'+esc(col.l)+'"'+(col.main?' class="t-main"':(col.ar?' class="ar"':''))+'>'+col.c(r)+'</td>';
@@ -3185,15 +3196,22 @@ function renderLane(screen, tab){
    SCREEN · PAVOI DETAIL (list + record)
    ========================================================================== */
 function renderPavoi(){
-  const rows = scoped().filter(r=>r.form==='pavoi')
+  /* r198: MVOI shares this tab and its layout; the Form filter narrows the register.
+     KPI 7, its Withdrawn rule and the 30-day window stay PAVOI only. */
+  const all = scoped().filter(r=>isPvForm(r.form));
+  const nOf = f => all.filter(r=>r.form===f).length;
+  if(BS.pvForm && !nOf(BS.pvForm)) BS.pvForm = '';
+  const formSel = sel('pvForm', [['', 'All ('+all.length+')'], ['pavoi', 'PAVOI ('+nOf('pavoi')+')'], ['mvoi', 'MVOI ('+nOf('mvoi')+')']], BS.pvForm || '', 'Form');
+  const rows = all.filter(r=>!BS.pvForm || r.form===BS.pvForm)
     .sort((a,b)=>{ const ao=isOpen(a)?0:1, bo=isOpen(b)?0:1; return ao-bo || a.dtd-b.dtd; });
   if(!rows.length) return '<section class="sec"><div class="card">'+emptyState()+'</div></section>';
 
   if(!state.sel.pavoi || !rows.some(r=>r.id===state.sel.pavoi)) state.sel.pavoi = rows[0].id;
   const r = rows.find(x=>x.id===state.sel.pavoi);
+  const mv = r.form === 'mvoi';
 
-  const kpiRows = rows.filter(x=>!x.withdrawn);
-  const total = kpiRows.length, done = kpiRows.filter(assessed).length, wd = rows.length - kpiRows.length;
+  const kpiRows = rows.filter(x=>x.form==='pavoi' && !x.withdrawn);
+  const total = kpiRows.length, done = kpiRows.filter(assessed).length, wd = rows.filter(x=>x.form==='pavoi' && x.withdrawn).length;
   const list = rows.map(x=>
     '<button class="rec" type="button" data-act="selpavoi" data-id="'+x.id+'"'+(x.id===r.id?' aria-current="true"':'')+'>'
     + '<span class="rec-top"><span class="row-id">'+esc(x.number)+'</span>'+(x.withdrawn?'<span class="tag">Withdrawn</span>':'')+chip(x.status)+'</span>'
@@ -3206,7 +3224,13 @@ function renderPavoi(){
 
   const fv = firstVerDate(r);
   const sinceIssue = dayDiff(TODAY, r.raised);
-  const flag = r.withdrawn
+  const flag = mv
+    ? (!assessed(r)
+      ? { cls:'warn', t:'No verification round recorded',
+          b:'No verification round has been recorded against this MVOI yet. Raised '+sinceIssue+' days ago.' }
+      : { cls:'', t:r.rounds.length+' verification round'+(r.rounds.length>1?'s':'')+' recorded',
+          b: fv ? 'First verified '+dayDiff(fv, r.raised)+' days after issue. MVOI is not part of KPI 7.' : 'Date verified is empty on the recorded rounds. MVOI is not part of KPI 7.' })
+    : r.withdrawn
     ? { cls:'warn', t:'Withdrawn — outside KPI 7',
         b:'This PAVOI has a Withdrawn stage and no completed accept/reject stage, so it is excluded from both the numerator and the denominator until it is closed properly.' }
     : !assessed(r)
@@ -3230,17 +3254,18 @@ function renderPavoi(){
     : '<p class="t-sub dim">No verification round has been recorded against this report yet.</p>';
 
   const meta = [
-    ['Form','PAVOI'], ['Status', null], ['Owner section', r.owner], ['Issued to', r.issuedTo],   /* r194: was dept / owner (same value twice) */
+    ['Form',r.code], ['Status', null], ['Owner section', r.owner], ['Issued to', r.issuedTo],   /* r194: was dept / owner (same value twice) */
     ['Raised', fmtDate(r.raised)], ['Target', fmtDate(r.target)],
     ['Days to due', r.closed ? 'closed '+fmtDate(r.closed) : (r.dtd<0 ? Math.abs(r.dtd)+' days over' : r.dtd+' days left')],
-  ].concat(REAL ? [['Department', r.pvDept], ['Source report', r.auditTitle], ['Final verification', r.verifResult]]
+  ].concat(REAL ? (mv ? [['MVOI type', r.mvoiType], ['Responsible department', r.pvDept]] : [['Department', r.pvDept]])
+                  .concat([['Source report', r.auditTitle], ['Final verification', r.verifResult]])
                 : [['Finding level', r.level], ['Audit', r.auditTitle+' · '+r.location]]
   ).map(m=>'<div class="meta-i"><span class="meta-k">'+esc(m[0])+'</span>'
     + (m[1]===null ? '<span class="meta-v">'+chip(r.status)+'</span>' : '<span class="meta-v od-truncate">'+esc(m[1])+'</span>')+'</div>').join('');
 
   return '<section class="sec"><div class="split">'
-    + '<div class="card"><div class="card-head"><h2>PAVOI register</h2>'
-      + '<span class="t-small dim od-fill">'+done+' of '+total+' assessed'+(wd?' · '+wd+' withdrawn excluded':'')+'</span></div>'
+    + '<div class="card"><div class="card-head"><h2>'+(BS.pvForm==='mvoi' ? 'MVOI' : BS.pvForm==='pavoi' ? 'PAVOI' : 'PAVOI / MVOI')+' register</h2>'
+      + '<span class="t-small dim od-fill">'+(total ? 'PAVOI '+done+' of '+total+' assessed'+(wd?' · '+wd+' withdrawn excluded':'') : '')+'</span>'+formSel+'</div>'
       + '<div class="rec-list">'+list+'</div></div>'
     + '<div class="card"><div class="card-head">'
       + '<h2 class="mono">'+esc(r.number)+'</h2>'+chip(r.status)+extBtn('report', r.id)
@@ -3568,7 +3593,7 @@ function render(){
 
   if(pendingId){
     const r = REPORTS.find(x=>x.id === pendingId);
-    if(r){ if(r.form === 'pavoi') state.sel.pavoi = r.id; else { state.rowQuery = r.number; if(REAL) setTimeout(() => showReport(r.id), 0); } }
+    if(r){ if(isPvForm(r.form)) state.sel.pavoi = r.id; else { state.rowQuery = r.number; if(REAL) setTimeout(() => showReport(r.id), 0); } }
     pendingId = null;
     renderFilterBar();
   }
@@ -4839,12 +4864,12 @@ function showReport(id){
           + (r.mcar_chk.target_warn ? ' <span class="t-small dim">(Target date on Coruson differs)</span>' : '') : undefined, true],
         ['Extension 1', r.ext1_date ? fdx(r.ext1_date) : undefined],
         ['Extension 2', r.ext2_date ? fdx(r.ext2_date) : undefined], ['Date completed', fdx(r.completed_date)], ['Date closed', fdx(r.close_date)]])
-      + block(rep.form === 'pavoi' ? 'Request for verification' : 'Finding', rep.form === 'pavoi' ? r.rfv : r.finding_desc)
+      + block(isPvForm(rep.form) ? 'Request for verification' : 'Finding', isPvForm(rep.form) ? r.rfv : r.finding_desc)
       /* r190: MCAR extension reason / denial reason as entered on the form (Extension applies to MCAR only) */
       + block('Reason for extension', r.ext_reason) + block('Extension denied reason', r.ext_denied)
-      + (rep.form === 'pavoi' ? block('Final verification', r.verif_final) : block('Verification result', r.verif_result))
+      + (isPvForm(rep.form) ? block('Final verification', r.verif_final) : block('Verification result', r.verif_result))
       /* r193: verified Satisfactory but still open on Coruson — r195: PAVOI only, Final Conclusion only */
-      + (rep.form === 'pavoi' && M.verifiedOpen(rep, r.verif_final) ? block('Verified Satisfactory — not closed', 'The verification result is Satisfactory but the report is still '+rep.status+' on Coruson. Close it there, or move its target date if follow-up continues.', true) : '')
+      + (isPvForm(rep.form) && M.verifiedOpen(rep, r.verif_final) ? block('Verified Satisfactory — not closed', 'The verification result is Satisfactory but the report is still '+rep.status+' on Coruson. Close it there, or move its target date if follow-up continues.', true) : '')
       /* r169: corrective actions of this report (F-088, investigation reports, AMO ECAR…); load once, then re-open */
       + (A.eis().loaded ? caList(A.eis().ca[id] || [], caForms().has(r.report_title))
          : (MODAL_KEY = 'rpt:'+id, Promise.resolve(A.loadEis()).then(() => { if(MODAL_KEY === 'rpt:'+id) showReport(id); }),
@@ -5336,7 +5361,7 @@ function scrGuideNew(){
     + '<table><tr><th>Section</th><th>Use it to</th></tr>'
     + '<tr><td>Overview</td><td>See key indicators for the selected period. Every tile opens the report list behind it.</td></tr>'
     + '<tr><td>Work Queue</td><td>Act on reports: Open reports, Overdue, and PAVOI awaiting verification.</td></tr>'
-    + '<tr><td>Findings</td><td>Read the register by form: All forms, PAVOI, CMR-CAR, ECAR, AMO-ECAR, MCAR, OSR / MOSR.</td></tr>'
+    + '<tr><td>Findings</td><td>Read the register by form: All forms, PAVOI / MVOI, CMR-CAR, ECAR, AMO-ECAR, MCAR, OSR / MOSR.</td></tr>'
     + '<tr><td>Analytics</td><td>KPI charts, SPI, OSR/MOSR Status, Early detection (KPI 2) and Event/IR report status on Coruson.</td></tr>'
     + '<tr><td>Audit Plan</td><td>The audit and inspection programme: timeline, schedule list and workflow stages.</td></tr>'
     + '<tr><td>Library</td><td>Controlled documents and this guide.</td></tr>'
@@ -5368,7 +5393,7 @@ function scrGuideNew(){
     '<ul><li><b>Overview</b>: key indicators (including audits completed against the plan with those delayed past their scheduled month, open and overdue PAVOI, reports closed late, MCAR under extension, overdue mitigation tasks from HIRA / CAPA and F-088 / investigation reports overdue themselves or through a corrective action), overdue reports by CAT with the most overdue, open reports by form, recent report events.</li>'
     + '<li><b>Work Queue</b>: Open reports (nearest target first), Overdue (with CAT), Awaiting verification (open PAVOI with no verification round). Select a row to open the report.</li>'
     + '<li><b>Reports › All forms</b>: every report type. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings).</li>'
-    + '<li><b>Reports › PAVOI</b>: register on the left, record on the right with the verification history and the RFI / Task list of open PAVOI.</li>'
+    + '<li><b>Reports › PAVOI / MVOI</b>: register on the left (Form filter: PAVOI or MVOI), record on the right with the verification history and the RFI / Task list of open records. KPI 7 counts PAVOI only.</li>'
     + '<li><b>Reports › OSR / MOSR</b>: OSR and MOSR of AMO and MQA : QA AMO, Open or Closed from Coruson.</li>'
     + '<li><b>Analytics › Event/IR report status</b>: EIS and F-088 completeness on Coruson; the tiles count the reports complete on each check, the table shows workflow, linked reports, final report and status per report.</li>'
     + '<li><b>Audit Plan</b>: KPI tiles, a location × month view (one dot per audit in its scheduled month; filter by type or show only upcoming / with overdue findings), and a schedule list. Select a dot or a row for its workflow stages and findings. <b>Workflow stages</b>: for the QA AMO audits in the selected period, how many stages of each name are in each Galileo status; select an InProgress or PendingSignOff count for the audits concerned.</li>'
