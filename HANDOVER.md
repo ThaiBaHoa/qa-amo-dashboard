@@ -5,7 +5,7 @@
 
 ---
 
-## ⏳ r199 — MVOI tính chung KPI 7 (19/10/2026, THAIBAHOA-HOME) — PUSH 19/10
+## ✅ r199 — MVOI tính chung KPI 7 (19/10/2026, THAIBAHOA-HOME) — ĐÃ PUSH `76b14c0`, live (curl APP_REV r199)
 
 - Eric chốt 19/10: MVOI vào KPI 7 + Withdrawn + cờ 30 ngày + ô Overview + Awaiting verification. Nguồn: `classic.html` (`isPvReport`), vault `beta-src` loader.js / metrics.js / screens.js / beta-template.html / guide.js.
 - Chia ban theo owner_name như PAVOI → MVOI-001/002 (owner cá nhân) ở Unassigned, MVOI-003 ở QC Section.
