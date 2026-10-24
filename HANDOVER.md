@@ -5,6 +5,12 @@
 
 ---
 
+## ✅ r200-i1 — danh sách PAVOI / MVOI giữ vị trí cuộn (24/10/2026, THAIBAHOA-HOME)
+- Lỗi: bấm một PAVOI/MVOI thì danh sách bên trái nhảy về đầu (`.rec-list` cuộn riêng, `render()` vẽ lại bằng innerHTML).
+- Sửa: vault `beta-src/beta.html` `render()` giữ `scrollTop` mỗi `.rec-list` khi cùng route → build → `index.html` (chỉ khác 4 dòng).
+- Kiểm local dữ liệu thật: cuộn 600 px, bấm PAVOI-439 → vẫn 600 px, chọn đúng, không lỗi console.
+- Bugfix thuần → `-i1` trên r200 (không bump major, doc rev giữ r200).
+
 ## ✅ r200 — classic + hướng dẫn sử dụng có MVOI (19/10/2026, THAIBAHOA-HOME) — ĐÃ PUSH `e84c1c0`, live (curl APP_REV r200)
 
 - classic: trang PAVOI / MVOI Detail + lọc Form, nhãn KPI 7. Nguồn manual: vault `beta-src/manual.js` → `HuongDan_SuDung_QA_AMO_Dashboard_r200.docx` (cài `docx@9` tạm ngoài vault; ảnh r186 cũ, tab vẫn ghi "PAVOI").

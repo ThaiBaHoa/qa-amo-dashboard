@@ -3624,7 +3624,11 @@ function render(){
       refocus.push(sel(n => n === 'id' || n === 'aria-label' || n.startsWith('data-')));
     if(ae.hasAttribute('aria-label')) refocus.push(sel(n => n === 'aria-label' || n === 'data-act' || n === 'data-key'));
   }
+  /* a record list scrolls on its own (.rec-list): picking a record (PAVOI / MVOI…) redraws the screen,
+     so keep each list where it was instead of jumping back to the first record */
+  const listTop = route === lastRoute ? [...scr.querySelectorAll('.rec-list')].map(e => e.scrollTop) : [];
   scr.innerHTML = html;
+  scr.querySelectorAll('.rec-list').forEach((e, i) => { if(listTop[i]) e.scrollTop = listTop[i]; });
   if(REAL && typeof topExtras === 'function') $('#betaTop').innerHTML = topExtras();
   writeUrlFilters();
   if(route !== lastRoute) $('#main-content').scrollTop = 0;
