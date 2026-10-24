@@ -5,7 +5,7 @@
 
 ---
 
-## ✅ r200-i1 — danh sách PAVOI / MVOI giữ vị trí cuộn (24/10/2026, THAIBAHOA-HOME)
+## ✅ r200-i1 — danh sách PAVOI / MVOI giữ vị trí cuộn (24/10/2026, THAIBAHOA-HOME) — ĐÃ PUSH `c15a0b6`, live (curl APP_REV r200-i1)
 - Lỗi: bấm một PAVOI/MVOI thì danh sách bên trái nhảy về đầu (`.rec-list` cuộn riêng, `render()` vẽ lại bằng innerHTML).
 - Sửa: vault `beta-src/beta.html` `render()` giữ `scrollTop` mỗi `.rec-list` khi cùng route → build → `index.html` (chỉ khác 4 dòng).
 - Kiểm local dữ liệu thật: cuộn 600 px, bấm PAVOI-439 → vẫn 600 px, chọn đúng, không lỗi console.
