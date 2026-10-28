@@ -5,7 +5,7 @@
 
 ---
 
-## ⏳ r202 — xuất sheet Surveillance cùng MCAR (28/10/2026, EricThai) — CHƯA PUSH
+## ✅ r202 — xuất sheet Surveillance cùng MCAR (28/10/2026, EricThai) — ĐÃ PUSH `0f7f5a4`, live (curl APP_REV r202)
 - Thẻ "MCAR & Surveillance report" (Admin › Export reports): Both sheets / MCAR only / Surveillance only, cùng khoảng Submitted Date. Nguồn: `classic.html` (`exportSncReport`, `survReportSheet`…) + vault `beta-src` loader.js / screens2.js.
 - Kiểm local 01/01–31/07/2026: 180 SR / 219 finding, khớp số finding mỗi SR với file mẫu; SR không có finding bị bỏ (13).
 - CATEGORY = TYPE OF FINDINGS từng finding — trống ở SR thật tới khi người dùng điền.
