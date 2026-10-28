@@ -5,6 +5,11 @@
 
 ---
 
+## ⏳ r203 — sheet biểu đồ trong file MCAR & Surveillance (28/10/2026, EricThai) — CHƯA PUSH
+- "Both sheets" thêm 3 sheet: Findings in Auditee · kiểu loại Lỗi · Số lượng (công thức COUNTIF/COUNTIFS + biểu đồ Excel thật chèn bằng JSZip). Nguồn: `classic.html` (`sncChartSheets`, `sncAddChartParts`, `sncCategoryList`) + vault `beta-src/screens2.js` (mô tả thẻ).
+- Kiểm bằng Excel thật (COM): mở được, 6 biểu đồ, số khớp; điền tay UNIT/CATEGORY → cập nhật.
+- Auditee + Kiểu loại lỗi = 0 tới khi có UNIT / TYPE OF FINDING. Ô Nhận xét để trống.
+
 ## ✅ r202 — xuất sheet Surveillance cùng MCAR (28/10/2026, EricThai) — ĐÃ PUSH `0f7f5a4`, live (curl APP_REV r202)
 - Thẻ "MCAR & Surveillance report" (Admin › Export reports): Both sheets / MCAR only / Surveillance only, cùng khoảng Submitted Date. Nguồn: `classic.html` (`exportSncReport`, `survReportSheet`…) + vault `beta-src` loader.js / screens2.js.
 - Kiểm local 01/01–31/07/2026: 180 SR / 219 finding, khớp số finding mỗi SR với file mẫu; SR không có finding bị bỏ (13).

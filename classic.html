@@ -2528,7 +2528,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.10.28-r202';
+const APP_REV = '2026.10.28-r203';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -9209,7 +9209,8 @@ async function mcarReportSheet(from,to){
   });
   const ws=sncSheet({title:'MCAR FINDINGS - TQA ('+fdShort(from)+' to '+fdShort(to)+')',titleSpan:14,headers,
     W:[19,13,14,14,14,75,19,19,13,13,13,47,30,30,19,22,15,17],orangeFrom:15,dateCols:new Set([2,3,4,8,9,10]),aoa,bandRows});
-  return {ws,n:rows.length,label:rows.length+' MCAR, '+bandRows.size+' month'+(bandRows.size>1?'s':'')};
+  return {ws,n:rows.length,label:rows.length+' MCAR, '+bandRows.size+' month'+(bandRows.size>1?'s':''),
+    stat:{last:2+aoa.length,rows:rows.map(({r,sub})=>({sub,cat:fOf(r,'TYPE OF FINDINGS'),unit:''}))}};
 }
 async function survReportSheet(from,to){
   const rows=await sncRows('Surveillance Report','Surveillance Report',from,to);
@@ -9226,20 +9227,184 @@ async function survReportSheet(from,to){
   rows.sort((a,b)=>String(a.r.report_number).localeCompare(String(b.r.report_number)));
   const headers=['Audit Ref. No','Raised From','Report Number','Submitted Date','Closed Date','Station','Report Owner',
     'Finding description','SR Status','CATEGORY','UNIT'];
-  const aoa=[]; let nf=0, nz=0;
+  const aoa=[], st=[]; let nf=0, nz=0;
   rows.forEach(({r,d,sub})=>{
     const secs=Object.entries(sec[r.report_id]||{}).filter(([,s])=>s.f['Finding description'])
       .sort((a,b)=>String(a[1].t).localeCompare(String(b[1].t))||a[0].localeCompare(b[0]));
     const head=[r.audit_ref||'',r.audit_number||'',r.report_number||'',xlSerial(sub),xlSerial(vnDay(d.closed_date)),
       tOf(r,'Station')||tOf(r,'Department'),r.owner_name||''];
     if(!secs.length){ nz++; return; }                    // SR không có finding: file mẫu không liệt kê (13 SR 01–07/2026)
-    secs.forEach(([,s])=>{ nf++;
+    secs.forEach(([,s])=>{ nf++; st.push({sub,cat:(s.f['TYPE OF FINDINGS']||[]).join('; '),unit:''});
       aoa.push([...head,s.f['Finding description'].join('\n\n'),r.report_status||'',(s.f['TYPE OF FINDINGS']||[]).join('; '),'']); });
   });
   const ws=sncSheet({title:'SURVEILLANCE REPORT ('+fdShort(from)+' to '+fdShort(to)+')',titleSpan:8,headers,
     W:[27,21,18,18,20,13,19,66,13,24,12],orangeFrom:9,dateCols:new Set([3,4]),aoa,zebra:true});
   if(!nf) return {n:0};
-  return {ws,n:rows.length-nz,label:(rows.length-nz)+' SR, '+nf+' finding'+(nf!==1?'s':'')+(nz?' ('+nz+' SR without findings left out)':'')};
+  return {ws,n:rows.length-nz,label:(rows.length-nz)+' SR, '+nf+' finding'+(nf!==1?'s':'')+(nz?' ('+nz+' SR without findings left out)':''),
+    stat:{last:2+aoa.length,rows:st}};
+}
+// ── S&C ANALYSIS — sheet biểu đồ (r203), theo 3 sheet biểu đồ của file mẫu (bỏ CATEROGY_Group — Eric 28/10) ──
+// Chỉ thêm khi xuất "Both sheets". Bảng là CÔNG THỨC trỏ vào sheet MCAR / Surveillance (như mẫu, COUNTIF) kèm giá trị
+// tính sẵn, nên người dùng điền tay UNIT / CATEGORY trong file thì bảng + biểu đồ tự cập nhật khi Excel tính lại.
+//   • Biểu đồ Findings in Auditee: số finding theo UNIT (MCAR!Q + Surveillance!K), cột đứng. UNIT xuất trống
+//     (Coruson không có trường) → 0 tới khi người dùng điền. Danh sách UNIT = sheet CATEROGY_Group của mẫu.
+//   • Biểu đồ kiểu loại Lỗi: theo TYPE OF FINDING (MCAR!P) / CATEGORY (Surveillance!J), 3 bảng MCAR · SURVEY · tổng,
+//     3 biểu đồ thanh ngang. Danh sách = list Coruson 'TYPE OF FINDING' (dwanalytics_lists, mục Active, thứ tự tạo).
+//     COUNTIF dạng "*"&tên&"*" vì trường là checklist (một finding có thể chọn nhiều loại, nối bằng '; ').
+//   • Biểu đồ Số lượng: số finding MCAR / SURVEY theo tháng Submitted trong khoảng, 2 biểu đồ cột.
+// Mẫu có 2 bản kiểu loại lỗi (1 tháng / 6 tháng) và "Nhận xét" viết tay: ở đây một bản cho cả khoảng đã chọn (muốn
+// 1 tháng thì xuất khoảng 1 tháng) và để ô "Nhận xét" trống cho người phân tích — không tự sinh nhận định.
+// SheetJS không ghi biểu đồ → sau XLSX.write mở gói bằng JSZip, thêm drawing + chart XML (Office Open XML).
+// Tên hàm KHÔNG được kết thúc bằng 'Chart(s)' / bắt đầu bằng render|show|update…: loader giao diện mới (beta-src
+// loader.js AUTO_STUB) biến các hàm đó thành rỗng — sncInjectCharts bị dính, trả undefined (28/10/2026).
+const SNC_UNITS=['STORE SGN','HAN','DAD','SGN','CXR','HPH','VII','VCA','PQC','SGN Structure Team ','TPS','Training',
+  'Workshop (GSE)','Oursouce/provider/Supplier','Base VTE','Workshop','GSE SGN'];
+async function sncCategoryList(){
+  const raw=await fetchAll(G_URL+'dwanalytics_lists?$select=list_item_name,list_item_status,created_date'+
+    '&$filter='+encodeURIComponent("list_name eq 'TYPE OF FINDING'"),true);
+  return raw.filter(x=>x.list_item_name&&x.list_item_status==='Active')
+    .sort((a,b)=>String(a.created_date).localeCompare(String(b.created_date))).map(x=>x.list_item_name);
+}
+// Thêm 3 sheet bảng; trả về đặc tả biểu đồ cho sncAddChartParts. mc / sr = {last (dòng Excel cuối), rows:[{sub,cat,unit}]}
+function sncChartSheets(wb,mc,sr,cats,from,to){
+  const B={style:'thin',color:{rgb:'808080'}}, border={top:B,bottom:B,left:B,right:B}, FONT='DejaVu Sans';
+  const head={fill:{fgColor:{rgb:'D9E4F1'}},font:{name:FONT,sz:10,bold:true,color:{rgb:'262626'}},alignment:{vertical:'center',wrapText:true},border};
+  const cell={font:{name:FONT,sz:10},alignment:{vertical:'center',wrapText:true},border};
+  const num={font:{name:FONT,sz:10},alignment:{horizontal:'center',vertical:'center'},border};
+  const sum={...num,font:{name:FONT,sz:10,bold:true}};
+  const titleS={font:{name:FONT,sz:14,bold:true,color:{rgb:'1F3864'}}};
+  const noteS={font:{name:FONT,sz:10,bold:true}}, boxS={alignment:{vertical:'top',wrapText:true},border};
+  const period=fdShort(from)+' to '+fdShort(to), q=s=>"'"+s.replace(/'/g,"''")+"'";
+  const rng=(sh,col,last)=>q(sh)+'!$'+col+'$3:$'+col+'$'+Math.max(3,last);
+  const charts=[];
+  // ws từ mảng ô {v, f?, s}; merges; cols
+  const mk=(name,cells,merges,cols)=>{
+    const ws={}; let mr=0, mc2=0;
+    cells.forEach(([r,c,v,s,f])=>{ const ref=XLSX.utils.encode_cell({r,c});
+      ws[ref]=typeof v==='number'?{t:'n',v}:{t:'s',v:v==null?'':String(v)}; if(f) ws[ref].f=f; if(s) ws[ref].s=s;
+      mr=Math.max(mr,r); mc2=Math.max(mc2,c); });
+    ws['!ref']=XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(mr,60),c:Math.max(mc2,23)}});
+    ws['!merges']=merges; ws['!cols']=cols.map(wch=>({wch}));
+    XLSX.utils.book_append_sheet(wb,ws,name); return name;
+  };
+  // 1) Findings in Auditee
+  {
+    const name='Biểu đồ Findings in Auditee', cells=[[0,1,'MCAR/SURVEY Findings by AMO Unit ('+period+')',titleS],
+      [1,1,'AMO Unit',head],[1,2,'MCAR/SURVEY Findings',head]];
+    SNC_UNITS.forEach((u,i)=>{ const r=2+i, ref='B'+(r+1);
+      const v=mc.rows.filter(x=>x.unit===u).length+sr.rows.filter(x=>x.unit===u).length;
+      cells.push([r,1,u,cell],[r,2,v,num,'COUNTIF('+rng('MCAR','Q',mc.last)+','+ref+')+COUNTIF('+rng('Surveillance','K',sr.last)+','+ref+')']); });
+    const sr2=2+SNC_UNITS.length;
+    cells.push([sr2,1,'SUM',head],[sr2,2,cells.filter(x=>x[0]>=2&&x[0]<sr2&&x[1]===2).reduce((a,x)=>a+x[2],0),sum,'SUM(C3:C'+sr2+')']);
+    cells.push([sr2+3,3,'Nhận xét:',noteS]); for(let r=sr2+4;r<=sr2+20;r++) for(let c=4;c<=11;c++) cells.push([r,c,'',boxS]);
+    mk(name,cells,[{s:{r:sr2+4,c:4},e:{r:sr2+20,c:11}}],[3,28,22,4,12,12,12,12,12,12,12,12]);
+    charts.push({sheet:name,from:[5,1],to:[13,20],dir:'col',title:'MCAR/SURVEY Findings by AMO Unit',
+      series:[{name:q(name)+'!$C$2',nameV:'MCAR/SURVEY Findings',cat:q(name)+'!$B$3:$B$'+(2+SNC_UNITS.length),catV:SNC_UNITS,
+        val:q(name)+'!$C$3:$C$'+(2+SNC_UNITS.length),valV:SNC_UNITS.map((_,i)=>cells.find(x=>x[0]===2+i&&x[1]===2)[2]),color:'4472C4'}]});
+  }
+  // 2) Kiểu loại lỗi
+  {
+    const name='Biểu đồ kiểu loại Lỗi', n=cats.length, last=3+n, cells=[[0,1,'Thống kê các kiểu loại lỗi ('+period+')',titleS],
+      [2,1,'MCAR FINDINGS',head],[2,2,'NUM',head],[2,4,'SURVEY FINDINGS',head],[2,5,'NUM',head],[2,8,'MCAR/SURVEY FINDINGS',head],[2,9,'NUM',head]];
+    const has=(x,c)=>String(x.cat||'').split('; ').includes(c);
+    const vm=[], vs=[];
+    cats.forEach((c,i)=>{ const r=3+i, R=r+1;
+      vm.push(mc.rows.filter(x=>has(x,c)).length); vs.push(sr.rows.filter(x=>has(x,c)).length);
+      cells.push([r,1,c,cell],[r,2,vm[i],num,'COUNTIF('+rng('MCAR','P',mc.last)+',"*"&B'+R+'&"*")'],
+        [r,4,c,cell],[r,5,vs[i],num,'COUNTIF('+rng('Surveillance','J',sr.last)+',"*"&E'+R+'&"*")'],
+        [r,8,c,cell],[r,9,vm[i]+vs[i],num,'C'+R+'+F'+R]); });
+    const tot=a=>a.reduce((x,y)=>x+y,0);
+    cells.push([last,1,'SUM',head],[last,2,tot(vm),sum,'SUM(C4:C'+last+')'],[last,4,'SUM',head],[last,5,tot(vs),sum,'SUM(F4:F'+last+')'],
+      [last,8,'SUM',head],[last,9,tot(vm)+tot(vs),sum,'SUM(J4:J'+last+')']);
+    const cr=last+28;
+    cells.push([cr,3,'Nhận xét:',noteS]); for(let r=cr+1;r<=cr+12;r++) for(let c=4;c<=12;c++) cells.push([r,c,'',boxS]);
+    mk(name,cells,[{s:{r:0,c:1},e:{r:0,c:9}},{s:{r:cr+1,c:4},e:{r:cr+1+11,c:12}}],[3,40,8,3,40,8,3,3,40,8,3,3,3]);
+    const ser=(col,lbl,vals,color)=>({name:q(name)+'!$'+col+'$3',nameV:'NUM',cat:q(name)+'!$'+lbl+'$4:$'+lbl+'$'+last,catV:cats,
+      val:q(name)+'!$'+col+'$4:$'+col+'$'+last,valV:vals,color});
+    const top=last+2;
+    charts.push({sheet:name,from:[0,top],to:[4,top+24],dir:'bar',title:'MCAR Findings Category',series:[ser('C','B',vm,'4472C4')]});
+    charts.push({sheet:name,from:[4,top],to:[9,top+24],dir:'bar',title:'SURVEY Findings Category',series:[ser('F','E',vs,'ED7D31')]});
+    charts.push({sheet:name,from:[9,top],to:[18,top+24],dir:'bar',title:'MCAR/SURVEY Findings Category',series:[ser('J','I',vm.map((v,i)=>v+vs[i]),'70AD47')]});
+  }
+  // 3) Số lượng theo tháng Submitted
+  {
+    const name='Biểu đồ Số lượng', months=[]; let [y,m]=from.slice(0,7).split('-').map(Number);
+    const [ey,em]=to.slice(0,7).split('-').map(Number);
+    while(y<ey||(y===ey&&m<=em)){ months.push([y,m]); m++; if(m>12){m=1;y++;} }
+    const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const cells=[[0,0,'Findings by month of Submitted Date ('+period+')',titleS],[1,0,'Finding Type',head],[2,0,'MCAR',cell],[3,0,'SURVEY',cell]];
+    const vm=[], vs=[], L=XLSX.utils.encode_col;
+    months.forEach(([yy,mm],i)=>{ const c=1+i, ym=yy+'-'+String(mm).padStart(2,'0');
+      const lo='DATE('+yy+','+mm+',1)', hi='DATE('+(mm===12?yy+1:yy)+','+(mm===12?1:mm+1)+',1)';
+      const cf=(sh,col,last)=>'COUNTIFS('+rng(sh,col,last)+',">="&'+lo+','+rng(sh,col,last)+',"<"&'+hi+')';
+      vm.push(mc.rows.filter(x=>x.sub.slice(0,7)===ym).length); vs.push(sr.rows.filter(x=>x.sub.slice(0,7)===ym).length);
+      cells.push([1,c,M[mm-1]+'-'+String(yy).slice(2),head],[2,c,vm[i],num,cf('MCAR','C',mc.last)],[3,c,vs[i],num,cf('Surveillance','D',sr.last)]); });
+    const lc=L(months.length);
+    mk(name,cells,[],[14,...months.map(()=>9)]);
+    const cat=q(name)+'!$B$2:$'+lc+'$2', catV=months.map(([yy,mm])=>M[mm-1]+'-'+String(yy).slice(2)), c0=months.length+2;
+    charts.push({sheet:name,from:[0,6],to:[Math.max(8,c0),24],dir:'col',title:'MCAR FINDINGS',
+      series:[{name:q(name)+'!$A$3',nameV:'MCAR',cat,catV,val:q(name)+'!$B$3:$'+lc+'$3',valV:vm,color:'4472C4'}]});
+    charts.push({sheet:name,from:[Math.max(8,c0)+1,6],to:[Math.max(8,c0)+10,24],dir:'col',title:'MCAR/SURVEILLANCE',
+      series:[{name:q(name)+'!$A$3',nameV:'MCAR',cat,catV,val:q(name)+'!$B$3:$'+lc+'$3',valV:vm,color:'4472C4'},
+              {name:q(name)+'!$A$4',nameV:'SURVEY',cat,catV,val:q(name)+'!$B$4:$'+lc+'$4',valV:vs,color:'ED7D31'}]});
+  }
+  return charts;
+}
+// Chèn biểu đồ (barChart, cột đứng / thanh ngang, nhãn giá trị) vào gói .xlsx đã ghi; trả về Blob.
+async function sncAddChartParts(buf,sheetNames,charts){
+  if(!window.JSZip) await new Promise((res,rej)=>{ const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; s.onload=res; s.onerror=()=>rej(new Error('could not load JSZip')); document.head.appendChild(s); });
+  const zip=await JSZip.loadAsync(buf), esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const C='http://schemas.openxmlformats.org/drawingml/2006/chart', A='http://schemas.openxmlformats.org/drawingml/2006/main',
+    R='http://schemas.openxmlformats.org/officeDocument/2006/relationships', RP='http://schemas.openxmlformats.org/package/2006/relationships';
+  let ct=await zip.file('[Content_Types].xml').async('string');
+  const strCache=v=>'<c:strCache><c:ptCount val="'+v.length+'"/>'+v.map((x,i)=>'<c:pt idx="'+i+'"><c:v>'+esc(x)+'</c:v></c:pt>').join('')+'</c:strCache>';
+  const numCache=v=>'<c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="'+v.length+'"/>'+v.map((x,i)=>'<c:pt idx="'+i+'"><c:v>'+x+'</c:v></c:pt>').join('')+'</c:numCache>';
+  const txt=(t,sz,b)=>'<c:tx><c:rich><a:bodyPr/><a:p><a:pPr><a:defRPr sz="'+sz+'" b="'+(b?1:0)+'"/></a:pPr><a:r><a:rPr lang="en-US" sz="'+sz+'" b="'+(b?1:0)+'"/><a:t>'+esc(t)+'</a:t></a:r></a:p></c:rich></c:tx>';
+  const chartXml=ch=>'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<c:chartSpace xmlns:c="'+C+'" xmlns:a="'+A+'" xmlns:r="'+R+'">'+
+    '<c:roundedCorners val="0"/><c:chart><c:title>'+txt(ch.title,1400,true)+'<c:overlay val="0"/></c:title><c:autoTitleDeleted val="0"/><c:plotArea><c:layout/>'+
+    '<c:barChart><c:barDir val="'+ch.dir+'"/><c:grouping val="clustered"/><c:varyColors val="0"/>'+
+    ch.series.map((s,i)=>'<c:ser><c:idx val="'+i+'"/><c:order val="'+i+'"/><c:tx><c:strRef><c:f>'+esc(s.name)+'</c:f>'+strCache([s.nameV])+'</c:strRef></c:tx>'+
+      '<c:spPr><a:solidFill><a:srgbClr val="'+s.color+'"/></a:solidFill></c:spPr><c:invertIfNegative val="0"/>'+
+      '<c:dLbls><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr><c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>'+
+      '<c:cat><c:strRef><c:f>'+esc(s.cat)+'</c:f>'+strCache(s.catV)+'</c:strRef></c:cat><c:val><c:numRef><c:f>'+esc(s.val)+'</c:f>'+numCache(s.valV)+'</c:numRef></c:val></c:ser>').join('')+
+    '<c:gapWidth val="80"/><c:axId val="111"/><c:axId val="222"/></c:barChart>'+
+    '<c:catAx><c:axId val="111"/><c:scaling><c:orientation val="'+(ch.dir==='bar'?'maxMin':'minMax')+'"/></c:scaling><c:delete val="0"/><c:axPos val="'+(ch.dir==='bar'?'l':'b')+'"/><c:numFmt formatCode="General" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:txPr><a:bodyPr/><a:p><a:pPr><a:defRPr sz="800"/></a:pPr><a:endParaRPr lang="en-US"/></a:p></c:txPr><c:crossAx val="222"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx>'+
+    '<c:valAx><c:axId val="222"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="'+(ch.dir==='bar'?'t':'l')+'"/><c:majorGridlines><c:spPr><a:ln w="6350"><a:solidFill><a:srgbClr val="D9D9D9"/></a:solidFill></a:ln></c:spPr></c:majorGridlines><c:numFmt formatCode="0" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="111"/><c:crosses val="'+(ch.dir==='bar'?'max':'autoZero')+'"/><c:crossBetween val="between"/>'+
+    // số đếm: giá trị lớn nhất ≤ 10 thì bước trục 1 (để Excel tự chia ra 0,2 → nhãn '0 0 0 1 1 1')
+    (Math.max(0,...ch.series.flatMap(s=>s.valV))<=10?'<c:majorUnit val="1"/>':'')+'</c:valAx>'+
+    '</c:plotArea>'+(ch.series.length>1?'<c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend>':'')+'<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>';
+  let n=0;
+  const bySheet={}; charts.forEach(ch=>(bySheet[ch.sheet]||=[]).push(ch));
+  Object.entries(bySheet).forEach(([sheet,list],di)=>{
+    const sIdx=sheetNames.indexOf(sheet)+1, d=di+1;
+    const anchors=list.map((ch,i)=>{ n++; zip.file('xl/charts/chart'+n+'.xml',chartXml(ch));
+      ct=ct.replace('</Types>','<Override PartName="/xl/charts/chart'+n+'.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/></Types>');
+      return {rid:'rId'+(i+1),n,ch}; });
+    zip.file('xl/drawings/drawing'+d+'.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="'+A+'">'+
+      anchors.map(({rid,n,ch})=>'<xdr:twoCellAnchor><xdr:from><xdr:col>'+ch.from[0]+'</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>'+ch.from[1]+'</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from>'+
+        '<xdr:to><xdr:col>'+ch.to[0]+'</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>'+ch.to[1]+'</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>'+
+        '<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="'+(n+1)+'" name="Chart '+n+'"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>'+
+        '<a:graphic><a:graphicData uri="'+C+'"><c:chart xmlns:c="'+C+'" xmlns:r="'+R+'" r:id="'+rid+'"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>').join('')+'</xdr:wsDr>');
+    zip.file('xl/drawings/_rels/drawing'+d+'.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="'+RP+'">'+
+      anchors.map(({rid,n})=>'<Relationship Id="'+rid+'" Type="'+R+'/chart" Target="../charts/chart'+n+'.xml"/>').join('')+'</Relationships>');
+    ct=ct.replace('</Types>','<Override PartName="/xl/drawings/drawing'+d+'.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/></Types>');
+    bySheet[sheet]={sIdx,d};
+  });
+  for(const {sIdx,d} of Object.values(bySheet)){
+    const sp='xl/worksheets/sheet'+sIdx+'.xml', rp='xl/worksheets/_rels/sheet'+sIdx+'.xml.rels';
+    let rels=zip.file(rp)?await zip.file(rp).async('string'):'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="'+RP+'"></Relationships>';
+    rels=rels.replace('</Relationships>','<Relationship Id="rIdDr1" Type="'+R+'/drawing" Target="../drawings/drawing'+d+'.xml"/></Relationships>');
+    zip.file(rp,rels);
+    let sx=await zip.file(sp).async('string');
+    if(!/xmlns:r=/.test(sx.slice(0,600))) sx=sx.replace('<worksheet ','<worksheet xmlns:r="'+R+'" ');
+    zip.file(sp,sx.replace('</worksheet>','<drawing r:id="rIdDr1"/></worksheet>'));
+  }
+  zip.file('[Content_Types].xml',ct);
+  // công thức không có giá trị trong file → bắt Excel tính lại khi mở
+  let wbx=await zip.file('xl/workbook.xml').async('string');
+  if(!/<calcPr/.test(wbx)) zip.file('xl/workbook.xml',wbx.replace('</workbook>','<calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>'));
+  return new Blob([await zip.generateAsync({type:'uint8array'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
 // kind: 'mcar' | 'sr' | 'both' (một file 2 sheet như file mẫu)
 async function exportSncReport(kind,from,to){
@@ -9250,11 +9415,21 @@ async function exportSncReport(kind,from,to){
     :kind==='sr'?[['Surveillance',survReportSheet]]:[['MCAR',mcarReportSheet]];
   setOv(true,'Generating '+parts.map(p=>p[0]).join(' + ')+' report...','');
   try{
-    const wb=XLSX.utils.book_new(), done=[];
-    for(const [name,fn] of parts){ const s=await fn(from,to); if(s.n){ XLSX.utils.book_append_sheet(wb,s.ws,name); done.push(name+': '+s.label); } }
+    const wb=XLSX.utils.book_new(), done=[], got={};
+    for(const [name,fn] of parts){ const s=await fn(from,to); if(s.n){ XLSX.utils.book_append_sheet(wb,s.ws,name); done.push(name+': '+s.label); got[name]=s.stat; } }
     if(!done.length){toast('No '+parts.map(p=>p[0]).join(' / ')+' submitted between '+fd(from)+' and '+fd(to),'err');return;}
-    const base=kind==='both'?'MCAR_Surveillance_Report':kind==='sr'?'Surveillance_Report':'MCAR_Report';
-    XLSX.writeFile(wb,base+'_'+from+'_to_'+to+'.xlsx');
+    const base=kind==='both'?'MCAR_Surveillance_Report':kind==='sr'?'Surveillance_Report':'MCAR_Report', fname=base+'_'+from+'_to_'+to+'.xlsx';
+    if(kind==='both'){                                     // [r203] 3 sheet biểu đồ (sncChartSheets) — cần cả 2 sheet dữ liệu
+      setOv(true,'Building charts...','');
+      const empty={last:3,rows:[]}, mc=got.MCAR||empty, sr=got.Surveillance||empty;
+      if(!got.MCAR){ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['No MCAR submitted in this period.']]),'MCAR'); }
+      if(!got.Surveillance){ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['No Surveillance Report submitted in this period.']]),'Surveillance'); }
+      const charts=sncChartSheets(wb,mc,sr,await sncCategoryList(),from,to);
+      const blob=await sncAddChartParts(XLSX.write(wb,{type:'array',bookType:'xlsx'}),wb.SheetNames,charts);
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+      done.push(charts.length+' charts');
+    }else XLSX.writeFile(wb,fname);
     toast('✓ Report exported ('+done.join(' · ')+')','ok');
   }catch(e){toast('Report export error: '+e.message,'err');}
   finally{setOv(false);}
