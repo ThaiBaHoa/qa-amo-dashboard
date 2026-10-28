@@ -5,6 +5,11 @@
 
 ---
 
+## ⏳ r202 — xuất sheet Surveillance cùng MCAR (28/10/2026, EricThai) — CHƯA PUSH
+- Thẻ "MCAR & Surveillance report" (Admin › Export reports): Both sheets / MCAR only / Surveillance only, cùng khoảng Submitted Date. Nguồn: `classic.html` (`exportSncReport`, `survReportSheet`…) + vault `beta-src` loader.js / screens2.js.
+- Kiểm local 01/01–31/07/2026: 180 SR / 219 finding, khớp số finding mỗi SR với file mẫu; SR không có finding bị bỏ (13).
+- CATEGORY = TYPE OF FINDINGS từng finding — trống ở SR thật tới khi người dùng điền.
+
 ## ✅ r201 — xuất MCAR report theo khoảng Submitted Date (28/10/2026, EricThai) — ĐÃ PUSH `46a94f7`, live (curl APP_REV r201)
 - Admin › Export reports › thẻ "MCAR report": chọn From / To (Submitted Date), xuất .xlsx theo mẫu sheet MCAR của S&C. Nguồn: `classic.html` `exportMcarReport` + vault `beta-src` loader.js (SCREEN_API) / screens2.js (thẻ + `mcarRange`/`dateBox`).
 - Kiểm local dữ liệu thật (beta-local): 01/01–31/07 → 57 MCAR, 7 tháng; đơn vị ngoài hiện ở Department (MCAR-0348 Lao Airlines, 0374/0375 Vietsky, 0357 LJATS).
