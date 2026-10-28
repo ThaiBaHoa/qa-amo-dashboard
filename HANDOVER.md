@@ -8,7 +8,7 @@
 ## ✅ r201 — xuất MCAR report theo khoảng Submitted Date (28/10/2026, EricThai) — ĐÃ PUSH `46a94f7`, live (curl APP_REV r201)
 - Admin › Export reports › thẻ "MCAR report": chọn From / To (Submitted Date), xuất .xlsx theo mẫu sheet MCAR của S&C. Nguồn: `classic.html` `exportMcarReport` + vault `beta-src` loader.js (SCREEN_API) / screens2.js (thẻ + `mcarRange`/`dateBox`).
 - Kiểm local dữ liệu thật (beta-local): 01/01–31/07 → 57 MCAR, 7 tháng; đơn vị ngoài hiện ở Department (MCAR-0348 Lao Airlines, 0374/0375 Vietsky, 0357 LJATS).
-- Còn: MCAR-0334/0336 (VOID trên Coruson) vẫn ra trong báo cáo — chờ Eric chốt loại hay giữ; freeze pane không ghi được bằng xlsx-js-style.
+- MCAR VOID (vd MCAR-0334/0336) vẫn xuất như Galileo — Eric 28/10: giữ, cần thì người dùng tự xoá trong file. Freeze pane không ghi được bằng xlsx-js-style.
 
 ## ✅ r200-i1 — danh sách PAVOI / MVOI giữ vị trí cuộn (24/10/2026, THAIBAHOA-HOME) — ĐÃ PUSH `c15a0b6`, live (curl APP_REV r200-i1)
 - Lỗi: bấm một PAVOI/MVOI thì danh sách bên trái nhảy về đầu (`.rec-list` cuộn riêng, `render()` vẽ lại bằng innerHTML).
