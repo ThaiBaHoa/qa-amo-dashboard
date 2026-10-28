@@ -2528,7 +2528,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.10.24-r200-i1';
+const APP_REV = '2026.10.28-r201';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -9100,6 +9100,114 @@ async function exportOverdueReport(){
     XLSX.writeFile(wb,'QA_AMO_Overdue_W'+week+'-'+year+formTag+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
     toast('✓ Overdue report exported ('+overdue.length+' overdue, '+soon.length+' due ≤7d)','ok');
   }catch(e){toast('Overdue export error: '+e.message,'err');}
+  finally{setOv(false);}
+}
+
+// ── MCAR REPORT (r201, styled .xlsx — layout of S&C "MCAR_SURVEILLANCE ANALYSIS", sheet MCAR) ──
+// Eric 28/10: MCAR có Submitted Date trong khoảng [from, to] (ngày VN, gồm cả 2 đầu), mọi trạng thái.
+// Nhóm theo tháng Submitted (tháng tăng dần, trong tháng mới nhất trước — như file mẫu), dòng tháng màu xanh.
+// Nguồn (probe 28/10/2026): Submitted / Opened / Closed = dwanalytics_report (bản version cao nhất của report);
+// RCA analysis · Corrective action plan · Final action taken · TYPE OF FINDINGS (checklist, có thể nhiều giá trị)
+// = dwanalytics_report_field theo report_id; Lead Auditor = lead_auditor_name của audit phát hành MCAR.
+// UNIT, CAT RCA: Coruson không có trường → để trống (Eric 28/10). Giá trị Galileo nguyên văn.
+// External organisation: MCAR phát cho đơn vị ngoài (Issued to = External) để trống Department — vd MCAR-0348
+// Lào Airline, MCAR-0374/0375 Viet SKY DAD; file mẫu ghi tên đơn vị đó vào cột Department.
+const MCAR_RPT_FIELDS=['RCA analysis','Corrective action plan','Final action taken','TYPE OF FINDINGS','External organisation'];
+function vnDay(iso){                                     // timestamp UTC → ngày VN 'YYYY-MM-DD'
+  if(!iso)return null; const t=new Date(iso); if(isNaN(t))return null;
+  return new Date(t.getTime()+7*3600000).toISOString().slice(0,10);
+}
+function xlSerial(day){                                  // 'YYYY-MM-DD' → số ngày Excel (không lệch múi giờ)
+  if(!day)return null; const[y,m,d]=day.slice(0,10).split('-').map(Number);
+  return (Date.UTC(y,m-1,d)-Date.UTC(1899,11,30))/86400000;
+}
+async function exportMcarReport(from,to){
+  if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
+  if(!allData||!allData.length){toast('No data loaded','err');return;}
+  if(!from||!to||from>to){toast('Choose a valid date range (From ≤ To)','err');return;}
+  setOv(true,'Generating MCAR report...','');
+  try{
+    const mcar=allData.filter(r=>r.report_title==='MCAR'&&r.report_id);
+    // 1. Submitted / Opened / Closed — mỗi report nhiều version, lấy version cao nhất
+    const repRaw=await fetchAll(G_URL+'dwanalytics_report?$select=report_id,version,status,submitted_date,opened_date,closed_date'+
+      '&$filter='+encodeURIComponent("form_name eq 'MCAR'"),true);
+    const rep={};
+    repRaw.forEach(x=>{ const ex=rep[x.report_id]; if(!ex||(x.version??0)>(ex.version??0)) rep[x.report_id]=x; });
+    const rows=mcar.map(r=>({r,d:rep[r.report_id]||{}}))
+      .map(o=>({...o,sub:vnDay(o.d.submitted_date)}))
+      .filter(o=>o.sub&&o.sub>=from&&o.sub<=to);
+    if(!rows.length){toast('No MCAR submitted between '+fd(from)+' and '+fd(to),'err');return;}
+
+    // 2. Ô text của form — theo report_id, từng lô
+    setOv(true,'MCAR report — loading '+rows.length+' findings...','');
+    // `report_id in (…)`: chuỗi 40 `report_id eq … or …` trả 400 (vượt giới hạn node OData, đo 28/10/2026)
+    const fv={}, ids=rows.map(o=>o.r.report_id), CHUNK=100;
+    const ff='('+MCAR_RPT_FIELDS.map(f=>"field_name eq '"+f+"'").join(' or ')+')';
+    for(let i=0;i<ids.length;i+=CHUNK){
+      const raw=await fetchAll(G_URL+'dwanalytics_report_field?$select=report_id,field_name,value_text'+
+        '&$filter='+encodeURIComponent(ff+' and report_id in ('+ids.slice(i,i+CHUNK).join(',')+')'),true);
+      raw.forEach(x=>{ if(x.value_text==null||String(x.value_text).trim()==='')return;
+        const m=(fv[x.report_id]||={}); (m[x.field_name]||=[]).includes(x.value_text)||m[x.field_name].push(x.value_text); });
+    }
+    const fOf=(r,k)=>(fv[r.report_id]?.[k]||[]).join(k==='TYPE OF FINDINGS'?'; ':'\n\n');
+    const leadOf={}; (auditData||[]).forEach(a=>{ leadOf[a.audit_id]=a.lead_auditor_name||''; });
+
+    // 3. Bảng: tháng tăng dần, trong tháng mới nhất trước
+    rows.sort((a,b)=>a.sub.slice(0,7)!==b.sub.slice(0,7)?a.sub.localeCompare(b.sub):b.sub.localeCompare(a.sub)||
+      String(b.r.report_number).localeCompare(String(a.r.report_number)));
+    const headers=['Audit No','Car Number','Submitted Date','Opened Date','Closed Date','Finding Detail','Department',
+      'Issued to','Deadline','Extension 1','Extension 2','RCA','Corrective action plan','Final action taken','Lead Auditor','TYPE OF FINDING','UNIT','CAT RCA'];
+    const NC=headers.length, DATE_C=new Set([2,3,4,8,9,10]);
+    const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const title='MCAR FINDINGS - TQA ('+fdShort(from)+' to '+fdShort(to)+')';
+    const aoa=[[title,...Array(NC-1).fill('')],headers.slice()], merges=[{s:{r:0,c:0},e:{r:0,c:14}}], monthRows=[];
+    let curYm=null;
+    rows.forEach(({r,d,sub})=>{
+      if(sub.slice(0,7)!==curYm){
+        curYm=sub.slice(0,7); monthRows.push(aoa.length);
+        merges.push({s:{r:aoa.length,c:0},e:{r:aoa.length,c:14}});
+        aoa.push([M[+curYm.slice(5,7)-1]+'-'+curYm.slice(2,4),...Array(NC-1).fill('')]);
+      }
+      aoa.push([r.audit_number||r.audit_ref||'',r.report_number||'',xlSerial(sub),xlSerial(vnDay(d.opened_date)),xlSerial(vnDay(d.closed_date)),
+        r.finding_desc||'',r.dept||fOf(r,'External organisation'),r.issued_person||'',xlSerial(r.Target_date),xlSerial(r.ext1_date),xlSerial(r.ext2_date),
+        fOf(r,'RCA analysis'),fOf(r,'Corrective action plan'),fOf(r,'Final action taken'),leadOf[r.audit_id]||'',
+        fOf(r,'TYPE OF FINDINGS'),'','']);
+    });
+
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    ws['!merges']=merges;
+    const W=[19,13,14,14,14,75,19,19,13,13,13,47,30,30,19,22,15,17];
+    ws['!cols']=W.map(wch=>({wch}));
+    const B={style:'thin',color:{rgb:'808080'}}, border={top:B,bottom:B,left:B,right:B};
+    const FONT='DejaVu Sans', al={horizontal:'left',vertical:'center',wrapText:true};
+    const titleStyle={font:{name:FONT,sz:17,color:{rgb:'333333'}},alignment:{horizontal:'center',vertical:'center'}};
+    const headStyle=c=>({fill:{fgColor:{rgb:c>=15?'F8CBAD':'D9E4F1'}},font:{name:FONT,sz:10,bold:true,color:{rgb:'262626'}},alignment:al,border});
+    const monthStyle={fill:{fgColor:{rgb:'92D050'}},font:{name:FONT,sz:10,bold:true},alignment:{horizontal:'center',vertical:'center'},border};
+    const cellStyle={font:{name:FONT,sz:10},alignment:al,border};
+    const dateStyle={font:{name:FONT,sz:10},alignment:al,border,numFmt:'mmm d, yyyy'};
+    const setStyle=(r,c,s)=>{const ref=XLSX.utils.encode_cell({r,c});if(!ws[ref])ws[ref]={t:'s',v:''};ws[ref].s=s;};
+    for(let c=0;c<NC;c++){ setStyle(0,c,titleStyle); setStyle(1,c,headStyle(c)); }
+    const mSet=new Set(monthRows), hpt=[{hpt:22},{hpt:30}];
+    for(let r=2;r<aoa.length;r++){
+      if(mSet.has(r)){ for(let c=0;c<NC;c++) setStyle(r,c,monthStyle); hpt.push({}); continue; }
+      let lines=1;
+      for(let c=0;c<NC;c++){
+        const ref=XLSX.utils.encode_cell({r,c});
+        if(DATE_C.has(c)&&typeof aoa[r][c]==='number'){ ws[ref].z='mmm d, yyyy'; setStyle(r,c,dateStyle); }
+        else setStyle(r,c,cellStyle);
+        if(typeof aoa[r][c]==='string'&&aoa[r][c]) lines=Math.max(lines,aoa[r][c].split('\n')
+          .reduce((n,s)=>n+Math.max(1,Math.ceil(s.length/(W[c]*1.05))),0));
+      }
+      hpt.push({hpt:Math.min(409,Math.max(15,lines*13))});           // SheetJS không tự giãn dòng có wrap
+    }
+    ws['!rows']=hpt;
+    ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:1,c:0},e:{r:aoa.length-1,c:NC-1}})};   // xlsx-js-style không ghi freeze pane
+
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'MCAR');
+    XLSX.writeFile(wb,'MCAR_Report_'+from+'_to_'+to+'.xlsx');
+    toast('✓ MCAR report exported ('+rows.length+' MCAR, '+monthRows.length+' month'+(monthRows.length>1?'s':'')+')','ok');
+  }catch(e){toast('MCAR export error: '+e.message,'err');}
   finally{setOv(false);}
 }
 

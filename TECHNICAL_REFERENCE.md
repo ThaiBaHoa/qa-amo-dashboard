@@ -456,6 +456,7 @@ Trạng thái bước: `NotStarted` · `InProgress` · `PendingSignOff` (Coruson
 | Pattern an toàn | Chỉ filter `field_name` (≤15 terms = 29 nodes) | Fetch hết rồi post-filter JS |
 | ⚠ Timeout (r107) | `field_name`-only mà tên field generic (vd `'Finding description'` ~14k row) | Quá 30s → rỗng âm thầm. Thêm `report_raised_date ge <ISO>` để thu hẹp + chunk ~8 field/query. |
 | ⚠ `report_id` 400 | `report_id eq '<uuid>'` trên `report_field`/`report_form_section_field` | Trả **HTTP 400** (cột không filter được) — bắt buộc post-filter JS. |
+| ⚠ chuỗi `or` dài 400 | 40 × `report_id eq <guid> or …` + 4 `field_name eq` trên `dwanalytics_report_field` (URL 2,7 KB) | Trả **HTTP 400** (đo 28/10/2026, r201 MCAR report). Dùng `report_id in (<guid>,…)` — 100 GUID/lô chạy được; mã cũ chia 15 GUID/lô cũng tránh được lỗi này. |
 | ✅ **Lối thoát: `in (…)`** (r131) | `report_key in (k1,…,k448)` · `context_id in (uuid1,…,uuid84)` | **KHÔNG bị tính như chuỗi `or`.** Đã đo trên chính proxy này: `or` hỏng ở 25 giá trị (đúng lỗi "node count limit of '100'"), còn `in()` nuốt gọn **448 số** và **84 UUID** trong 1 request. UUID trong `in()` viết trần, KHÔNG bọc nháy; chuỗi thì vẫn phải có nháy đơn. Nhờ đó `loadRptStatus()` chỉ tốn ~8 request thay vì ~40. **Lưu ý:** `in()` KHÔNG cứu được giới hạn `report_id` ở dòng trên — đó là hạn chế của view EAV, không phải node count. |
 
 ---
