@@ -5,6 +5,10 @@
 
 ---
 
+## ✅ r203-i2 — ngày theo giờ máy chủ (30/10/2026, EricThai)
+- Màn LED hiện "14 Sep 2026" vì PC khởi động với đồng hồ lùi (pin CMOS). Loader lấy giờ từ header `Date` của máy chủ; PC lệch > 2 phút thì `window.Date` được bù. Kiosk tự reload khi sang ngày. Nguồn: vault `beta-src/loader.js` + `screens2.js`. Bugfix → `-i2`.
+- Còn: thay pin CMOS máy LED (phần cứng).
+
 ## ✅ r203-i1 — tiêu đề thẻ MCAR & Surveillance + nhãn ngày (28/10/2026, EricThai)
 - Tiêu đề hiện `&amp;` → `&`; nhãn "Submitted from" không còn bị cắt. Nguồn: vault `beta-src/screens2.js`. Bugfix → `-i1`.
 - Hướng dẫn sử dụng: workspace `HuongDan_Xuat_MCAR_Surveillance_r203.docx` (9 trang, hình từ file xuất 01/01–28/06/2026).

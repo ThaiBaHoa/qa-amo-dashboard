@@ -1671,7 +1671,35 @@ return { reports, audits, depts, checks, partial: !!HOOK.lite, mem,
 
 function localDay(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 
+/* [r203-i2] "Today" comes from the web server's clock (HTTP Date header), not this PC's. The LED PC
+   boots with its clock at 14/09/2026 (CMOS battery) and showed that day, with overdue counted from it,
+   until someone reloaded (30/10/2026). When the PC is more than 2 minutes off, window.Date is replaced
+   by a subclass that adds the difference, so classic's own logic and the new UI both see server time.
+   A PC with a correct clock is left untouched. Local preview: ?pcClock=-46 pretends the PC is 46 days behind. */
+let RealDate = Date, CLOCK_SKEW = 0;
+if(DEV && qs.get('pcClock')){ const fake = +qs.get('pcClock') * 864e5, D0 = Date;
+  window.Date = RealDate = class PcDate extends D0 { constructor(...a){ if(a.length) super(...a); else super(D0.now() + fake); }
+    static now(){ return D0.now() + fake; } }; }
+function installClock(){
+  if(window.Date !== RealDate) return;
+  window.Date = class NetDate extends RealDate {
+    constructor(...a){ if(a.length) super(...a); else super(RealDate.now() + CLOCK_SKEW); }
+    static now(){ return RealDate.now() + CLOCK_SKEW; } };
+}
+async function clockSync(){
+  try{
+    const t0 = RealDate.now();
+    const r = await fetch('classic.html', { method:'HEAD', cache:'no-store' });
+    const h = r.headers.get('Date'); if(!h) return;
+    const skew = RealDate.parse(h) + 500 + (RealDate.now() - t0) / 2 - RealDate.now();   /* +500: header is whole seconds */
+    CLOCK_SKEW = Math.abs(skew) > 120e3 ? Math.round(skew) : 0;
+    if(CLOCK_SKEW){ installClock(); console.warn('[beta] this PC clock is ' + Math.round(skew / 60e3) + ' min off the server; using server time'); }
+  }catch(e){ console.warn('[beta] server clock not read, using this PC clock:', e.message); }
+}
+window.BETA_CLOCK = { sync: clockSync, skew: () => CLOCK_SKEW };
+
 async function run(){
+  const clockReady = clockSync();
   const t0 = Date.now();
   say('Loading the dashboard code…');
   let SRC;
@@ -1713,6 +1741,7 @@ async function run(){
     })().catch(e => { p = null; throw e; }));
   })();
 
+  await clockReady;
   say('Checking your sign-in…');
   let user;
   try{ user = await signedInUser(SRC); }
@@ -5275,6 +5304,12 @@ function startKiosk(){
   const show = () => { const st = KIOSK_STEPS[KIOSK.i]; st.go(); const c = $('#kioskChip'); if(c){ c.hidden = false; c.textContent = 'LED '+(KIOSK.i+1)+'/'+KIOSK_STEPS.length+' · '+st.l; } };
   show();
   KIOSK.timer = setInterval(() => { KIOSK.i = (KIOSK.i + 1) % KIOSK_STEPS.length; show(); }, KIOSK.sec * 1000);
+  /* [r203-i2] the wall runs for days: every 10 minutes re-read the server clock, and when the day
+     differs from the day the data was computed for (midnight, or a PC clock that jumped), reload */
+  setInterval(async () => {
+    if(window.BETA_CLOCK) await window.BETA_CLOCK.sync();
+    if(REAL && REAL.asOf && localDay(new Date()) !== REAL.asOf) location.reload();
+  }, 10 * 60e3);
   document.addEventListener('keydown', e => { if(e.key === 'Escape' && KIOSK.on){ clearInterval(KIOSK.timer); KIOSK.on = false;
     document.body.classList.remove('kiosk'); const c = $('#kioskChip'); if(c) c.hidden = true; toast('LED mode off', ''); } });
 }
