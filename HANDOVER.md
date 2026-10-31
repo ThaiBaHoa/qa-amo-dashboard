@@ -5,6 +5,13 @@
 
 ---
 
+## ⏳ TD-17 — RSP/SSP chưa vào dashboard (31/10/2026, chẩn đoán, CHƯA CODE)
+- Galileo: RSP = Random Surveillance (type_id `7e4d3710-…`, 17 số hiệu), SSP = Specified Surveillance (`2c0d057b-…`, SSP-0001/0002), nhánh `Maintenance | VJC AMO | Surveillance`.
+- Bị loại ở `classic.html:3720-3727` (prefix MNT / type Internal Audit-Inspection) và `is_qa_amo_scope` (prefix MNT) bên `index.html`.
+- Cách sửa: `KE_HOACH_SUA_4_VIEC_TON.md` Việc 2 (workspace) — lọc theo `audit_type_id` + `dwreporting_audit_type_hierarchy`.
+- CHỜ Eric: RSP/SSP là nhóm Surveillance riêng hay tính vào Audit Plan (Total / vs plan / Delayed).
+- ⚠ Proxy trả dữ liệu cho curl chỉ với header Origin, không cần token → AUTH_MODE có vẻ còn `soft`.
+
 ## ✅ r203-i2 — ngày theo giờ máy chủ (30/10/2026, EricThai)
 - Màn LED hiện "14 Sep 2026" vì PC khởi động với đồng hồ lùi (pin CMOS). Loader lấy giờ từ header `Date` của máy chủ; PC lệch > 2 phút thì `window.Date` được bù. Kiosk tự reload khi sang ngày. Nguồn: vault `beta-src/loader.js` + `screens2.js`. Bugfix → `-i2`.
 - Còn: thay pin CMOS máy LED (phần cứng).
