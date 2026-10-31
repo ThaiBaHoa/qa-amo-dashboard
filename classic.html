@@ -2528,7 +2528,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.10.30-r203-i2';
+const APP_REV = '2026.10.31-r204';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3719,7 +3719,7 @@ async function loadData(forceRefresh=false, opts={}) {
 
       const allAudits = Object.values(auMap).filter(a =>
         auditIdSet.has(a.audit_id) ||                              // (1) có report QA AMO
-        QA_AMO_PREFIXES.includes(extractAuditPrefix(a.number)) ||  // (2) mọi audit prefix MNT
+        QA_AMO_PREFIXES.includes(extractAuditPrefix(a.number)) ||  // (2) mọi audit prefix MNT / RSP / SSP [r204]
         (                                                          // (3) hoặc audit của QA AMO auditor
           RELEVANT_TYPES.has(a.audit_type) &&
           QA_AMO_AUDITORS.has(a.lead_auditor_name)
@@ -4367,7 +4367,7 @@ function runSelfChecks(){
     const badSem = [...new Set(AL.filter(r=>r.semantic_status && !SEM[r.semantic_status]).map(r=>r.semantic_status))];
     if(badSem.length) warn.push('Unknown report semantic_status (add it to CFG.SEM): '+badSem.join(', '));
     // 3) Overview tie-out: ô "By status" phải KHỚP ô "Audit vs Inspection" (mọi năm)
-    const mnt = AU.filter(a=>a.prefix==='MNT');
+    const mnt = AU.filter(a=>a.is_qa_amo_scope);   // [r204] MNT + RSP + SSP
     const donutSum = AUDIT_STATUS_ORDER.reduce((s,st)=>s+mnt.filter(a=>a.status===st).length,0);
     const barSum   = mnt.filter(isClosed).length + mnt.filter(isActive).length + mnt.filter(isCancelled).length;
     if(donutSum!==barSum) warn.push(`Overview mismatch: By status (${donutSum}) does not equal Audit vs Inspection (${barSum}) — an audit status is missing from CFG.AUDIT_STATUS or AUDIT_ACTIVE`);
@@ -4593,7 +4593,7 @@ function filterOverviewYear() {
 
 function renderOverview(d) {
   // ── Section 1: Audit & Inspection progress (MNT = audit + inspection) ──
-  let mnt = auditData.filter(a => a.prefix === 'MNT' && ymHas('ovYearFilter', a.sched_year));
+  let mnt = auditData.filter(a => a.is_qa_amo_scope && ymHas('ovYearFilter', a.sched_year));   // [r204] MNT + RSP + SSP
   s('ov-mnt-cnt', `(${mnt.length})`);
 
   // Donut: by status — dùng CFG.AUDIT_STATUS (nguồn chung với ô bar bên cạnh)
@@ -7843,6 +7843,7 @@ function normalizeStageTitle(t) {
 // Helper: derive workflow category from audit type / audit_type field
 function deriveWorkflowCategory(audit) {
   const at = (audit.audit_type || '').toLowerCase();
+  if (at.includes('surveillance')) return 'Surveillance';   // [r204] Random / Specified Surveillance (RSP / SSP)
   if (at.includes('cmr')) return 'CMR';
   if (at.includes('inspection')) return 'Inspection';
   if (at.includes('audit')) return 'Audit';
@@ -8341,6 +8342,7 @@ function renderAudit() {
     'Audit':      '<span class="badge b-admin">Audit</span>',
     'Inspection': '<span class="badge b-open">Inspection</span>',
     'CMR':        '<span class="badge b-c1">CMR</span>',
+    'Surveillance': '<span class="badge b-open">Surveillance</span>',
     'Other':      '<span class="badge b-with">Other</span>',
   };
 
@@ -8410,7 +8412,9 @@ const WORKFLOW_CATEGORY = {
   'Security Audit Workflow':              'Other',
 };
 
-const QA_AMO_PREFIXES = ['MNT'];
+// [r204] RSP = Random Surveillance, SSP = Specified Surveillance (nhánh 'Maintenance | VJC AMO | Surveillance',
+// tạo 27/07/2026). Eric 31/10/2026: gộp vào Audit Plan như MNT. Probe 31/10: mọi audit RSP/SSP đều thuộc 2 loại đó.
+const QA_AMO_PREFIXES = ['MNT', 'RSP', 'SSP'];
 
 let stageAggregate = null;
 let auditStageCache = {};   // audit_id → stage details

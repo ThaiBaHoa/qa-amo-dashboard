@@ -2224,7 +2224,7 @@ function fromReal(r){
      late closed  = Lately Closed (summary.late).
      CA risk      = F-088 / EIS / Event Investigation Report overdue: report Overdue OR any CA Overdue (caRisk).
      mitigation   = HIRA with Additional mitigation = Yes · AMO - Additional Mitigation tasks (capaTaskStats).
-     audits       = MNT scope; year = scheduled year, month = scheduled start month;
+     audits       = MNT + RSP + SSP scope (r204); year = scheduled year, month = scheduled start month;
                     open = InProgress / Performed / Scheduled (renderAuditKpi 7676).
                     delayed = scheduled month ended, not Performed / Closed (Eric 30/09/2026).
    ========================================================================== */
@@ -3347,7 +3347,7 @@ function renderAudit(tab){
     + '</div></div>';
   const seg = (k, v, label) => '<button class="btn'+(f[k]===v?' primary':'')+'" type="button" data-act="audf" data-k="'+k+'" data-v="'+v+'" aria-pressed="'+(f[k]===v)+'">'+esc(label)+'</button>';
   const filters = '<div class="od-row" style="--od-gap:6px;flex-wrap:wrap"><span class="t-small dim">Type</span>'
-    + seg('type', '', 'All '+ALL.length) + ['Inspection','Audit','Other'].filter(typeN).map(t => seg('type', t, t+' '+typeN(t))).join('')
+    + seg('type', '', 'All '+ALL.length) + ['Inspection','Audit','Surveillance','Other'].filter(typeN).map(t => seg('type', t, t+' '+typeN(t))).join('')
     + '<span style="width:12px"></span><span class="t-small dim">Show</span>'
     + seg('show', 'all', 'All') + seg('show', 'upcoming', 'Upcoming '+ALL.filter(a => a.status === 'Scheduled').length)   /* metrics-ok: audit status */
     + seg('show', 'overdue', 'With overdue '+ALL.filter(a => a.overdue > 0).length) + '</div>';
@@ -3362,7 +3362,7 @@ function renderAudit(tab){
 
   return kpis + '<section class="sec"><div class="card">'
     + '<div class="card-head"><h2>'+(REAL ? 'Programme · '+esc(periodLabel()) : 'Annual programme 2026')+'</h2>'
-    + '<span class="t-small dim od-fill">'+AUD.length+(AUD.length !== ALL.length ? ' of '+ALL.length : '')+' audits and inspections · one dot per audit, in the month it is scheduled</span></div>'
+    + '<span class="t-small dim od-fill">'+AUD.length+(AUD.length !== ALL.length ? ' of '+ALL.length : '')+' audits, inspections and surveillances · one dot per audit, in the month it is scheduled</span></div>'
     + '<div class="card-pad" style="display:grid;gap:12px;padding-bottom:0">'+filters+legend+'</div>'
     + (AUD.length ? '<div class="card-pad">'+grid+'</div>' : '<div class="card-pad">'+emptyState()+'</div>')
     + '<div class="tbl-foot">'+counts.map(c=>'<span class="t-small dim">'+c.s+' <span class="num strong">'+c.n+'</span></span>').join('')+'</div>'
@@ -3388,7 +3388,7 @@ function renderAuditList(){
   const AUD = ALL.filter(a => !f.type || a.type === f.type);
   const seg = (v, label) => '<button class="btn'+(f.type===v?' primary':'')+'" type="button" data-act="audf" data-k="type" data-v="'+v+'" aria-pressed="'+(f.type===v)+'">'+esc(label)+'</button>';
   const filters = '<div class="card-pad" style="padding-bottom:0"><div class="od-row" style="--od-gap:6px;flex-wrap:wrap"><span class="t-small dim">Type</span>'
-    + seg('', 'All '+ALL.length) + ['Audit','Inspection','Other'].filter(typeN).map(t => seg(t, t+' '+typeN(t))).join('') + '</div></div>';
+    + seg('', 'All '+ALL.length) + ['Audit','Inspection','Surveillance','Other'].filter(typeN).map(t => seg(t, t+' '+typeN(t))).join('') + '</div></div>';
   const cmp = st ? (a,b) => { const c = AUD_COLS[st.k], av = c.v(a), bv = c.v(b), r = av < bv ? -1 : av > bv ? 1 : 0; return st.dir === 'asc' ? r : -r; }
                  : (a,b) => (a.year||0)-(b.year||0) || a.start-b.start;
   const rows = AUD.slice().sort(cmp).map(a=>
@@ -5363,7 +5363,7 @@ function auditKpiTiles(){
      Audit Plan › Workflow stages shows every stage × status */
   const years = [...new Set(data.map(a => a.sched_year).filter(Boolean))].sort();
   const P = M.auditProgress(data);   /* same figure as the Overview tile 'Audits completed vs plan' */
-  return tiles6([stat('Total audits', String(S.total), 'MNT · '+periodLabel()), stat('Closed', String(S.closed), 'status Closed'),
+  return tiles6([stat('Total audits', String(S.total), 'MNT · RSP · SSP · '+periodLabel()), stat('Closed', String(S.closed), 'status Closed'),
     stat('Delayed', String(P.delayed), P.delayed ? P.delayedList.map(a => a.number).slice(0, 6).join(', ')+(P.delayed > 6 ? '…' : '')
       : 'scheduled month passed, not performed', P.delayed > 0, true, P.delayed ? 'bdelayed' : null),
     stat('Open', String(S.open), 'in progress, performed or scheduled'), stat('Closure rate', S.rate+'%', S.closed+' of '+S.total, S.total > 0 && S.rate < 50),

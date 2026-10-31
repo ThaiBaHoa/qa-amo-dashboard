@@ -5,12 +5,11 @@
 
 ---
 
-## ⏳ TD-17 — RSP/SSP chưa vào dashboard (31/10/2026, chẩn đoán, CHƯA CODE)
-- Galileo: RSP = Random Surveillance (type_id `7e4d3710-…`, 17 số hiệu), SSP = Specified Surveillance (`2c0d057b-…`, SSP-0001/0002), nhánh `Maintenance | VJC AMO | Surveillance`.
-- Bị loại ở `classic.html:3720-3727` (prefix MNT / type Internal Audit-Inspection) và `is_qa_amo_scope` (prefix MNT) bên `index.html`.
-- Cách sửa: `KE_HOACH_SUA_4_VIEC_TON.md` Việc 2 (workspace) — lọc theo `audit_type_id` + `dwreporting_audit_type_hierarchy`.
-- CHỜ Eric: RSP/SSP là nhóm Surveillance riêng hay tính vào Audit Plan (Total / vs plan / Delayed).
-- ⚠ Proxy trả dữ liệu cho curl chỉ với header Origin, không cần token → AUTH_MODE có vẻ còn `soft`.
+## ✅ r204 — RSP / SSP vào Audit Plan (31/10/2026, EricThai) — TD-17 (phần Surveillance)
+- Eric chốt: RSP (Random Surveillance) + SSP (Specified Surveillance) **gộp vào Audit Plan** như MNT.
+- `classic.html`: `QA_AMO_PREFIXES = ['MNT','RSP','SSP']`; `deriveWorkflowCategory` → `Surveillance`; self-check + Overview classic theo `is_qa_amo_scope`. UI: vault `beta-src` (beta-template.html nút Type, screens2.js nhãn, metrics.js chú thích) → build → make-index. Bản sao nguồn trước khi sửa: `rebuild UIUX/beta-src-bak-20261031/`.
+- Kiểm local: 17 RSP + 2 SSP = Galileo; Audit Plan 2026 = 255; `M.consistency()` rỗng; console sạch. RSP-0010 vào Delayed (lịch 26/09, còn Scheduled).
+- Còn: PRJ / EXT / MPS / CAAV ngoài MNT (TD-17 phần còn lại) chưa vào — chờ quyết định. ⚠ Proxy trả dữ liệu cho curl chỉ với header Origin → AUTH_MODE có vẻ còn `soft`.
 
 ## ✅ r203-i2 — ngày theo giờ máy chủ (30/10/2026, EricThai)
 - Màn LED hiện "14 Sep 2026" vì PC khởi động với đồng hồ lùi (pin CMOS). Loader lấy giờ từ header `Date` của máy chủ; PC lệch > 2 phút thì `window.Date` được bù. Kiosk tự reload khi sang ngày. Nguồn: vault `beta-src/loader.js` + `screens2.js`. Bugfix → `-i2`.
