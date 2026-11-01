@@ -471,6 +471,11 @@ select.ctl{min-width:168px;cursor:pointer}
 .tbl tbody tr:hover{background:var(--raised);cursor:pointer}
 .tbl tbody tr:last-child td{border-bottom:none}
 .tbl td.ar{text-align:right}
+/* r205: a .fit column is as narrow as its content (dates, chips, codes, counts); the free width of a wide screen
+   goes to the text columns instead of opening gaps between short values. Phones reflow rows to cards: not there.
+   Only a table with room to spare carries .tbl-fit (few columns); a dense one keeps sharing its width as before. */
+@media (min-width:768px){ .tbl-fit th.fit, .tbl-fit td.fit{width:1%;white-space:nowrap}
+  .tbl-fit td.fit .row-main{width:max-content;max-width:34ch} }   /* Report: the number in full, a long title cut with … (full text on the record) */
 /* header follows its column: numbers right or centred, not a left header over right-aligned digits */
 .tbl th.ar, .tbl th.ar>button, .tbl th.ar>span{text-align:right;justify-content:flex-end}
 .tbl th.ac, .tbl td.ac, .tbl th.ac>button, .tbl th.ac>span{text-align:center;justify-content:center}
@@ -565,7 +570,11 @@ select.ctl{min-width:168px;cursor:pointer}
 .am-key{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:-1px;border:1.5px solid var(--ok);background:var(--ok)}
 
 /* ---------- split view (PAVOI) ---------- */
-.split{display:grid;grid-template-columns:minmax(300px,356px) minmax(0,1fr);gap:var(--s3);align-items:start}
+.split{display:grid;grid-template-columns:minmax(340px,min(440px,34%)) minmax(0,1fr);gap:var(--s3);align-items:start}
+/* r205: a record's tags (HIRA, tasks done, overdue, days) wrap to a second line instead of running off the card */
+.rec .od-row{flex-wrap:wrap;row-gap:6px}
+.rec .row-sub.od-truncate{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow-wrap:anywhere}
+.rec-top .row-id{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rec-list{display:grid;gap:2px;max-height:min(68vh,840px);overflow-y:auto;padding:var(--s2)}
 .rec{display:grid;gap:var(--s2);width:100%;text-align:left;padding:var(--s3);border-radius:var(--r-ctl);border:1px solid transparent}
 .rec:hover{background:var(--raised)}
@@ -795,6 +804,8 @@ body.kiosk .wrap{max-width:none}
 .tbl.beta-minw{min-width:var(--beta-minw)}
 .card-pad .tbl th, .card-pad .tbl td{padding-left:12px;padding-right:12px}
 .card-pad .tbl th{white-space:nowrap}
+/* r205: the cell already carries the side padding here — a sort button adds none, so the label sits over its values */
+.card-pad .tbl th>button{padding-left:0;padding-right:0}
 @media (max-width:767px){.tbl.beta-minw{min-width:0}}
 .beta-cards{display:grid;gap:var(--s4);grid-template-columns:repeat(auto-fit,minmax(min(380px,100%),1fr))}
 .beta-cards > .card, .cols > .card{min-width:0}
@@ -3069,25 +3080,27 @@ function renderOverview(){
    ========================================================================== */
 const PAGE_SIZE = 12;
 
+/* r205 col.fit: a short value (date, chip, code, count) — the column is as narrow as its content, so the
+   free width of a wide screen goes to the text columns (Report, Summary, Department…) instead of gaps */
 const COL = {
-  number:{ l:'Report', main:true, v:r=>r.number,
+  number:{ l:'Report', main:true, fit:true, v:r=>r.number,
     c:r=>'<span class="row-main"><span class="row-id">'+esc(r.number)+extLink('report', r.id, r.number)+'</span><span class="row-sub od-truncate">'+esc(r.auditTitle)+'</span></span>' },
-  form:{ l:'Form', v:r=>r.code, c:r=>'<span class="tag">'+esc(r.code)+'</span>' },
-  status:{ l:'Status', v:r=>r.status, c:r=>chip(r.status) },
-  cat:{ l:'CAT', v:r=>({'I':1,'II':2,'III':3}[r.cat]||0), c:r=>catChip(r.cat) },
+  form:{ l:'Form', fit:true, v:r=>r.code, c:r=>'<span class="tag">'+esc(r.code)+'</span>' },
+  status:{ l:'Status', fit:true, v:r=>r.status, c:r=>chip(r.status) },
+  cat:{ l:'CAT', fit:true, v:r=>({'I':1,'II':2,'III':3}[r.cat]||0), c:r=>catChip(r.cat) },
   owner:{ l:'Owner', v:r=>r.owner, c:r=>'<span class="od-truncate">'+esc(r.owner)+'</span>' },
   dept:{ l:'Department', v:r=>r.dept, c:r=>'<span class="od-truncate t-small">'+esc(r.dept)+'</span>' },
   /* r194: 'Issued to (person)' — the auditee, no longer shown under Owner */
   issued:{ l:'Issued to', v:r=>r.issuedTo || '', c:r=>'<span class="od-truncate">'+esc(r.issuedTo || '—')+'</span>' },
-  aircraft:{ l:'Aircraft', v:r=>r.acReg||'zzz',
+  aircraft:{ l:'Aircraft', fit:true, v:r=>r.acReg||'zzz',
     c:r=> r.acReg ? '<span class="od-row" style="--od-gap:6px"><span class="mono strong">'+esc(r.acReg)+'</span>'+(r.acType?'<span class="tag">'+esc(r.acType)+'</span>':'')+'</span>'
                   : '<span class="dim">'+(REAL ? '—' : 'Fleet-wide')+'</span>' },
-  raised:{ l:'Raised', v:r=>r.raised ? r.raised.getTime() : 0, c:r=>'<span class="num dim od-nowrap">'+fmtShort(r.raised)+'</span>' },
-  target:{ l:'Target', v:r=>r.target ? r.target.getTime() : 0, c:r=>'<span class="num od-nowrap">'+fmtShort(r.target)+'</span>' },
-  dtd:{ l:'Days to due', ar:true, v:r=>r.closed?99999:r.dtd, c:dueCell },
+  raised:{ l:'Raised', fit:true, v:r=>r.raised ? r.raised.getTime() : 0, c:r=>'<span class="num dim od-nowrap">'+fmtShort(r.raised)+'</span>' },
+  target:{ l:'Target', fit:true, v:r=>r.target ? r.target.getTime() : 0, c:r=>'<span class="num od-nowrap">'+fmtShort(r.target)+'</span>' },
+  dtd:{ l:'Days to due', ar:true, fit:true, v:r=>r.closed?99999:r.dtd, c:dueCell },
   /* r189: MCAR deadline rule r101 restored from classic mcarWarnCell — response due = raised + 14 d,
      target = raised + 45 d + 30 d per approved extension; flags a stored Target date that differs */
-  rule:{ l:'Response due', v:r=>r.mcarRule ? r.mcarRule.exp_resp : '', c:r=>{ const c = r.mcarRule; if(!c) return '<span class="dim">—</span>';
+  rule:{ l:'Response due', fit:true, v:r=>r.mcarRule ? r.mcarRule.exp_resp : '', c:r=>{ const c = r.mcarRule; if(!c) return '<span class="dim">—</span>';
       const tip = 'Response due (raised + 14 d): '+fdx(c.exp_resp)+' · Target by rule (raised + 45 d'+(c.n ? ' + '+(30*c.n)+' d, '+c.n+' extension'+(c.n > 1 ? 's' : '') : '')+'): '+fdx(c.exp_target);
       return '<span class="od-row" style="--od-gap:6px" title="'+esc(tip)+'"><span class="num od-nowrap">'+fdx(c.exp_resp)+'</span>'
         /* r194: a quiet note, not an alarm — Coruson targets are typed by the auditor (probe 03/10: 31–48 days after raise) */
@@ -3100,10 +3113,10 @@ const COL = {
   /* r191: Report Summary (Coruson summary, else the finding text, marked) + RFI state — anh Ngọc 07/08 mục D/E */
   summary:{ l:'Summary', v:r=>(RX.sum && RX.sum[r.id]) || r.finding || '', c:r=>summaryCell(r) },
   rfi:{ l:'RFI', v:r=>{ const l = RX.rfi && RX.rfi[r.id]; if(!l || !l.length) return -1; const s = M.rfiSummary(l); return s.overdue*10000 + s.open*100 + s.total; }, c:r=>rfiCell(r) },
-  level:{ l:'Finding level', v:r=>r.level, c:r=>'<span class="tag">'+esc(r.level)+'</span>' },
-  repetitive:{ l:'Repetitive', v:r=>r.repetitive?1:0, c:r=> r.repetitive ? '<span class="cat c1">Repeat</span>' : '<span class="dim">—</span>' },
+  level:{ l:'Finding level', fit:true, v:r=>r.level, c:r=>'<span class="tag">'+esc(r.level)+'</span>' },
+  repetitive:{ l:'Repetitive', fit:true, v:r=>r.repetitive?1:0, c:r=> r.repetitive ? '<span class="cat c1">Repeat</span>' : '<span class="dim">—</span>' },
   finding:{ l:'Finding', v:r=>r.finding, c:r=>'<span class="t-small od-clamp-2">'+esc(r.finding)+'</span>' },
-  verified:{ l:'Verified', v:r=>r.rounds.length, c:r=>{
+  verified:{ l:'Verified', fit:true, v:r=>r.rounds.length, c:r=>{
       if(!r.rounds.length) return '<span class="chip s-open">'+mark('Open')+'Not assessed</span>';
       return '<span class="od-row" style="--od-gap:6px"><span class="num">'+fmtShort(firstVerDate(r))+'</span>'
         + (verifiedIn30(r) || !firstVerDate(r) ?'':'<span class="cat c1">&gt;30d</span>')+'</span>'; } },
@@ -3144,7 +3157,8 @@ function tableHTML(key, cfg, rows){
   const head = cfg.cols.map(c=>{
     const col = COL[c], on = st && st.k === c;
     const icName = on ? (st.dir==='asc'?'sortUp':'sortDown') : 'sortNone';
-    return '<th scope="col"'+(on?' aria-sort="'+(st.dir==='asc'?'ascending':'descending')+'"':'')+(col.ar?' class="ar"':'')+'>'
+    const cls = [col.ar ? 'ar' : '', col.fit ? 'fit' : ''].filter(Boolean).join(' ');
+    return '<th scope="col"'+(on?' aria-sort="'+(st.dir==='asc'?'ascending':'descending')+'"':'')+(cls?' class="'+cls+'"':'')+'>'
       + '<button type="button" data-act="sort" data-key="'+key+'" data-col="'+c+'">'+esc(col.l)+ic(icName,13,'sort-ic')+'</button></th>';
   }).join('');
 
@@ -3157,7 +3171,8 @@ function tableHTML(key, cfg, rows){
   const body = slice.map(r=>'<tr tabindex="0" '+(REAL && !isPvForm(r.form) ? 'data-act="breport"' : 'data-go="findings" data-tab="'+formTab(r.form)+'"')+' data-id="'+r.id+'">'
     + cfg.cols.map(c=>{
         const col = COL[c];
-        return '<td data-l="'+esc(col.l)+'"'+(col.main?' class="t-main"':(col.ar?' class="ar"':''))+'>'+col.c(r)+'</td>';
+        const cls = [col.main ? 't-main' : col.ar ? 'ar' : '', col.fit ? 'fit' : ''].filter(Boolean).join(' ');
+        return '<td data-l="'+esc(col.l)+'"'+(cls?' class="'+cls+'"':'')+'>'+col.c(r)+'</td>';
       }).join('') + '</tr>').join('');
 
   let pager = '';
@@ -3174,7 +3189,8 @@ function tableHTML(key, cfg, rows){
 
   if(!sorted.length) return emptyState();
 
-  return '<div class="tbl-wrap"><table class="tbl"><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>'
+  /* r205: a register with few columns (CMR-CAR, ECAR…) leaves free width on a wide screen — .tbl-fit gives it to the text columns */
+  return '<div class="tbl-wrap"><table class="tbl'+(cfg.cols.length <= 7 ? ' tbl-fit' : '')+'"><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>'
     + '<div class="tbl-foot"><span class="t-small dim">Showing '+((p-1)*PAGE_SIZE+1)+'–'+Math.min(p*PAGE_SIZE, sorted.length)+' of '+sorted.length+'</span>'+pager+'</div>';
 }
 function emptyState(){
@@ -3655,7 +3671,11 @@ function render(){
       refocus.push(sel(n => n === 'id' || n === 'aria-label' || n.startsWith('data-')));
     if(ae.hasAttribute('aria-label')) refocus.push(sel(n => n === 'aria-label' || n === 'data-act' || n === 'data-key'));
   }
+  /* a record list scrolls on its own (.rec-list): picking a record (PAVOI / MVOI…) redraws the screen,
+     so keep each list where it was instead of jumping back to the first record */
+  const listTop = route === lastRoute ? [...scr.querySelectorAll('.rec-list')].map(e => e.scrollTop) : [];
   scr.innerHTML = html;
+  scr.querySelectorAll('.rec-list').forEach((e, i) => { if(listTop[i]) e.scrollTop = listTop[i]; });
   if(REAL && typeof topExtras === 'function') $('#betaTop').innerHTML = topExtras();
   writeUrlFilters();
   if(route !== lastRoute) $('#main-content').scrollTop = 0;
@@ -3950,30 +3970,35 @@ function searchBox(key, cur, ph){
 /* opt.full: no height cap (whole table in one view) · opt.compact: tighter rows · col.ac: centred column · col.w: column width
    · col.raw: header text exactly as given (no upper-casing) — for Galileo values such as InProgress
    · opt.sortVals (r191): one array of raw values per row, same order as cols — headers become sort buttons
-     (BS.sort[key] = {c, dir}); a column with col.nosort stays plain */
+     (BS.sort[key] = {c, dir}); a column with col.nosort stays plain
+   · r205: every table sorts by its headers — without opt.sortVals the value is read from the cell text
+     (cellKey: dates, counts, "12d over"); opt.nosort keeps a table plain; opt.head / opt.tail = leading /
+     trailing rows (a TOTAL row) that stay in place · col.fit: column as narrow as its content, the free width goes to the text columns */
 function plainTable(key, cols, rows, size, minW, opt){
   opt = opt || {};
-  const al = c => c.ac ? 'ac' : c.ar ? 'ar' : '';
+  const al = c => [c.ac ? 'ac' : c.ar ? 'ar' : '', c.fit ? 'fit' : ''].filter(Boolean).join(' ');
   size = size || 25;
   if(!rows.length) return '<div class="empty"><h3>No records</h3><p class="t-sub">Nothing matches the current filters.</p></div>';
-  const so = opt.sortVals && BS.sort && BS.sort[key];
+  const sortable = !opt.nosort;
+  const so = sortable && BS.sort && BS.sort[key];
   if(so){
-    const sv = opt.sortVals, cmp = (a, b) => { const x = sv[a][so.c], y = sv[b][so.c];
+    const lead = rows.slice(0, opt.head || 0), tail = opt.tail ? rows.slice(-opt.tail) : [], main = rows.slice(opt.head || 0, rows.length - (opt.tail || 0));
+    const sv = opt.sortVals || main.map(r => r.map(cellKey)), cmp = (a, b) => { const x = sv[a][so.c], y = sv[b][so.c];
       if(x == null || x === '') return (y == null || y === '') ? 0 : 1;   /* empty values last, either direction */
       if(y == null || y === '') return -1;
       const r = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric:true });
       return so.dir === 'asc' ? r : -r; };
-    rows = rows.map((r, i) => i).sort(cmp).map(i => rows[i]);
+    rows = lead.concat(main.map((r, i) => i).sort(cmp).map(i => main[i]), tail);
   }
   const pages = Math.max(1, Math.ceil(rows.length/size));
   const p = Math.min(BS.pg[key] || 1, pages);
   const head = cols.map((c, ci) => '<th scope="col"'+(al(c)?' class="'+al(c)+'"':'')+((c.w||c.raw)?' style="'+(c.w?'width:'+c.w+';':'')+(c.raw?'text-transform:none':'')+'"':'')
-    + (opt.sortVals && so && so.c === ci ? ' aria-sort="'+(so.dir === 'asc' ? 'ascending' : 'descending')+'"' : '')+'>'
-    + (opt.sortVals && !c.nosort
+    + (sortable && so && so.c === ci ? ' aria-sort="'+(so.dir === 'asc' ? 'ascending' : 'descending')+'"' : '')+'>'
+    + (sortable && !c.nosort
         ? '<button type="button" data-act="bsort" data-k="'+key+'" data-c="'+ci+'">'+esc(c.l)+ic(so && so.c === ci ? (so.dir === 'asc' ? 'sortUp' : 'sortDown') : 'sortNone', 13, 'sort-ic')+'</button>'
         : esc(c.l))+'</th>').join('');
   const body = rows.slice((p-1)*size, p*size).map(r => '<tr>'+r.map((cell,i) =>
-    '<td data-l="'+esc(cols[i].l)+'"'+(i===0?' class="t-main"':(al(cols[i])?' class="'+al(cols[i])+'"':''))+'>'+cell+'</td>').join('')+'</tr>').join('');
+    '<td data-l="'+esc(cols[i].l)+'"'+(i===0?' class="t-main'+(cols[i].fit?' fit':'')+'"':(al(cols[i])?' class="'+al(cols[i])+'"':''))+'>'+cell+'</td>').join('')+'</tr>').join('');
   let pager = '';
   if(pages > 1){
     pager = '<div class="pg">'
@@ -3982,8 +4007,25 @@ function plainTable(key, cols, rows, size, minW, opt){
       + '<button type="button" data-act="bpage" data-k="'+key+'" data-p="'+(p+1)+'"'+(p===pages?' disabled':'')+' aria-label="Next page">'+ic('chevron',14,'')+'</button></div>';
   }
   /* many columns: keep a readable minimum and scroll inside the card (phones reflow to cards) */
-  return '<div class="tbl-wrap'+(opt.full ? ' tbl-full' : '')+'"><table class="tbl'+(minW ? ' beta-minw' : '')+(opt.compact ? ' tbl-compact' : '')+'"'+(minW ? ' style="--beta-minw:'+minW+'px"' : '')+'><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>'
+  return '<div class="tbl-wrap'+(opt.full ? ' tbl-full' : '')+'"><table class="tbl'+(cols.some(c => c.fit) ? ' tbl-fit' : '')+(minW ? ' beta-minw' : '')+(opt.compact ? ' tbl-compact' : '')+'"'+(minW ? ' style="--beta-minw:'+minW+'px"' : '')+'><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>'
     + '<div class="tbl-foot"><span class="t-small dim">Showing '+((p-1)*size+1)+'–'+Math.min(p*size, rows.length)+' of '+rows.length+'</span>'+pager+'</div>';
+}
+/* r205: the sort value of a table cell, read from what it shows — "08 Oct 2026" / "08 Oct" → date,
+   "12d over" → −12 and "5d left" → 5 (most overdue first), "1,234" / "87.1%" → number, "—" → empty (sorts last) */
+const CELL_TXT = document.createElement('div');
+function cellKey(html){
+  CELL_TXT.innerHTML = String(html ?? '');
+  const t = CELL_TXT.textContent.replace(/\s+/g, ' ').trim();
+  if(!t || t === '—' || t === '-') return '';
+  let m = t.match(/^(\d+)d (over|left)\b/);
+  if(m) return m[2] === 'over' ? -m[1] : +m[1];
+  m = t.match(/^(\d{1,2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(?: (\d{4}))?\b/);
+  if(m) return new Date(m[3] ? +m[3] : new Date().getFullYear(), MONTHS.indexOf(m[2]), +m[1]).getTime();
+  m = t.match(/^(\d{4})-(\d{2})-(\d{2})\b/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3]).getTime();
+  m = t.match(/^-?[\d,]*\.?\d+(?=%?(\s|$))/);
+  if(m) return parseFloat(m[0].replace(/,/g, ''));
+  return t.toLowerCase();
 }
 function barList(items, hotKey){
   const max = Math.max(1, ...items.map(x => x.n));
@@ -4089,7 +4131,7 @@ function scrKpi(){
   html += '<section class="sec cols cols-2">'
     + card('KPI 2 · MCAR ÷ AMO-ECAR', 'volume ratio by Nature of finding · '+esc(periodLabel()), k2body)
     + card('KPI 7 · PAVOI / MVOI assessed', esc(k7note),
-        plainTable('k7', [{l:'Section'},{l:'Assessed',ar:true},{l:'No verif.',ar:true},{l:'Closed',ar:true},{l:'Total',ar:true},{l:'KPI %',ar:true}], k7rows, 10))
+        plainTable('k7', [{l:'Section'},{l:'Assessed',ar:true},{l:'No verif.',ar:true},{l:'Closed',ar:true},{l:'Total',ar:true},{l:'KPI %',ar:true}], k7rows, 10, 0, { tail:1 }))
     + '</section>';
   html += '<section class="sec">'+scrAta()+'</section>';
   return html;
@@ -4132,7 +4174,7 @@ function scrAta(){
     rows.push(['<span class="dim t-small">No-ATA / non-numeric</span>', '<span class="num dim">'+(num.Other||0)+'</span>', '<span class="num dim">'+(den.Other||0)+'</span>', '<span class="dim">—</span>', '<span class="dim">N/A</span>']);
   return card('KPI QC · ATA comparison', 'Internal '+totN+' ÷ ECAR '+totD+' = <span class="strong">'+tc.ratio+'</span> · '+numYM+' ÷ '+denYM
       + ' · sources: CMR-CAR QC '+cmrQcRep.length+', ECAR '+ecarRep.length,
-    ctl + plainTable('ata', [{l:'ATA chapter'},{l:'Internal (N−1)',ar:true},{l:'ECAR (N)',ar:true},{l:'Ratio',ar:true},{l:'Assessment'}], rows, 15));
+    ctl + plainTable('ata', [{l:'ATA chapter'},{l:'Internal (N−1)',ar:true},{l:'ECAR (N)',ar:true},{l:'Ratio',ar:true},{l:'Assessment'}], rows, 15, 0, { head:1, tail:(num.Other||0) + (den.Other||0) > 0 ? 1 : 0 }));
 }
 
 /* ==========================================================================
@@ -4188,7 +4230,7 @@ function scrSafety(){
       stat('Open reports', String(t.osrO + t.mosrO), 'awaiting action', (t.osrO + t.mosrO) > 0)
     ])
     + '<section class="sec">' + card('MSAG report status', 'OSR / MOSR owned by an MSAG group · loaded '+esc(d.updated),
-      plainTable('safety', [{l:'Group on Coruson',w:'240px'},{l:'OSR closed',ac:true},{l:'OSR open',ac:true},{l:'OSR total',ac:true},{l:'MOSR closed',ac:true},{l:'MOSR open',ac:true},{l:'MOSR total',ac:true}], rows, 40, 0, {full:true, compact:true}))
+      plainTable('safety', [{l:'Group on Coruson',w:'240px'},{l:'OSR closed',ac:true},{l:'OSR open',ac:true},{l:'OSR total',ac:true},{l:'MOSR closed',ac:true},{l:'MOSR open',ac:true},{l:'MOSR total',ac:true}], rows, 40, 0, {full:true, compact:true, nosort:true}))   /* group headings between rows: order is the layout */
     + '</section>';
 }
 
@@ -4384,13 +4426,13 @@ function scrCapa(titles){
          : '<span class="cat c1" title="Report Reference does not name a VJC AMO-HIRA number">Not linked</span>')+'</span></div>';
 
   const acts = inf.actions.length
-    ? plainTable('capa-a-'+r.id, [{l:'Mitigation action'},{l:'Department'},{l:'Target'}], inf.actions.map(a =>
+    ? plainTable('capa-a-'+r.id, [{l:'Mitigation action'},{l:'Department'},{l:'Target',fit:true}], inf.actions.map(a =>
         ['<span class="t-small">'+esc(a.text || '—')+'</span>', '<span class="t-small">'+esc(a.dept || '—')+'</span>', '<span class="num">'+fdx(a.target)+'</span>']), 20, 640)
     : '<p class="t-sub dim">No mitigation action recorded on the form.</p>';
   const tl = tasks[r.id] || [];
   const sdx = v => v ? '<span class="num od-nowrap">'+fmtShort(new Date(+String(v).slice(0,4), +String(v).slice(5,7)-1, +String(v).slice(8,10)))+'</span>' : '<span class="dim">—</span>';
   const tasksTbl = tl.length
-    ? plainTable('capa-t-'+r.id, [{l:'Task'},{l:'Owner'},{l:'Status'},{l:'Target'},{l:'Completed'}], tl.map(t =>
+    ? plainTable('capa-t-'+r.id, [{l:'Task'},{l:'Owner'},{l:'Status',fit:true},{l:'Target',fit:true},{l:'Completed',fit:true}], tl.map(t =>
         ['<span class="t-small strong">'+esc(t.task_title)+'</span>'+(t.task_related_section_name ? ' <span class="tag">'+esc(t.task_related_section_name)+'</span>' : '')
           + (t.task_instructions ? '<br><span class="t-small dim od-clamp-2" title="'+esc(t.task_instructions)+'">'+esc(t.task_instructions)+'</span>' : ''),
          '<span class="t-small">'+esc(t.task_owner || '—')+'</span>', '<span class="od-nowrap">'+chip(t.sem)+'</span>',
@@ -4724,7 +4766,12 @@ const BETA_ACT = {
   bretry: el => { delete LAZY[el.dataset.k]; render(); },
   /* r191: sortable plainTable headers — first click ascending, then toggles */
   bsort: el => { const k = el.dataset.k, c = +el.dataset.c; BS.sort = BS.sort || {}; const cur = BS.sort[k];
-    BS.sort[k] = { c, dir: cur && cur.c === c && cur.dir === 'asc' ? 'desc' : 'asc' }; BS.pg[k] = 1; render(); },
+    BS.sort[k] = { c, dir: cur && cur.c === c && cur.dir === 'asc' ? 'desc' : 'asc' }; BS.pg[k] = 1;
+    /* r205: a table inside a dialog redraws the dialog (render() only redraws #screen), keeps its scroll and the focus */
+    if(el.closest('#betaModal') && MODAL_REDRAW){ const body = $('#betaModalBody'), top = body ? body.scrollTop : 0;
+      MODAL_REDRAW(); if(body) body.scrollTop = top;
+      const b = $('#betaModal').querySelector('button[data-act="bsort"][data-k="'+CSS.escape(k)+'"][data-c="'+c+'"]'); if(b) b.focus({ preventScroll: true }); }
+    else render(); },
   buser: el => { userAction(el); },
   bfeedback: () => { sendFeedback(); },
   bfbopen: () => { feedbackModal(); },

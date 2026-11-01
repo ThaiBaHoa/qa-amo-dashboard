@@ -5,6 +5,13 @@
 
 ---
 
+## ⏳ r205 — rà giao diện bảng: sort mọi header, cột co theo nội dung, panel trái (01/11/2026, THAIBAHOA-HOME) — COMMIT, CHƯA PUSH
+- Eric gửi 3 ảnh: CMR-CAR có khe trống (Aircraft–Status, trước Days to due) · panel trái Additional Mitigation hẹp, cắt chip/số ngày · header bảng Event/IR report status không sort.
+- Nguồn: vault `beta-src` — `screens.js` (`plainTable` sort mặc định + `cellKey`, `opt.nosort/head/tail`, `col.fit`; `bsort` vẽ lại hộp thoại), `beta-template.html` (COL `fit`, `.tbl-fit` khi ≤ 7 cột, `.split` 340–440px/34%, `.rec` tag xuống dòng + tiêu đề 2 dòng, header sort trong `.card-pad`). Bản sao nguồn trước khi sửa: `rebuild UIUX/beta-src-bak-20261101/`.
+- **Khôi phục r200-i1** (giữ cuộn `.rec-list`): sửa cũ nằm ở `beta-src/beta.html` (file build, bị chép đè) nên r201–r204 đã mất. Từ nay chỉ sửa `beta-template.html`.
+- Kiểm local dữ liệu thật: 1920 / 1366 / 375; sort Event/IR (tên, Satis/Unsatis, trạng thái), Workflow stages + hộp thoại (theo ngày), KPI 7 giữ TOTAL cuối; bảng nhiều cột (All forms, MCAR, Overdue) độ rộng cột y hệt r204; console sạch.
+- Còn: push (deploy) chờ Eric.
+
 ## ✅ r204 — RSP / SSP vào Audit Plan (31/10/2026, EricThai) — TD-17 (phần Surveillance)
 - Eric chốt: RSP (Random Surveillance) + SSP (Specified Surveillance) **gộp vào Audit Plan** như MNT.
 - `classic.html`: `QA_AMO_PREFIXES = ['MNT','RSP','SSP']`; `deriveWorkflowCategory` → `Surveillance`; self-check + Overview classic theo `is_qa_amo_scope`. UI: vault `beta-src` (beta-template.html nút Type, screens2.js nhãn, metrics.js chú thích) → build → make-index. Bản sao nguồn trước khi sửa: `rebuild UIUX/beta-src-bak-20261031/`.
