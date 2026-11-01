@@ -5,7 +5,7 @@
 
 ---
 
-## ⏳ r205 — rà giao diện bảng: sort mọi header, cột co theo nội dung, panel trái (01/11/2026, THAIBAHOA-HOME) — COMMIT, CHƯA PUSH
+## ✅ r205 — rà giao diện bảng: sort mọi header, cột co theo nội dung, panel trái (01/11/2026, THAIBAHOA-HOME) — ✅ ĐÃ PUSH, LIVE (`a7205bd`, kiểm APP_REV trên vjc-qa-amo.com 01/11)
 - Eric gửi 3 ảnh: CMR-CAR có khe trống (Aircraft–Status, trước Days to due) · panel trái Additional Mitigation hẹp, cắt chip/số ngày · header bảng Event/IR report status không sort.
 - Nguồn: vault `beta-src` — `screens.js` (`plainTable` sort mặc định + `cellKey`, `opt.nosort/head/tail`, `col.fit`; `bsort` vẽ lại hộp thoại), `beta-template.html` (COL `fit`, `.tbl-fit` khi ≤ 7 cột, `.split` 340–440px/34%, `.rec` tag xuống dòng + tiêu đề 2 dòng, header sort trong `.card-pad`). Bản sao nguồn trước khi sửa: `rebuild UIUX/beta-src-bak-20261101/`.
 - **Khôi phục r200-i1** (giữ cuộn `.rec-list`): sửa cũ nằm ở `beta-src/beta.html` (file build, bị chép đè) nên r201–r204 đã mất. Từ nay chỉ sửa `beta-template.html`.
