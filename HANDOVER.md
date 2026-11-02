@@ -5,6 +5,9 @@
 
 ---
 
+## ✅ r206-i1 — Raised by đứng trước Owner (02/11/2026, EricThai)
+- Eric yêu cầu đổi chỗ 2 cột trong All forms khi chọn PAVOI / MVOI. Nguồn: vault `beta-src/screens.js` `scrAllForms`.
+
 ## ✅ r206 — All forms: cột riêng cho PAVOI / MVOI (02/11/2026, EricThai) — ✅ ĐÃ PUSH `325555c`, live (curl APP_REV r206)
 - Eric gửi ảnh: chọn MVOI / PAVOI trong Reports › All forms → Summary đổi thành Request For Verification, thêm Raised by, bỏ CAT và Issued to. Form khác và "All forms" giữ nguyên.
 - Summary cũ lấy từ Coruson `summary` nên có MVOI hiện hashtag (`[nightshift] [event]`); nay là field `Request For Verification`.

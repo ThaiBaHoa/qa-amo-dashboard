@@ -4352,7 +4352,7 @@ function scrAllForms(){
     || lazyState('capa', () => A.loadCapa(), () => A.capa().loaded, 'Additional Mitigation (CAPA) links'));
   if(w) return w;
   const cfg = { cols: hira ? ['number','status','hiraMethod','hazardType','addMitig','owner','raised','target','dtd']
-                           : pv ? ['number','form','status','rfv','pvOwner','raisedBy','raised','target','dtd','rfi']
+                           : pv ? ['number','form','status','rfv','raisedBy','pvOwner','raised','target','dtd','rfi']
                            : ['number','form','status','summary','owner','issued','raised','target','dtd','cat','rfi'],   /* r191: + Summary, RFI · r194: + Issued to */
                 rows: rs => BS.afForm ? rs.filter(r => r.code === BS.afForm) : rs };
   if(REAL && !hira) lazy('rfisum:'+rxFrom(), loadRfiSum, rxReady);
