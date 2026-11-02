@@ -5,10 +5,15 @@
 
 ---
 
+## ✅ r208 — quay lại danh sách không mất trang (02/11/2026, EricThai)
+- Eric: All forms lọc PAVOI, trang 4, mở chi tiết rồi quay lại thì về trang 1. Sửa ở vault `beta-src/beta-template.html` + `screens.js`: giữ trang khi bấm dòng/tab, thêm link "← Back to …", khôi phục lọc, tìm kiếm, cuộn và đánh dấu dòng vừa xem.
+- Kiểm local: PAVOI-365 trang 4, cả link Back, Back trình duyệt và tab All forms đều về trang 4, đúng cuộn. Chưa thử thực tế: quay lại từ Work Queue, khôi phục tìm kiếm, reset trang khi đổi năm/tháng và link từ Overview.
+
 ## ✅ r207 — cột RFI / Task khớp Galileo (02/11/2026, EricThai) — ✅ ĐÃ PUSH `9a2cb7b`, live (curl APP_REV r207)
 - Eric báo cột RFI không khớp (MVOI-002 hiện "—" dù có 2 task). Sửa ở vault `beta-src/screens2.js`, `metrics.js`, `loader.js`, `beta-template.html` và `isPavoiItem` trong `classic.html`.
 - Kiểm local trên dữ liệu thật, năm 2026: 1278 dòng All forms khớp từng report; số dòng các tab AMO-ECAR 21, CMR-CAR 474, ECAR 69, MCAR 83, PAVOI/MVOI 75 khớp; 3680 report khớp Galileo theo form và trạng thái.
-- Chờ Eric quyết, CHƯA đổi: 106 CAR org TQA link với 22 audit MNT không vào cột Findings; tab OSR/MOSR 609 khác All forms 52 vì khác phạm vi; form Test SPI / Test AMO - Additional Mitigation còn trong danh sách.
+- Eric chốt 02/11: 106 CAR org TQA link với 22 audit MNT KHÔNG tính vào cột Findings (OU TQA không liên quan).
+- Chờ Eric quyết, CHƯA đổi: tab OSR/MOSR 609 khác All forms 52 vì khác phạm vi; form Test SPI / Test AMO - Additional Mitigation còn trong danh sách.
 - Chưa xử lý: AISC -0520, MVOI-001, VJC-MOSR-0518 ghi Open trên Galileo nhưng đã có ngày đóng; 10 report link với audit MPS bị loại khỏi Audit Plan.
 
 ## ✅ r206-i3 — chữ Form không bị ô chọn đè (02/11/2026, EricThai)

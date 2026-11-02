@@ -470,6 +470,7 @@ select.ctl{min-width:168px;cursor:pointer}
 .tbl tbody tr{transition:background var(--dur-out) var(--ease-out)}
 .tbl tbody tr:hover{background:var(--raised);cursor:pointer}
 .tbl tbody tr:last-child td{border-bottom:none}
+.tbl tbody tr.row-back{background:var(--raised);box-shadow:inset 3px 0 0 var(--accent)}
 .tbl td.ar{text-align:right}
 /* r205: a .fit column is as narrow as its content (dates, chips, codes, counts); the free width of a wide screen
    goes to the text columns instead of opening gaps between short values. Phones reflow rows to cards: not there.
@@ -2707,6 +2708,9 @@ function writeUrlFilters(){
   if(location.hash !== want) history.replaceState(history.state, '', location.pathname + location.search + want);
 }
 let pendingId = null;
+/* A row that opens its record on another tab (PAVOI / MVOI) remembers the list it came from: Back, the
+   "Back to" link or the list's own tab return to the same search, category, row and scroll position. */
+let listReturn = null, listRestore = null;
 function go(screen, tab, opts){
   opts = opts || {};
   if(opts.years !== undefined)  state.filters.years  = opts.years;
@@ -2720,6 +2724,9 @@ function go(screen, tab, opts){
 }
 function route(fromUrl){
   if(fromUrl) readUrlFilters();
+  if(listReturn && hashPath() === listReturn.path){
+    state.cat = listReturn.cat; state.rowQuery = listReturn.q; listRestore = listReturn; listReturn = null;
+  } else if(listReturn && hashPath() !== listReturn.to) listReturn = null;
   const parts = hashPath().replace(/^#\/?/,'').split('/').filter(Boolean);
   let screen = parts[0] || 'overview';
   if((screen !== 'rationale' || REAL) && !NAV_BY_ID[screen]) screen = 'overview';
@@ -3306,7 +3313,8 @@ function renderPavoi(){
   ).map(m=>'<div class="meta-i"><span class="meta-k">'+esc(m[0])+'</span>'
     + (m[1]===null ? '<span class="meta-v">'+chip(r.status)+'</span>' : '<span class="meta-v od-truncate">'+esc(m[1])+'</span>')+'</div>').join('');
 
-  return '<section class="sec"><div class="split">'
+  return (listReturn ? '<button class="link-b" type="button" data-act="backlist" style="margin-bottom:var(--s3)">← Back to '+esc(listReturn.label)+'</button>' : '')
+    + '<section class="sec"><div class="split">'
     + '<div class="card"><div class="card-head"><h2>'+(BS.pvForm==='mvoi' ? 'MVOI' : BS.pvForm==='pavoi' ? 'PAVOI' : 'PAVOI / MVOI')+' register</h2>'
       /* r206-i2: the narrow left panel squeezed the caption into four lines — it gets its own row under the title */
       + '<span class="od-fill"></span>'+formSel
@@ -3683,8 +3691,18 @@ function render(){
   scr.querySelectorAll('.rec-list').forEach((e, i) => { if(listTop[i]) e.scrollTop = listTop[i]; });
   if(REAL && typeof topExtras === 'function') $('#betaTop').innerHTML = topExtras();
   writeUrlFilters();
-  if(route !== lastRoute) $('#main-content').scrollTop = 0;
-  else { const el = refocus.map(q => scr.querySelector(q)).find(Boolean);
+  if(listRestore){
+    const b = listRestore, wrap = scr.querySelector('.tbl-wrap'), tr = scr.querySelector('tr[data-id="'+b.id+'"]');
+    listRestore = null;
+    $('#main-content').scrollTop = b.top;
+    if(wrap){ wrap.scrollTop = b.wrapTop; wrap.scrollLeft = b.wrapLeft; }
+    if(tr){ tr.classList.add('row-back'); tr.focus({ preventScroll: true }); }
+  } else if(route !== lastRoute){
+    $('#main-content').scrollTop = 0;
+    /* arriving on a record: its row in the list is in view, however far down */
+    const cur = scr.querySelector('.rec-list [aria-current="true"]');
+    if(cur){ const l = cur.closest('.rec-list'); l.scrollTop += cur.getBoundingClientRect().top - l.getBoundingClientRect().top - 8; }
+  } else { const el = refocus.map(q => scr.querySelector(q)).find(Boolean);
     if(el){ el.focus({ preventScroll: true });
       /* a text box gets its caret back at the end, so typing continues where it was */
       if(el.tagName === 'INPUT' && /^(search|text)$/.test(el.type)) try{ el.setSelectionRange(el.value.length, el.value.length); }catch(e){} } }
@@ -3781,8 +3799,17 @@ function handle(el, e){
   const screen = el.getAttribute('data-go');
   if(screen){
     closeDrawer();
+    /* a row or a tab only moves around: pages stay. Any other link opens a new view of the data: page 1 */
+    const row = el.matches('tr'), keepPage = row || el.classList.contains('tab');
+    if(!el.classList.contains('tab')) listReturn = null;   /* a tab may be the list's own: route() decides */
+    if(row && REAL){
+      const to = '#/' + screen + (el.dataset.tab ? '/' + el.dataset.tab : ''), wrap = $('#screen .tbl-wrap'), tabs = (NAV_BY_ID[state.screen] || {}).tabs || [];
+      if(to !== hashPath()) listReturn = { path: hashPath(), to, id: el.dataset.id, cat: state.cat, q: state.rowQuery,
+        label: (tabs.find(t => t.id === state.tab[state.screen]) || NAV_BY_ID[state.screen] || {}).label || 'list',
+        top: $('#main-content').scrollTop, wrapTop: wrap ? wrap.scrollTop : 0, wrapLeft: wrap ? wrap.scrollLeft : 0 };
+    }
     if(el.dataset.cat !== undefined) state.cat = el.dataset.cat; else state.cat = '';
-    state.page = {};
+    if(!keepPage) state.page = {};
     go(screen, el.dataset.tab || null, {
       id: el.dataset.id || null,
       q:  el.dataset.q  !== undefined ? el.dataset.q  : undefined
@@ -4776,6 +4803,7 @@ const BETA_SCREENS = REAL ? {
   'admin/users': scrUsers, 'admin/exports': () => scrExportsFull(), 'admin/mydash': scrMyDash
 } : {};
 const BETA_ACT = {
+  backlist: () => history.back(),
   bset: el => { BS[el.dataset.k] = el.dataset.v === '' ? (el.dataset.k === 'docType' ? null : '') : el.dataset.v; BS.pg = {}; render(); },
   bpage: el => { BS.pg[el.dataset.k] = Number(el.dataset.p);
     if(el.closest('#betaModal') && MODAL_REDRAW) redrawModal(el); else render(); },
