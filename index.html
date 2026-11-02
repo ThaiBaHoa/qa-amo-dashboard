@@ -1171,8 +1171,8 @@ function authUI(sb, mode){
 }
 
 async function signedInUser(SRC){
-  /* local preview only: no Supabase session; ?role=admin shows the admin screens' layout */
-  if(DEV && !qs.get('auth')) return { full_name:'Local preview', email:'', role: qs.get('role') === 'admin' ? 'admin' : 'viewer' };
+  /* local preview only: no Supabase session; ?role=admin or ?role=moderator shows that role's screens */
+  if(DEV && !qs.get('auth')) return { full_name:'Local preview', email:'', role: ['admin','moderator'].includes(qs.get('role')) ? qs.get('role') : 'approved' };
   const sb = authClient(SRC);
   const recoveryLink = RECOVERY || /type=recovery/.test(location.hash) || qs.get('reset') === '1';
   if(recoveryLink){
@@ -2037,6 +2037,11 @@ const DAY = 86400000;
    TODAY is pinned to the snapshot day, because status, CAT and days-to-due were
    computed by the live dashboard's own functions on that day. */
 const REAL = window.QA_REAL_DATA || null;
+/* r213: Admin holds three tabs for an admin, Export reports for a moderator, nothing for a view-only user */
+if(REAL && REAL.user && REAL.user.role !== 'admin'){
+  if(REAL.user.role === 'moderator') NAV_BY_ID.admin.tabs = NAV_BY_ID.admin.tabs.filter(t => t.id === 'exports');
+  else { NAV.splice(NAV.indexOf(NAV_BY_ID.admin), 1); delete NAV_BY_ID.admin; }
+}
 const realDay = s => s ? new Date(+s.slice(0,4), +s.slice(5,7)-1, +s.slice(8,10)) : null;
 const TODAY = REAL ? realDay(REAL.asOf) : new Date(2026, 8, 13);
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -2660,7 +2665,7 @@ function betaSwap(D){
    ========================================================================== */
 const state = {
   screen:'overview',
-  tab:{ work:'open', findings:'all', analytics:'kpi', audit:'timeline', library:'documents', admin:'users' },
+  tab:{ work:'open', findings:'all', analytics:'kpi', audit:'timeline', library:'documents', admin:(NAV_BY_ID.admin || { tabs:[{ id:'users' }] }).tabs[0].id },
   filters:{ years:[TODAY.getFullYear()], months:[] },
   cat:'',
   rowQuery:'',
@@ -2876,7 +2881,7 @@ function renderChrome(){
       + (['analytics','library','admin','rationale'].includes(state.screen)?' aria-current="page"':'')
       + ' aria-haspopup="dialog">'+ic('more',22)+'<span>More</span></button>';
 
-  $('#drawerBody').innerHTML = ['analytics','library','admin'].map(id=>{
+  $('#drawerBody').innerHTML = ['analytics','library','admin'].filter(id => NAV_BY_ID[id]).map(id=>{
     const n = NAV_BY_ID[id];
     return '<button class="nav-b" type="button" data-go="'+id+'"'+(state.screen===id?' aria-current="page"':'')+'>'
       + ic(n.icon,20)+'<span class="nav-label">'+esc(n.label)+'</span></button>';
@@ -3961,6 +3966,10 @@ const BS = { pg:{}, ataLevel:'2', ataY:TODAY.getFullYear(), ataM:TODAY.getMonth(
 const LAZY = {};
 function betaResetLazy(){ Object.keys(LAZY).forEach(k => delete LAZY[k]); }
 const IS_ADMIN = () => !!(REAL && REAL.user && REAL.user.role === 'admin');
+/* r213: three roles (Eric 02/11/2026). admin: everything. moderator: export reports, AI chat. approved: view only. */
+const CAN_EXPORT = () => IS_ADMIN() || !!(REAL && REAL.user && REAL.user.role === 'moderator');
+const CAN_AI = CAN_EXPORT;
+const ROLE_LABEL = { admin:'Admin', moderator:'Moderator', approved:'User', pending:'Pending', rejected:'Rejected' };
 
 /* Run a main-dashboard loader once; re-render the screen when it settles. The main loaders
    swallow their own errors (toast + flag stays false), so "settled but not ready" is an error
@@ -4159,7 +4168,7 @@ function drillOpen(){
       '<span class="t-small">'+esc(r.code)+'</span>', chip(r.status), '<span class="od-clamp-2 t-small" style="min-width:130px">'+esc(r.owner || '—')+'</span>',
       '<span class="num od-nowrap">'+fmtDate(r.raised)+'</span>', '<span class="num od-nowrap">'+fmtDate(r.target)+'</span>', '<span class="num od-nowrap">'+fmtDate(r.closed)+'</span>'
     ].concat(d.days ? ['<span class="num strong">'+(late(r) === null ? '—' : late(r))+'</span>'] : [])), 30, 800),
-    IS_ADMIN() ? '<button class="btn" type="button" data-act="bdrillxlsx">Export Excel</button>' : '');
+    CAN_EXPORT() ? '<button class="btn" type="button" data-act="bdrillxlsx">Export Excel</button>' : '');
   $('#betaModal .beta-modal-panel').classList.add('wide');   /* eight columns need more than a record's width */
 }
 /* the Audits tile counts distinct audit ids of the reports in view; an audit outside the plan (MPS…) still counts, without a detail link */
@@ -4174,7 +4183,7 @@ function drillAudits(label){
       '<span class="t-small">'+esc((a && a.title) || x.title || '—')+'</span>', '<span class="t-small">'+esc((a && a.status) || '—')+'</span>', '<span class="num">'+x.n+'</span>']; }), 30, 720));
 }
 async function drillExport(){
-  if(!IS_ADMIN()) return toast('Only admins can export reports', '');
+  if(!CAN_EXPORT()) return toast('Only admins and moderators can export reports', '');
   try{
     await window.betaLoadExportLibs();
     const A = API(), rows = M.raw(drillSrc().list);
@@ -4790,13 +4799,16 @@ function scrUsers(){
   const list = LAZY['users:'+BS.usersF].value, me = REAL.user && REAL.user.email;
   const act = (id, a, l, extra) => '<button class="btn" type="button" data-act="buser" data-a="'+a+'" data-id="'+esc(id)+'"'+(extra||'')+'>'+l+'</button>';
   return '<section class="sec">' + card('User management', list.length+' users · Supabase public.users',
-    segs('usersF', [['all','All'],['pending','Pending'],['approved','Approved'],['rejected','Rejected']], BS.usersF)
+    segs('usersF', [['all','All'],['pending','Pending'],['approved','User'],['moderator','Moderator'],['admin','Admin'],['rejected','Rejected']], BS.usersF)
     + plainTable('users', [{l:'Full name'},{l:'Username'},{l:'Role'},{l:'Registered'},{l:'Actions'}], list.map(u => {
         const self = u.email === me;
-        const acts = u.role === 'pending' ? act(u.id,'approve','Approve') + act(u.id,'reject','Reject')
-          : u.role === 'approved' && !self ? act(u.id,'admin','Make admin') + act(u.id,'reject','Revoke')
-          : u.role === 'rejected' ? act(u.id,'approve','Re-approve') : '<span class="dim t-small">'+esc(u.role)+'</span>';
-        return ['<span class="strong">'+esc(u.full_name || '—')+'</span>', '<span class="t-small">'+esc(u.email)+'</span>', '<span class="tag">'+esc(u.role)+'</span>',
+        /* nobody changes their own role, so an admin cannot lock the dashboard out by accident */
+        const acts = self ? '<span class="dim t-small">your account</span>'
+          : u.role === 'pending' ? act(u.id,'approve','Approve') + act(u.id,'reject','Reject')
+          : u.role === 'rejected' ? act(u.id,'approve','Re-approve')
+          : (u.role !== 'approved' ? act(u.id,'approve','Make user') : '') + (u.role !== 'moderator' ? act(u.id,'moderator','Make moderator') : '')
+            + (u.role !== 'admin' ? act(u.id,'admin','Make admin') : '') + act(u.id,'reject','Revoke');
+        return ['<span class="strong">'+esc(u.full_name || '—')+'</span>', '<span class="t-small">'+esc(u.email)+'</span>', '<span class="tag">'+esc(ROLE_LABEL[u.role] || u.role)+'</span>',
           '<span class="num">'+fdx(u.created_at)+'</span>',
           '<span class="od-row" style="--od-gap:6px;flex-wrap:wrap">'+acts+(self ? '' : act(u.id,'delete','Delete',' data-email="'+esc(u.email)+'" data-role="'+esc(u.role)+'"'))+'</span>'];
       }), 20)) + '</section>';
@@ -4807,9 +4819,9 @@ async function userAction(el){
   try{
     if(a === 'approve' || a === 'reject'){
       const { error } = await sb.from('users').update({ role: a === 'approve' ? 'approved' : 'rejected' }).eq('id', id); if(error) throw error;
-    } else if(a === 'admin'){
-      if(!confirm('Grant admin rights to this user?')) return;
-      const { error } = await sb.from('users').update({ role:'admin' }).eq('id', id); if(error) throw error;
+    } else if(a === 'admin' || a === 'moderator'){
+      if(!confirm(a === 'admin' ? 'Grant admin rights to this user?' : 'Make this user a moderator? They can export reports and use the AI Assistant.')) return;
+      const { error } = await sb.from('users').update({ role:a }).eq('id', id); if(error) throw error;
     } else if(a === 'delete'){
       if(!confirm('Delete '+el.dataset.email+' permanently? The account is removed from Supabase Auth and the profile table.')) return;
       /* same Edge Function as the main dashboard (deleteUser 8943): service_role stays server-side */
@@ -5356,7 +5368,7 @@ function exportRowsFor(f, form, status){
 }
 const exportRows = () => exportRowsFor(state.filters, BS.exForm, BS.expSt);   /* own key: afForm is Reports › All forms */
 function scrExportsFull(){
-  if(!IS_ADMIN()) return adminOnly();
+  if(!CAN_EXPORT()) return adminOnly();
   const titles = [...new Set(M.qa(REPORTS).map(r => r.code))].sort();
   const rows = exportRows(), S = M.summary(rows);
   const busy = BS.expBusy ? ' disabled' : '';
@@ -5394,7 +5406,7 @@ function dateBox(key, cur, label){
     + '<input class="ctl" type="date" data-bset="'+key+'" value="'+esc(cur||'')+'"></label>';
 }
 async function runExport(kind){
-  if(!IS_ADMIN()) return toast('Only admins can export reports', '');
+  if(!CAN_EXPORT()) return toast('Only admins and moderators can export reports', '');
   BS.expBusy = true; render();
   try{
     await window.betaLoadExportLibs();
@@ -5431,7 +5443,7 @@ function aiPanelHTML(){
 }
 function aiRender(){ const p = $('#betaAi'); if(!p) return; p.hidden = !AI.open; if(AI.open){ p.innerHTML = aiPanelHTML(); const b = $('#aiMsgs'); if(b) b.scrollTop = b.scrollHeight; const t = $('#aiIn'); if(t && !AI.busy) t.focus(); } }
 async function aiSend(){
-  const t = $('#aiIn'), q = t ? t.value.trim() : ''; if(!q || AI.busy) return;
+  const t = $('#aiIn'), q = t ? t.value.trim() : ''; if(!q || AI.busy || !CAN_AI()) return;
   const A = API();
   AI.msgs.push({ role:'user', content:q });
   /* Trim to the last ~16 messages, starting at a QUESTION. Tool results are role 'user' too; a history that
@@ -5536,7 +5548,7 @@ Object.assign(BETA_ACT, {
   bpassword: () => changePasswordModal(),
   bpwsave: () => savePassword(),
   bexp: el => runExport(el.dataset.k),
-  baitoggle: () => { AI.open = !AI.open; aiRender(); },
+  baitoggle: () => { if(!CAN_AI()) return; AI.open = !AI.open; aiRender(); },
   baiclear: () => { AI.msgs = []; aiRender(); },
   baisend: () => aiSend(),
   bselfcheck: () => { (BS.selfWarn || []).forEach(w => toast('Data self-check', w)); },
@@ -5695,12 +5707,12 @@ BETA_SCREENS['library/guide'] = scrGuideNew;
     const un = document.querySelector('.user-name'), ur = document.querySelector('.user-role'), av = document.querySelector('.user .avatar');
     const nm = (REAL.user && (REAL.user.full_name || REAL.user.email)) || 'Signed in';
     if(un) un.textContent = nm;
-    if(ur) ur.textContent = (REAL.user && REAL.user.role === 'admin' ? 'Admin' : 'Viewer')+' · '+REAL.appRev;
+    if(ur) ur.textContent = ({ admin:'Admin', moderator:'Moderator' }[REAL.user && REAL.user.role] || 'User')+' · '+REAL.appRev;
     if(av) av.textContent = nm.split(/\s+/).filter(Boolean).slice(-2).map(w=>w[0]).join('').toUpperCase() || '·';
     if(REAL.loadWarnings && REAL.loadWarnings.length)
       setTimeout(()=> toast('Some data did not load', REAL.loadWarnings.join(' · ')), 400);
     $('#betaAccount').hidden = false;
-    $('#betaAiBtn').hidden = false;
+    $('#betaAiBtn').hidden = !CAN_AI();
   }
 
   $('#themeBtn').addEventListener('click', ()=> setTheme(currentTheme() === 'light' ? 'dark' : 'light'));

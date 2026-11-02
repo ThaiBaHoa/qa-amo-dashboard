@@ -2528,7 +2528,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.02-r212';
+const APP_REV = '2026.11.02-r213';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2763,6 +2763,8 @@ function enterRecoveryUI() {
 // [r141] Nguồn dữ liệu thất bại trong lượt loadData hiện tại. Đọc bởi runSelfChecks (để hiện
 // lên chip cảnh báo) và bởi khối cuối loadData (để chặn cacheSave). Reset đầu mỗi loadData.
 let loadFailures = [];
+// [r213] Ba cấp: admin > moderator (xuất report, chat AI) > approved (chỉ xem) — Eric 02/11/2026
+const canExport = () => !!curUser && (curUser.role === 'admin' || curUser.role === 'moderator');
 let curUser = null, allData = [], auditData = [], docData = [], cmrData = [], ecarData = [], docTaskCache = {}, charts = {}, userFilter = 'all', isLoading = false;
 let _docTasks = [], _docTaskSort = { col:'status', asc:true };   // copyholder list + sort (modal Document)
 let docTypeTree=[], docTypeFlat=[], docTypeIndex={}, docTypeByTitle={}, selectedTypeId=null, docWorkflowCache={}, expandedTreeNodes=new Set(), currentDocRevId=null;
@@ -2989,14 +2991,13 @@ function initApp() {
   if(g('aiTopBtn'))g('aiTopBtn').style.display='flex';   // AI Assistant — chỉ hiện sau khi đăng nhập
   g('sideAvatar').textContent=curUser.full_name[0].toUpperCase();
   g('sideName').textContent=curUser.full_name;
-  g('sideRole').textContent=curUser.role==='admin'?'🔑 Administrator':'👤 Viewer';
+  g('sideRole').textContent=curUser.role==='admin'?'🔑 Administrator':curUser.role==='moderator'?'🛠 Moderator':'👤 User';
   if(g('appRev'))g('appRev').textContent='Rev '+APP_REV;
   if(g('guideVer'))g('guideVer').textContent='QA AMO Dashboard · Rev '+APP_REV+' · Full documentation';
   if(g('guideFooter'))g('guideFooter').textContent='QA AMO Dashboard · Rev '+APP_REV+' · VietJet Air · Data from Galileo GRC · Developed by QA AMO Team';
-  if(curUser.role==='admin'){
-    g('adminNav').style.display='';
-    document.querySelectorAll('.admin-only').forEach(el=>el.style.display='');
-  }
+  if(curUser.role==='admin') g('adminNav').style.display='';
+  if(canExport()) document.querySelectorAll('.admin-only').forEach(el=>el.style.display='');   // [r213] .admin-only = các nút xuất report
+  if(g('aiTopBtn')) g('aiTopBtn').style.display = canExport() ? '' : 'none';                  // [r213] chat AI: admin + moderator
   // [r145] cacheLoad() là async (IndexedDB). Dùng .then() chứ KHÔNG await: giữ initApp()
   // đồng bộ như cũ để startAutoRefresh()/startKiosk() chạy ngay, không chờ đĩa.
   cacheLoad().then(ok => { cacheStatsRecord(ok); if(ok === 'stale') loadData(false, {background:true}); else if(!ok) loadData(); })
@@ -5162,7 +5163,7 @@ function renderOpen() {
 }
 
 async function exportATAComparePDF() {
-  if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
+  if(!canExport()){toast('Only admins and moderators can export reports','err');return;}
   toast('Generating PDF...','info');
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
@@ -7103,7 +7104,7 @@ function pdfSafe(str){
     .replace(/[^\x00-\xFF]/g,'?');    // any remaining non-Latin-1
 }
 function exportCmrPDF(){
-  if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
+  if(!canExport()){toast('Only admins and moderators can export reports','err');return;}
   if(!cmrLoaded||!cmrData.length){toast('No CMR-CAR data loaded','err');return;}
   const ts=TS.cmr;
   const hasYr=ymVal('cmrYearF').length>0, yrTxt=ymText('cmrYearF');
@@ -7598,7 +7599,7 @@ function showEcarDetail(report_id){
 function closeEcarModal(e){if(e&&e.target!==g('ecarModal'))return;g('ecarModal').style.display='none';}
 
 async function exportEcarPDF(){
-  if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
+  if(!canExport()){toast('Only admins and moderators can export reports','err');return;}
   if(!ecarLoaded||!ecarData.length){toast('No ECAR data loaded','err');return;}
   setOv(true,'Generating PDF...','');
   try{
@@ -7785,7 +7786,7 @@ async function exportEcarPDF(){
 }
 
 function exportEcarExcel(){
-  if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
+  if(!canExport()){toast('Only admins and moderators can export reports','err');return;}
   if(!ecarLoaded||!ecarData.length){toast('No ECAR data loaded','err');return;}
   setOv(true,'Exporting Excel...','');
   try{
@@ -8274,7 +8275,7 @@ function showAuditPlanPage(navBtn) {
 // ── EXPORT AUDIT EXCEL ────────────────────────────────────────
 
 function exportAuditExcel() {
-  if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
+  if(!canExport()){toast('Only admins and moderators can export reports','err');return;}
   try {
     const data = getCurrentlyFilteredAudits();
     if (!data.length) { toast('No data to export','info'); return; }
@@ -8817,7 +8818,7 @@ function generateReport(){
 }
 
 async function exportPDF(){
-  if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
+  if(!canExport()){toast('Only admins and moderators can export reports','err');return;}
   if(!rptData.length){toast('No data to export','err');return;}
   const {jsPDF}=window.jspdf;
   setOv(true,'Generating PDF...','Please wait');
@@ -8968,7 +8969,7 @@ async function exportPDF(){
 }
 
 function exportExcel(){
-  if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
+  if(!canExport()){toast('Only admins and moderators can export reports','err');return;}
   if(!rptData.length){toast('No data','err');return;}
   setOv(true,'Generating Excel...','');
   try{
@@ -9041,7 +9042,7 @@ async function ovrFetchPending(reportIds){
   return map;
 }
 async function exportOverdueReport(){
-  if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
+  if(!canExport()){toast('Only admins and moderators can export reports','err');return;}
   if(!allData||!allData.length){toast('No data loaded','err');return;}
   const forms=rptFormSelected||[];                                          // [] = all forms (dùng chung dropdown "Form Type")
   setOv(true,'Generating Overdue Report...','');
@@ -9419,7 +9420,7 @@ async function sncAddChartParts(buf,sheetNames,charts){
 }
 // kind: 'mcar' | 'sr' | 'both' (một file 2 sheet như file mẫu)
 async function exportSncReport(kind,from,to){
-  if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
+  if(!canExport()){toast('Only admins and moderators can export reports','err');return;}
   if(!allData||!allData.length){toast('No data loaded','err');return;}
   if(!from||!to||from>to){toast('Choose a valid date range (From ≤ To)','err');return;}
   const parts=kind==='both'?[['MCAR',mcarReportSheet],['Surveillance',survReportSheet]]
@@ -9472,7 +9473,7 @@ function pdfLetterhead(doc, pageNo, totalPages){
 }
 
 async function exportOverduePDF(){
-  if(!curUser||curUser.role!=='admin'){toast('Only admins can export reports','err');return;}
+  if(!canExport()){toast('Only admins and moderators can export reports','err');return;}
   if(!allData||!allData.length){toast('No data loaded','err');return;}
   if(!window.jspdf){toast('PDF library not loaded','err');return;}
   const forms=rptFormSelected||[];
@@ -10154,7 +10155,7 @@ function renderRptStatus(){
 }
 
 function showPage(name,btn){
-  if((name==='reports'||name==='admin'||name==='querybuilder'||name==='mydashboard')&&(!curUser||curUser.role!=='admin')){
+  if(((name==='admin'||name==='querybuilder'||name==='mydashboard')&&(!curUser||curUser.role!=='admin'))||(name==='reports'&&!canExport())){
     toast('You do not have permission to access this page','err');return;
   }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -12593,6 +12594,7 @@ function aiQA(q){
 
 // ── UI ──────────────────────────────────────────────────────
 function aiToggle(){
+  if(!canExport()) return;
   const p=g('aiPanel'); p.classList.toggle('open');
   if(p.classList.contains('open')) setTimeout(()=>g('aiInput').focus(),50);
 }

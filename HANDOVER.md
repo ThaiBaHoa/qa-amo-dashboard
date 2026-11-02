@@ -5,6 +5,12 @@
 
 ---
 
+## ✅ r213 — ba cấp quyền (02/11/2026, EricThai)
+- Supabase đã chạy migration trước khi push; file `MIGRATION_r213_phan_quyen.sql` trong workspace có lệnh hoàn tác. Dry-run có rollback: tự nâng quyền bị chặn, admin đổi được.
+- Kiểm local bằng `?role=approved|moderator`. Chưa thử: màn hình User management mới (cần đăng nhập thật), `classic.html` ngoài kiểm cú pháp.
+- Eric sẽ đổi admin thứ hai thành moderator bằng nút Make moderator.
+- Còn mở: Worker `galileo-ai` có vẻ chưa kiểm đăng nhập, CORS chỉ cho `Content-Type`, mã chỉ trên Cloudflare.
+
 ## ✅ r212 — KPI 2 và KPI 7 bấm được (02/11/2026, EricThai)
 - Sửa ở vault `beta-src/screens.js` (`drillSrc`, `DRILL_X`), `metrics.js` và `kpi7Stats` trong `classic.html`.
 - Kiểm local năm 2026: 39/39 ô khớp số dòng. `M.consistency` chỉ chạy với admin: giả lập quyền ở local cho kết quả `consistency OK`, cho năm 2026. Muốn kiểm phép này ở trang xem thử Viewer phải giả lập admin.
