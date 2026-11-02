@@ -2528,7 +2528,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.02-r209';
+const APP_REV = '2026.11.02-r210';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3542,7 +3542,7 @@ async function loadData(forceRefresh=false, opts={}) {
       par('Report summary',
         orgP.then(() => fetchAll(G_URL + 'dwreporting_report_summary' +
         '?$select=report_id,report_title,report_number,report_status,' +
-        'org_unit_name,raised_date,audit_title,audit_id,modified_date,valid_from,valid_to,owner_id,reported_by_id' +
+        'org_unit_name,raised_date,closed_date,audit_title,audit_id,modified_date,valid_from,valid_to,owner_id,reported_by_id' +
         '&$filter=' + encodeURIComponent(orgUnitFilter()), true)),   // [r143] QA AMO + ban con, lọc theo UUID
         rows => {
           try {
@@ -3657,8 +3657,9 @@ async function loadData(forceRefresh=false, opts={}) {
       const td = f['Target date'] || sd.td || wf?.stage_target_date || null;
       // Completed date: ngày làm xong báo cáo (stage Task)
       const completed_date = sd.completed || null;
-      // Close date: ngày report đóng (ReportAcceptReject) → fallback stage completed cũ
-      const cd = sd.cd || wf?.stage_completed_date || null;
+      // Close date: đúng ô CLOSED DATE trên Coruson (report_summary.closed_date) — Eric chốt 02/11/2026. KHÔNG suy từ
+      // stage: 'Approve for report closure' Completed chưa phải đã đóng (AISC -0520, MVOI-001 vẫn Open trên Coruson).
+      const cd = r.closed_date || null;
 
       const ag = ageCalc(td);
       const sm = semCalc(r.report_status, cd, td);

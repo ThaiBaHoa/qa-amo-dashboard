@@ -122,7 +122,7 @@ GET dwreporting_report_workflow
   $select: report_id, stage_type, stage_status,
            stage_completed_date, stage_target_date
 ```
-→ Build `wfMap[report_id]`: chỉ lấy stage `ReportAcceptReject` (Completed/InProgress) để lấy `close_date`.
+→ Build `wfMap[report_id]`: chỉ lấy stage `ReportAcceptReject` (Completed/InProgress). **[r210] `close_date` của report QA AMO KHÔNG suy từ stage nữa:** lấy `dwreporting_report_summary.closed_date`, đúng ô Closed date trên Coruson. Stage closure Completed chưa phải đã đóng (AISC -0520, MVOI-001). CMR-CAR / ECAR vẫn dùng field `Date completed`.
 → Build `wfAllMap[report_id]`: tất cả stages để render workflow steps — **có lọc trùng bằng `Set` (r134)**.
    Bảng này **trải phẳng theo (stage × task)**: một stage có N task thì ra N dòng giống hệt nhau ở đúng 5 cột
    trên. Không lọc thì `wf_stages` phình **36,1%** (12.808 → 8.181 trên phạm vi QA AMO) và cột Workflow vẽ lặp

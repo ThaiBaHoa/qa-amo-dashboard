@@ -5,6 +5,12 @@
 
 ---
 
+## ✅ r210 — ngày đóng lấy từ Closed date của Coruson (02/11/2026, EricThai)
+- Eric: dashboard lấy sai ngày đóng (MVOI-001, AISC -0520 đã qua bước phê duyệt nhưng chưa đóng). `close_date` của report QA AMO nay = `report_summary.closed_date` trong `classic.html`.
+- ⚠ Tỷ lệ đúng hạn đổi: 2026 42,9% → 41,0%, 2025 40,4% → 36,2% (tính đúng hạn / (đúng hạn + trễ hạn) trên toàn QA AMO). Checklist verify gửi các ban 03/10 có thể theo số cũ.
+- Kiểm local sau khi nạp lại: 0 report Closed thiếu ngày, 0 report chưa đóng có ngày, selfChecks rỗng. Chưa so từng ô KPI trước và sau.
+- Để sau (VIEC_TUONG_LAI): CMR-CAR / ECAR dùng `Date completed`; audit MPS.
+
 ## ✅ r209 — loại form Test (02/11/2026, EricThai)
 - Bỏ `report_title` bắt đầu bằng "Test " lúc nạp Report summary trong `classic.html`: Test SPI -02/-04/-05, Test-CAPA-01. Kiểm local: 3676 report, All forms 2026 còn 1274, 38 form, selfChecks rỗng. Chưa so từng ô KPI Overview trước và sau.
 
@@ -17,7 +23,7 @@
 - Kiểm local trên dữ liệu thật, năm 2026: 1278 dòng All forms khớp từng report; số dòng các tab AMO-ECAR 21, CMR-CAR 474, ECAR 69, MCAR 83, PAVOI/MVOI 75 khớp; 3680 report khớp Galileo theo form và trạng thái.
 - Eric chốt 02/11: 106 CAR org TQA link với 22 audit MNT KHÔNG tính vào cột Findings (OU TQA không liên quan).
 - Eric chốt 02/11: tab OSR/MOSR giữ nguyên phạm vi (609 khác All forms 52 vì tính theo đơn vị người báo cáo); form Test loại ở r209.
-- Chưa xử lý: AISC -0520, MVOI-001, VJC-MOSR-0518 ghi Open trên Galileo nhưng đã có ngày đóng; 10 report link với audit MPS bị loại khỏi Audit Plan.
+- AISC -0520, MVOI-001, VJC-MOSR-0518: Eric xác nhận chưa đóng, sửa ở r210. 10 report link với audit MPS: để sau, xem VIEC_TUONG_LAI.
 
 ## ✅ r206-i3 — chữ Form không bị ô chọn đè (02/11/2026, EricThai)
 - r206-i2 chưa hết lỗi: Eric gửi ảnh chữ "Form" bị cắt. Nhãn trong `.beta-sel` co còn 24 px trong khi chữ cần 32 px. Sửa CSS chung ở vault `beta-src/beta-template.html`.
