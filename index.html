@@ -3306,7 +3306,9 @@ function renderPavoi(){
 
   return '<section class="sec"><div class="split">'
     + '<div class="card"><div class="card-head"><h2>'+(BS.pvForm==='mvoi' ? 'MVOI' : BS.pvForm==='pavoi' ? 'PAVOI' : 'PAVOI / MVOI')+' register</h2>'
-      + '<span class="t-small dim od-fill">'+done+' of '+total+' assessed'+(wd?' · '+wd+' withdrawn excluded':'')+'</span>'+formSel+'</div>'
+      /* r206-i2: the narrow left panel squeezed the caption into four lines — it gets its own row under the title */
+      + '<span class="od-fill"></span>'+formSel
+      + '<span class="t-small dim" style="flex:0 0 100%">'+done+' of '+total+' assessed'+(wd?' · '+wd+' withdrawn excluded':'')+'</span></div>'
       + '<div class="rec-list">'+list+'</div></div>'
     + '<div class="card"><div class="card-head">'
       + '<h2 class="mono">'+esc(r.number)+'</h2>'+chip(r.status)+extBtn('report', r.id)
