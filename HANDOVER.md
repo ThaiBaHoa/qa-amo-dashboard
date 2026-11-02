@@ -5,11 +5,16 @@
 
 ---
 
+## ✅ r212 — KPI 2 và KPI 7 bấm được (02/11/2026, EricThai)
+- Sửa ở vault `beta-src/screens.js` (`drillSrc`, `DRILL_X`), `metrics.js` và `kpi7Stats` trong `classic.html`.
+- Kiểm local năm 2026: 39/39 ô khớp số dòng. `M.consistency` chỉ chạy với admin: giả lập quyền ở local cho kết quả `consistency OK`, cho năm 2026. Muốn kiểm phép này ở trang xem thử Viewer phải giả lập admin.
+- Chưa kiểm: điện thoại; Export Excel riêng cho KPI 2, KPI 7. ATA comparison chưa bấm được.
+
 ## ✅ r211 — bấm số trên KPI charts mở danh sách report (02/11/2026, EricThai)
 - Sửa ở vault `beta-src/metrics.js` (`M.DRILL`, kiểm trong `M.consistency`), `screens.js`, `screens2.js` (`dismissModal`), `beta-template.html`.
 - Kiểm local năm 2026: 30/30 ô bấm được khớp số dòng; Excel Q1 Late closed 131 dòng (chặn tải file, đọc nội dung); đóng chi tiết về đúng trang và cuộn.
 - Chưa kiểm: điện thoại; nút Export với tài khoản admin thật (chỉ giả lập quyền ở local). Tên file Excel theo mẫu chung.
-- Còn lại: KPI 2 và KPI 7 chưa bấm được.
+- KPI 2 và KPI 7: xong ở r212.
 
 ## ✅ r210 — ngày đóng lấy từ Closed date của Coruson (02/11/2026, EricThai)
 - Eric: dashboard lấy sai ngày đóng (MVOI-001, AISC -0520 đã qua bước phê duyệt nhưng chưa đóng). `close_date` của report QA AMO nay = `report_summary.closed_date` trong `classic.html`.

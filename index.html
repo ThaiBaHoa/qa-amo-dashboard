@@ -2481,9 +2481,16 @@ M.consistency = function(){
   const k7 = M.kpi7(f), pav = qa.filter(r => (r.form === 'pavoi' || r.form === 'mvoi') && !r.withdrawn);   /* r199: + MVOI */
   say('KPI 7 total (kpi7Stats) vs PAVOI / MVOI in period', k7.total, pav.length);
   say('KPI 7 assessed (kpi7Stats) vs verification rounds', k7.assessed, pav.filter(r => r.rounds.length > 0).length);
+  /* r212: the list behind each KPI 7 cell holds exactly that many reports, and each maps to a report row */
+  { const ids = new Set(REPORTS.map(r => r.id));
+    k7.stats.order.map(k => k7.stats.rows[k]).forEach(r => [['total','totalList'],['assessed','assessedList'],['notAssessed','notList'],['closed','closedList'],['withdrawn','wdList']].forEach(([n, l]) =>
+      say('KPI 7 list ' + l + ' vs its count, ' + r.key, r[l].filter(x => ids.has(x.report_id)).length, r[n]))); }
   const k2 = M.kpi2(qa);
   say('KPI 2 MCAR vs classic', k2.mcar, raw.filter(r => r.report_title === 'MCAR').length);
   say('KPI 2 AMO-ECAR vs classic', k2.amo, raw.filter(r => r.report_title === 'AMO ECAR').length);
+  if(A.kpi2().loaded){ const kr = A.kpi2().rows.filter(r => M.inPeriodDay(M.dayOf(r.raised_date), f));   /* r212: the rows its lists read */
+    say('KPI 2 list MCAR vs its count', kr.filter(r => r.type === 'mcar').length, k2.mcar);
+    say('KPI 2 list AMO-ECAR vs its count', kr.filter(r => r.type === 'amo').length, k2.amo); }
   { const bq = M.byQuarter(M.qa(REPORTS), f);
     say('Quarters: total vs year', bq.reduce((t, x) => t + x.s.total, 0), s.total);
     say('Quarters: late closed vs year', bq.reduce((t, x) => t + x.s.late, 0), s.late);
@@ -4115,18 +4122,38 @@ function kpiChartStats(f){ const data = M.period(M.qa(REPORTS), f); return { dat
 let DRILL = null;
 const drillBase = scope => scope === 'period' ? kpiChartStats().data : ((M.byQuarter(M.qa(REPORTS)).find(x => x.q === scope) || {}).rows || []);
 const drillTile = (kind, n) => n ? ['bdrill', ' data-scope="period" data-kind="'+kind+'"'] : [null, ''];
-const drillNum = (n, scope, kind, cls) => n
-  ? '<button class="drill num'+(cls ? ' '+cls : '')+'" type="button" data-act="bdrill" data-scope="'+esc(scope)+'" data-kind="'+kind+'" aria-label="'+n+' '+esc(M.DRILL[kind].l)+', '+esc(scope)+'. Select for the list">'+n+'</button>'
+/* r212: KPI 2 and KPI 7 cells. Their lists come from the same rows as the counts (A.kpi2().rows, kpi7Stats lists). */
+const DRILL_X = { k7total:{ l:'Total', f:'totalList' }, k7assessed:{ l:'Assessed', f:'assessedList' }, k7not:{ l:'No verification round', f:'notList' },
+  k7closed:{ l:'Closed', f:'closedList' }, k7wd:{ l:'Withdrawn, outside KPI 7', f:'wdList' }, mcar:{ l:'MCAR' }, amo:{ l:'AMO-ECAR' } };
+const drillNum = (n, scope, kind, cls, text) => n
+  ? '<button class="drill num'+(cls ? ' '+cls : '')+'" type="button" data-act="bdrill" data-scope="'+esc(scope)+'" data-kind="'+kind+'" aria-label="'+n+' '+esc((M.DRILL[kind] || DRILL_X[kind]).l)+', '+esc(scope.replace(/^k[27]:/, ''))+'. Select for the list">'+(text || n)+'</button>'
   : '<span class="num">0</span>';
+/* the list a count opens, with its title. KPI 2 counts a report once per Nature group, so a report can sit in several. */
+function drillSrc(){
+  const { scope, kind } = DRILL, A = API(), rep = new Map(REPORTS.map(r => [r.id, r]));
+  const toRep = rows => rows.map(r => rep.get(r.report_id)).filter(Boolean);
+  if(scope.indexOf('k7:') === 0){
+    const st = M.kpi7().stats, key = scope.slice(3), x = DRILL_X[kind];
+    const rows = key === 'tot' ? st.order.map(k => st.rows[k]) : [st.rows[key]];
+    const name = key === 'tot' ? 'MQA' : key === '__unassigned__' ? 'Unassigned owner' : key;
+    return { title:'KPI 7 · '+name+' · '+x.l, list:toRep(rows.flatMap(r => r[x.f])), d:{} };
+  }
+  if(scope.indexOf('k2:') === 0){
+    const g = scope.slice(3), rows = A.kpi2().rows.filter(r => inPeriod(r.raised_date) && r.type === kind && (g === '*' || r.natureGroups.includes(g)));
+    return { title:'KPI 2 · '+(g === '*' ? periodLabel() : g)+' · '+DRILL_X[kind].l, list:toRep(rows), d:{} };
+  }
+  const d = M.DRILL[kind];
+  return { title:(scope === 'period' ? periodLabel() : scope)+' · '+d.l, list:drillBase(scope).filter(d.p), d };
+}
 function drillOpen(){
   const { scope, kind } = DRILL, label = scope === 'period' ? periodLabel() : scope;
   MODAL_KEY = 'drill'; MODAL_REDRAW = drillOpen; DRILL.detail = false;
   if(kind === 'audits') return drillAudits(label);
-  const d = M.DRILL[kind];
+  const { title, list:src, d } = drillSrc();
   const late = r => r.target ? dayDiff(r.closed || TODAY, r.target) : null;
-  const list = drillBase(scope).filter(d.p).slice().sort((a, b) => d.days ? (late(b) || 0) - (late(a) || 0) : (b.raised || 0) - (a.raised || 0));
+  const list = src.slice().sort((a, b) => d.days ? (late(b) || 0) - (late(a) || 0) : (b.raised || 0) - (a.raised || 0));
   const cols = [{l:'Report'},{l:'Form'},{l:'Status'},{l:'Owner'},{l:'Raised'},{l:'Target'},{l:'Closed'}].concat(d.days ? [{l:'Days late',ar:true}] : []);
-  openModal(label+' · '+d.l, list.length+' report'+(list.length === 1 ? '' : 's')+' · select a report for its detail',
+  openModal(title, list.length+' report'+(list.length === 1 ? '' : 's')+' · select a report for its detail',
     plainTable('drill-'+kind, cols, list.map(r => [
       '<button class="link-b row-id" type="button" data-act="bdrillopen" data-fn="showReport" data-id="'+esc(r.id)+'"><span class="od-nowrap">'+esc(r.number)+'</span></button>',
       '<span class="t-small">'+esc(r.code)+'</span>', chip(r.status), '<span class="od-clamp-2 t-small" style="min-width:130px">'+esc(r.owner || '—')+'</span>',
@@ -4150,7 +4177,7 @@ async function drillExport(){
   if(!IS_ADMIN()) return toast('Only admins can export reports', '');
   try{
     await window.betaLoadExportLibs();
-    const A = API(), rows = M.raw(drillBase(DRILL.scope).filter(M.DRILL[DRILL.kind].p));
+    const A = API(), rows = M.raw(drillSrc().list);
     A.setExport(REAL.user, rows, [], state.filters.years, state.filters.months);
     await A.exportExcel();
     const t = A.toasts().slice(-1)[0];
@@ -4201,10 +4228,10 @@ function scrKpi(){
       .sort((a,b) => (grp[b].amo+grp[b].mcar) - (grp[a].amo+grp[a].mcar)).slice(0,12);
     /* headline = the same METRICS figure as the Overview tile; the table breaks it down by nature */
     k2body = '<div class="od-row" style="--od-gap:16px;align-items:baseline"><span class="kpi-val">'
-      + (K.k2.amo > 0 ? K.k2.pct+'%' : 'N/A') + '</span><span class="t-small dim">MCAR '+K.k2.mcar+' ÷ AMO-ECAR '+K.k2.amo+'</span></div>'
+      + (K.k2.amo > 0 ? K.k2.pct+'%' : 'N/A') + '</span><span class="t-small dim">'+drillNum(K.k2.mcar, 'k2:*', 'mcar', '', 'MCAR '+K.k2.mcar)+' ÷ '+drillNum(K.k2.amo, 'k2:*', 'amo', '', 'AMO-ECAR '+K.k2.amo)+'</span></div>'
       + plainTable('k2vol', [{l:'Nature group'},{l:'MCAR',ar:true},{l:'AMO-ECAR',ar:true},{l:'Rate',ar:true}],
-          keys.map(g => ['<span class="t-small">'+esc(g)+'</span>', '<span class="num">'+grp[g].mcar+'</span>',
-            '<span class="num">'+grp[g].amo+'</span>', '<span class="num strong">'+(grp[g].amo > 0 ? M.pct(grp[g].mcar, grp[g].amo)+'%' : '—')+'</span>']), 12);
+          keys.map(g => ['<span class="t-small">'+esc(g)+'</span>', drillNum(grp[g].mcar, 'k2:'+g, 'mcar'),
+            drillNum(grp[g].amo, 'k2:'+g, 'amo'), '<span class="num strong">'+(grp[g].amo > 0 ? M.pct(grp[g].mcar, grp[g].amo)+'%' : '—')+'</span>']), 12);
   }
 
   /* KPI 7 by section, kpi7Stats 6191 + renderKpi7 6267 (rate withheld while any row is pending) */
@@ -4215,20 +4242,21 @@ function scrKpi(){
   const rowRate = r => (r.total && !r.pending) ? A.kpi7Rate(r) : null;
   const k7rows = st.order.map(k => st.rows[k]).map(r => [
     '<span class="t-small">'+esc(r.key === '__unassigned__' ? 'Unassigned owner' : r.key)+'</span>',
-    '<span class="num">'+r.assessed+'</span>', '<span class="num">'+r.notAssessed+'</span>',
-    '<span class="num">'+r.closed+'</span>', '<span class="num">'+r.total+'</span>',
+    drillNum(r.assessed, 'k7:'+r.key, 'k7assessed'), drillNum(r.notAssessed, 'k7:'+r.key, 'k7not'),
+    drillNum(r.closed, 'k7:'+r.key, 'k7closed'), drillNum(r.total, 'k7:'+r.key, 'k7total'),
     '<span class="num strong">'+A.kpi7Fmt(rowRate(r))+'</span>']);
-  k7rows.push(['<span class="strong">TOTAL — MQA</span>', '<span class="num strong">'+st.tot.assessed+'</span>',
-    '<span class="num strong">'+st.tot.notAssessed+'</span>', '<span class="num strong">'+st.tot.closed+'</span>',
-    '<span class="num strong">'+st.tot.total+'</span>', '<span class="num strong">'+A.kpi7Fmt(rowRate(st.tot))+'</span>']);
+  k7rows.push(['<span class="strong">TOTAL — MQA</span>', drillNum(st.tot.assessed, 'k7:tot', 'k7assessed', 'strong'),
+    drillNum(st.tot.notAssessed, 'k7:tot', 'k7not', 'strong'), drillNum(st.tot.closed, 'k7:tot', 'k7closed', 'strong'),
+    drillNum(st.tot.total, 'k7:tot', 'k7total', 'strong'), '<span class="num strong">'+A.kpi7Fmt(rowRate(st.tot))+'</span>']);
   const lags = st.tot.lags.slice().sort((a,b) => a-b);
   const k7note = st.tot.total ? st.tot.assessed+' / '+st.tot.total+' assessed · '+st.tot.notAssessed+' with no verification round'
     + (lags.length ? ' · median '+lags[Math.floor(lags.length/2)]+'d to first verification' : '')
-    + (st.tot.withdrawn ? ' · '+st.tot.withdrawn+' withdrawn excluded' : '') : 'no PAVOI / MVOI in this period';
+    : 'no PAVOI / MVOI in this period';
+  const k7wd = st.tot.total && st.tot.withdrawn ? ' · '+drillNum(st.tot.withdrawn, 'k7:tot', 'k7wd', '', st.tot.withdrawn+' withdrawn excluded') : '';
 
   html += '<section class="sec cols cols-2">'
     + card('KPI 2 · MCAR ÷ AMO-ECAR', 'volume ratio by Nature of finding · '+esc(periodLabel()), k2body)
-    + card('KPI 7 · PAVOI / MVOI assessed', esc(k7note),
+    + card('KPI 7 · PAVOI / MVOI assessed', esc(k7note)+k7wd,
         plainTable('k7', [{l:'Section'},{l:'Assessed',ar:true},{l:'No verif.',ar:true},{l:'Closed',ar:true},{l:'Total',ar:true},{l:'KPI %',ar:true}], k7rows, 10, 0, { tail:1 }))
     + '</section>';
   html += '<section class="sec">'+scrAta()+'</section>';

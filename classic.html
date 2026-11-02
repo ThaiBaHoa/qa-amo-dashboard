@@ -2528,7 +2528,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.02-r211';
+const APP_REV = '2026.11.02-r212';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -6464,7 +6464,7 @@ function kpi7Stats(pass){
                           && ymHas('kpi7Month', r.raised_ym ? +r.raised_ym.slice(5,7) : null));
   const order = [...KPI7_SECTIONS, KPI7_UNASSIGNED];
   const rows = {};
-  order.forEach(k=>{ rows[k] = {key:k, assessed:0, notAssessed:0, pending:0, open:0, closed:0, total:0, withdrawn:0, wdList:[], notList:[], lags:[]}; });
+  order.forEach(k=>{ rows[k] = {key:k, assessed:0, notAssessed:0, pending:0, open:0, closed:0, total:0, withdrawn:0, wdList:[], notList:[], totalList:[], assessedList:[], closedList:[], lags:[]}; });
   const tot = {assessed:0, notAssessed:0, pending:0, open:0, closed:0, total:0, withdrawn:0, inGroup:0, all:0, lags:[]};
   allData.forEach(r=>{
     if(!isPvReport(r) || !r.report_id) return;          // [r199] PAVOI + MVOI
@@ -6481,13 +6481,14 @@ function kpi7Stats(pass){
     // là hồ sơ nào — nếu không, một hồ sơ sai trạng thái sẽ biến mất khỏi mọi báo cáo.
     if(kpi7Withdrawn(r)){ row.withdrawn++; tot.withdrawn++; row.wdList.push(r); return; }
     row.total++; tot.total++;                                   // mẫu số: mọi PAVOI còn hiệu lực
-    if(r.report_status === 'Open'){ row.open++; tot.open++; } else { row.closed++; tot.closed++; }
+    row.totalList.push(r);                                      // [r212] danh sách sau mỗi ô, cùng nhánh với số đếm
+    if(r.report_status === 'Open'){ row.open++; tot.open++; } else { row.closed++; tot.closed++; row.closedList.push(r); }
     // [r153] Open/Closed giờ chỉ là CỘT THÔNG TIN, không còn là thành phần công thức.
     // Trước r153 hồ sơ Closed được tính đã xử lý VÔ ĐIỀU KIỆN; Eric bác vì đóng hồ sơ không
     // chứng minh đã đánh giá. [r155] Nay mọi hồ sơ đều phải có lượt xác minh như nhau.
     if(!kpi7Done.has(r.report_id)){ row.pending++; tot.pending++; return; }
     if((kpi7Cnt[r.report_id]||0) > 0){
-      row.assessed++; tot.assessed++;
+      row.assessed++; tot.assessed++; row.assessedList.push(r);
       const d = kpi7Ver[r.report_id];
       if(d && r.raised_date){                                   // độ trễ: phát hành → lượt xác minh đầu tiên
         const n = Math.round((new Date(d) - new Date(String(r.raised_date).slice(0,10)))/86400000);
