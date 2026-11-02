@@ -5,7 +5,7 @@
 
 ---
 
-## ✅ r207 — cột RFI / Task khớp Galileo (02/11/2026, EricThai)
+## ✅ r207 — cột RFI / Task khớp Galileo (02/11/2026, EricThai) — ✅ ĐÃ PUSH `9a2cb7b`, live (curl APP_REV r207)
 - Eric báo cột RFI không khớp (MVOI-002 hiện "—" dù có 2 task). Sửa ở vault `beta-src/screens2.js`, `metrics.js`, `loader.js`, `beta-template.html` và `isPavoiItem` trong `classic.html`.
 - Kiểm local trên dữ liệu thật, năm 2026: 1278 dòng All forms khớp từng report; số dòng các tab AMO-ECAR 21, CMR-CAR 474, ECAR 69, MCAR 83, PAVOI/MVOI 75 khớp; 3680 report khớp Galileo theo form và trạng thái.
 - Chờ Eric quyết, CHƯA đổi: 106 CAR org TQA link với 22 audit MNT không vào cột Findings; tab OSR/MOSR 609 khác All forms 52 vì khác phạm vi; form Test SPI / Test AMO - Additional Mitigation còn trong danh sách.
