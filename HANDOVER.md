@@ -5,6 +5,9 @@
 
 ---
 
+## ✅ r215 — sidebar thu gọn (02/11/2026, EricThai)
+- Kiểm local ở 975 và 1500 px, thu gọn và mở rộng: 72 và 248 px, không thanh cuộn ngang.
+
 ## ✅ r214 — khung chat AI (02/11/2026, EricThai)
 - Kiểm local bằng câu trả lời giả (chặn fetch tới Worker): 0 tin bị cắt, không cuộn ngang. Chưa thử với AI thật.
 

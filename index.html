@@ -236,14 +236,15 @@ svg{display:block;flex:none}
 /* ---------- sidebar ---------- */
 .sidebar{
   background:var(--surface);border-right:1px solid var(--border);
-  display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-height:0;
+  /* the column stays the rail's width: the account links used to widen every row past it */
+  display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;min-height:0;
 }
 .brand{display:flex;align-items:center;gap:10px;padding:var(--s4);border-bottom:1px solid var(--border)}
 .brand-mark{width:34px;height:34px;flex:none;border-radius:7px;background:var(--accent);display:grid;place-items:center;font-weight:800;font-size:15px;color:var(--on-accent);letter-spacing:-.03em}
 .brand-text{display:grid;gap:1px;min-width:0}
 .brand-name{font-size:15px;font-weight:700;letter-spacing:-.01em;display:block}
 .brand-sub{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);font-weight:650;display:block}
-.sb-nav{padding:var(--s3) var(--s3) var(--s4);overflow-y:auto;min-height:0}
+.sb-nav{padding:var(--s3) var(--s3) var(--s4);overflow-x:hidden;overflow-y:auto;min-height:0}
 .sb-foot{border-top:1px solid var(--border);padding:var(--s3)}
 
 .nav-b{
@@ -758,7 +759,16 @@ mark{background:var(--accent-34);color:var(--on-wash);border-radius:3px;padding:
 .beta-auth-alert.success{border-color:var(--border-strong);background:var(--raised)}
 .beta-account{display:flex;gap:var(--s2);padding:0 var(--s3) var(--s2);flex-wrap:wrap}
 .beta-account .link-b{font-size:13px}
-body.rail .beta-account{display:none}
+.acct-ic{display:none}
+/* on the rail the account links are icons, so sign out stays one click away */
+body.rail .beta-account{flex-direction:column;align-items:center;padding-inline:0;gap:2px}
+body.rail .acct-ic{display:block}
+body.rail .acct-t{display:none}
+@media (max-width:1279px){
+  body:not(.rail-off) .beta-account{flex-direction:column;align-items:center;padding-inline:0;gap:2px}
+  body:not(.rail-off) .acct-ic{display:block}
+  body:not(.rail-off) .acct-t{display:none}
+}
 .beta-modal{position:fixed;inset:0;z-index:150;display:grid;place-items:center;background:rgba(0,0,0,.45);padding:var(--s4)}
 .beta-modal[hidden]{display:none}
 .beta-modal-panel{width:min(880px,100%);max-height:min(88vh,900px);overflow:auto;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-card);box-shadow:var(--shadow-2)}
@@ -867,9 +877,9 @@ body.kiosk .wrap{max-width:none}
         </span>
       </div>
       <div class="beta-account" id="betaAccount" hidden>
-        <button class="link-b" type="button" data-act="bfbopen">Send feedback</button>
-        <button class="link-b" type="button" data-act="bpassword">Change password</button>
-        <button class="link-b" type="button" data-act="bsignout">Sign out</button>
+        <button class="link-b" type="button" data-act="bfbopen" title="Send feedback" aria-label="Send feedback"><svg class="ic acct-ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-8 8H4l2.5-3A8 8 0 1 1 21 12Z"/></svg><span class="acct-t">Send feedback</span></button>
+        <button class="link-b" type="button" data-act="bpassword" title="Change password" aria-label="Change password"><svg class="ic acct-ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3"/></svg><span class="acct-t">Change password</span></button>
+        <button class="link-b" type="button" data-act="bsignout" title="Sign out" aria-label="Sign out"><svg class="ic acct-ic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4H5v16h5M15 8l4 4-4 4M19 12H9"/></svg><span class="acct-t">Sign out</span></button>
       </div>
       <button class="nav-b" id="rationaleNav" data-label="Design rationale" type="button"></button>
     </div>
@@ -2860,7 +2870,7 @@ function donut(parts){
    ========================================================================== */
 function navButton(n, current, extra){
   const openCount = n.id === 'work' ? qaScope(scoped()).filter(isOpen).length : 0;
-  return '<button class="nav-b" type="button" data-go="'+n.id+'" data-label="'+esc(n.label)+'"'
+  return '<button class="nav-b" type="button" data-go="'+n.id+'" data-label="'+esc(n.label)+'" title="'+esc(n.label)+'"'
     + (current ? ' aria-current="page"' : '') + '>'
     + ic(n.icon, 20) + '<span class="nav-label">'+esc(n.label)+'</span>'
     + (openCount ? '<span class="nav-count">'+openCount+'</span>' : '') + (extra||'') + '</button>';
