@@ -1556,6 +1556,7 @@ allData.forEach(r => {
        classic (5737–5990). owner_name stays the owner section.
        r198: MVOI (new Coruson form, 10/2026) has the same sections; its department is 'Responsible Department'. */
     o.finding = orDash(r.rfv);
+    o.raisedBy = orDash(r.reported_by_name);   /* r206: Coruson 'reported by' — probe 02/11: filled on all 479 PAVOI + 12 MVOI */
     o.auditTitle = orDash(r.report_ref);
     o.pvDept = orDash(form === 'mvoi' ? r.resp_dept : r.dept);
     o.mvoiType = form === 'mvoi' ? orDash(r.mvoi_type) : null;
@@ -4345,10 +4346,13 @@ function scrAllForms(){
   if(BS.afForm === A.CAPA_TITLE) return scrCapa(titles);
   /* AMO - HIRA (r171): its three EVALUATION classifications replace Form and CAT */
   const hira = BS.afForm === A.HIRA_TITLE;
+  /* r206 (Eric 02/11): PAVOI / MVOI read as Request For Verification + Raised by; no CAT, no Issued to */
+  const pv = BS.afForm === 'PAVOI' || BS.afForm === 'MVOI';
   const w = hira && (lazyState('hira', () => A.loadHira(), () => A.hira().loaded, 'HIRA classifications')
     || lazyState('capa', () => A.loadCapa(), () => A.capa().loaded, 'Additional Mitigation (CAPA) links'));
   if(w) return w;
   const cfg = { cols: hira ? ['number','status','hiraMethod','hazardType','addMitig','owner','raised','target','dtd']
+                           : pv ? ['number','form','status','rfv','pvOwner','raisedBy','raised','target','dtd','rfi']
                            : ['number','form','status','summary','owner','issued','raised','target','dtd','cat','rfi'],   /* r191: + Summary, RFI · r194: + Issued to */
                 rows: rs => BS.afForm ? rs.filter(r => r.code === BS.afForm) : rs };
   if(REAL && !hira) lazy('rfisum:'+rxFrom(), loadRfiSum, rxReady);
@@ -4362,7 +4366,15 @@ function scrAllForms(){
 /* AMO - HIRA classification columns (values from loadHiraCls; '—' when the report has none) */
 const hiraCls = (r, k) => ((API().hira().map || {})[r.id] || {})[k] || '';
 const hiraCell = v => v ? '<span class="t-small">'+esc(v)+'</span>' : '<span class="dim">—</span>';
+const rfvCell = r => r.finding && r.finding !== '—'
+  ? '<span class="t-small od-clamp-3" style="min-width:220px;max-width:360px" title="'+esc(r.finding)+'">'+esc(r.finding)+'</span>'
+  : '<span class="dim">—</span>';
+/* names wrap here so the ten columns stay on screen without sideways scrolling */
+const nameCell = v => '<span class="od-clamp-2" style="min-width:130px" title="'+esc(v || '')+'">'+esc(v || '—')+'</span>';
 Object.assign(COL, {
+  rfv:{ l:'Request For Verification', v:r=>r.finding || '', c:rfvCell },
+  pvOwner:{ l:'Owner', v:r=>r.owner, c:r=>nameCell(r.owner) },
+  raisedBy:{ l:'Raised by', v:r=>r.raisedBy || '', c:r=>nameCell(r.raisedBy) },
   hiraMethod:{ l:'HIRA method', v:r=>hiraCls(r,'method') || 'zzz', c:r=>hiraCell(hiraCls(r,'method')) },
   hazardType:{ l:'Hazard type', v:r=>hiraCls(r,'type') || 'zzz', c:r=>hiraCell(hiraCls(r,'type')) },
   addMitig:{ l:'Additional mitigation', v:r=>hiraCls(r,'mitig') || 'zzz', c:hiraMitigCell }

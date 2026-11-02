@@ -2528,7 +2528,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.01-r205';
+const APP_REV = '2026.11.02-r206';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3540,7 +3540,7 @@ async function loadData(forceRefresh=false, opts={}) {
       par('Report summary',
         orgP.then(() => fetchAll(G_URL + 'dwreporting_report_summary' +
         '?$select=report_id,report_title,report_number,report_status,' +
-        'org_unit_name,raised_date,audit_title,audit_id,modified_date,valid_from,valid_to,owner_id' +
+        'org_unit_name,raised_date,audit_title,audit_id,modified_date,valid_from,valid_to,owner_id,reported_by_id' +
         '&$filter=' + encodeURIComponent(orgUnitFilter()), true)),   // [r143] QA AMO + ban con, lọc theo UUID
         rows => {
           try {
@@ -3685,6 +3685,7 @@ async function loadData(forceRefresh=false, opts={}) {
         finding_desc:  f['Finding description']        || null,
         nature_raw:    f['Nature of finding']          || null,
         owner_name:      userMap[r.owner_id]            || null,
+        reported_by_name: userMap[r.reported_by_id]     || null,   // [r206] người raise report: cột Raised by của PAVOI / MVOI
         semantic_status: sm,
         report_ageing:   ag,
         overdue_cat:     catCalc(ag, sm),

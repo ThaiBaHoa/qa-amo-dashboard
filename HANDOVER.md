@@ -5,6 +5,13 @@
 
 ---
 
+## ✅ r206 — All forms: cột riêng cho PAVOI / MVOI (02/11/2026, EricThai) — ⏳ CHƯA COMMIT / PUSH
+- Eric gửi ảnh: chọn MVOI / PAVOI trong Reports › All forms → Summary đổi thành Request For Verification, thêm Raised by, bỏ CAT và Issued to. Form khác và "All forms" giữ nguyên.
+- Summary cũ lấy từ Coruson `summary` nên có MVOI hiện hashtag (`[nightshift] [event]`); nay là field `Request For Verification`.
+- Raised by = `reported_by_id` (`dwreporting_report_summary`) tra `userMap`. Probe 02/11: đủ 479 PAVOI + 12 MVOI. MVOI/PAVOI form không có field "Raised by" riêng.
+- Nguồn: `classic.html` (select + `reported_by_name`, APP_REV); vault `beta-src` `loader.js` (`o.raisedBy`), `screens.js` (`scrAllForms`, cột `rfv`/`pvOwner`/`raisedBy`). Bản sao nguồn trước khi sửa: `rebuild UIUX/beta-src-bak-20261102/`.
+- Kiểm local dữ liệu thật: 12 MVOI, PAVOI 2026; không dòng nào trống RFV/Raised by; sort 2 cột mới OK; `M.consistency()` rỗng; console sạch. Tab PAVOI / MVOI (danh sách + chi tiết) không đổi.
+
 ## ✅ r205 — rà giao diện bảng: sort mọi header, cột co theo nội dung, panel trái (01/11/2026, THAIBAHOA-HOME) — ✅ ĐÃ PUSH, LIVE (`a7205bd`, kiểm APP_REV trên vjc-qa-amo.com 01/11)
 - Eric gửi 3 ảnh: CMR-CAR có khe trống (Aircraft–Status, trước Days to due) · panel trái Additional Mitigation hẹp, cắt chip/số ngày · header bảng Event/IR report status không sort.
 - Nguồn: vault `beta-src` — `screens.js` (`plainTable` sort mặc định + `cellKey`, `opt.nosort/head/tail`, `col.fit`; `bsort` vẽ lại hộp thoại), `beta-template.html` (COL `fit`, `.tbl-fit` khi ≤ 7 cột, `.split` 340–440px/34%, `.rec` tag xuống dòng + tiêu đề 2 dòng, header sort trong `.card-pad`). Bản sao nguồn trước khi sửa: `rebuild UIUX/beta-src-bak-20261101/`.
