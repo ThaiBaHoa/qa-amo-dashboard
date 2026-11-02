@@ -5,6 +5,9 @@
 
 ---
 
+## ✅ r214 — khung chat AI (02/11/2026, EricThai)
+- Kiểm local bằng câu trả lời giả (chặn fetch tới Worker): 0 tin bị cắt, không cuộn ngang. Chưa thử với AI thật.
+
 ## ✅ r213 — ba cấp quyền (02/11/2026, EricThai)
 - Supabase đã chạy migration trước khi push; file `MIGRATION_r213_phan_quyen.sql` trong workspace có lệnh hoàn tác. Dry-run có rollback: tự nâng quyền bị chặn, admin đổi được.
 - Kiểm local bằng `?role=approved|moderator`. Chưa thử: màn hình User management mới (cần đăng nhập thật), `classic.html` ngoài kiểm cú pháp.

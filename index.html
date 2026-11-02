@@ -786,14 +786,15 @@ body.rail .beta-account{display:none}
 .ca-voi.pending{background:var(--info-bg);border-left-color:var(--info)}.ca-voi.pending b{color:var(--info)}
 #betaTop{display:flex;align-items:center;gap:var(--s2)}
 #betaTop .t-small{white-space:nowrap}
-.beta-ai{position:fixed;right:22px;top:80px;bottom:22px;width:min(420px,calc(100vw - 28px));max-height:640px;z-index:120;
+.beta-ai{position:fixed;right:22px;top:80px;bottom:22px;width:min(500px,calc(100vw - 28px));z-index:120;
   background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-card);box-shadow:var(--shadow-2);display:grid;grid-template-rows:auto minmax(0,1fr) auto}
 .beta-ai[hidden]{display:none}
 .beta-ai-head{display:flex;align-items:center;gap:var(--s2);padding:var(--s3) var(--s4);border-bottom:1px solid var(--border)}
-.beta-ai-msgs{overflow:auto;padding:var(--s3) var(--s4);display:grid;gap:var(--s2);align-content:start}
-.beta-ai-msg{padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.5;max-width:100%;overflow-x:auto}
-.beta-ai-msg.user{background:var(--accent-08);border:1px solid var(--accent-20);justify-self:end}
-.beta-ai-msg.assistant{background:var(--raised)}
+.beta-ai-msgs{overflow:auto;padding:var(--s3) var(--s4);display:flex;flex-direction:column;gap:var(--s2)}
+/* flex:none: a message keeps its full height and the list scrolls; in a grid each one shrank to a sliver with its own scrollbar */
+.beta-ai-msg{flex:none;padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.5;max-width:100%;overflow-x:auto;overflow-y:hidden;overflow-wrap:anywhere}
+.beta-ai-msg.user{background:var(--accent-08);border:1px solid var(--accent-20);align-self:flex-end;max-width:88%}
+.beta-ai-msg.assistant{background:var(--raised);align-self:flex-start}
 .beta-ai-msg table{border-collapse:collapse;font-size:13px}.beta-ai-msg td,.beta-ai-msg th{border-bottom:1px solid var(--border);padding:4px 6px;text-align:left}
 .beta-ai-in{display:flex;gap:var(--s2);padding:var(--s3);border-top:1px solid var(--border)}
 .beta-ai-in textarea{flex:1;font:inherit;padding:8px;resize:none}
@@ -5428,7 +5429,8 @@ async function runExport(kind){
 /* ---- AI Assistant (galileo-ai Worker; tools run in the browser on the loaded data) ---- */
 const AI = { open:false, msgs:[], busy:false };
 function aiPanelHTML(){
-  const msgs = AI.msgs.filter(m => typeof m.content === 'string' || (Array.isArray(m.content) && m.content.some(c => c.type === 'text')));
+  /* a turn that calls a tool is working text ("I will filter…"): the panel shows the questions and the answers */
+  const msgs = AI.msgs.filter(m => typeof m.content === 'string' || (Array.isArray(m.content) && m.content.some(c => c.type === 'text') && !m.content.some(c => c.type === 'tool_use')));
   const bubble = m => {
     const txt = typeof m.content === 'string' ? m.content : m.content.filter(c => c.type === 'text').map(c => c.text).join('\n');
     return '<div class="beta-ai-msg '+m.role+'">'+(m.role === 'assistant' ? API().aiMd(txt) : esc(txt))+'</div>';
@@ -5438,10 +5440,11 @@ function aiPanelHTML(){
     + '<div class="beta-ai-msgs" id="aiMsgs">' + (msgs.length ? msgs.map(bubble).join('')
       : '<p class="t-small dim">Ask about the loaded QA data, e.g. "How many PAVOI are overdue in 2026 by section?" Answers come from queries on the dashboard data; numbers are never invented.</p>')
     + (AI.busy ? '<div class="beta-ai-msg assistant dim">Querying the data…</div>' : '') + '</div>'
-    + '<div class="beta-ai-in"><textarea class="ctl" id="aiIn" rows="2" placeholder="Ask a question"'+(AI.busy?' disabled':'')+'></textarea>'
+    + '<div class="beta-ai-in"><textarea class="ctl" id="aiIn" rows="2" placeholder="Ask a question · Enter to send, Shift+Enter for a new line"'+(AI.busy?' disabled':'')+'></textarea>'
     + '<button class="btn primary" type="button" data-act="baisend"'+(AI.busy?' disabled':'')+'>Send</button></div>';
 }
-function aiRender(){ const p = $('#betaAi'); if(!p) return; p.hidden = !AI.open; if(AI.open){ p.innerHTML = aiPanelHTML(); const b = $('#aiMsgs'); if(b) b.scrollTop = b.scrollHeight; const t = $('#aiIn'); if(t && !AI.busy) t.focus(); } }
+function aiRender(){ const p = $('#betaAi'); if(!p) return; p.hidden = !AI.open; if(AI.open){ p.innerHTML = aiPanelHTML(); const b = $('#aiMsgs'); if(b){ /* a finished answer is read from its question down, not from its last line */
+      const q = [...b.querySelectorAll('.beta-ai-msg.user')].pop(); b.scrollTop = !AI.busy && q ? q.offsetTop - b.offsetTop - 8 : b.scrollHeight; } const t = $('#aiIn'); if(t && !AI.busy) t.focus(); } }
 async function aiSend(){
   const t = $('#aiIn'), q = t ? t.value.trim() : ''; if(!q || AI.busy || !CAN_AI()) return;
   const A = API();
