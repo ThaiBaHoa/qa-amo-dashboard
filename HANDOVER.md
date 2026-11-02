@@ -5,6 +5,10 @@
 
 ---
 
+## ✅ r206-i3 — chữ Form không bị ô chọn đè (02/11/2026, EricThai)
+- r206-i2 chưa hết lỗi: Eric gửi ảnh chữ "Form" bị cắt. Nhãn trong `.beta-sel` co còn 24 px trong khi chữ cần 32 px. Sửa CSS chung ở vault `beta-src/beta-template.html`.
+- Đo local dữ liệu thật ở 1525 / 1366 / 375: nhãn không chồng select, chọn All / PAVOI / MVOI vẫn đủ chữ; các ô Level, Year, Month (Analytics KPI) và Form (Work Queue) không chồng; console sạch.
+
 ## ✅ r206-i2 — đầu thẻ PAVOI / MVOI register (02/11/2026, EricThai)
 - Eric gửi ảnh: dòng "56 of 70 assessed · 5 withdrawn excluded" bị bóp thành 4 dòng cạnh ô Form. Nay xuống hàng riêng. Nguồn: vault `beta-src/beta-template.html` `renderPavoi`.
 - Kiểm local dữ liệu thật: 1920 và 1525-ish tiêu đề + ô Form cùng hàng; 1366 và 375 ô Form xuống hàng riêng (panel 355 px, thiếu 16 px); caption luôn 1 dòng; không tràn ngang; console sạch.

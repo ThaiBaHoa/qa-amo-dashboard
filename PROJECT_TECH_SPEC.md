@@ -2,7 +2,7 @@
 
 **File:** `index.html` (single-file SPA, không build step)
 **Repo:** `ThaiBaHoa/qa-amo-dashboard` · **Domain:** `vjc-qa-amo.com` (GitHub Pages)
-**Version hiện tại:** `2026.11.02-r206-i2`
+**Version hiện tại:** `2026.11.02-r206-i3`
 **Cập nhật spec:** 2026-07-22 — phản ánh code thực tế (gồm r81–r118-i3; **r113–r118 = phân hệ Export/Login, KHÔNG đổi luồng dữ liệu chính** — xem §14; **delta luồng duy nhất từ r112: bước [5/6] `loadData` thêm field `Issued to (person)` → `issued_person`, tổng 16 field**), **r110: cập nhật roster `QA_AMO_AUDITORS`; r111: nút Feedback / Bug Report (Google Form) ở sidebar; r112: AI Assistant chat — hỏi-đáp dữ liệu qua Worker `galileo-ai` (tool-use client-side) — xem §8.9; r112-i1: AI Assistant fuzzy form matching + alias (SR/EIS/QC)**; r104: User delete qua Edge Function + EIS form-specific schema/roll-up ở All Forms; r105: fix EIS per-CA load — revert về field_name + post-filter Set (I3); r106: EIS đóng/mở theo cấp report (không suy từ CA Date completed); r107: QC Spot Check Report detail ở All Forms (+ hotfix TDZ thứ tự khai báo & timeout report_field — xem §8.8, I11); r108: KPI ATA = (CMR-CAR + QC Spot Check)÷ECAR lệch tháng N−1/N (§6.4c); r109: tử số CMR-CAR chỉ tính report gán cờ "QC MQA Physical Finding" (category_id), MCAR cột Raised by, Target_date lấy từ Report, MCAR deadline check, copyholder on-time so theo ngày, lọc Cancelled/Deleted, auto-refresh kiosk, multi-year filter, admin export, SPI, KPI2, PAVOI RFI)
 
 > Tài liệu này mô tả TOÀN BỘ kiến trúc, dữ liệu, logic và quy ước của dashboard. Dùng làm nguồn tham chiếu chuẩn khi sửa code. Số dòng (Lxxxx) là tương đối, dùng để định vị nhanh.
@@ -556,6 +556,7 @@ Supabase thật, mà worker chỉ nhận origin `vjc-qa-amo.com` nên localhost 
 
 | Rev | Nội dung |
 |---|---|
+| r206-i3 | **Nhãn ô chọn không bị ô chọn đè (02/11/2026, Eric).** Chữ "Form" (32 px) bị co còn 24 px rồi chui dưới select. CSS chung `.beta-sel>span{flex:none;white-space:nowrap}` (beta-src `beta-template.html`), áp cho mọi ô chọn có nhãn. |
 | r206-i2 | **Đầu thẻ PAVOI / MVOI register không còn bóp chữ (02/11/2026, Eric).** Dòng "x of y assessed · n withdrawn excluded" bị ép thành 4 dòng trong panel trái; nay xuống hàng riêng dưới tiêu đề + ô Form (beta-src `beta-template.html` `renderPavoi`). |
 | r206-i1 | **All forms PAVOI / MVOI: Raised by đứng trước Owner (02/11/2026, Eric).** Chỉ đổi thứ tự cột trong `scrAllForms`. |
 | r206 | **Reports › All forms khi chọn PAVOI / MVOI: cột riêng (02/11/2026, Eric).** Cột: Report · Form · Status · **Request For Verification** (`rfv`, thay Summary) · Owner · **Raised by** (mới) · Raised · Target · Days to due · RFI; bỏ CAT và Issued to. Form khác + "All forms" giữ nguyên. Raised by = `reported_by_id` của `dwreporting_report_summary` tra `userMap` → `reported_by_name` (classic `loadData`), UI `o.raisedBy` (beta-src `loader.js`); probe 02/11: đủ 479 PAVOI + 12 MVOI, 322/491 trùng owner_id. Cột trong beta-src `screens.js` (`scrAllForms`, `rfv`, `pvOwner`, `raisedBy`); tên xuống 2 dòng để 10 cột vừa màn hình. |

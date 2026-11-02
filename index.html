@@ -800,6 +800,7 @@ body.kiosk .app{grid-template-columns:minmax(0,1fr) !important}
 body.kiosk .wrap{max-width:none}
 .beta-guide{max-width:96ch}
 .beta-sel{min-width:0;max-width:100%}
+.beta-sel>span{flex:none;white-space:nowrap}   /* r206-i3: the label keeps its width; the select gives way, not the text */
 .beta-sel select.ctl{min-width:0;width:min(280px,100%);text-overflow:ellipsis}
 .tbl.beta-minw{min-width:var(--beta-minw)}
 .card-pad .tbl th, .card-pad .tbl td{padding-left:12px;padding-right:12px}
