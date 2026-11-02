@@ -2528,7 +2528,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.02-r215';
+const APP_REV = '2026.11.02-r216';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -12646,7 +12646,7 @@ function aiMd(t){
 
 async function aiCallWorker(){
   const res = await fetch(AI_URL, {
-    method:'POST', headers:{'Content-Type':'application/json'},
+    method:'POST', headers:{'Content-Type':'application/json', ...(await gAuth())},   // [r216] Worker kiểm đăng nhập và quyền
     body: JSON.stringify({ system: aiSystem(), tools: AI_TOOLS, messages: aiMsgs })
   });
   const data = await res.json().catch(()=>({}));

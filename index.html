@@ -1685,7 +1685,7 @@ const SCREEN_API = {
   exportSncReport: (user, kind, from, to) => { curUser = user; return exportSncReport(kind, from, to); },
   exportAudits: (user, rows) => { curUser = user; HOOK.auditRows = rows; return exportAuditExcel(); },
   /* AI Assistant (r112/r159): prompt, tools and tool runner of the main dashboard */
-  AI_URL, aiSystem, AI_TOOLS, aiRunTool, aiMd,
+  AI_URL, aiSystem, AI_TOOLS, aiRunTool, aiMd, gAuth: () => gAuth(),
 };
 
 return { reports, audits, depts, checks, partial: !!HOOK.lite, mem,
@@ -5469,7 +5469,7 @@ async function aiSend(){
       const ctl = new AbortController(), tid = setTimeout(() => ctl.abort(), 90000);
       let r, data;
       try{
-        r = await fetch(A.AI_URL, { method:'POST', headers:{ 'Content-Type':'application/json' }, signal: ctl.signal,
+        r = await fetch(A.AI_URL, { method:'POST', headers:{ 'Content-Type':'application/json', ...(await A.gAuth()) }, signal: ctl.signal,
           body: JSON.stringify({ system: A.aiSystem(), tools: A.AI_TOOLS, messages: AI.msgs }) });
         data = await r.json().catch(() => ({}));
       }catch(e){ throw new Error(e.name === 'AbortError' ? 'no answer within 90 s' : e.message); }

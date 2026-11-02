@@ -512,6 +512,7 @@ const ALLOWED_ORIGINS = [
 - Nhận **POST** `{ system, tools, messages }`, trả nguyên response Messages API (`content[]`, `stop_reason`).
 - Client chạy **tool-use tại browser**: Claude sinh `tool_use` → JS truy vấn `allData`/`auditData` → `tool_result` → lặp ≤6 round. **Chỉ kết quả truy vấn được gửi lên API, KHÔNG upload dữ liệu thô.**
 - Chi tiết kiến trúc: `PROJECT_TECH_SPEC.md` §8.9.
+- **[r216] Source trong repo:** `workers/galileo-ai/`, deploy `npx.cmd wrangler deploy`. Kiểm Origin, phiên Supabase và role (chỉ admin, moderator), nhớ kết quả 5 phút theo token. `AUTH_MODE`: soft = chỉ ghi log, enforce = từ chối 401/403. Bản cũ từ dashboard: `worker.live-2026-11-02.js`.
 
 ### 3. `qa-feedback` (Bug report → Telegram — `FB_URL`, r151)
 
@@ -525,8 +526,7 @@ const ALLOWED_ORIGINS = [
 - `shot` (dataURL JPEG) gửi bằng `sendPhoto` **rời** khỏi tin nhắn text — caption Telegram
   giới hạn 1024 ký tự, nhét chung sẽ bị cắt. Ảnh hỏng thì bỏ qua, tin text đã gửi xong.
 - **Source nằm TRONG repo:** `workers/qa-feedback/` (wrangler). Deploy `npx.cmd wrangler deploy`,
-  xem log `npx.cmd wrangler tail`. `galileo-proxy` cũng đã vào repo từ r176; `galileo-ai` vẫn chỉ
-  tồn tại trong editor trên Cloudflare dashboard, không có bản nào trong git.
+  xem log `npx.cmd wrangler tail`. `galileo-proxy` cũng đã vào repo từ r176, `galileo-ai` từ r216.
 - Tách riêng khỏi `galileo-proxy` **có chủ đích**: proxy là đường dữ liệu sống của toàn app,
   hỏng nó là mất data mọi trang; kênh báo lỗi hỏng thì chỉ hỏng nút báo lỗi.
 

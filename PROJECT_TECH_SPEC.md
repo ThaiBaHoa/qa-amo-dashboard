@@ -2,7 +2,7 @@
 
 **File:** `index.html` (single-file SPA, không build step)
 **Repo:** `ThaiBaHoa/qa-amo-dashboard` · **Domain:** `vjc-qa-amo.com` (GitHub Pages)
-**Version hiện tại:** `2026.11.02-r215`
+**Version hiện tại:** `2026.11.02-r216`
 **Cập nhật spec:** 2026-07-22 — phản ánh code thực tế (gồm r81–r118-i3; **r113–r118 = phân hệ Export/Login, KHÔNG đổi luồng dữ liệu chính** — xem §14; **delta luồng duy nhất từ r112: bước [5/6] `loadData` thêm field `Issued to (person)` → `issued_person`, tổng 16 field**), **r110: cập nhật roster `QA_AMO_AUDITORS`; r111: nút Feedback / Bug Report (Google Form) ở sidebar; r112: AI Assistant chat — hỏi-đáp dữ liệu qua Worker `galileo-ai` (tool-use client-side) — xem §8.9; r112-i1: AI Assistant fuzzy form matching + alias (SR/EIS/QC)**; r104: User delete qua Edge Function + EIS form-specific schema/roll-up ở All Forms; r105: fix EIS per-CA load — revert về field_name + post-filter Set (I3); r106: EIS đóng/mở theo cấp report (không suy từ CA Date completed); r107: QC Spot Check Report detail ở All Forms (+ hotfix TDZ thứ tự khai báo & timeout report_field — xem §8.8, I11); r108: KPI ATA = (CMR-CAR + QC Spot Check)÷ECAR lệch tháng N−1/N (§6.4c); r109: tử số CMR-CAR chỉ tính report gán cờ "QC MQA Physical Finding" (category_id), MCAR cột Raised by, Target_date lấy từ Report, MCAR deadline check, copyholder on-time so theo ngày, lọc Cancelled/Deleted, auto-refresh kiosk, multi-year filter, admin export, SPI, KPI2, PAVOI RFI)
 
 > Tài liệu này mô tả TOÀN BỘ kiến trúc, dữ liệu, logic và quy ước của dashboard. Dùng làm nguồn tham chiếu chuẩn khi sửa code. Số dòng (Lxxxx) là tương đối, dùng để định vị nhanh.
@@ -556,6 +556,7 @@ Supabase thật, mà worker chỉ nhận origin `vjc-qa-amo.com` nên localhost 
 
 | Rev | Nội dung |
 |---|---|
+| r216 | **AI Assistant gửi phiên đăng nhập; Worker `galileo-ai` vào repo (02/11/2026, Eric).** Worker cũ không kiểm gì, ai biết URL đều dùng được khóa Anthropic. Bản mới (`workers/galileo-ai`): Origin allow-list, kiểm phiên Supabase, chỉ admin + moderator, `AUTH_MODE` soft/enforce. Đã deploy `soft` (`cf79db9a`); phải chuyển `enforce` mới đóng hẳn. |
 | r215 | **Sidebar thu gọn không tràn (02/11/2026, Eric).** Link tài khoản làm rộng cột sidebar lên 114 px trong khi rail 72 px, gây tràn ô đang chọn và thanh cuộn ngang dưới 1280 px. Khóa cột `minmax(0,1fr)`, `.sb-nav` không cuộn ngang; ở rail ba link thành icon. |
 | r214 | **Khung chat AI (02/11/2026, Eric).** Tin nhắn không còn bị bóp kèm thanh cuộn riêng (grid → flex, `flex:none`). Khung 500 px, cao theo màn hình. Ẩn câu trung gian của lượt gọi tool. Trả lời xong dừng ở đầu câu hỏi vừa gửi. |
 | r213 | **Ba cấp quyền (02/11/2026, Eric).** admin: toàn quyền. moderator: xuất report + chat AI. approved (hiện là User): chỉ xem. `CAN_EXPORT`, `CAN_AI`; classic `canExport`. Admin có Make moderator / Make user, không ai tự đổi quyền mình. Supabase đã chạy migration `r213_three_roles_and_role_guard`: chặn tự nâng quyền, đăng ký mới chỉ `pending`. Giới hạn AI mới ở giao diện: Worker `galileo-ai` chưa kiểm đăng nhập. |

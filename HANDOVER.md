@@ -5,6 +5,10 @@
 
 ---
 
+## ✅ r216 — AI gửi phiên đăng nhập, Worker vào repo (02/11/2026, EricThai)
+- Worker `galileo-ai` đã deploy `AUTH_MODE: soft` (`cf79db9a`): chặn Origin lạ (đã kiểm trên live), chưa chặn người chưa đăng nhập. Logic kiểm phiên và role thử offline 13/13 với Supabase, Anthropic giả; chưa có câu chat thật qua Worker mới.
+- Việc kế tiếp: Eric thử chat trên live → đổi `AUTH_MODE` sang `enforce` trong `workers/galileo-ai/wrangler.jsonc` → deploy → kiểm người chưa đăng nhập bị 401. Lùi: đặt lại `soft`, hoặc phiên bản `226d55c0` trên Cloudflare.
+
 ## ✅ r215 — sidebar thu gọn (02/11/2026, EricThai)
 - Kiểm local ở 975 và 1500 px, thu gọn và mở rộng: 72 và 248 px, không thanh cuộn ngang.
 
@@ -266,7 +270,7 @@ chỉ số (CLAUDE.md, mục Galileo values). **Worker:** thử bằng dữ li�
 **Còn mở (theo thứ tự):**
 1. **Bật `AUTH_MODE: enforce`** cho `galileo-proxy` — trước đó F5 màn LED (`https://vjc-qa-amo.com/?kiosk=1`) + mọi máy đang mở;
    xem log `npx.cmd wrangler tail galileo-proxy` không còn `soft-allow` từ trình duyệt. Lùi: đặt lại `soft`.
-2. Worker `galileo-ai` (khoá Anthropic) — chưa xem có kiểm đăng nhập không.
+2. Worker `galileo-ai` (khoá Anthropic) — đã có kiểm đăng nhập từ r216, xem mục r216: còn phải chuyển `enforce`.
 3. Modal audit của `classic.html` (r177) chưa xem bằng mắt.
 4. **VIỆC KẾ TIẾP (Eric, 30/09 trên laptop): áp bộ màu trạng thái cho các page còn lại.** Mẫu đã làm: Audit Plan (commit `02c9cb4`) —
    token có sẵn 2 theme `--ok` (xanh lá, đạt/Closed) · `--info` (xanh dương) · `--warn` (vàng, đang làm) · `--accent` (đỏ, overdue) ·
