@@ -470,6 +470,9 @@ select.ctl{min-width:168px;cursor:pointer}
 .tbl tbody tr{transition:background var(--dur-out) var(--ease-out)}
 .tbl tbody tr:hover{background:var(--raised);cursor:pointer}
 .tbl tbody tr:last-child td{border-bottom:none}
+.beta-modal-panel.wide{width:min(1180px,100%)}
+.drill{font:inherit;color:inherit;padding:0;background:none;border:0;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px}
+.drill:hover{color:var(--accent-fg);text-decoration-style:solid}
 .tbl tbody tr.row-back{background:var(--raised);box-shadow:inset 3px 0 0 var(--accent)}
 .tbl td.ar{text-align:right}
 /* r205: a .fit column is as narrow as its content (dates, chips, codes, counts); the free width of a wide screen
@@ -2359,7 +2362,7 @@ const M = {
     const base = M.period(rows, { years: f.years, months: [] }), by = {};
     base.forEach(r => { const d = M.raisedDay(r); if(!d) return;
       const k = d.getFullYear() + ' Q' + (Math.floor(d.getMonth() / 3) + 1); (by[k] ||= []).push(r); });
-    return Object.keys(by).sort().reverse().map(k => { const s = M.summary(by[k]); return { q: k, s, everLate: s.late + s.overdue }; });
+    return Object.keys(by).sort().reverse().map(k => { const s = M.summary(by[k]); return { q: k, s, everLate: s.late + s.overdue, rows: by[k] }; });
   },
 
   kpi2: rows => { const mcar = rows.filter(r => r.form === 'mcar').length, amo = rows.filter(r => r.form === 'amoecar').length;
@@ -2437,6 +2440,20 @@ const M = {
   raw(rows){ const by = new Map(API().allData().map(r => [r.report_id, r])); return rows.map(r => by.get(r.id)).filter(Boolean); }
 };
 
+/* r211: what a count on Analytics opens. p picks the rows, n reads the same count from M.summary, and
+   M.consistency holds the two together, so a list can never disagree with the number that opened it. */
+M.DRILL = {
+  total:      { l:'All reports',          p:() => true,                            n:s => s.total },
+  onTime:     { l:'On-time closed',       p:M.isOnTime,                            n:s => s.onTime },
+  late:       { l:'Late closed',          p:M.isLate,                              n:s => s.late, days:true },
+  ungraded:   { l:'Closed, no target',    p:M.isUngraded,                          n:s => s.ungraded },
+  inTarget:   { l:'Open (within target)', p:M.isInTarget,                          n:s => s.inTarget },
+  overdue:    { l:'Overdue',              p:M.isOverdue,                           n:s => s.overdue, days:true },
+  everPast:   { l:'Ever past target',     p:r => M.isLate(r) || M.isOverdue(r),    n:s => s.late + s.overdue, days:true },
+  graded:     { l:'Closed with a target', p:r => M.isOnTime(r) || M.isLate(r),     n:s => s.graded },
+  catIII:     { l:'CAT III',              p:r => M.isOverdue(r) && M.catOf(r) === 'III', n:s => s.cat.III, days:true },
+  repetitive: { l:'Repetitive',           p:r => !!r.repetitive,                   n:s => s.repetitive }
+};
 /* Consistency check — every screen path must give the classic numbers for the same period.
    Runs after each load and swap; differences go to the admin chip and the console. */
 M.consistency = function(){
@@ -2470,7 +2487,10 @@ M.consistency = function(){
   { const bq = M.byQuarter(M.qa(REPORTS), f);
     say('Quarters: total vs year', bq.reduce((t, x) => t + x.s.total, 0), s.total);
     say('Quarters: late closed vs year', bq.reduce((t, x) => t + x.s.late, 0), s.late);
-    say('Quarters: overdue vs year', bq.reduce((t, x) => t + x.s.overdue, 0), s.overdue); }
+    say('Quarters: overdue vs year', bq.reduce((t, x) => t + x.s.overdue, 0), s.overdue);
+    Object.keys(M.DRILL).forEach(k => { const d = M.DRILL[k];
+      say('Analytics list ' + k + ' vs its count', qa.filter(d.p).length, d.n(s));
+      bq.forEach(x => say('Analytics list ' + k + ' vs its count, ' + x.q, x.rows.filter(d.p).length, d.n(x.s))); }); }
   say('Extension (MCAR) vs classic mcar_chk', M.extension(qa).granted,
       raw.filter(r => r.report_title === 'MCAR' && r.mcar_chk && r.mcar_chk.n > 0).length);
   { const mi = M.mitigation(qa);
@@ -3976,11 +3996,11 @@ function card(title, sub, body, pad){
     + (pad === false ? body : '<div class="card-pad" style="display:grid;gap:14px">'+body+'</div>') + '</div>';
 }
 /* act: a BETA_ACT name — the tile becomes a button that runs it (e.g. opens the list behind the count) */
-function stat(label, value, note, alarm, wrap, act){
+function stat(label, value, note, alarm, wrap, act, attrs){
   const inner = '<span class="kpi-lbl">'+esc(label)+'</span><span class="kpi-val '+(wrap ? 'beta-wrap' : 'od-nowrap')+'">'+esc(value)+'</span>'
     + '<span class="kpi-foot"><span class="kpi-note">'+esc(note || '')+'</span></span>';
   return act
-    ? '<button class="kpi'+(alarm?' alarm':'')+'" type="button" data-act="'+act+'" aria-label="'+esc(label+': '+value+'. '+(note || '')+'. Select for the list')+'">'+inner+'</button>'
+    ? '<button class="kpi'+(alarm?' alarm':'')+'" type="button" data-act="'+act+'"'+(attrs || '')+' aria-label="'+esc(label+': '+value+'. '+(note || '')+'. Select for the list')+'">'+inner+'</button>'
     : '<div class="kpi'+(alarm?' alarm':'')+'" style="cursor:default">'+inner+'</div>';
 }
 const tiles = list => '<section class="sec"><div class="kpi-grid">'+list.join('')+'</div></section>';
@@ -4091,20 +4111,66 @@ const whenFull = (what, fn) => () => REAL.partial ? partialMsg(what) : fn();
    ========================================================================== */
 /* KPI charts numbers — the QA scope in the period, through METRICS only (checked by M.consistency) */
 function kpiChartStats(f){ const data = M.period(M.qa(REPORTS), f); return { data, s: M.summary(data), k2: M.kpi2(data) }; }
+/* r211: a count on Analytics opens the reports behind it. scope = 'period' (the tiles) or a quarter key. */
+let DRILL = null;
+const drillBase = scope => scope === 'period' ? kpiChartStats().data : ((M.byQuarter(M.qa(REPORTS)).find(x => x.q === scope) || {}).rows || []);
+const drillTile = (kind, n) => n ? ['bdrill', ' data-scope="period" data-kind="'+kind+'"'] : [null, ''];
+const drillNum = (n, scope, kind, cls) => n
+  ? '<button class="drill num'+(cls ? ' '+cls : '')+'" type="button" data-act="bdrill" data-scope="'+esc(scope)+'" data-kind="'+kind+'" aria-label="'+n+' '+esc(M.DRILL[kind].l)+', '+esc(scope)+'. Select for the list">'+n+'</button>'
+  : '<span class="num">0</span>';
+function drillOpen(){
+  const { scope, kind } = DRILL, label = scope === 'period' ? periodLabel() : scope;
+  MODAL_KEY = 'drill'; MODAL_REDRAW = drillOpen; DRILL.detail = false;
+  if(kind === 'audits') return drillAudits(label);
+  const d = M.DRILL[kind];
+  const late = r => r.target ? dayDiff(r.closed || TODAY, r.target) : null;
+  const list = drillBase(scope).filter(d.p).slice().sort((a, b) => d.days ? (late(b) || 0) - (late(a) || 0) : (b.raised || 0) - (a.raised || 0));
+  const cols = [{l:'Report'},{l:'Form'},{l:'Status'},{l:'Owner'},{l:'Raised'},{l:'Target'},{l:'Closed'}].concat(d.days ? [{l:'Days late',ar:true}] : []);
+  openModal(label+' · '+d.l, list.length+' report'+(list.length === 1 ? '' : 's')+' · select a report for its detail',
+    plainTable('drill-'+kind, cols, list.map(r => [
+      '<button class="link-b row-id" type="button" data-act="bdrillopen" data-fn="showReport" data-id="'+esc(r.id)+'"><span class="od-nowrap">'+esc(r.number)+'</span></button>',
+      '<span class="t-small">'+esc(r.code)+'</span>', chip(r.status), '<span class="od-clamp-2 t-small" style="min-width:130px">'+esc(r.owner || '—')+'</span>',
+      '<span class="num od-nowrap">'+fmtDate(r.raised)+'</span>', '<span class="num od-nowrap">'+fmtDate(r.target)+'</span>', '<span class="num od-nowrap">'+fmtDate(r.closed)+'</span>'
+    ].concat(d.days ? ['<span class="num strong">'+(late(r) === null ? '—' : late(r))+'</span>'] : [])), 30, 800),
+    IS_ADMIN() ? '<button class="btn" type="button" data-act="bdrillxlsx">Export Excel</button>' : '');
+  $('#betaModal .beta-modal-panel').classList.add('wide');   /* eight columns need more than a record's width */
+}
+/* the Audits tile counts distinct audit ids of the reports in view; an audit outside the plan (MPS…) still counts, without a detail link */
+function drillAudits(label){
+  const A = API(), by = {};
+  drillBase(DRILL.scope).forEach(r => { if(r.auditId) (by[r.auditId] ||= { id:r.auditId, title:r.auditTitle, n:0 }).n++; });
+  const list = Object.values(by).sort((a, b) => b.n - a.n);
+  const au = id => A.auditData().find(a => a.audit_id === id);
+  openModal(label+' · Audits', list.length+' audit'+(list.length === 1 ? '' : 's')+' behind these reports · select an audit for its detail',
+    plainTable('drill-audits', [{l:'Audit'},{l:'Title'},{l:'Status'},{l:'Reports',ar:true}], list.map(x => { const a = au(x.id); return [
+      a ? '<button class="link-b row-id" type="button" data-act="bdrillopen" data-fn="showAudit" data-id="'+esc(x.id)+'">'+esc(a.number)+'</button>' : '<span class="dim">not in the plan</span>',
+      '<span class="t-small">'+esc((a && a.title) || x.title || '—')+'</span>', '<span class="t-small">'+esc((a && a.status) || '—')+'</span>', '<span class="num">'+x.n+'</span>']; }), 30, 720));
+}
+async function drillExport(){
+  if(!IS_ADMIN()) return toast('Only admins can export reports', '');
+  try{
+    await window.betaLoadExportLibs();
+    const A = API(), rows = M.raw(drillBase(DRILL.scope).filter(M.DRILL[DRILL.kind].p));
+    A.setExport(REAL.user, rows, [], state.filters.years, state.filters.months);
+    await A.exportExcel();
+    const t = A.toasts().slice(-1)[0];
+    if(t) toast(t.kind === 'err' ? 'Export failed' : 'Export ready', t.m);
+  }catch(e){ console.warn('[export]', e); toast('Export failed', e.message || String(e)); }
+}
 function scrKpi(){
   const A = API();
   const K = kpiChartStats(), S = K.s;
   let html = tiles([
-    stat('Total reports', String(S.total), periodLabel()),
-    stat('Open (within target)', String(S.inTarget), 'not closed, target not yet passed'),
-    stat('Overdue', String(S.overdue), 'past target date', S.overdue > 0),
-    stat('On-time closure rate', S.graded ? S.onTimeRate+'%' : '—', S.onTime+' of '+S.graded+' closed with a target'),
-    stat('CAT III', String(S.cat.III), 'overdue > 60 days', S.cat.III > 0),
+    stat('Total reports', String(S.total), periodLabel(), false, false, ...drillTile('total', S.total)),
+    stat('Open (within target)', String(S.inTarget), 'not closed, target not yet passed', false, false, ...drillTile('inTarget', S.inTarget)),
+    stat('Overdue', String(S.overdue), 'past target date', S.overdue > 0, false, ...drillTile('overdue', S.overdue)),
+    stat('On-time closure rate', S.graded ? S.onTimeRate+'%' : '—', S.onTime+' of '+S.graded+' closed with a target', false, false, ...drillTile('graded', S.graded)),
+    stat('CAT III', String(S.cat.III), 'overdue > 60 days', S.cat.III > 0, false, ...drillTile('catIII', S.cat.III)),
     /* r189: restored from classic (mc-rep) — anh Ngọc 07/08: repeated findings feed risk-based planning.
        Probe 03/10/2026: Coruson field 'Repetitive' exists on CAR / ECAR / AMO ECAR only — MCAR has none, so the
        rate stays near 0 until the form carries it (07/08 mục I: field + definition still to agree). */
-    stat('Repetitive rate', S.total ? S.repetitiveRate+'%' : '—', S.repetitive+' of '+S.total+' marked Repetitive = Yes · target ≤ 10% · MCAR form has no Repetitive field', S.repetitiveRate > 10),
-    stat('Audits', String(S.audits), 'distinct audits behind these reports')
+    stat('Repetitive rate', S.total ? S.repetitiveRate+'%' : '—', S.repetitive+' of '+S.total+' marked Repetitive = Yes · target ≤ 10% · MCAR form has no Repetitive field', S.repetitiveRate > 10, false, ...drillTile('repetitive', S.repetitive)),
+    stat('Audits', String(S.audits), 'distinct audits behind these reports', false, false, ...drillTile('audits', S.audits))
   ]);
 
   /* r170 — closure health by quarter (METRICS byQuarter): reports that ever passed their target
@@ -4116,10 +4182,10 @@ function scrKpi(){
       + ' · Late closed = closed after the target date · Ever past target = late closed + overdue',
       plainTable('kpi-q', [{l:'Quarter'},{l:'Raised',ar:true},{l:'On-time closed',ar:true},{l:'Late closed',ar:true},{l:'Closed, no target',ar:true},
         {l:'Open',ar:true},{l:'Overdue',ar:true},{l:'Ever past target',ar:true},{l:'On-time rate',ar:true}],
-        bq.map(x => ['<span class="strong">'+esc(x.q)+'</span>', '<span class="num">'+x.s.total+'</span>', '<span class="num">'+x.s.onTime+'</span>',
-          '<span class="num'+(x.s.late ? ' red strong' : '')+'">'+x.s.late+'</span>', '<span class="num">'+x.s.ungraded+'</span>',
-          '<span class="num">'+x.s.inTarget+'</span>', '<span class="num'+(x.s.overdue ? ' red strong' : '')+'">'+x.s.overdue+'</span>',
-          '<span class="num strong">'+x.everLate+' <span class="dim t-small">('+M.pct(x.everLate, x.s.total)+'%)</span></span>',
+        bq.map(x => ['<span class="strong">'+esc(x.q)+'</span>', drillNum(x.s.total, x.q, 'total'), drillNum(x.s.onTime, x.q, 'onTime'),
+          drillNum(x.s.late, x.q, 'late', 'red strong'), drillNum(x.s.ungraded, x.q, 'ungraded'),
+          drillNum(x.s.inTarget, x.q, 'inTarget'), drillNum(x.s.overdue, x.q, 'overdue', 'red strong'),
+          '<span class="num strong">'+drillNum(x.everLate, x.q, 'everPast')+' <span class="dim t-small">('+M.pct(x.everLate, x.s.total)+'%)</span></span>',
           '<span class="num strong">'+(x.s.graded ? x.s.onTimeRate+'%' : '—')+'</span>']), 12, 900)) + '</section>';
 
   /* KPI 2 volume card, buildKPI2 5227–5277 (kpi2Rows = MCAR + AMO ECAR of allData) */
@@ -4803,6 +4869,11 @@ const BETA_SCREENS = REAL ? {
   'admin/users': scrUsers, 'admin/exports': () => scrExportsFull(), 'admin/mydash': scrMyDash
 } : {};
 const BETA_ACT = {
+  bdrill: el => { DRILL = { scope: el.dataset.scope, kind: el.dataset.kind }; BS.pg['drill-'+el.dataset.kind] = 1; drillOpen(); },
+  /* a record opened from the list: closing it comes back to the same list, page and scroll */
+  bdrillopen: el => { const b = $('#betaModalBody'), w = b && b.querySelector('.tbl-wrap'); DRILL.top = b ? b.scrollTop : 0; DRILL.wrapTop = w ? w.scrollTop : 0; DRILL.detail = true; MODAL_REDRAW = null;
+    (el.dataset.fn === 'showAudit' ? showAudit : showReport)(el.dataset.id); },
+  bdrillxlsx: () => drillExport(),
   backlist: () => history.back(),
   bset: el => { BS[el.dataset.k] = el.dataset.v === '' ? (el.dataset.k === 'docType' ? null : '') : el.dataset.v; BS.pg = {}; render(); },
   bpage: el => { BS.pg[el.dataset.k] = Number(el.dataset.p);
@@ -4847,12 +4918,19 @@ document.addEventListener('input', e => {
 let MODAL_RETURN = null;
 function openModal(title, sub, body, link){
   if($('#betaModal').hidden) MODAL_RETURN = document.activeElement;   /* not on a redraw of the same modal */
+  $('#betaModal .beta-modal-panel').classList.remove('wide');
   $('#betaModalTitle').textContent = title; $('#betaModalSub').textContent = sub || '';
   $('#betaModalBody').innerHTML = body; $('#betaModal').hidden = false;
   $('#betaModalLink').innerHTML = link || '';   /* "Open in Coruson" for a report or an audit */
   const b = $('#betaModal .icon-b'); if(b) b.focus();
 }
+/* Esc, the backdrop and the close button: a record opened from an Analytics list goes back to that list */
+function dismissModal(){
+  if(DRILL && DRILL.detail){ const { top, wrapTop } = DRILL; drillOpen(); const b = $('#betaModalBody'), w = b && b.querySelector('.tbl-wrap'); if(b) b.scrollTop = top; if(w) w.scrollTop = wrapTop; return; }
+  closeModal();
+}
 function closeModal(){
+  DRILL = null;
   $('#betaModal').hidden = true; MODAL_KEY = null; MODAL_REDRAW = null;
   const back = MODAL_RETURN; MODAL_RETURN = null;
   if(back && document.contains(back) && back.focus) back.focus({ preventScroll: true });
@@ -4881,8 +4959,8 @@ function redrawModal(pager){
   const other = $('#betaModal').querySelector('button[data-act="bpage"][data-k="'+CSS.escape(pager.dataset.k)+'"]:not([disabled])');
   const f = again && !again.disabled ? again : other; if(f) f.focus({ preventScroll: true });
 }
-document.addEventListener('keydown', e => { if(e.key === 'Escape' && !$('#betaModal').hidden) closeModal(); });
-document.addEventListener('click', e => { if(e.target && e.target.id === 'betaModal') closeModal(); });
+document.addEventListener('keydown', e => { if(e.key === 'Escape' && !$('#betaModal').hidden) dismissModal(); });
+document.addEventListener('click', e => { if(e.target && e.target.id === 'betaModal') dismissModal(); });
 const kv = pairs => '<dl class="beta-kv">' + pairs.filter(p => p[1] !== undefined).map(p =>
   '<div><dt>'+esc(p[0])+'</dt><dd>'+(p[2] ? p[1] : esc(p[1] == null || p[1] === '' ? '—' : p[1]))+'</dd></div>').join('') + '</dl>';
 const block = (label, text, hot) => text ? '<div class="beta-block'+(hot?' hot':'')+'"><span class="t-micro">'+esc(label)+'</span><span class="t-sub" style="white-space:pre-wrap">'+esc(text)+'</span></div>' : '';
@@ -5414,7 +5492,7 @@ function startKiosk(){
 setInterval(() => { if(REAL && !REAL.partial && Date.now() - (REAL.cacheTs || Date.parse(REAL.generatedAt)) > 12 * 3600e3 && window.betaRefresh) window.betaRefresh(true); }, 5 * 60000);
 
 Object.assign(BETA_ACT, {
-  bmodalclose: () => closeModal(),
+  bmodalclose: () => dismissModal(),
   beis: el => showEis(el.dataset.id),
   bcapa: el => { BS.capaSel = el.dataset.id; render(); },
   bgocapa: el => { BS.afForm = API().CAPA_TITLE; BS.capaSel = el.dataset.id; render(); window.scrollTo(0, 0); },
