@@ -6,9 +6,12 @@
   "workers_dev": true,
   "preview_urls": false,
   "compatibility_date": "2026-05-16",
+  // Keep this. Calls from Vietnam land on Cloudflare's Hong Kong colo by default, and Anthropic refuses
+  // that region with 403 "Request not allowed" (hit on the first wrangler deploy, 02/11/2026).
+  "placement": { "region": "aws:ap-northeast-1" },
   "vars": {
     // 'soft' = check sign-in and log, still serve · 'enforce' = refuse without an admin / moderator session
-    "AUTH_MODE": "soft",
+    "AUTH_MODE": "enforce",
     // public values, the same ones classic.html ships to every browser
     "SUPA_URL": "https://czftzgdcnpnspbbegwjt.supabase.co",
     "SUPA_KEY": "sb_publishable_eGdEXBCSD_19tu4sOV8NWQ_8mZmUqqq"

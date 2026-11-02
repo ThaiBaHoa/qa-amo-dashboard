@@ -6,8 +6,10 @@
 ---
 
 ## ✅ r216 — AI gửi phiên đăng nhập, Worker vào repo (02/11/2026, EricThai)
-- Worker `galileo-ai` đã deploy `AUTH_MODE: soft` (`cf79db9a`): chặn Origin lạ (đã kiểm trên live), chưa chặn người chưa đăng nhập. Logic kiểm phiên và role thử offline 13/13 với Supabase, Anthropic giả; chưa có câu chat thật qua Worker mới.
-- Việc kế tiếp: Eric thử chat trên live → đổi `AUTH_MODE` sang `enforce` trong `workers/galileo-ai/wrangler.jsonc` → deploy → kiểm người chưa đăng nhập bị 401. Lùi: đặt lại `soft`, hoặc phiên bản `226d55c0` trên Cloudflare.
+- Worker `galileo-ai` đang `AUTH_MODE: enforce`, chạy ở `aws:ap-northeast-1`. Chat thật của Eric chạy được ở soft; kiểm trên live: không phiên và phiên sai đều 401. Logic role thử offline 13/13.
+- ⚠ Giữ `placement` trong `wrangler.jsonc`: từ VN Worker rơi vào colo HKG, Anthropic trả 403 `Request not allowed`. Lần deploy wrangler đầu đã làm chat hỏng tới khi thêm dòng này.
+- Lùi: đặt lại `soft` trong `workers/galileo-ai/wrangler.jsonc` rồi deploy, hoặc phiên bản `226d55c0` trên Cloudflare.
+- Còn mở: `galileo-proxy` vẫn `soft`.
 
 ## ✅ r215 — sidebar thu gọn (02/11/2026, EricThai)
 - Kiểm local ở 975 và 1500 px, thu gọn và mở rộng: 72 và 248 px, không thanh cuộn ngang.
