@@ -5,6 +5,12 @@
 
 ---
 
+## ✅ r207 — cột RFI / Task khớp Galileo (02/11/2026, EricThai)
+- Eric báo cột RFI không khớp (MVOI-002 hiện "—" dù có 2 task). Sửa ở vault `beta-src/screens2.js`, `metrics.js`, `loader.js`, `beta-template.html` và `isPavoiItem` trong `classic.html`.
+- Kiểm local trên dữ liệu thật, năm 2026: 1278 dòng All forms khớp từng report; số dòng các tab AMO-ECAR 21, CMR-CAR 474, ECAR 69, MCAR 83, PAVOI/MVOI 75 khớp; 3680 report khớp Galileo theo form và trạng thái.
+- Chờ Eric quyết, CHƯA đổi: 106 CAR org TQA link với 22 audit MNT không vào cột Findings; tab OSR/MOSR 609 khác All forms 52 vì khác phạm vi; form Test SPI / Test AMO - Additional Mitigation còn trong danh sách.
+- Chưa xử lý: AISC -0520, MVOI-001, VJC-MOSR-0518 ghi Open trên Galileo nhưng đã có ngày đóng; 10 report link với audit MPS bị loại khỏi Audit Plan.
+
 ## ✅ r206-i3 — chữ Form không bị ô chọn đè (02/11/2026, EricThai)
 - r206-i2 chưa hết lỗi: Eric gửi ảnh chữ "Form" bị cắt. Nhãn trong `.beta-sel` co còn 24 px trong khi chữ cần 32 px. Sửa CSS chung ở vault `beta-src/beta-template.html`.
 - Đo local dữ liệu thật ở 1525 / 1366 / 375: nhãn không chồng select, chọn All / PAVOI / MVOI vẫn đủ chữ; các ô Level, Year, Month (Analytics KPI) và Form (Work Queue) không chồng; console sạch.

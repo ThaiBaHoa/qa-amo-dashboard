@@ -2528,7 +2528,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.02-r206-i3';
+const APP_REV = '2026.11.02-r207';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2772,9 +2772,11 @@ let pavoiRfiMap = {};            // report_id -> [item,...]  (RFI + Task; xem is
 let pavoiRfiDone = new Set();    // report_id đã fetch xong (để cell hiện data đã có dù còn chunk lỗi)
 // Trong workflow PAVOI, auditor có thể chọn "Request For Information" HOẶC "Add task".
 // Cả hai đều là dwreporting_report_task cần theo dõi. Item hợp lệ = có task_title (non-empty)
-// và chưa bị xóa. Row task_title=null là stage placeholder (vd "Approve to close PAVOI") → loại.
+// và chưa bị xóa/hủy. Row task_title=null là stage placeholder (vd "Approve to close PAVOI") → loại.
+// "All Stages were completed…" là nhắc việc tự sinh của workflow MVOI (12/12 report, kể cả report chưa có việc
+// nào, probe 02/11/2026) — không phải RFI/Task của ai nên cũng loại. 22 task Cancelled đều nằm ở report đã đóng.
 const PAVOI_RFI_TITLE = 'Request For Information';
-const isPavoiItem = t => !!(t && t.task_title && String(t.task_title).trim() && t.task_status !== 'Deleted');
+const isPavoiItem = t => !!(t && t.task_title && String(t.task_title).trim() && t.task_status !== 'Deleted' && t.task_status !== 'Cancelled' && !/^All Stages were completed/i.test(t.task_title));
 const isPavoiRfi  = t => !!(t && t.task_title === PAVOI_RFI_TITLE);
 // [r142] KPI 7 — PAVOI KPI. Kho đếm RIÊNG, KHÔNG dùng chung pavoiRfiMap: loadPavoiRfi()
 // chỉ fetch task cho PAVOI đang Open, nên đọc map đó sẽ đếm nhầm mọi PAVOI đã đóng thành

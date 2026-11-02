@@ -1652,7 +1652,7 @@ const SCREEN_API = {
   fetchAll: u => fetchAll(u, true), G_URL,
   orgUnitIds: () => ORG_UNIT_IDS.slice(),   /* r191: report summary query */
   /* PAVOI RFI / Task (loadPavoiRfi 5829: open PAVOI only, chunks of 15 GUIDs) */
-  loadPavoiRfi: () => loadPavoiRfi(), pavoiRfi: () => ({ loaded: pavoiRfiLoaded, map: pavoiRfiMap, done: pavoiRfiDone }), pavoiRfiSummary, isPavoiItem,
+  loadPavoiRfi: () => loadPavoiRfi(), pavoiRfi: () => ({ loaded: pavoiRfiLoaded, map: pavoiRfiMap, done: pavoiRfiDone }), pavoiRfiSummary, isPavoiItem, fetchPavoiRfiOne,
   /* Data self-check (runSelfChecks 4226), shown to admins */
   selfChecks: () => runSelfChecks() || [],
   /* Exports: the main dashboard's own functions. They read curUser / rptData / rptFormSelected / _YM,
@@ -2304,15 +2304,16 @@ const M = {
      departments, tracked like findings (anh Ngọc 24/09/2026). Each CA carries the classic semCalc
      status (loadEisDetail): On-time Closed / Lately Closed by Date completed vs Target date,
      Open / Overdue while not completed, Closed (ungraded) when the report closed with no date. */
-  /* r191: Request For Information tasks of one report (dwreporting_report_task, task_title 'Request For
-     Information'; Deleted / Cancelled dropped at load). Answered = completed; open past its target = overdue. */
+  /* r191: RFI / Task items of one report (dwreporting_report_task, classic isPavoiItem applied at load).
+     Answered = completed; open past its target = overdue. */
   rfiSummary(list){
     const today = M.dayOf(TODAY);
     const done = list.filter(t => t.task_completed_date);
     const open = list.filter(t => !t.task_completed_date);
     const overdue = open.filter(t => t.task_target_date && M.dayOf(t.task_target_date) < today);
     const last = done.map(t => String(t.task_completed_date).slice(0, 10)).sort().pop() || null;
-    return { total: list.length, answered: done.length, open: open.length, overdue: overdue.length, lastAnswered: last };
+    const rfi = list.filter(t => t.task_title === 'Request For Information').length;
+    return { total: list.length, rfi, task: list.length - rfi, answered: done.length, open: open.length, overdue: overdue.length, lastAnswered: last };
   },
   /* r193: verification result 'Satisfactory' recorded but the report is not closed on Coruson — overdue only
      because nobody closed it (or moved its target). Value as Galileo returns it, compared case-insensitively.
@@ -3114,7 +3115,7 @@ const COL = {
       : '<span class="dim">—</span>' },
   /* r191: Report Summary (Coruson summary, else the finding text, marked) + RFI state — anh Ngọc 07/08 mục D/E */
   summary:{ l:'Summary', v:r=>(RX.sum && RX.sum[r.id]) || r.finding || '', c:r=>summaryCell(r) },
-  rfi:{ l:'RFI', v:r=>{ const l = RX.rfi && RX.rfi[r.id]; if(!l || !l.length) return -1; const s = M.rfiSummary(l); return s.overdue*10000 + s.open*100 + s.total; }, c:r=>rfiCell(r) },
+  rfi:{ l:'RFI / Task', v:r=>{ const l = RX.rfi && RX.rfi[r.id]; if(!l || !l.length) return -1; const s = M.rfiSummary(l); return s.overdue*10000 + s.open*100 + s.total; }, c:r=>rfiCell(r) },
   level:{ l:'Finding level', fit:true, v:r=>r.level, c:r=>'<span class="tag">'+esc(r.level)+'</span>' },
   repetitive:{ l:'Repetitive', fit:true, v:r=>r.repetitive?1:0, c:r=> r.repetitive ? '<span class="cat c1">Repeat</span>' : '<span class="dim">—</span>' },
   finding:{ l:'Finding', v:r=>r.finding, c:r=>'<span class="t-small od-clamp-2">'+esc(r.finding)+'</span>' },
@@ -5120,8 +5121,10 @@ function showAudit(id){
 /* r191 — Report Summary + RFI columns (anh Ngọc 07/08, mục D/E; Eric 03/10).
    Summary: Coruson 'summary' (dwanalytics_report_users, current version) — rarely filled (probe 03/10: MCAR 5/97,
    SR 12/265), so the column falls back to the finding text the register already carries, marked as such.
-   RFI: every 'Request For Information' task of the reports in scope, one query per 8 form titles. Loaded once,
-   on the first register that shows these columns. */
+   RFI / Task: every item of the reports in scope, one query per 8 form titles. Same rule as the PAVOI / MVOI panel
+   (classic isPavoiItem): 'Request For Information' and tasks named by the auditor both count — r207, Eric 02/11:
+   MVOI-002 has 2 completed tasks and showed '—' while the query looked for the RFI title only. Loaded once, on
+   the first register that shows these columns. */
 const RX = { rfi: null, sum: null, from: null };
 /* only the years in view: from 1 Jan of the earliest selected year (no year filter = everything) */
 const rxFrom = () => state.filters.years.length ? Math.min(...state.filters.years) + '-01-01' : '2000-01-01';
@@ -5134,19 +5137,21 @@ function plainText(h){
 }
 async function loadRfiSum(){
   const A = API(), ids = new Set(M.qa(REPORTS).map(r => r.id)), from = rxFrom(), since = from + 'T00:00:00Z';
-  const titles = [...new Set(A.allData().filter(r => ids.has(r.report_id)).map(r => r.report_title).filter(Boolean))];
+  /* CMR-CAR and ECAR live outside the QA scope but are rows of All forms (their data arrives after the first paint) */
+  const TQA = ['CMR CAR', 'ECAR'];
+  const titles = [...new Set(A.allData().filter(r => ids.has(r.report_id)).map(r => r.report_title).filter(Boolean).concat(TQA))];
   const chunks = []; for(let i = 0; i < titles.length; i += 8) chunks.push(titles.slice(i, i + 8));
   const q = s => "'" + String(s).replace(/'/g, "''") + "'";
   const ouF = '(' + A.orgUnitIds().map(i => 'organisational_unit_id eq ' + i).join(' or ') + ') and valid_to eq null and summary ne null and raised_date ge ' + since;
   /* a few summaries carry pasted images (~1 MB each, probe 03/10): text-sized ones only, the rest by id */
   const [parts, sums, big] = await Promise.all([
-    Promise.all(chunks.map(c => A.fetchAll(A.G_URL + 'dwreporting_report_task?$select=report_id,task_id,task_owner,task_status,task_target_date,task_completed_date'
-      + '&$filter=' + encodeURIComponent("task_title eq 'Request For Information' and report_created_date ge " + since + " and (" + c.map(t => 'report_title eq ' + q(t)).join(' or ') + ')')))),
+    Promise.all(chunks.map(c => A.fetchAll(A.G_URL + 'dwreporting_report_task?$select=report_id,report_title,task_id,task_title,task_owner,task_status,task_target_date,task_completed_date'
+      + '&$filter=' + encodeURIComponent("task_title ne null and report_created_date ge " + since + " and (" + c.map(t => 'report_title eq ' + q(t)).join(' or ') + ')')))),
     A.fetchAll(A.G_URL + 'dwanalytics_report_users?$select=report_id,summary&$filter=' + encodeURIComponent(ouF + ' and length(summary) lt 30000')),
     A.fetchAll(A.G_URL + 'dwanalytics_report_users?$select=report_id&$filter=' + encodeURIComponent(ouF + ' and length(summary) ge 30000'))
   ]);
   const rfi = {};
-  parts.flat().forEach(t => { if(!ids.has(t.report_id) || t.task_status === 'Deleted' || t.task_status === 'Cancelled') return; (rfi[t.report_id] = rfi[t.report_id] || []).push(t); });
+  parts.flat().forEach(t => { if(!(ids.has(t.report_id) || TQA.includes(t.report_title)) || !A.isPavoiItem(t)) return; (rfi[t.report_id] = rfi[t.report_id] || []).push(t); });
   const sum = {};
   sums.forEach(x => { const s = plainText(x.summary); if(s && ids.has(x.report_id)) sum[x.report_id] = s; });
   RX.big = new Set(big.map(x => x.report_id).filter(id => ids.has(id)));
@@ -5157,8 +5162,8 @@ function rfiCell(r){
   if(!RX.rfi) return '<span class="dim">…</span>';
   const list = RX.rfi[r.id] || []; if(!list.length) return '<span class="dim">—</span>';
   const s = M.rfiSummary(list);
-  const tip = list.map(t => (t.task_owner || '—') + ' · target ' + fdx(t.task_target_date) + ' · ' + (t.task_completed_date ? 'answered ' + fdx(t.task_completed_date) : 'open')).join('\n');
-  return '<span class="od-row" style="--od-gap:6px;flex-wrap:wrap" title="' + esc(tip) + '"><span class="tag">' + s.total + ' RFI</span>'
+  const tip = list.map(t => (t.task_title === 'Request For Information' ? 'RFI' : 'Task: ' + t.task_title) + ' · ' + (t.task_owner || '—') + ' · target ' + fdx(t.task_target_date) + ' · ' + (t.task_completed_date ? 'answered ' + fdx(t.task_completed_date) : 'open')).join('\n');
+  return '<span class="od-row" style="--od-gap:6px;flex-wrap:wrap" title="' + esc(tip) + '">' + (s.rfi ? '<span class="tag">' + s.rfi + ' RFI</span>' : '') + (s.task ? '<span class="tag">' + s.task + ' Task</span>' : '')
     + (s.overdue ? '<span class="cat c3">' + s.overdue + ' overdue</span>' : s.open ? '<span class="cat c1">' + s.open + ' open</span>' : '')
     + (s.lastAnswered ? '<span class="t-small dim od-nowrap">answered ' + fdx(s.lastAnswered) + '</span>' : '') + '</span>';
 }
@@ -5172,11 +5177,12 @@ function summaryCell(r){
     : RX.big && RX.big.has(r.id) ? '<span class="t-small dim">' + why + '</span>' : '<span class="dim">—</span>';
 }
 
-/* PAVOI: RFI / Task list for the record open in the detail panel (loadPavoiRfi 5829, pavoiRfiCell) */
+/* PAVOI: RFI / Task list for the record open in the detail panel (loadPavoiRfi 5829, pavoiRfiCell).
+   loadPavoiRfi skips closed reports, so a closed one is fetched alone when opened (fetchPavoiRfiOne). */
 function pavoiTasksHTML(r){
   const A = API();
-  if(!isOpen(r)) return '';
-  const st = lazy('pavoiRfi', () => A.loadPavoiRfi(), () => A.pavoiRfi().loaded || A.pavoiRfi().done.has(r.id));
+  const st = isOpen(r) ? lazy('pavoiRfi', () => A.loadPavoiRfi(), () => A.pavoiRfi().loaded || A.pavoiRfi().done.has(r.id))
+                       : lazy('pavoiRfi:'+r.id, () => A.fetchPavoiRfiOne(r.id), () => !!A.pavoiRfi().map[r.id]);
   if(st === 'loading') return '<div style="display:grid;gap:8px"><span class="t-micro">RFI / Task</span><p class="t-sub dim">Loading…</p></div>';
   const items = (A.pavoiRfi().map[r.id] || []).filter(A.isPavoiItem);
   const today = new Date(); today.setHours(0,0,0,0);
