@@ -5,7 +5,7 @@
 
 ---
 
-## ✅ r206 — All forms: cột riêng cho PAVOI / MVOI (02/11/2026, EricThai) — ⏳ CHƯA COMMIT / PUSH
+## ✅ r206 — All forms: cột riêng cho PAVOI / MVOI (02/11/2026, EricThai) — ✅ ĐÃ PUSH `325555c`, live (curl APP_REV r206)
 - Eric gửi ảnh: chọn MVOI / PAVOI trong Reports › All forms → Summary đổi thành Request For Verification, thêm Raised by, bỏ CAT và Issued to. Form khác và "All forms" giữ nguyên.
 - Summary cũ lấy từ Coruson `summary` nên có MVOI hiện hashtag (`[nightshift] [event]`); nay là field `Request For Verification`.
 - Raised by = `reported_by_id` (`dwreporting_report_summary`) tra `userMap`. Probe 02/11: đủ 479 PAVOI + 12 MVOI. MVOI/PAVOI form không có field "Raised by" riêng.
