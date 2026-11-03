@@ -2528,7 +2528,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.03-r219';
+const APP_REV = '2026.11.03-r220';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -9798,6 +9798,48 @@ async function loadMosr(){
     if(!o[k].includes(c.value_text)) o[k].push(c.value_text);
     if(k==='occ_raw'){ const g=occGroup(c.value_id); if(g && !o.occ.includes(g)) o.occ.push(g); } });
   mosrRows=Object.values(out); mosrLoaded=true;
+}
+// ── MCCF NGOÀI QA AMO (Eric chốt 03/11/2026) ─────────────────────
+// Probe 03/11: 61 MCCF, 46 thuộc Line Maintenance / Workshop / Store nên orgUnitFilter loại khỏi allData.
+// Chỉ MCCF, chỉ hiện ở Reports › All forms: KHÔNG đưa vào allData / REPORTS để KPI, Overview, Work Queue,
+// Export giữ nguyên phạm vi QA AMO. Trạng thái tính cùng công thức loadData (semCalc / ageCalc / catCalc).
+let mccfOutLoaded=false, mccfOutRows=[], mccfOutTasks={};
+async function loadMccfOut(){
+  const inScope=new Set(ORG_UNIT_IDS), m={};
+  const raw=await fetchAll(G_URL+'dwreporting_report_summary?$select=report_id,report_title,report_number,report_status,org_unit_id,org_unit_name,raised_date,closed_date,owner_id,reported_by_id,modified_date&$filter='+encodeURIComponent("valid_to eq null and report_title eq 'MCCF'"), true);
+  raw.forEach(r=>{
+    if(!r.report_id || !(r.report_number||'').trim() || inScope.has(r.org_unit_id)) return;
+    const ex=m[r.report_id];
+    if(!ex || new Date(r.modified_date)>new Date(ex.modified_date)) m[r.report_id]=r;
+  });
+  const rows=Object.values(m), chunks=[];
+  for(let i=0;i<rows.length;i+=10) chunks.push(rows.slice(i,i+10).map(r=>'report_id eq '+r.report_id).join(' or '));   // lô 15 kèm điều kiện summary bị 400
+  const [wf,cf,sums,tasks,groups,users]=await Promise.all([
+    Promise.all(chunks.map(c=>fetchAll(G_URL+'dwreporting_report_workflow?$select=report_id,stage_type,stage_status,stage_completed_date,stage_target_date&$filter='+encodeURIComponent(c), true))).then(a=>a.flat()),
+    fetchAll(CF_URL+'?$select=report_id,field_name,text_value&$filter='+encodeURIComponent("report_title eq 'MCCF' and (field_name eq 'Target date' or field_name eq 'Finding description' or field_name eq 'Issued to (person)' or field_name eq 'Department')"), true),
+    Promise.all(chunks.map(c=>fetchAll(G_URL+'dwanalytics_report_users?$select=report_id,summary&$filter='+encodeURIComponent('('+c+') and valid_to eq null and summary ne null and length(summary) lt 30000'), true))).then(a=>a.flat()),
+    fetchAll(G_URL+'dwreporting_report_task?$select=report_id,report_title,task_id,task_title,task_owner,task_status,task_target_date,task_completed_date&$filter='+encodeURIComponent("task_title ne null and report_title eq 'MCCF'"), true),
+    fetchAll(G_URL+'dwanalytics_user_group?$select=group_id,name', true),
+    fetchAll(G_URL+'dwreporting_users?$select=user_id,full_name', true)
+  ]);
+  const owner={}; users.forEach(u=>{owner[u.user_id]=u.full_name;}); groups.forEach(g=>{owner[g.group_id]=g.name;});
+  const wfBy={}, fBy={}, sumBy={}, tBy={};
+  wf.forEach(w=>{(wfBy[w.report_id] ||= []).push(w);});
+  cf.forEach(f=>{ const o=(fBy[f.report_id] ||= {}); if(f.text_value && !o[f.field_name]) o[f.field_name]=f.text_value; });
+  sums.forEach(x=>{sumBy[x.report_id]=x.summary;});
+  tasks.forEach(t=>{ if(m[t.report_id] && isPavoiItem(t)) (tBy[t.report_id] ||= []).push(t); });
+  const day=v=>{ const d=dDay(v); return d?ymd(d):null; };
+  mccfOutRows=rows.map(r=>{
+    const f=fBy[r.report_id]||{}, st=wfBy[r.report_id]||[], sd=deriveStageDates(st);
+    const accept=st.filter(w=>w.stage_type==='ReportAcceptReject' && w.stage_target_date).map(w=>w.stage_target_date).sort().pop()||null;
+    const td=f['Target date']||sd.td||accept, cd=r.closed_date||null;
+    const ag=ageCalc(td), sm=semCalc(r.report_status,cd,td);
+    return {...r, Target_date:td, close_date:cd, completed_date:sd.completed||null, semantic_status:sm, report_ageing:ag, overdue_cat:catCalc(ag,sm),
+      raised_day:day(r.raised_date), target_day:day(td), closed_day:day(cd), is_closed:/Closed/.test(sm||''),
+      owner_name:owner[r.owner_id]||null, reported_by_name:owner[r.reported_by_id]||null, issued_person:f['Issued to (person)']||null, dept:f['Department']||null,
+      finding_desc:f['Finding description']||null, summary:sumBy[r.report_id]||null, wf_stages:st};
+  });
+  mccfOutTasks=tBy; mccfOutLoaded=true;
 }
 function setOsr(sf,btn){
   TS.osr.sf=sf; TS.osr.page=1;

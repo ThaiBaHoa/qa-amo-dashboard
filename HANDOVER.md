@@ -5,6 +5,11 @@
 
 ---
 
+## ✅ r220 — MCCF mọi đơn vị trong All forms (03/11/2026, EricThai) — chưa push
+- Eric hỏi vì sao thiếu MCCF: 46/61 report ở đơn vị ngoài QA AMO bị `orgUnitFilter` loại. Eric chọn nạp thêm, chỉ MCCF.
+- Kiểm local: 46 dòng, 2026 hiện 26; `allData` trước và sau đều 3676, Open 83, Overdue 24. Chưa bấm thử mở chi tiết report ngoài QA AMO, chưa chạy lại `M.consistency`.
+- ⚠ Export Excel của All forms chưa gồm 46 report này. INTERNAL MOR, MOR, Confidential MOSR, Spot Check thiếu cùng nguyên nhân: danh sách cho các ban ở vault `02-Bao-Cao/Coruson/Danh-sach-form-theo-bo-phan-AOC-AMO-2026-11-03.xlsx`.
+
 ## ✅ r219 — màn LED (03/11/2026, EricThai) — chưa push
 - Eric: tỷ lệ chưa cân đối, trang không hiện đủ thông tin, search vô ích trên màn trình chiếu. Nguồn: vault `beta-src/screens2.js` (`kioskFit`), `screens.js` (`plainTable`), `beta-template.html` (CSS `body.kiosk`).
 - Kiểm local cửa sổ 1912×867: đủ 6 trang; EIS hiện đủ 7 report; Timeline 0 bộ lọc; Esc thoát đúng; console sạch.

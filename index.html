@@ -1678,6 +1678,8 @@ const SCREEN_API = {
   loadOsr: () => loadOsr(), osr: () => ({ loaded: osrLoaded, rows: osrRows }),
   /* MOSR register (classic loadMosr): table in Reports, charts in Analytics */
   loadMosr: () => loadMosr(), mosr: () => ({ loaded: mosrLoaded, rows: mosrRows }),
+  /* MCCF outside QA AMO: All forms only, never in REPORTS (classic loadMccfOut) */
+  loadMccfOut: () => loadMccfOut(), mccfOut: () => ({ loaded: mccfOutLoaded, rows: mccfOutRows, tasks: mccfOutTasks }),
   /* All forms (15 AF_FORMS) with EIS / QC Spot Check detail */
   AF_FORMS, EIS_TITLE, QCS_TITLE,
   loadEis: () => loadEisDetail(), eis: () => ({ loaded: eisLoaded, desc: eisDescMap, ca: eisCAMap }), enrichEis, enrichQcs,
@@ -4517,6 +4519,25 @@ function scrStatus(){
 /* ==========================================================================
    FINDINGS · ALL FORMS (every report type) and OSR / MOSR
    ========================================================================== */
+/* MCCF raised outside QA AMO (Eric 03/11/2026): rows of All forms only. They stay out of REPORTS, so KPIs, Overview,
+   Work Queue and Export keep the QA AMO scope. Summary and RFI / Task go into RX, where their columns read them. */
+const MCCF_OUT = { src:null, rows:[], sum:{} };
+function mccfOutRows(){
+  const A = API();
+  MCCF_OUT.st = lazy('mccfout', () => A.loadMccfOut(), () => A.mccfOut().loaded);
+  if(MCCF_OUT.st !== 'ready') return [];
+  const d = A.mccfOut();
+  if(MCCF_OUT.src !== d.rows){
+    MCCF_OUT.src = d.rows; MCCF_OUT.sum = {};
+    d.rows.forEach(r => { const t = plainText(r.summary); if(t) MCCF_OUT.sum[r.report_id] = t; });
+    MCCF_OUT.rows = d.rows.map(r => fromReal({ id:r.report_id, form:'other', code:r.report_title, number:r.report_number, auditTitle:'—', location:'—',
+      raised:r.raised_day, target:r.target_day, closed:r.closed_day, status:r.semantic_status, cat:(String(r.overdue_cat || '').match(/^CAT (I+)$/) || [])[1] || null,
+      dtd:r.report_ageing, isClosed:r.is_closed, progress:false, level:'—', repetitive:false, auditId:null, acReg:null, acType:null, rounds:[],
+      finding:r.finding_desc || '—', owner:r.owner_name || '—', issuedTo:r.issued_person || '—', dept:r.dept || '—', orgUnit:r.org_unit_name || '—', outOfScope:true }));
+  }
+  if(RX.rfi){ Object.assign(RX.rfi, d.tasks); Object.assign(RX.sum, MCCF_OUT.sum); }
+  return MCCF_OUT.rows;
+}
 function scrAllForms(){
   const titles = [...new Set(REPORTS.map(r => r.code))].sort();
   const A = API();
@@ -4531,13 +4552,14 @@ function scrAllForms(){
   if(w) return w;
   const cfg = { cols: hira ? ['number','status','hiraMethod','hazardType','addMitig','owner','raised','target','dtd']
                            : pv ? ['number','form','status','rfv','raisedBy','pvOwner','raised','target','dtd','rfi']
+                           : BS.afForm === 'MCCF' ? ['number','orgUnit','status','summary','owner','issued','raised','target','dtd','cat','rfi']
                            : ['number','form','status','summary','owner','issued','raised','target','dtd','cat','rfi'],   /* r191: + Summary, RFI · r194: + Issued to */
                 rows: rs => BS.afForm ? rs.filter(r => r.code === BS.afForm) : rs };
   if(REAL && !hira) lazy('rfisum:'+rxFrom(), loadRfiSum, rxReady);
-  let rows = cfg.rows(scoped());
+  let rows = cfg.rows(scoped().concat(hira ? [] : applyQuery(applyFilters(mccfOutRows()))));
   if(state.cat) rows = rows.filter(r => r.cat === state.cat);
   return '<section class="sec"><div class="card'+(hira ? ' af-hira' : '')+'"><div class="card-head"><h2>All forms</h2>'
-    + '<span class="t-small dim od-fill">Every report type the dashboard loads — '+titles.length+' forms. The tabs above keep the five finding forms with their own columns.</span>'
+    + '<span class="t-small dim od-fill">Every report type the dashboard loads — '+titles.length+' forms. The tabs above keep the five finding forms with their own columns.'+(BS.afForm === 'MCCF' ? (MCCF_OUT.st === 'ready' ? ' MCCF here covers every unit on Coruson; those outside QA AMO are not counted in KPIs or Overview.' : MCCF_OUT.st === 'error' ? ' Could not load the MCCF of units outside QA AMO: only QA AMO is listed.' : ' Loading the MCCF of units outside QA AMO…') : '')+'</span>'
     + sel('afForm', [['','All forms']].concat(titles.map(t => [t, t])), BS.afForm) + '</div>'
     + tableHTML('findings/all'+(BS.afForm ? '/'+BS.afForm : ''), cfg, rows) + '</div></section>';
 }
@@ -4550,6 +4572,7 @@ const rfvCell = r => r.finding && r.finding !== '—'
 /* names wrap here so the ten columns stay on screen without sideways scrolling */
 const nameCell = v => '<span class="od-clamp-2" style="min-width:130px" title="'+esc(v || '')+'">'+esc(v || '—')+'</span>';
 Object.assign(COL, {
+  orgUnit:{ l:'Org unit', v:r=>r.orgUnit || 'QA AMO', c:r=>'<span class="t-small">'+esc(r.orgUnit || 'QA AMO')+'</span>' },
   rfv:{ l:'Request For Verification', v:r=>r.finding || '', c:rfvCell },
   pvOwner:{ l:'Owner', v:r=>r.owner, c:r=>nameCell(r.owner) },
   raisedBy:{ l:'Raised by', v:r=>r.raisedBy || '', c:r=>nameCell(r.raisedBy) },
@@ -5158,11 +5181,11 @@ function showEis(id){
    the fields from the raw record: CMR-CAR as showCmrDetail 6710, ECAR as showEcarDetail 7342. */
 const stageName = t => String(t || '—').replace(/([a-z])([A-Z])/g, '$1 $2');
 function showReport(id){
-  const A = API(), rep = REPORTS.find(x => x.id === id); if(!rep) return;
+  const A = API(), rep = REPORTS.find(x => x.id === id) || mccfOutRows().find(x => x.id === id); if(!rep) return;
   MODAL_REDRAW = () => showReport(id); MODAL_KEY = 'rpt:'+id;
   if(rep.code === A.EIS_TITLE) return showEis(id);
   if(rep.code === A.QCS_TITLE) return showQcs(id);
-  const src = rep.form === 'cmrcar' ? A.cmrData() : rep.form === 'ecar' ? A.ecarData() : A.allData();
+  const src = rep.outOfScope ? A.mccfOut().rows : rep.form === 'cmrcar' ? A.cmrData() : rep.form === 'ecar' ? A.ecarData() : A.allData();
   const r = src.find(x => x.report_id === id); if(!r) return;
   const head = kv([['Status', chip(rep.status), true], ['CAT', catChip(rep.cat), true], ['Days to due', dueCell(rep), true]]);
   const findings = rows => rows.length ? '<div style="display:grid;gap:8px"><span class="t-micro">Findings ('+rows.length+')</span>'
