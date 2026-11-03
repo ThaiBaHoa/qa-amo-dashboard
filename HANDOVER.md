@@ -9,7 +9,8 @@
 - Worker `galileo-ai` đang `AUTH_MODE: enforce`, chạy ở `aws:ap-northeast-1`. Chat thật của Eric chạy được ở soft; kiểm trên live: không phiên và phiên sai đều 401. Logic role thử offline 13/13.
 - ⚠ Giữ `placement` trong `wrangler.jsonc`: từ VN Worker rơi vào colo HKG, Anthropic trả 403 `Request not allowed`. Lần deploy wrangler đầu đã làm chat hỏng tới khi thêm dòng này.
 - Lùi: đặt lại `soft` trong `workers/galileo-ai/wrangler.jsonc` rồi deploy, hoặc phiên bản `226d55c0` trên Cloudflare.
-- Còn mở: `galileo-proxy` vẫn `soft`.
+- `galileo-proxy` đang `enforce` từ 03/11/2026 (`3ab84f2d`): không phiên hoặc phiên sai 401, không Origin 403. Trước khi bật: sáng 03/11 không có request thật nào thiếu phiên; log 7 ngày có 1.504 request không phiên, chủ yếu đoán là trang xem thử local, không xác nhận được vì log không lưu trình duyệt.
+- ⚠ Từ đây trang xem thử local chỉ tải được dữ liệu khi dùng `&auth=1` và đăng nhập; `?relay` không đăng nhập sẽ bị 401. Trong log, trường `auth` bị Cloudflare che: lọc bằng `exists(why)`. Lùi: đặt lại `soft` rồi deploy.
 
 ## ✅ r215 — sidebar thu gọn (02/11/2026, EricThai)
 - Kiểm local ở 975 và 1500 px, thu gọn và mở rộng: 72 và 248 px, không thanh cuộn ngang.
@@ -270,8 +271,7 @@ Worker `galileo-proxy` = bản trong `workers/galileo-proxy/`, version `fc20ebb6
 chỉ số (CLAUDE.md, mục Galileo values). **Worker:** thử bằng dữ liệu cỡ thật + so A/B với bản cũ trước khi deploy (sự cố 29/09).
 
 **Còn mở (theo thứ tự):**
-1. **Bật `AUTH_MODE: enforce`** cho `galileo-proxy` — trước đó F5 màn LED (`https://vjc-qa-amo.com/?kiosk=1`) + mọi máy đang mở;
-   xem log `npx.cmd wrangler tail galileo-proxy` không còn `soft-allow` từ trình duyệt. Lùi: đặt lại `soft`.
+1. ~~Bật `AUTH_MODE: enforce` cho `galileo-proxy`~~ — xong 03/11/2026, xem mục r216.
 2. Worker `galileo-ai` (khoá Anthropic) — đã có kiểm đăng nhập từ r216, xem mục r216: còn phải chuyển `enforce`.
 3. Modal audit của `classic.html` (r177) chưa xem bằng mắt.
 4. **VIỆC KẾ TIẾP (Eric, 30/09 trên laptop): áp bộ màu trạng thái cho các page còn lại.** Mẫu đã làm: Audit Plan (commit `02c9cb4`) —

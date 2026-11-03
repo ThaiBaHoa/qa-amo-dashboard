@@ -8,7 +8,7 @@
   "compatibility_date": "2026-05-16",
   "vars": {
     // 'soft' = check sign-in and log, still serve · 'enforce' = refuse without a valid session
-    "AUTH_MODE": "soft",
+    "AUTH_MODE": "enforce",
     // public values, the same ones classic.html ships to every browser
     "SUPA_URL": "https://czftzgdcnpnspbbegwjt.supabase.co",
     "SUPA_KEY": "sb_publishable_eGdEXBCSD_19tu4sOV8NWQ_8mZmUqqq"
