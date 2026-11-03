@@ -5,6 +5,11 @@
 
 ---
 
+## ✅ r218 — MOSR charts trong Analytics (03/11/2026, EricThai) — chưa push
+- Eric yêu cầu đưa biểu đồ của file Excel vào, không kèm bảng, lọc theo tháng / quý / năm.
+- ⚠ 2026: 193 MOSR = 88 trong Technical + 94 ngoài Technical + 11 chưa phân loại. Dòng chú thích trên tab ghi rõ.
+- Kiểm local: Q4 = 35 report khớp đếm độc lập; màu giữ theo bộ phận khi đổi kỳ. Chỉ kiểm ở bản đủ r220.
+
 ## ✅ r217 — tab MOSR trong Reports (03/11/2026, EricThai) — chưa push
 - Eric gửi file `MOSR Database - Dashboard.xlsx`: thay tab OSR / MOSR bằng bảng theo file, bỏ 4 cột vàng. Eric chốt Occurrence Category chỉ lấy nhóm dưới Technical.
 - ⚠ Chỉ form MOSR: probe 03/11 không report OSR nào có Classifications. Phân loại MOSR mới có từ 2026 (2025: 1/348).

@@ -132,6 +132,7 @@
   --data-1:#39414E;  --on-data-1:#FFFFFF;
   --data-2:#2B313B;  --on-data-2:#E8EBF0;
   --data-3:#4C5563;
+  --mosr-1:#2a78d6;--mosr-2:#eb6834;--mosr-3:#1baf7a;--mosr-4:#eda100;--mosr-5:#e87ba4;
   --hatch:#1A1E24;             /* diagonal hatch for "scheduled" */
 
   /* depth */
@@ -173,6 +174,7 @@ html[data-theme="light"]{
   --data-1:#A4AFBE;  --on-data-1:#12161C;
   --data-2:#CBD3DE;  --on-data-2:#12161C;
   --data-3:#8593A4;
+  --mosr-1:#3987e5;--mosr-2:#d95926;--mosr-3:#199e70;--mosr-4:#c98500;--mosr-5:#d55181;
   --hatch:#D3DAE3;
 
   --scrim:rgba(18,22,28,.46);
@@ -808,6 +810,18 @@ body.rail .acct-t{display:none}
 .beta-ai-msg table{border-collapse:collapse;font-size:13px}.beta-ai-msg td,.beta-ai-msg th{border-bottom:1px solid var(--border);padding:4px 6px;text-align:left}
 .beta-ai-in{display:flex;gap:var(--s2);padding:var(--s3);border-top:1px solid var(--border)}
 .beta-ai-in textarea{flex:1;font:inherit;padding:8px;resize:none}
+/* MOSR charts */
+.mosr-cols{display:flex;align-items:stretch;gap:var(--s2);height:280px;padding-top:var(--s2)}
+.mosr-col{flex:1 1 0;min-width:0;position:relative;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;text-align:center;padding-bottom:58px}
+.mosr-col>.num{flex:none}
+.mosr-bar{display:block;width:min(56px,70%);background:var(--data-1);border-radius:4px 4px 0 0;flex:none}
+.mosr-lbl{position:absolute;bottom:0;left:0;right:0;height:54px;line-height:1.2;overflow:hidden;overflow-wrap:anywhere;font-size:12px}
+.mosr-pie{display:grid;grid-template-columns:minmax(120px,190px) minmax(0,1fr);gap:var(--s4);align-items:center;min-height:280px}
+.mosr-pie svg{width:100%;height:auto;display:block}
+.mosr-leg{list-style:none;margin:0;padding:0;display:grid;gap:var(--s2)}
+.mosr-leg li{display:flex;align-items:center;gap:var(--s2);min-width:0}
+.mosr-leg i{width:10px;height:10px;border-radius:2px;flex:none}
+@media (max-width:767px){.mosr-pie{grid-template-columns:minmax(0,1fr)}.mosr-pie svg{max-width:190px;margin-inline:auto}}
 /* LED wall (?kiosk=): no sidebar, no bottom bar, no assistant — same as classic body.kiosk */
 body.kiosk .sidebar, body.kiosk .botnav, body.kiosk #betaAiBtn, body.kiosk .beta-ai, body.kiosk .filterbar{display:none !important}
 body.kiosk .app{grid-template-columns:minmax(0,1fr) !important}
@@ -2011,6 +2025,7 @@ const NAV = [
       {id:'kpi',    label:'KPI charts'},
       {id:'spi',    label:'SPI'},
       {id:'safety', label:'OSR/MOSR Status'},
+      {id:'mosr',   label:'MOSR charts'},
       {id:'early',  label:'Early detection'},
       {id:'status', label:'Event/IR report status'}
     ]},
@@ -3503,6 +3518,8 @@ const PH = {
                        ['One row per SPI with its alert and target level','Rolling 12-month view with breach months called out','Link from a breach straight to the contributing occurrences']],
   'analytics/safety': ['MSAG report status — OSR and MOSR progress.',
                        ['Status of each safety report through the MSAG workflow','Ageing of reports still awaiting a decision','Owner and next action for anything stalled']],
+  'analytics/mosr':   ['MOSR by department, occurrence category and base.',
+                       ['Three charts over the selected year, quarter or month','Counts by submitted date','Reports not classified are stated, not hidden']],
   'analytics/early':  ['KPI 2 — how much the organisation finds before the authority does.',
                        ['MCAR ÷ AMO-ECAR as a rate over time','Split by ATA chapter and by department','The internal and authority findings side by side for the same scope']],
   'analytics/status': ['Event and IR report status — the EIS and F-088 extracts from Coruson.',
@@ -3974,7 +3991,7 @@ document.addEventListener('keydown', e=>{
    ========================================================================== */
 const API = () => window.BETA_API;
 const BS = { pg:{}, ataLevel:'2', ataY:TODAY.getFullYear(), ataM:TODAY.getMonth()+1, k2g:'nature',
-             rsTab:'f088', rsSF:'all', rsQ:'', mosrSF:'all', mosrOcc:'', afForm:'', exForm:'',
+             rsTab:'f088', rsSF:'all', rsQ:'', mosrSF:'all', mosrOcc:'', mosrQ:'', afForm:'', exForm:'',
              docType:null, docSt:'', docRev:'', docQ:'', usersF:'all', fbMsg:'' };
 const LAZY = {};
 function betaResetLazy(){ Object.keys(LAZY).forEach(k => delete LAZY[k]); }
@@ -4686,6 +4703,54 @@ function scrMosr(){
           { sortVals: rows.map(r => [String(r.submitted_date || '').slice(0, 10), r.report_number, r.short, r.summary, r.base, r.owner, r.dept.join(', '), r.orc.join(', '), r.hazard.join(', '), r.hazard_type.join(', '), r.occ.join(', '), r.report_status]) }) + '</div>') + '</section>';
 }
 
+/* ANALYTICS · MOSR charts: Year and Month from the filter bar, Quarter here. One report with two selected values counts once in each. */
+const mosrQuarterOk = v => !BS.mosrQ || Math.ceil((+String(v).slice(5, 7)) / 3) === +BS.mosrQ;
+function mosrCount(rows, get){
+  const c = {}; rows.forEach(r => [].concat(get(r)).filter(Boolean).forEach(k => { c[k] = (c[k] || 0) + 1; }));
+  return Object.keys(c).map(k => ({ k, n:c[k] })).sort((a,b) => b.n - a.n || a.k.localeCompare(b.k));
+}
+/* more values than fit: the smallest fold into one "Other" entry */
+function mosrFold(items, max){
+  if(items.length <= max) return items;
+  const rest = items.slice(max - 1);
+  return items.slice(0, max - 1).concat({ k:'Other ('+rest.length+')', n:rest.reduce((a,x) => a + x.n, 0), other:true });
+}
+const mosrEmpty = '<div class="empty"><h3>No data</h3><p class="t-sub">No report in this period carries this value.</p></div>';
+function mosrColumns(items){
+  if(!items.length) return mosrEmpty;
+  const max = Math.max(...items.map(x => x.n));
+  return '<div class="mosr-cols" role="img" aria-label="'+esc(items.map(x => x.k+': '+x.n).join(', '))+'">' + items.map(x =>
+    '<div class="mosr-col" title="'+esc(x.k+': '+x.n)+'"><span class="num strong">'+x.n+'</span>'
+    + '<span class="mosr-bar" style="height:'+Math.max(1, x.n/max*78).toFixed(1)+'%"></span><span class="mosr-lbl t-small">'+esc(x.k)+'</span></div>').join('') + '</div>';
+}
+/* colour follows the department, not its rank: a filter must not repaint the survivors */
+const MOSR_DEPT_SLOT = { 'Maintenance Station':1, 'Others':2, 'Line Store':3, 'Contractor':4, 'Technology Information':5 };
+function mosrPie(items){
+  if(!items.length) return mosrEmpty;
+  const total = items.reduce((a,x) => a + x.n, 0), R = 42, C = 2*Math.PI*R, free = [1,2,3,4,5].filter(s => !items.some(x => MOSR_DEPT_SLOT[x.k] === s));
+  const colour = x => x.other ? 'var(--text-3)' : 'var(--mosr-'+(MOSR_DEPT_SLOT[x.k] || free.shift())+')';
+  let at = 0; const parts = items.map(x => { const c = colour(x), len = x.n/total*C, draw = Math.max(0.5, len - (items.length > 1 ? 1.5 : 0)); const seg = '<circle cx="60" cy="60" r="'+R+'" fill="none" stroke="'+c+'" stroke-width="20" stroke-dasharray="'+draw.toFixed(2)+' '+(C-draw).toFixed(2)+'" stroke-dashoffset="'+(-at).toFixed(2)+'" transform="rotate(-90 60 60)"><title>'+esc(x.k+': '+x.n)+'</title></circle>'; at += len; return { x, c, seg }; });
+  return '<div class="mosr-pie"><svg viewBox="0 0 120 120" role="img" aria-label="'+esc(items.map(x => x.k+': '+x.n).join(', '))+'">'+parts.map(p => p.seg).join('')+'</svg>'
+    + '<ul class="mosr-leg">'+parts.map(p => '<li><i style="background:'+p.c+'"></i><span class="t-small od-fill">'+esc(p.x.k)+'</span><span class="num strong">'+p.x.n+'</span><span class="t-small dim num">'+M.pct(p.x.n, total)+'%</span></li>').join('')+'</ul></div>';
+}
+function scrMosrCharts(){
+  const A = API();
+  const w = lazyState('mosr', () => A.loadMosr(), () => A.mosr().loaded, 'MOSR');
+  if(w) return w;
+  const rows = A.mosr().rows.filter(r => inPeriod(r.submitted_date) && mosrQuarterOk(r.submitted_date));
+  const noClass = rows.filter(r => !r.occ_raw.length).length, outside = rows.filter(r => r.occ_raw.length && !r.occ.length).length;
+  const occ = MOSR_OCC.map(k => ({ k, n:rows.filter(r => r.occ.includes(k)).length }));
+  const period = periodLabel() + (BS.mosrQ ? ' · Q'+BS.mosrQ : '');
+  return '<section class="sec"><div class="od-row" style="--od-gap:12px;flex-wrap:wrap;align-items:center">'
+    + sel('mosrQ', [['','All quarters'],['1','Q1'],['2','Q2'],['3','Q3'],['4','Q4']], BS.mosrQ, 'Quarter')
+    + '<span class="t-small dim">'+esc(period)+' · '+rows.length+' MOSR by submitted date · '+noClass+' not classified · '+outside+' with a category outside Technical</span></div></section>'
+    + '<section class="sec beta-cards">'
+    + card('By department responsible', 'a report with two departments counts in both', mosrPie(mosrFold(mosrCount(rows, r => r.dept), 6)))
+    + card('By occurrence category', 'groups under Technical only', occ.some(x => x.n) ? mosrColumns(occ) : mosrEmpty)
+    + card('By base', 'station code when the typed text carries one · blank not counted', mosrColumns(mosrFold(mosrCount(rows, r => r.base_group), 9)))
+    + '</section>';
+}
+
 /* ==========================================================================
    AUDIT PLAN · BOTTLENECK  (loadStageAggregate 7715, renderBottleneckPanel 7754)
    ========================================================================== */
@@ -4918,7 +4983,7 @@ const BETA_SCREENS = REAL ? {
   'findings/ecar':   whenFull('ECAR', () => renderLane('findings','ecar')),
   'findings/pavoi':  whenFull('PAVOI / MVOI verification rounds', () => renderPavoi()),
   'work/verify':     whenFull('PAVOI / MVOI verification rounds', () => renderLane('work','verify')),
-  'analytics/kpi': scrKpi, 'analytics/spi': scrSpi, 'analytics/safety': scrSafety,
+  'analytics/kpi': scrKpi, 'analytics/spi': scrSpi, 'analytics/safety': scrSafety, 'analytics/mosr': scrMosrCharts,
   'analytics/early': scrEarly, 'analytics/status': scrStatus,
   'audit/bottleneck': scrBottleneck,
   'library/documents': scrDocs, 'library/guide': scrGuide,
@@ -5641,7 +5706,7 @@ function scrGuideNew(){
     + '<tr><td>Overview</td><td>See key indicators for the selected period. Every tile opens the report list behind it.</td></tr>'
     + '<tr><td>Work Queue</td><td>Act on reports: Open reports, Overdue, and PAVOI awaiting verification.</td></tr>'
     + '<tr><td>Findings</td><td>Read the register by form: All forms, PAVOI / MVOI, CMR-CAR, ECAR, AMO-ECAR, MCAR, MOSR.</td></tr>'
-    + '<tr><td>Analytics</td><td>KPI charts, SPI, OSR/MOSR Status, Early detection (KPI 2) and Event/IR report status on Coruson.</td></tr>'
+    + '<tr><td>Analytics</td><td>KPI charts, SPI, OSR/MOSR Status, MOSR charts, Early detection (KPI 2) and Event/IR report status on Coruson.</td></tr>'
     + '<tr><td>Audit Plan</td><td>The audit and inspection programme: timeline, schedule list and workflow stages.</td></tr>'
     + '<tr><td>Library</td><td>Controlled documents and this guide.</td></tr>'
     + '<tr><td>Admin</td><td>User management, report export and pinned widgets (administrators).</td></tr></table>'
