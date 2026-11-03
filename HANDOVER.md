@@ -5,6 +5,11 @@
 
 ---
 
+## ✅ r219 — màn LED (03/11/2026, EricThai) — chưa push
+- Eric: tỷ lệ chưa cân đối, trang không hiện đủ thông tin, search vô ích trên màn trình chiếu. Nguồn: vault `beta-src/screens2.js` (`kioskFit`), `screens.js` (`plainTable`), `beta-template.html` (CSS `body.kiosk`).
+- Kiểm local cửa sổ 1912×867: đủ 6 trang; EIS hiện đủ 7 report; Timeline 0 bộ lọc; Esc thoát đúng; console sạch.
+- Chưa kiểm: máy LED thật, chế độ tối. Trang dài làm vòng xoay dài hơn số giây đặt trong `?kiosk=`.
+
 ## ✅ r218 — MOSR charts trong Analytics (03/11/2026, EricThai) — chưa push
 - Eric yêu cầu đưa biểu đồ của file Excel vào, không kèm bảng, lọc theo tháng / quý / năm.
 - ⚠ 2026: 193 MOSR = 88 trong Technical + 94 ngoài Technical + 11 chưa phân loại. Dòng chú thích trên tab ghi rõ.
