@@ -5,6 +5,12 @@
 
 ---
 
+## ✅ r217 — tab MOSR trong Reports (03/11/2026, EricThai) — chưa push
+- Eric gửi file `MOSR Database - Dashboard.xlsx`: thay tab OSR / MOSR bằng bảng theo file, bỏ 4 cột vàng. Eric chốt Occurrence Category chỉ lấy nhóm dưới Technical.
+- ⚠ Chỉ form MOSR: probe 03/11 không report OSR nào có Classifications. Phân loại MOSR mới có từ 2026 (2025: 1/348).
+- Kiểm local dữ liệu thật 2026: 193 report; 6/6 dòng Excel khớp Base, ORC, Hazard, Hazard type, Occurrence, Status; 0529 lệch Report Owner và Department vì Coruson khác file. Chỉ kiểm ở bản đủ r220, bản r217 riêng chỉ qua build.
+- Report Summary trên 30.000 ký tự (thường nhúng ảnh) hiện —. Chưa đo thời gian nạp trên live.
+
 ## ✅ r216 — AI gửi phiên đăng nhập, Worker vào repo (02/11/2026, EricThai)
 - Worker `galileo-ai` đang `AUTH_MODE: enforce`, chạy ở `aws:ap-northeast-1`. Chat thật của Eric chạy được ở soft; kiểm trên live: không phiên và phiên sai đều 401. Logic role thử offline 13/13.
 - ⚠ Giữ `placement` trong `wrangler.jsonc`: từ VN Worker rơi vào colo HKG, Anthropic trả 403 `Request not allowed`. Lần deploy wrangler đầu đã làm chat hỏng tới khi thêm dòng này.

@@ -2528,7 +2528,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.02-r216';
+const APP_REV = '2026.11.03-r217';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -9744,6 +9744,60 @@ async function loadOsr(){
   }catch(e){ console.error('OSR/MOSR load error:',e); toast('Error loading OSR / MOSR: '+e.message,'err'); }
   setOv(false);
   renderOsr();
+}
+// ── MOSR REGISTER (bảng + biểu đồ, Eric 03/11/2026) ──────────────
+// Chỉ form 'MOSR': probe 03/11 cả 6 form họ OSR thì chỉ MOSR có tab Classifications (OSR 0 report).
+// Nguồn: Short summary + Base = field form · Report summary = dwanalytics_report.summary (valid_to null: bảng giữ mọi
+// version, không lọc thì ~30 MB; HTML bị encode 2 lần) · Report owner = owner_id tra User Group rồi user · còn lại =
+// dwanalytics_report_classification_field. Phân loại mới có từ 2026 (2025: 1/348 report).
+const MOSR_CLS = {'DEPARTMENT RESPONSIBLE':'dept','ORC - Occurrence Reached Criticality':'orc','HAZARD?':'hazard','HAZARD TYPE':'hazard_type','OCCURRENCE CATEGORY':'occ_raw'};
+// Base là ô nhập tay (64 cách ghi: 'SGN LMD', 'LMD-SGN', 'sgn'…): biểu đồ gộp theo mã trạm nếu có, bảng giữ nguyên chữ gốc.
+const MOSR_STATIONS = /\b(SGN|HAN|DAD|PQC|VCA|VTE|CXR|HPH|DLI|ICN)\b/;
+const mosrBaseGroup = t => { const s=String(t||'').trim().toUpperCase(); const m=s.match(MOSR_STATIONS); return m?m[1]:s; };
+// Giải mã trước rồi mới bỏ thẻ (HTML encode 2 lần); có report nhúng ảnh base64 tới 1 triệu ký tự nên cắt 1500.
+const mosrEnt = t => t.replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'");
+const mosrPlain = t => mosrEnt(mosrEnt(String(t||''))).replace(/<(style|script)[\s\S]*?<\/\1>/gi,' ').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim().slice(0,1500);
+let mosrLoaded=false, mosrRows=[];
+async function loadMosr(){
+  const [raw,fields,sums,items,groups,users]=await Promise.all([
+    fetchAll(G_URL+'dwreporting_report_summary?$select=report_id,report_number,report_status,owner_id,submitted_date,modified_date&$filter='+encodeURIComponent("valid_to eq null and report_title eq 'MOSR'"), true),
+    fetchAll(G_URL+'dwanalytics_report_form_section_field?$select=report_id,field_name,text_value&$filter='+encodeURIComponent("report_title eq 'MOSR' and (startswith(field_name,'SHORT SUMMARY') or startswith(field_name,'BASE'))"), true),
+    fetchAll(G_URL+'dwanalytics_report?$select=id,report_id,summary&$filter='+encodeURIComponent("form_name eq 'MOSR' and summary ne null and valid_to eq null and length(summary) lt 30000"), true),
+    fetchAll(G_URL+'dwanalytics_lists?$select=list_item_id,list_item_name,list_item_parent_id&$filter='+encodeURIComponent("list_name eq 'OCCURRENCE CATEGORY'"), true),
+    fetchAll(G_URL+'dwanalytics_user_group?$select=group_id,name', true),
+    fetchAll(G_URL+'dwreporting_users?$select=user_id,full_name', true)
+  ]);
+  // Classifications: ORC / HAZARD có ở cả OSR nên quét theo list_name là toàn hệ thống. Lấy theo report_id, chỉ report từ 2026
+  // (trước đó chưa phân loại), mỗi lô 15 id như loadCapa (lô 40 bị Galileo trả 400).
+  const clsIds=[...new Set(raw.filter(r=>String(r.submitted_date)>='2026').map(r=>r.report_id))], clsChunks=[];
+  for(let i=0;i<clsIds.length;i+=15) clsChunks.push(clsIds.slice(i,i+15));
+  const cls=(await Promise.all(clsChunks.map(ch=>fetchAll(G_URL+'dwanalytics_report_classification_field?$select=report_id,list_name,value_id,value_text&$filter='+encodeURIComponent(ch.map(id=>'report_id eq '+id).join(' or ')), true)))).flat();
+  const ownerName={}; users.forEach(u=>{ownerName[u.user_id]=u.full_name;}); groups.forEach(g=>{ownerName[g.group_id]=g.name;});
+  // Occurrence Category (Eric chốt 03/11): chỉ 3 nhóm dưới Technical. Giá trị con gộp lên nhóm cha; 'Others' gốc = Others;
+  // nhánh khác (Human Factor, Standard & Compliance…) = không có nhóm. Cây có node gốc tên null: dừng khi gặp lại node đã đi qua.
+  const itemById={}; items.forEach(x=>{itemById[x.list_item_id]=x;});
+  const occGroup=id=>{
+    const names=[], seen=new Set(); let c=itemById[id];
+    while(c && !seen.has(c)){ seen.add(c); if(c.list_item_name) names.unshift(c.list_item_name); c=itemById[c.list_item_parent_id]; }
+    const i=names.indexOf('Technical');
+    return i>=0 ? (names[i+1]||null) : (names[0]==='Others' ? 'Others' : null);
+  };
+  const m={};
+  raw.forEach(r=>{
+    if(!r.report_id || !(r.report_number||'').trim()) return;
+    const ex=m[r.report_id];
+    if(!ex || new Date(r.modified_date)>new Date(ex.modified_date)) m[r.report_id]=r;
+  });
+  const out={};
+  Object.values(m).forEach(r=>{ out[r.report_id]={report_id:r.report_id, report_number:r.report_number, report_status:r.report_status, submitted_date:r.submitted_date,
+    owner:ownerName[r.owner_id]||'', short:'', summary:'', base:'', base_group:'', dept:[], orc:[], hazard:[], hazard_type:[], occ:[], occ_raw:[]}; });
+  fields.forEach(f=>{ const o=out[f.report_id]; if(!o || !f.text_value) return;
+    if(f.field_name.startsWith('BASE')){ o.base=f.text_value.trim(); o.base_group=mosrBaseGroup(f.text_value); } else o.short=f.text_value.trim(); });
+  sums.forEach(x=>{ if(out[x.report_id]) out[x.report_id].summary=mosrPlain(x.summary); });
+  cls.forEach(c=>{ const o=out[c.report_id], k=MOSR_CLS[c.list_name]; if(!o || !k || !c.value_text) return;
+    if(!o[k].includes(c.value_text)) o[k].push(c.value_text);
+    if(k==='occ_raw'){ const g=occGroup(c.value_id); if(g && !o.occ.includes(g)) o.occ.push(g); } });
+  mosrRows=Object.values(out); mosrLoaded=true;
 }
 function setOsr(sf,btn){
   TS.osr.sf=sf; TS.osr.page=1;

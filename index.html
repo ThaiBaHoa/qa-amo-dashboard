@@ -1648,6 +1648,8 @@ const SCREEN_API = {
   rsOkE, rsOkF, rsOkH, rsDone, rsGaps, rsMissNames, RS_FORMS,
   /* OSR / MOSR (AMO + QA AMO) */
   loadOsr: () => loadOsr(), osr: () => ({ loaded: osrLoaded, rows: osrRows }),
+  /* MOSR register (classic loadMosr): table in Reports, charts in Analytics */
+  loadMosr: () => loadMosr(), mosr: () => ({ loaded: mosrLoaded, rows: mosrRows }),
   /* All forms (15 AF_FORMS) with EIS / QC Spot Check detail */
   AF_FORMS, EIS_TITLE, QCS_TITLE,
   loadEis: () => loadEisDetail(), eis: () => ({ loaded: eisLoaded, desc: eisDescMap, ca: eisCAMap }), enrichEis, enrichQcs,
@@ -2001,7 +2003,7 @@ const NAV = [
       {id:'ecar',   label:'ECAR'},
       {id:'amoecar',label:'AMO-ECAR'},
       {id:'mcar',   label:'MCAR'},
-      {id:'osr',    label:'OSR / MOSR'}
+      {id:'osr',    label:'MOSR'}
     ]},
   { id:'analytics', label:'Analytics',  icon:'chart',    task:'analyse', title:'Analytics',
     lead:'KPIs, SPIs and report status by period.',
@@ -3972,7 +3974,7 @@ document.addEventListener('keydown', e=>{
    ========================================================================== */
 const API = () => window.BETA_API;
 const BS = { pg:{}, ataLevel:'2', ataY:TODAY.getFullYear(), ataM:TODAY.getMonth()+1, k2g:'nature',
-             rsTab:'f088', rsSF:'all', rsQ:'', osrForm:'', osrSF:'all', osrOu:'', afForm:'', exForm:'',
+             rsTab:'f088', rsSF:'all', rsQ:'', mosrSF:'all', mosrOcc:'', afForm:'', exForm:'',
              docType:null, docSt:'', docRev:'', docQ:'', usersF:'all', fbMsg:'' };
 const LAZY = {};
 function betaResetLazy(){ Object.keys(LAZY).forEach(k => delete LAZY[k]); }
@@ -4645,40 +4647,43 @@ function scrFormDetail(titles){
     + sel('afForm', [['','All forms']].concat(titles.map(t => [t, t])), BS.afForm) + '</div>'
     + (w ? w : '<div class="card-pad">'+plainTable('af-'+BS.afForm, cols, rows, 25, 980)+'</div>') + '</div></section>';
 }
-function scrOsr(){
+/* MOSR register (Eric 03/11/2026): the columns of "MOSR Database - Dashboard.xlsx" without the yellow ones
+   (Describe what happened, Actions taken, Reporter, Position). Data: classic loadMosr. */
+const MOSR_OCC = ['Aircraft Technical Defect', 'Cabin Defect', 'Others'];
+const mosrCell = v => { const t = Array.isArray(v) ? v.join(', ') : v; return t ? esc(t) : '—'; };
+function scrMosr(){
   const A = API();
-  const w = lazyState('osr', () => A.loadOsr(), () => A.osr().loaded, 'OSR / MOSR');
+  const w = lazyState('mosr', () => A.loadMosr(), () => A.mosr().loaded, 'MOSR');
   if(w) return w;
-  const all = A.osr().rows;
-  const ous = [...new Set(all.map(r => r.org_unit_name).filter(Boolean))].sort();
   const q = (state.rowQuery || '').toLowerCase();
-  const rows = all.filter(r => inPeriod(r.raised_date))
-    /* 'k:OSR' / 'k:MOSR' = every form of that kind (osr_kind set by classic loadOsr, r168-i1) */
-    .filter(r => !BS.osrForm || (BS.osrForm.startsWith('k:') ? r.osr_kind === BS.osrForm.slice(2) : r.report_title === BS.osrForm))
-    .filter(r => BS.osrSF === 'all' || r.report_status === BS.osrSF)   /* metrics-ok: OSR/MOSR Coruson status */
-    .filter(r => !BS.osrOu || r.org_unit_name === BS.osrOu)
-    .filter(r => !q || [r.report_number, r.report_title, r.org_unit_name, r.report_status].join(' ').toLowerCase().includes(q))
-    .sort((a,b) => String(b.raised_date).localeCompare(String(a.raised_date)));
-  const open = rows.filter(r => r.report_status === 'Open').length;   /* metrics-ok: OSR/MOSR Coruson status (classic loadOsr) */
-  const conf = k => rows.filter(r => r.osr_kind === k && r.confidential).length;
+  const scope = A.mosr().rows.filter(r => inPeriod(r.submitted_date));
+  const rows = scope
+    .filter(r => BS.mosrSF === 'all' || r.report_status === BS.mosrSF)   /* metrics-ok: MOSR Coruson status */
+    .filter(r => !BS.mosrOcc || r.occ.includes(BS.mosrOcc))
+    .filter(r => !q || [r.report_number, r.short, r.summary, r.base, r.owner, r.dept.join(' ')].join(' ').toLowerCase().includes(q))
+    .sort((a,b) => String(b.report_number).localeCompare(String(a.report_number), undefined, { numeric:true }));
+  const open = scope.filter(r => r.report_status === 'Open').length;   /* metrics-ok: MOSR Coruson status */
+  const closed = scope.filter(r => r.report_status === 'Closed').length;   /* metrics-ok: MOSR Coruson status */
+  const noClass = scope.filter(r => !r.occ_raw.length).length;
+  const txt = (v, n) => { const t = v || ''; return t ? '<span class="t-small od-clamp-'+n+'" title="'+esc(t)+'">'+esc(t)+'</span>' : '—'; };
   return tiles([
-      stat('OSR / MOSR', String(rows.length), periodLabel()),
-      stat('OSR', String(rows.filter(r => r.osr_kind === 'OSR').length), '1. OSR · OSR · incl. ' + conf('OSR') + ' confidential'),
-      stat('MOSR', String(rows.filter(r => r.osr_kind === 'MOSR').length), 'MOSR · incl. ' + conf('MOSR') + ' confidential'),
-      stat('Open', String(open), 'status on Coruson', open > 0)
+      stat('MOSR', String(scope.length), periodLabel()),
+      stat('Open', String(open), 'status on Coruson', open > 0),
+      stat('Closed', String(closed), 'status on Coruson'),
+      stat('Not classified', String(noClass), 'no Occurrence Category on Coruson')
     ])
-    + '<section class="sec">' + card('OSR / MOSR — AMO + QA AMO', 'raised by a unit under AMO or MQA : QA AMO (org unit of the reporter) · all OSR / MOSR forms incl. Confidential · Open/Closed from report status',
+    + '<section class="sec">' + card('MOSR register', 'form MOSR, by submitted date · classifications from tab EVALUATION on Coruson · Occurrence Category: the groups under Technical only',
       '<div class="od-row" style="--od-gap:12px;flex-wrap:wrap">'
-      + segs('osrSF', [['all','All'],['Open','Open'],['Closed','Closed']], BS.osrSF)
-      + sel('osrForm', [['','OSR + MOSR (all forms)'],['k:OSR','OSR (all forms)'],['k:MOSR','MOSR (all forms)']]
-          .concat([...new Set(all.map(r => r.report_title))].sort().map(t => [t, t])), BS.osrForm)
-      + sel('osrOu', [['','All org units']].concat(ous.map(o => [o, o])), BS.osrOu) + '</div>'
-      + plainTable('osr', [{l:'Report'},{l:'Form'},{l:'Status'},{l:'Raised'},{l:'Org unit'},{l:'Last modified'}],
-          rows.map(r => ['<span class="row-id">'+esc(r.report_number)+extLink('report', r.report_id, r.report_number)+'</span>', '<span class="tag">'+esc(r.report_title)+'</span>',
-            statusChip(r.report_status === 'Closed' ? 'Closed' : r.report_status),   /* metrics-ok: OSR/MOSR Coruson status */ '<span class="num">'+fdx(r.raised_date)+'</span>',
-            '<span class="t-small">'+esc(r.org_unit_name || '—')+'</span>', '<span class="num dim">'+fdx(r.modified_date)+'</span>']), 25, 720,
-          /* r191: sortable (Eric 03/10) — raw values per column */
-          { sortVals: rows.map(r => [r.report_number, r.report_title, r.report_status, String(r.raised_date || '').slice(0, 10), r.org_unit_name, String(r.modified_date || '').slice(0, 10)]) })) + '</section>';
+      + segs('mosrSF', [['all','All'],['Open','Open'],['Closed','Closed']], BS.mosrSF)
+      + sel('mosrOcc', [['','All categories']].concat(MOSR_OCC.map(o => [o, o])), BS.mosrOcc, 'Occurrence') + '</div>'
+      + '<div class="af-hira">' + plainTable('mosr', [{l:'Submitted',fit:true},{l:'Report number',fit:true},{l:'Short summary'},{l:'Report summary'},{l:'Base'},{l:'Report owner'},{l:'Department responsible'},{l:'ORC'},{l:'Hazard?'},{l:'Hazard type'},{l:'Occurrence category'},{l:'Status'}],
+          rows.map(r => ['<span class="num">'+fdx(r.submitted_date)+'</span>',
+            '<span class="row-id">'+esc(r.report_number)+extLink('report', r.report_id, r.report_number)+'</span>',
+            txt(r.short, 3), txt(r.summary, 3), '<span class="t-small">'+mosrCell(r.base)+'</span>', '<span class="t-small">'+mosrCell(r.owner)+'</span>',
+            '<span class="t-small">'+mosrCell(r.dept)+'</span>', '<span class="t-small">'+mosrCell(r.orc)+'</span>', '<span class="t-small">'+mosrCell(r.hazard)+'</span>',
+            '<span class="t-small">'+mosrCell(r.hazard_type)+'</span>', '<span class="t-small">'+mosrCell(r.occ)+'</span>',
+            statusChip(r.report_status === 'Closed' ? 'Closed' : r.report_status)]), 25, 1180,   /* metrics-ok: MOSR Coruson status */
+          { sortVals: rows.map(r => [String(r.submitted_date || '').slice(0, 10), r.report_number, r.short, r.summary, r.base, r.owner, r.dept.join(', '), r.orc.join(', '), r.hazard.join(', '), r.hazard_type.join(', '), r.occ.join(', '), r.report_status]) }) + '</div>') + '</section>';
 }
 
 /* ==========================================================================
@@ -4908,7 +4913,7 @@ async function sendFeedback(){
 
 /* ---- screen registry, action handlers, form controls ---- */
 const BETA_SCREENS = REAL ? {
-  'findings/all': scrAllForms, 'findings/osr': scrOsr,
+  'findings/all': scrAllForms, 'findings/osr': scrMosr,
   'findings/cmrcar': whenFull('CMR-CAR', () => renderLane('findings','cmrcar')),
   'findings/ecar':   whenFull('ECAR', () => renderLane('findings','ecar')),
   'findings/pavoi':  whenFull('PAVOI / MVOI verification rounds', () => renderPavoi()),
@@ -5635,7 +5640,7 @@ function scrGuideNew(){
     + '<table><tr><th>Section</th><th>Use it to</th></tr>'
     + '<tr><td>Overview</td><td>See key indicators for the selected period. Every tile opens the report list behind it.</td></tr>'
     + '<tr><td>Work Queue</td><td>Act on reports: Open reports, Overdue, and PAVOI awaiting verification.</td></tr>'
-    + '<tr><td>Findings</td><td>Read the register by form: All forms, PAVOI / MVOI, CMR-CAR, ECAR, AMO-ECAR, MCAR, OSR / MOSR.</td></tr>'
+    + '<tr><td>Findings</td><td>Read the register by form: All forms, PAVOI / MVOI, CMR-CAR, ECAR, AMO-ECAR, MCAR, MOSR.</td></tr>'
     + '<tr><td>Analytics</td><td>KPI charts, SPI, OSR/MOSR Status, Early detection (KPI 2) and Event/IR report status on Coruson.</td></tr>'
     + '<tr><td>Audit Plan</td><td>The audit and inspection programme: timeline, schedule list and workflow stages.</td></tr>'
     + '<tr><td>Library</td><td>Controlled documents and this guide.</td></tr>'
@@ -5668,7 +5673,7 @@ function scrGuideNew(){
     + '<li><b>Work Queue</b>: Open reports (nearest target first), Overdue (with CAT), Awaiting verification (open PAVOI / MVOI with no verification round). Select a row to open the report.</li>'
     + '<li><b>Reports › All forms</b>: every report type. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings).</li>'
     + '<li><b>Reports › PAVOI / MVOI</b>: register on the left (Form filter: PAVOI or MVOI), record on the right with the verification history and the RFI / Task list of open records. KPI 7 counts PAVOI and MVOI.</li>'
-    + '<li><b>Reports › OSR / MOSR</b>: OSR and MOSR of AMO and MQA : QA AMO, Open or Closed from Coruson.</li>'
+    + '<li><b>Reports › MOSR</b>: every MOSR by submitted date, with its classifications from Coruson. OSR forms carry no classifications; their counts are in Analytics › OSR/MOSR Status.</li>'
     + '<li><b>Analytics › Event/IR report status</b>: EIS and F-088 completeness on Coruson; the tiles count the reports complete on each check, the table shows workflow, linked reports, final report and status per report.</li>'
     + '<li><b>Audit Plan</b>: KPI tiles, a location × month view (one dot per audit in its scheduled month; filter by type or show only upcoming / with overdue findings), and a schedule list. Select a dot or a row for its workflow stages and findings. <b>Workflow stages</b>: for the QA AMO audits in the selected period, how many stages of each name are in each Galileo status; select an InProgress or PendingSignOff count for the audits concerned.</li>'
     + '<li><b>Library › Documents</b>: browse by document type; the document number opens copyholders (on time, late, overdue) and the workflow.</li></ul>')
