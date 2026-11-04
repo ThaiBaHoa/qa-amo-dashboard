@@ -5,6 +5,9 @@
 
 ---
 
+## ✅ r220-i3 — đường xu hướng Overdue (04/11/2026, EricThai)
+- Tháng chưa hết thì so target với hôm nay, không với cuối tháng. Điểm cuối 59 → 25 trên dữ liệu live, 11 tháng trước không đổi. Đường xu hướng vẫn tính mọi năm nên có thể khác số trên ô khi lọc một năm.
+
 ## ✅ r220-i2 — Glossary classic có MVOI (04/11/2026, EricThai)
 - Eric yêu cầu làm luôn việc r200 để lại. Chỉ thêm một mục chữ trong `classic.html`, tên lấy từ tiêu đề form MVOI Rev 7 trên Coruson. Chọn -i2 vì không đổi tính năng.
 

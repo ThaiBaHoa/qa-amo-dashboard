@@ -1684,7 +1684,7 @@ const SCREEN_API = {
   AF_FORMS, EIS_TITLE, QCS_TITLE,
   loadEis: () => loadEisDetail(), eis: () => ({ loaded: eisLoaded, desc: eisDescMap, ca: eisCAMap }), enrichEis, enrichQcs,
   /* AMO - HIRA classifications (r171 loadHiraCls): HIRA method / hazard type / additional mitigation */
-  HIRA_TITLE, loadHira: () => loadHiraCls(), hira: () => ({ loaded: hiraLoaded, map: hiraClsMap }),
+  HIRA_TITLE, loadHira: () => loadHiraCls(), hira: () => ({ loaded: hiraLoaded, map: hiraClsMap, hazards: hiraHazardMap }),
   /* AMO - Additional Mitigation (r172 loadCapa): tasks graded by semCalc + form content */
   CAPA_TITLE, loadCapa: () => loadCapa(), capa: () => ({ loaded: capaLoaded, tasks: capaTaskMap, info: capaInfoMap, byHira: hiraCapaMap }), capaTaskStats,
   /* Audit Plan bottleneck (system-wide $apply aggregate, invariant I7) */
@@ -2660,7 +2660,9 @@ function seriesFor(rows){
     closed.push(rows.filter(r=> r.closed && r.closed >= start && r.closed <= mo.end).length);
     const live = rows.filter(r=> r.raised && r.raised <= mo.end && (r.closed ? r.closed > mo.end : isOpen(r)));
     open.push(live.length);
-    overdue.push(live.filter(r=> r.target && r.target < mo.end).length);
+    /* the current month is not over: a target later this month is not overdue yet */
+    const cut = mo.end < TODAY ? mo.end : TODAY;
+    overdue.push(live.filter(r=> r.target && r.target < cut).length);
   });
   return { raised, closed, open, overdue };
 }
@@ -4550,7 +4552,7 @@ function scrAllForms(){
   const w = hira && (lazyState('hira', () => A.loadHira(), () => A.hira().loaded, 'HIRA classifications')
     || lazyState('capa', () => A.loadCapa(), () => A.capa().loaded, 'Additional Mitigation (CAPA) links'));
   if(w) return w;
-  const cfg = { cols: hira ? ['number','status','hiraMethod','hazardType','addMitig','owner','raised','target','dtd']
+  const cfg = { cols: hira ? ['number','status','hiraMethod','hazardType','addMitig','owner','raised','target','dtd','hiraDue']
                            : pv ? ['number','form','status','rfv','raisedBy','pvOwner','raised','target','dtd','rfi']
                            : BS.afForm === 'MCCF' ? ['number','orgUnit','status','summary','owner','issued','raised','target','dtd','cat','rfi']
                            : ['number','form','status','summary','owner','issued','raised','target','dtd','cat','rfi'],   /* r191: + Summary, RFI · r194: + Issued to */
@@ -4565,6 +4567,16 @@ function scrAllForms(){
 }
 /* AMO - HIRA classification columns (values from loadHiraCls; '—' when the report has none) */
 const hiraCls = (r, k) => ((API().hira().map || {})[r.id] || {})[k] || '';
+/* Each specific component is a hazard with its own due date (Eric 04/11/2026). Shown beside Target, which stays the
+   workflow date the status is graded on. */
+const hiraHazards = r => (API().hira().hazards || {})[r.id] || [];
+function hiraDueCell(r){
+  const L = hiraHazards(r);
+  if(!L.length) return '<span class="dim">—</span>';
+  return '<span style="display:grid;gap:4px;min-width:260px;max-width:380px">' + L.map(h => '<span class="od-row" style="--od-gap:8px;align-items:baseline">'
+    + '<span class="num t-small" style="white-space:nowrap">'+fdx(h.due)+'</span>'
+    + '<span class="t-small dim od-clamp-2" title="'+esc(h.comp)+'">'+esc(h.comp || '—')+'</span></span>').join('') + '</span>';
+}
 const hiraCell = v => v ? '<span class="t-small">'+esc(v)+'</span>' : '<span class="dim">—</span>';
 const rfvCell = r => r.finding && r.finding !== '—'
   ? '<span class="t-small od-clamp-3" style="min-width:220px;max-width:360px" title="'+esc(r.finding)+'">'+esc(r.finding)+'</span>'
@@ -4578,7 +4590,8 @@ Object.assign(COL, {
   raisedBy:{ l:'Raised by', v:r=>r.raisedBy || '', c:r=>nameCell(r.raisedBy) },
   hiraMethod:{ l:'HIRA method', v:r=>hiraCls(r,'method') || 'zzz', c:r=>hiraCell(hiraCls(r,'method')) },
   hazardType:{ l:'Hazard type', v:r=>hiraCls(r,'type') || 'zzz', c:r=>hiraCell(hiraCls(r,'type')) },
-  addMitig:{ l:'Additional mitigation', v:r=>hiraCls(r,'mitig') || 'zzz', c:hiraMitigCell }
+  addMitig:{ l:'Additional mitigation', v:r=>hiraCls(r,'mitig') || 'zzz', c:hiraMitigCell },
+  hiraDue:{ l:'Due date by hazard', v:r=>hiraHazards(r).map(h => h.due || '').filter(Boolean).sort().join(', ') || 'zzz', c:hiraDueCell }
 });
 /* r173: the CAPA reports that name this HIRA in their Report Reference (classic loadCapa → hiraCapaMap).
    A CAPA number opens the Additional Mitigation register on that record. */
@@ -5215,6 +5228,7 @@ function showReport(id){
           + (r.mcar_chk.target_warn ? ' <span class="t-small dim">(Target date on Coruson differs)</span>' : '') : undefined, true],
         ['Extension 1', r.ext1_date ? fdx(r.ext1_date) : undefined],
         ['Extension 2', r.ext2_date ? fdx(r.ext2_date) : undefined], ['Date completed', fdx(r.completed_date)], ['Date closed', fdx(r.close_date)]])
+      + (rep.code === A.HIRA_TITLE ? hiraHazardBlock(id, 'rpt:'+id) : '')
       + block(isPvForm(rep.form) ? 'Request for verification' : 'Finding', isPvForm(rep.form) ? r.rfv : r.finding_desc)
       /* r190: MCAR extension reason / denial reason as entered on the form (Extension applies to MCAR only) */
       + block('Reason for extension', r.ext_reason) + block('Extension denied reason', r.ext_denied)
@@ -5317,6 +5331,21 @@ function dDayLocal(v){ const s = String(v).slice(0,10); return new Date(+s.slice
    all, they carry no order column, and the report view only gives the stage type (Task /
    ReportAcceptReject), not the stage title. One request per record, on opening its modal. */
 const WF_STAGES = {};
+/* AMO - HIRA: one row per hazard, read from loadHiraCls. A report opened from another screen loads it on the spot. */
+function hiraHazardBlock(id, key){
+  const A = API();
+  if(!A.hira().loaded){
+    if(!HIRA_WAIT) HIRA_WAIT = A.loadHira().catch(() => {}).then(() => { HIRA_WAIT = null; if(A.hira().loaded && MODAL_KEY === key && MODAL_REDRAW) MODAL_REDRAW(); });
+    return '<div style="display:grid;gap:8px"><span class="t-micro">Hazards</span><span class="t-small dim">Loading…</span></div>';
+  }
+  const L = (A.hira().hazards || {})[id] || [];
+  if(!L.length) return '';
+  return '<div style="display:grid;gap:8px"><span class="t-micro">Hazards ('+L.length+')</span>'
+    + plainTable('hira-h-'+id, [{l:'Specific component'},{l:'Current risk',fit:true},{l:'Due date',fit:true}],
+        L.map(h => [esc(h.comp || '—'), esc(h.risk || '—'), '<span class="num">'+fdx(h.due)+'</span>']), 30, 0, { compact:true })
+    + '</div>';
+}
+let HIRA_WAIT = null;
 function wfStages(ctxId, key){
   const have = WF_STAGES[ctxId];
   if(have !== undefined) return have;          /* array, { err }, or null while loading */

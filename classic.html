@@ -2532,7 +2532,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.04-r220-i2';
+const APP_REV = '2026.11.04-r220-i3';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3469,7 +3469,7 @@ function resetLazyStores(){
   try{ localStorage.removeItem(KPI7_CACHE_KEY); }catch{}
   eisLoaded=false; eisCAMap={}; eisDescMap={};   // reset EIS per-CA cache để Refresh kéo lại
   qcsLoaded=false; qcsMap={};                     // reset QC Spot Check cache để Refresh kéo lại
-  hiraLoaded=false; hiraClsMap={};                // [r173] HIRA classifications + CAPA (r171/r172)
+  hiraLoaded=false; hiraClsMap={}; hiraHazardMap={};                // [r173] HIRA classifications + CAPA (r171/r172)
   capaLoaded=false; capaTaskMap={}; capaInfoMap={}; hiraCapaMap={};
   auditStageRows=null;                            // [r178] bước audit của màn Workflow stages
 }
@@ -5322,11 +5322,37 @@ const AF_FORM_SET = new Set(AF_FORMS);
 // 24/24 report HIRA đủ cả 3 trường; nếu một trường chọn nhiều giá trị thì nối bằng ', '.
 const HIRA_TITLE = 'AMO - HIRA';
 const HIRA_CLS = {'HIRA METHOD':'method','HAZARD TYPE':'type','ADDITIONAL MITIGATION?':'mitig'};
-let hiraLoaded=false, hiraClsMap={};
+// [HIRA] Mỗi Specific component là 1 mối nguy, có DUE DATE riêng (Eric 04/11/2026). Probe 04/11: bảng
+// dwanalytics_report_field có section_id; mỗi mối nguy là 1 section SPECIFIC COMPONENTS, 50/50 ô DUE DATE ghép
+// đúng mối nguy. KHÔNG dùng dwanalytics_report_form_section_field: bảng đó không có section và còn ô thừa
+// (HIRA-11 có 3 DUE DATE cho 2 mối nguy). Chỉ để hiển thị: Target và trạng thái của report không đổi.
+let hiraLoaded=false, hiraClsMap={}, hiraHazardMap={};
+async function loadHiraHazards(ids){
+  const list=[...ids], chunks=[];
+  for(let i=0;i<list.length;i+=8) chunks.push(list.slice(i,i+8).map(id=>'report_id eq '+id).join(' or '));
+  const flt="(field_name eq 'SPECIFIC COMPONENTS OF THE GENERIC HAZARD' or field_name eq 'DUE DATE' or field_name eq 'CURRENT RISK RATING')";
+  const raw=(await Promise.all(chunks.map(c=>fetchAll(G_URL+'dwanalytics_report_field?$select=report_id,section_id,field_name,value_text&$filter='+encodeURIComponent('('+c+') and '+flt), true)))).flat();
+  const secs={};
+  raw.forEach(f=>{
+    const o=(secs[f.report_id+'|'+f.section_id] ||= {report_id:f.report_id,comp:'',due:null,risk:null});
+    if(f.field_name==='DUE DATE') o.due=f.value_text ? String(f.value_text).slice(0,10) : null;
+    else if(f.field_name==='CURRENT RISK RATING') o.risk=f.value_text||null;
+    else o.comp=mosrPlain(f.value_text);
+  });
+  // Số thứ tự người nhập ghi đầu mô tả ("2. ..."); không có số thì xếp sau
+  const no=x=>{ const m=x.comp.match(/^(\d+)\s*[.)]/); return m?+m[1]:99; };
+  const m={};
+  Object.values(secs).forEach(o=>(m[o.report_id] ||= []).push(o));
+  Object.values(m).forEach(a=>a.sort((x,y)=>no(x)-no(y)||x.comp.localeCompare(y.comp)));
+  return m;
+}
 async function loadHiraCls(){
   const ids=new Set(allData.filter(r=>r.report_title===HIRA_TITLE).map(r=>r.report_id));
   const flt=Object.keys(HIRA_CLS).map(n=>"list_name eq '"+n+"'").join(' or ');
-  const raw=await fetchAll(G_URL+'dwanalytics_report_classification_field?$select=report_id,list_name,value_text&$filter='+encodeURIComponent(flt), true);
+  const [raw,hazards]=await Promise.all([
+    fetchAll(G_URL+'dwanalytics_report_classification_field?$select=report_id,list_name,value_text&$filter='+encodeURIComponent(flt), true),
+    loadHiraHazards(ids)
+  ]);
   const m={};
   raw.forEach(r=>{
     const k=HIRA_CLS[r.list_name];
@@ -5334,7 +5360,7 @@ async function loadHiraCls(){
     const o=(m[r.report_id] ||= {});
     o[k]=o[k] ? o[k]+', '+r.value_text : r.value_text;
   });
-  hiraClsMap=m; hiraLoaded=true;
+  hiraClsMap=m; hiraHazardMap=hazards; hiraLoaded=true;
 }
 // [r172] AMO - Additional Mitigation (VJC-AMO-CAPA-xx) — theo dõi như PAVOI: từng Task/RFI của workflow,
 // hạn và overdue (Eric 28/09/2026). Probe 28/09: 8 report (Test-CAPA-01 là form khác, report_title
