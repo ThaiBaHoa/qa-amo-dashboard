@@ -2532,7 +2532,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.04-r221-i2';
+const APP_REV = '2026.11.04-r221-i3';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -5349,13 +5349,15 @@ let hiraLoaded=false, hiraClsMap={}, hiraHazardMap={};
 async function loadHiraHazards(ids){
   const list=[...ids], chunks=[];
   for(let i=0;i<list.length;i+=8) chunks.push(list.slice(i,i+8).map(id=>'report_id eq '+id).join(' or '));
-  const flt="(field_name eq 'SPECIFIC COMPONENTS OF THE GENERIC HAZARD' or field_name eq 'DUE DATE' or field_name eq 'CURRENT RISK RATING' or field_name eq 'DATE VERIFIED' or field_name eq 'Date verified')";
-  const raw=(await Promise.all(chunks.map(c=>fetchAll(G_URL+'dwanalytics_report_field?$select=report_id,section_id,field_name,value_text&$filter='+encodeURIComponent('('+c+') and '+flt), true)))).flat();
-  const secs={}, verified={};
+  const flt="(field_name eq 'SPECIFIC COMPONENTS OF THE GENERIC HAZARD' or field_name eq 'DUE DATE' or field_name eq 'CURRENT RISK RATING' or field_name eq 'DATE VERIFIED' or field_name eq 'Date verified' or field_name eq 'HOW MANY SPECIFIC COMPONENTS OF THE GENERIC HAZARD?')";
+  const raw=(await Promise.all(chunks.map(c=>fetchAll(G_URL+'dwanalytics_report_field?$select=report_id,section_id,field_name,value_text,report_field_created_date&$filter='+encodeURIComponent('('+c+') and '+flt), true)))).flat();
+  const secs={}, verified={}, howMany={};
   raw.forEach(f=>{
     // DATE VERIFIED ở mục VERIFICATION, 1 ô/report, không thuộc mối nguy nào
     if(/^date verified$/i.test(f.field_name)){ const v=f.value_text?String(f.value_text).slice(0,10):null; if(v && !(verified[f.report_id]>v)) verified[f.report_id]=v; return; }
-    const o=(secs[f.report_id+'|'+f.section_id] ||= {report_id:f.report_id,comp:'',due:null,risk:null});
+    if(f.field_name.startsWith('HOW MANY')){ howMany[f.report_id]=parseInt(f.value_text,10)||0; return; }
+    const o=(secs[f.report_id+'|'+f.section_id] ||= {report_id:f.report_id,comp:'',due:null,risk:null,created:f.report_field_created_date});
+    if(f.report_field_created_date<o.created) o.created=f.report_field_created_date;
     if(f.field_name==='DUE DATE') o.due=f.value_text ? String(f.value_text).slice(0,10) : null;
     else if(f.field_name==='CURRENT RISK RATING') o.risk=f.value_text||null;
     else o.comp=mosrPlain(f.value_text);
@@ -5364,7 +5366,13 @@ async function loadHiraHazards(ids){
   const no=x=>{ const m=x.comp.match(/^(\d+)\s*[.)]/); return m?+m[1]:99; };
   const m={};
   Object.values(secs).forEach(o=>(m[o.report_id] ||= []).push(o));
-  Object.values(m).forEach(a=>a.sort((x,y)=>no(x)-no(y)||x.comp.localeCompare(y.comp)));
+  // Giảm HOW MANY trên form chỉ ẩn mục thừa, dữ liệu vẫn còn (HIRA-05: khai 1, có 2; mục ẩn tạo sau, due trống).
+  // Bảng không có cờ ẩn: giữ các mục tạo sớm nhất. HOW MANY lớn hơn số mục thì giữ nguyên, không tự thêm.
+  Object.keys(m).forEach(id=>{
+    const n=howMany[id];
+    if(n>0 && m[id].length>n) m[id]=m[id].sort((x,y)=>String(x.created).localeCompare(String(y.created))||(y.due?1:0)-(x.due?1:0)).slice(0,n);
+    m[id].sort((x,y)=>no(x)-no(y)||x.comp.localeCompare(y.comp));
+  });
   return {hazards:m, verified};
 }
 async function loadHiraCls(){

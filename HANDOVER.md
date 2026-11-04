@@ -5,6 +5,10 @@
 
 ---
 
+## ✅ r221-i3 — HIRA chỉ tính mối nguy theo ô HOW MANY (04/11/2026, EricThai)
+- Eric phát hiện HIRA-05 có due nhưng báo `1 hazard no due date`. Form khai 1 mối nguy; mục thứ 2 bị ẩn vẫn còn trong `dwanalytics_report_field`. Bảng không có cờ ẩn nên giữ các mục tạo sớm nhất theo HOW MANY.
+- Chưa xử lý: HIRA-09 khai 4 có 3, HIRA-17 khai 3 có 2. Giữ nguyên, không báo đỏ, chờ Eric quyết.
+
 ## ✅ r221-i2 — hai câu trong User guide (04/11/2026, EricThai)
 - Chỉ sửa chữ ở `beta-src/guide.js`. Câu Work Queue 'Select a row' đã đúng: bấm thử trên live mở được chi tiết. Manual rời dựng lại theo bản live: `HuongDan_SuDung_QA_AMO_Dashboard_r221.docx`, ảnh `manual-shots-r220/` chụp lại Overview và Export reports.
 
