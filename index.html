@@ -5770,13 +5770,14 @@ function scrGuideNew(){
     '<p>Seven sections, named after the work they support:</p>'
     + '<table><tr><th>Section</th><th>Use it to</th></tr>'
     + '<tr><td>Overview</td><td>See key indicators for the selected period. Every tile opens the report list behind it.</td></tr>'
-    + '<tr><td>Work Queue</td><td>Act on reports: Open reports, Overdue, and PAVOI awaiting verification.</td></tr>'
-    + '<tr><td>Findings</td><td>Read the register by form: All forms, PAVOI / MVOI, CMR-CAR, ECAR, AMO-ECAR, MCAR, MOSR.</td></tr>'
+    + '<tr><td>Work Queue</td><td>Act on reports: Open reports, Overdue, and PAVOI / MVOI awaiting verification.</td></tr>'
+    + '<tr><td>Reports</td><td>Read the register by form: All forms, PAVOI / MVOI, CMR-CAR, ECAR, AMO-ECAR, MCAR, MOSR.</td></tr>'
     + '<tr><td>Analytics</td><td>KPI charts, SPI, OSR/MOSR Status, MOSR charts, Early detection (KPI 2) and Event/IR report status on Coruson.</td></tr>'
     + '<tr><td>Audit Plan</td><td>The audit and inspection programme: timeline, schedule list and workflow stages.</td></tr>'
     + '<tr><td>Library</td><td>Controlled documents and this guide.</td></tr>'
-    + '<tr><td>Admin</td><td>User management, report export and pinned widgets (administrators).</td></tr></table>'
-    + '<p><b>Filter bar.</b> <b>Year</b> and <b>Month</b> are multi-select (for example Jul–Sep, or 2025 and 2026 together; the Q1–Q4 buttons pick a quarter). The filter stays when you change section. The chips under the bar show what is filtered; <b>Clear all</b> returns to the current year.</p>'
+    + '<tr><td>Admin</td><td>User management, report export and pinned widgets (administrators; a moderator sees report export only).</td></tr></table>'
+    + '<p><b>Roles.</b> <b>User</b>: view only, no Admin section. <b>Moderator</b>: also report exports and the AI Assistant. <b>Admin</b>: also User management and My dashboard.</p>'
+    + '<p><b>Filter bar.</b> <b>Year</b> and <b>Month</b> are multi-select (for example Jul–Sep, or 2025 and 2026 together; the Q1–Q4 buttons pick a quarter). The filter stays when you change section. The chips under the bar show what is filtered; <b>Clear all</b> returns to the current year. Library and Admin do not show the bar; Admin › Export reports uses the filter set on another screen.</p>'
     + '<p><b>Search</b> (Ctrl K) finds report numbers, audit numbers and titles, aircraft and people. The moon/sun button switches dark and light theme.</p>'
     + '<p><b>Open in Coruson.</b> The ↗ next to a report or audit number, and the <b>Open in Coruson</b> button at the top of a detail window, open that record on Coruson in a new tab (you need to be signed in to Coruson).</p>')
   + sec('terms','Status, CAT and forms',
@@ -5802,18 +5803,22 @@ function scrGuideNew(){
   + sec('screens','Screens',
     '<ul><li><b>Overview</b>: key indicators (including audits completed against the plan with those delayed past their scheduled month, open and overdue PAVOI / MVOI, reports closed late, MCAR under extension, overdue mitigation tasks from HIRA / CAPA and F-088 / investigation reports overdue themselves or through a corrective action), overdue reports by CAT with the most overdue, open reports by form, recent report events.</li>'
     + '<li><b>Work Queue</b>: Open reports (nearest target first), Overdue (with CAT), Awaiting verification (open PAVOI / MVOI with no verification round). Select a row to open the report.</li>'
-    + '<li><b>Reports › All forms</b>: every report type. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings).</li>'
+    + '<li><b>Reports › All forms</b>: every report type. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings). With <b>MCCF</b> selected the list covers every unit on Coruson, with an Org unit column; MCCF outside QA AMO appear only here and are not counted in KPIs, Overview, Work Queue or Export.</li>'
     + '<li><b>Reports › PAVOI / MVOI</b>: register on the left (Form filter: PAVOI or MVOI), record on the right with the verification history and the RFI / Task list of open records. KPI 7 counts PAVOI and MVOI.</li>'
     + '<li><b>Reports › MOSR</b>: every MOSR by submitted date, with its classifications from Coruson. OSR forms carry no classifications; their counts are in Analytics › OSR/MOSR Status.</li>'
+    + '<li><b>Analytics › KPI charts</b>: summary tiles, Closure by quarter, KPI 2, KPI 7 and KPI QC. Select a tile or a count for the reports behind it; closing a detail returns to that list.</li>'
+    + '<li><b>Analytics › OSR/MOSR Status</b>: OSR and MOSR closed, open and total for each MSAG group on Coruson. It counts all the data of these groups and ignores the Year and Month filter, so its figures differ from Reports › MOSR.</li>'
+    + '<li><b>Analytics › MOSR charts</b>: form MOSR by department, occurrence category and base, by submitted date. Year and month come from the filter bar, the quarter is chosen in the tab. A report with two departments counts in both; occurrence category holds the groups under Technical only, and the caption states the reports not classified or outside Technical.</li>'
     + '<li><b>Analytics › Event/IR report status</b>: EIS and F-088 completeness on Coruson; the tiles count the reports complete on each check, the table shows workflow, linked reports, final report and status per report.</li>'
-    + '<li><b>Audit Plan</b>: KPI tiles, a location × month view (one dot per audit in its scheduled month; filter by type or show only upcoming / with overdue findings), and a schedule list. Select a dot or a row for its workflow stages and findings. <b>Workflow stages</b>: for the QA AMO audits in the selected period, how many stages of each name are in each Galileo status; select an InProgress or PendingSignOff count for the audits concerned.</li>'
+    + '<li><b>Audit Plan</b>: KPI tiles, a location × month view (one dot per audit, inspection or surveillance in its scheduled month; filter by type or show only upcoming / with overdue findings), and a schedule list. Select a dot or a row for its workflow stages and findings. <b>Workflow stages</b>: for the QA AMO audits in the selected period, how many stages of each name are in each Galileo status; select an InProgress or PendingSignOff count for the audits concerned.</li>'
     + '<li><b>Library › Documents</b>: browse by document type; the document number opens copyholders (on time, late, overdue) and the workflow.</li></ul>')
   + sec('export','Exports',
-    '<p><b>Admin › Export reports</b> (administrators):</p>'
+    '<p><b>Admin › Export reports</b> (administrators and moderators):</p>'
     + '<ul><li><b>Export PDF</b>: report on the VietJet letterhead with KPIs, charts, form summary and detail by form.</li>'
     + '<li><b>Export Excel</b>: KPI summary, form summary and every record.</li>'
-    + '<li><b>Overdue workbook / Overdue PDF</b>: the weekly overdue report — every overdue report and every open report due within 7 days, with department, deadline and extensions.</li></ul>'
-    + '<p>Year and month come from the filter bar; form and status are chosen on the screen. CMR-CAR and ECAR (TQA) are not part of these exports.</p>')
+    + '<li><b>Overdue workbook / Overdue PDF</b>: the weekly overdue report — every overdue report and every open report due within 7 days, with department, owner, who it is pending with, deadline and extensions. It ignores the year and month filters; only the form applies.</li>'
+    + '<li><b>MCAR &amp; Surveillance report</b>: every MCAR and Surveillance Report submitted in a date range, any status, in the layout of the S&amp;C analysis workbook. It ignores the filter bar.</li></ul>'
+    + '<p>For Export PDF and Export Excel, year and month come from the filter bar (set them on another screen, then come back); form and status are chosen on the screen. CMR-CAR and ECAR (TQA), and MCCF outside QA AMO, are not part of these two exports. A list opened from KPI charts has its own <b>Export Excel</b> button.</p>')
   + sec('data','Data sources and refresh',
     '<ul><li>Reports, audits, workflow and documents come from Coruson through Galileo; accounts from the dashboard user list.</li>'
     + '<li>The dashboard keeps a copy on your computer. A copy younger than 4 hours opens at once; an older copy opens at once and refreshes in the background.</li>'
@@ -5821,10 +5826,10 @@ function scrGuideNew(){
     + '<li>A tile or table that shows a dash or "Loading…" is waiting for its data; it never shows 0 for data that has not arrived.</li>'
     + '<li>If a number looks wrong, check the record in Coruson first: the dashboard shows what Coruson holds.</li></ul>')
   + sec('led','LED wall mode',
-    '<p>Open the dashboard with <b>?kiosk=1</b> at the end of the address (or <b>?kiosk=60</b> for 60 seconds per page). The screen rotates Overview → Report status EIS → Report status F-088 → SPI → OSR/MOSR Status → Audit Plan timeline, without the navigation. Press Esc to stop. Use one browser window; the data refreshes itself every 12 hours without reloading the page.</p>')
+    '<p>Open the dashboard with <b>?kiosk=1</b> at the end of the address (30 seconds per page), or <b>?kiosk=60</b> for 60 seconds per page (5 to 600 seconds). The screen rotates Overview → Report status EIS → Report status F-088 → SPI → OSR/MOSR Status → Audit Plan timeline, without navigation, search, tabs or filters. Pages scale to the height of the wall. A page still longer than the wall stays 4 seconds at the top, scrolls slowly to the bottom and stays 4 seconds, so it can stay longer than the seconds you set. Press Esc to stop. Sign in on the tab on show and keep it open; use one browser window. The data refreshes itself every 12 hours, and the page reloads when a new day starts.</p>')
   + sec('faq','Questions',
     '<p><b>The first opening is slow.</b> The first load of the day on a computer fetches everything from Galileo. Later openings use the saved copy.</p>'
-    + '<p><b>I cannot see Admin screens.</b> They are for administrators. Ask an administrator to change your role.</p>'
+    + '<p><b>I cannot see Admin screens, export buttons or the AI Assistant.</b> The User role is view only. Ask an administrator to change your role.</p>'
     + '<p><b>How do I add a user?</b> The user chooses Request an account; an administrator approves it in Admin › User management.</p>'
     + '<p><b>Where is the previous dashboard?</b> It is kept as a backup at <b>/classic.html</b>.</p>'
     + '<p><b>How do I report a problem?</b> <b>Send feedback</b> (under your name in the sidebar, or in the More menu on a phone) sends your message to the dashboard owner, with the screen you are on.</p>');

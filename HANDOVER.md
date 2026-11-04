@@ -5,22 +5,27 @@
 
 ---
 
-## ✅ r220 — MCCF mọi đơn vị trong All forms (03/11/2026, EricThai) — chưa push
+## ✅ r220-i1 — User guide khớp r220 (04/11/2026, EricThai)
+- Chỉ sửa chữ ở Library › User guide, nguồn vault `beta-src/guide.js`. Không đổi số liệu, tính năng, bố cục. Chọn -i1 vì không đổi tính năng, theo checklist `cap-nhat-revision`.
+- Manual rời dựng lại: `HuongDan_SuDung_QA_AMO_Dashboard_r220.docx` từ `beta-src/manual.js`, ảnh `manual-shots-r220/`.
+- Eric cần xem: mũi tên ô Overdue trên Overview hiện +30 khi Overdue là 18 (`seriesFor` tính điểm tháng hiện tại tới cuối tháng); Admin › Export reports ghi lấy kỳ từ filter bar nhưng màn này không có thanh lọc.
+
+## ✅ r220 — MCCF mọi đơn vị trong All forms (03/11/2026, EricThai)
 - Eric hỏi vì sao thiếu MCCF: 46/61 report ở đơn vị ngoài QA AMO bị `orgUnitFilter` loại. Eric chọn nạp thêm, chỉ MCCF.
 - Kiểm local: 46 dòng, 2026 hiện 26; `allData` trước và sau đều 3676, Open 83, Overdue 24. Chưa bấm thử mở chi tiết report ngoài QA AMO, chưa chạy lại `M.consistency`.
 - ⚠ Export Excel của All forms chưa gồm 46 report này. INTERNAL MOR, MOR, Confidential MOSR, Spot Check thiếu cùng nguyên nhân: danh sách cho các ban ở vault `02-Bao-Cao/Coruson/Danh-sach-form-theo-bo-phan-AOC-AMO-2026-11-03.xlsx`.
 
-## ✅ r219 — màn LED (03/11/2026, EricThai) — chưa push
+## ✅ r219 — màn LED (03/11/2026, EricThai)
 - Eric: tỷ lệ chưa cân đối, trang không hiện đủ thông tin, search vô ích trên màn trình chiếu. Nguồn: vault `beta-src/screens2.js` (`kioskFit`), `screens.js` (`plainTable`), `beta-template.html` (CSS `body.kiosk`).
 - Kiểm local cửa sổ 1912×867: đủ 6 trang; EIS hiện đủ 7 report; Timeline 0 bộ lọc; Esc thoát đúng; console sạch.
 - Chưa kiểm: máy LED thật, chế độ tối. Trang dài làm vòng xoay dài hơn số giây đặt trong `?kiosk=`.
 
-## ✅ r218 — MOSR charts trong Analytics (03/11/2026, EricThai) — chưa push
+## ✅ r218 — MOSR charts trong Analytics (03/11/2026, EricThai)
 - Eric yêu cầu đưa biểu đồ của file Excel vào, không kèm bảng, lọc theo tháng / quý / năm.
 - ⚠ 2026: 193 MOSR = 88 trong Technical + 94 ngoài Technical + 11 chưa phân loại. Dòng chú thích trên tab ghi rõ.
 - Kiểm local: Q4 = 35 report khớp đếm độc lập; màu giữ theo bộ phận khi đổi kỳ. Chỉ kiểm ở bản đủ r220.
 
-## ✅ r217 — tab MOSR trong Reports (03/11/2026, EricThai) — chưa push
+## ✅ r217 — tab MOSR trong Reports (03/11/2026, EricThai)
 - Eric gửi file `MOSR Database - Dashboard.xlsx`: thay tab OSR / MOSR bằng bảng theo file, bỏ 4 cột vàng. Eric chốt Occurrence Category chỉ lấy nhóm dưới Technical.
 - ⚠ Chỉ form MOSR: probe 03/11 không report OSR nào có Classifications. Phân loại MOSR mới có từ 2026 (2025: 1/348).
 - Kiểm local dữ liệu thật 2026: 193 report; 6/6 dòng Excel khớp Base, ORC, Hazard, Hazard type, Occurrence, Status; 0529 lệch Report Owner và Department vì Coruson khác file. Chỉ kiểm ở bản đủ r220, bản r217 riêng chỉ qua build.
