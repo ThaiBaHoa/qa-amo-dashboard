@@ -6,7 +6,7 @@
 ---
 
 ## ✅ r221-i2 — hai câu trong User guide (04/11/2026, EricThai)
-- Chỉ sửa chữ ở `beta-src/guide.js`. Câu Work Queue 'Select a row' đã đúng: bấm thử trên live mở được chi tiết. Manual r220 chờ push để chụp lại Overview và Export reports.
+- Chỉ sửa chữ ở `beta-src/guide.js`. Câu Work Queue 'Select a row' đã đúng: bấm thử trên live mở được chi tiết. Manual rời dựng lại theo bản live: `HuongDan_SuDung_QA_AMO_Dashboard_r221.docx`, ảnh `manual-shots-r220/` chụp lại Overview và Export reports.
 
 ## ✅ r221-i1 — thanh lọc ở Export reports (04/11/2026, EricThai)
 - Thanh lọc hiện ở riêng tab Export reports, User management và My dashboard vẫn không có. Weekly overdue và MCAR & Surveillance vẫn không theo bộ lọc.
