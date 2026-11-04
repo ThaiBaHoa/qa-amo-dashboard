@@ -5,6 +5,9 @@
 
 ---
 
+## ✅ r220-i2 — Glossary classic có MVOI (04/11/2026, EricThai)
+- Eric yêu cầu làm luôn việc r200 để lại. Chỉ thêm một mục chữ trong `classic.html`, tên lấy từ tiêu đề form MVOI Rev 7 trên Coruson. Chọn -i2 vì không đổi tính năng.
+
 ## ✅ r220-i1 — User guide khớp r220 (04/11/2026, EricThai)
 - Chỉ sửa chữ ở Library › User guide, nguồn vault `beta-src/guide.js`. Không đổi số liệu, tính năng, bố cục. Chọn -i1 vì không đổi tính năng, theo checklist `cap-nhat-revision`.
 - Manual rời dựng lại: `HuongDan_SuDung_QA_AMO_Dashboard_r220.docx` từ `beta-src/manual.js`, ảnh `manual-shots-r220/`.
