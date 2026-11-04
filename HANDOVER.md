@@ -5,6 +5,9 @@
 
 ---
 
+## ✅ r221-i1 — thanh lọc ở Export reports (04/11/2026, EricThai)
+- Thanh lọc hiện ở riêng tab Export reports, User management và My dashboard vẫn không có. Weekly overdue và MCAR & Surveillance vẫn không theo bộ lọc.
+
 ## ✅ r221 — AMO - HIRA chấm theo DUE DATE và DATE VERIFIED (04/11/2026, EricThai)
 - Eric chốt: mỗi Specific component là 1 mối nguy có DUE DATE riêng; Target = due lớn nhất; đúng hạn hay trễ so với DATE VERIFIED; thiếu dữ liệu báo đỏ, không suy từ nguồn khác.
 - ⚠ Phần đầu code HIRA (`loadHiraHazards`, `hiraHazardMap`) lọt vào commit r220-i3 (409056d) vì hai phiên cùng sửa một repo; Eric chọn commit nối tiếp, không viết lại lịch sử.

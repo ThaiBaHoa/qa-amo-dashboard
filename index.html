@@ -2963,7 +2963,8 @@ const FILTERED_SCREENS = ['overview','work','findings','audit','analytics'];
 /* No Department filter (Eric 23/09/2026): the field means a different thing per form (PAVOI owner
    section, CMR-CAR department, none on ECAR), so filtering by it emptied whole tabs */
 function renderFilterBar(){
-  const on = FILTERED_SCREENS.includes(state.screen);
+  /* Admin › Export reports reads the period from this bar (Eric 04/11/2026) */
+  const on = FILTERED_SCREENS.includes(state.screen) || (state.screen === 'admin' && state.tab.admin === 'exports');
   $('#filterbar').hidden = !on;
   if(!on) return;
   const f = state.filters, chips = [];
@@ -5812,7 +5813,7 @@ function scrGuideNew(){
     + '<tr><td>Library</td><td>Controlled documents and this guide.</td></tr>'
     + '<tr><td>Admin</td><td>User management, report export and pinned widgets (administrators; a moderator sees report export only).</td></tr></table>'
     + '<p><b>Roles.</b> <b>User</b>: view only, no Admin section. <b>Moderator</b>: also report exports and the AI Assistant. <b>Admin</b>: also User management and My dashboard.</p>'
-    + '<p><b>Filter bar.</b> <b>Year</b> and <b>Month</b> are multi-select (for example Jul–Sep, or 2025 and 2026 together; the Q1–Q4 buttons pick a quarter). The filter stays when you change section. The chips under the bar show what is filtered; <b>Clear all</b> returns to the current year. Library and Admin do not show the bar; Admin › Export reports uses the filter set on another screen.</p>'
+    + '<p><b>Filter bar.</b> <b>Year</b> and <b>Month</b> are multi-select (for example Jul–Sep, or 2025 and 2026 together; the Q1–Q4 buttons pick a quarter). The filter stays when you change section. The chips under the bar show what is filtered; <b>Clear all</b> returns to the current year. Library and Admin do not show the bar, except Admin › Export reports.</p>'
     + '<p><b>Search</b> (Ctrl K) finds report numbers, audit numbers and titles, aircraft and people. The moon/sun button switches dark and light theme.</p>'
     + '<p><b>Open in Coruson.</b> The ↗ next to a report or audit number, and the <b>Open in Coruson</b> button at the top of a detail window, open that record on Coruson in a new tab (you need to be signed in to Coruson).</p>')
   + sec('terms','Status, CAT and forms',
@@ -5853,7 +5854,7 @@ function scrGuideNew(){
     + '<li><b>Export Excel</b>: KPI summary, form summary and every record.</li>'
     + '<li><b>Overdue workbook / Overdue PDF</b>: the weekly overdue report — every overdue report and every open report due within 7 days, with department, owner, who it is pending with, deadline and extensions. It ignores the year and month filters; only the form applies.</li>'
     + '<li><b>MCAR &amp; Surveillance report</b>: every MCAR and Surveillance Report submitted in a date range, any status, in the layout of the S&amp;C analysis workbook. It ignores the filter bar.</li></ul>'
-    + '<p>For Export PDF and Export Excel, year and month come from the filter bar (set them on another screen, then come back); form and status are chosen on the screen. CMR-CAR and ECAR (TQA), and MCCF outside QA AMO, are not part of these two exports. A list opened from KPI charts has its own <b>Export Excel</b> button.</p>')
+    + '<p>For Export PDF and Export Excel, year and month come from the filter bar; form and status are chosen on the screen. CMR-CAR and ECAR (TQA), and MCCF outside QA AMO, are not part of these two exports. A list opened from KPI charts has its own <b>Export Excel</b> button.</p>')
   + sec('data','Data sources and refresh',
     '<ul><li>Reports, audits, workflow and documents come from Coruson through Galileo; accounts from the dashboard user list.</li>'
     + '<li>The dashboard keeps a copy on your computer. A copy younger than 4 hours opens at once; an older copy opens at once and refreshes in the background.</li>'
