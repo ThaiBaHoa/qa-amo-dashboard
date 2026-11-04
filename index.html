@@ -1570,6 +1570,7 @@ function base(r, form){
     auditTitle: orDash(r.audit_title),
     location: orDash(auById[r.audit_id] && auById[r.audit_id].location_name),
     raised: day(r.raised_date), target: day(r.Target_date), closed: day(r.close_date),
+    gradedOnVerify: r.report_title === HIRA_TITLE, verified: day(r.verified_date), hazardsNoDue: r.hazards_no_due || 0,
     status: r.semantic_status, cat: CAT[r.overdue_cat] || null, dtd: r.report_ageing,
     isClosed: CLOSED.has(r.semantic_status),
     progress: false, level: orDash(r.finding_level), repetitive: false, auditId: r.audit_id || null,
@@ -2261,7 +2262,7 @@ function buildReports(){
 }
 function fromReal(r){
   return Object.assign({}, r, {
-    raised: realDay(r.raised), target: realDay(r.target), closed: realDay(r.closed),
+    raised: realDay(r.raised), target: realDay(r.target), closed: realDay(r.closed), verified: realDay(r.verified),
     firstVerified: (r.form === 'pavoi' || r.form === 'mvoi') ? realDay(r.firstVerified) : undefined,
     rounds: (r.rounds || []).map(v => Object.assign({}, v, { date: realDay(v.date) }))
   });
@@ -2852,8 +2853,23 @@ function extBtn(kind, id){
   return u ? '<a class="ext-btn" href="'+u+'" target="_blank" rel="noopener">Open in Coruson <span aria-hidden="true">↗</span></a>' : '';
 }
 function catChip(c){ return c ? '<span class="cat c'+({'I':1,'II':2,'III':3}[c])+'">CAT '+c+'</span>' : '<span class="dim">—</span>'; }
+/* AMO - HIRA: a date the rule needs is missing on Coruson (Eric 04/11/2026) */
+const missingData = t => '<span class="cat c3 od-nowrap">'+t+'</span>';
 function dueCell(r){
-  if(r.closed) return '<span class="num dim">'+fmtShort(r.closed)+'</span>';
+  if(!r.hazardsNoDue) return dueCount(r);
+  return '<span style="display:grid;gap:4px;justify-items:end">'+dueCount(r)+missingData(r.hazardsNoDue+(r.hazardsNoDue === 1 ? ' hazard' : ' hazards')+' no due date')+'</span>';
+}
+function dueCount(r){
+  if(r.gradedOnVerify && !r.target) return missingData('Missing due date');
+  /* a closed report counts too (Eric 04/11/2026): closed date against target, by day as semCalc grades it.
+     AMO - HIRA is graded on its verification date instead. */
+  if(r.closed){
+    if(!r.target) return '<span class="dim od-nowrap">no target</span>';
+    if(r.gradedOnVerify && !r.verified) return missingData('Missing verify date');
+    const dayOf = d => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+    const late = Math.round((dayOf(r.gradedOnVerify ? r.verified : r.closed) - dayOf(r.target))/864e5);
+    return '<span class="num dim od-nowrap">'+(late > 0 ? late+'d late' : late < 0 ? -late+'d early' : 'on due date')+'</span>';
+  }
   if(!isOpen(r)) return '<span class="dim od-nowrap">closed · no date</span>';
   const d = r.dtd;
   if(d === null || d === undefined) return '<span class="dim od-nowrap">no target</span>';
@@ -4207,7 +4223,7 @@ function drillOpen(){
   MODAL_KEY = 'drill'; MODAL_REDRAW = drillOpen; DRILL.detail = false;
   if(kind === 'audits') return drillAudits(label);
   const { title, list:src, d } = drillSrc();
-  const late = r => r.target ? dayDiff(r.closed || TODAY, r.target) : null;
+  const late = r => r.target ? dayDiff((r.gradedOnVerify ? r.verified : r.closed) || TODAY, r.target) : null;
   const list = src.slice().sort((a, b) => d.days ? (late(b) || 0) - (late(a) || 0) : (b.raised || 0) - (a.raised || 0));
   const cols = [{l:'Report'},{l:'Form'},{l:'Status'},{l:'Owner'},{l:'Raised'},{l:'Target'},{l:'Closed'}].concat(d.days ? [{l:'Days late',ar:true}] : []);
   openModal(title, list.length+' report'+(list.length === 1 ? '' : 's')+' · select a report for its detail',
@@ -4552,7 +4568,7 @@ function scrAllForms(){
   const w = hira && (lazyState('hira', () => A.loadHira(), () => A.hira().loaded, 'HIRA classifications')
     || lazyState('capa', () => A.loadCapa(), () => A.capa().loaded, 'Additional Mitigation (CAPA) links'));
   if(w) return w;
-  const cfg = { cols: hira ? ['number','status','hiraMethod','hazardType','addMitig','owner','raised','target','dtd','hiraDue']
+  const cfg = { cols: hira ? ['number','genHazard','status','hiraMethod','hazardType','addMitig','owner','raised','target','dtd']
                            : pv ? ['number','form','status','rfv','raisedBy','pvOwner','raised','target','dtd','rfi']
                            : BS.afForm === 'MCCF' ? ['number','orgUnit','status','summary','owner','issued','raised','target','dtd','cat','rfi']
                            : ['number','form','status','summary','owner','issued','raised','target','dtd','cat','rfi'],   /* r191: + Summary, RFI · r194: + Issued to */
@@ -4567,16 +4583,6 @@ function scrAllForms(){
 }
 /* AMO - HIRA classification columns (values from loadHiraCls; '—' when the report has none) */
 const hiraCls = (r, k) => ((API().hira().map || {})[r.id] || {})[k] || '';
-/* Each specific component is a hazard with its own due date (Eric 04/11/2026). Shown beside Target, which stays the
-   workflow date the status is graded on. */
-const hiraHazards = r => (API().hira().hazards || {})[r.id] || [];
-function hiraDueCell(r){
-  const L = hiraHazards(r);
-  if(!L.length) return '<span class="dim">—</span>';
-  return '<span style="display:grid;gap:4px;min-width:260px;max-width:380px">' + L.map(h => '<span class="od-row" style="--od-gap:8px;align-items:baseline">'
-    + '<span class="num t-small" style="white-space:nowrap">'+fdx(h.due)+'</span>'
-    + '<span class="t-small dim od-clamp-2" title="'+esc(h.comp)+'">'+esc(h.comp || '—')+'</span></span>').join('') + '</span>';
-}
 const hiraCell = v => v ? '<span class="t-small">'+esc(v)+'</span>' : '<span class="dim">—</span>';
 const rfvCell = r => r.finding && r.finding !== '—'
   ? '<span class="t-small od-clamp-3" style="min-width:220px;max-width:360px" title="'+esc(r.finding)+'">'+esc(r.finding)+'</span>'
@@ -4591,7 +4597,7 @@ Object.assign(COL, {
   hiraMethod:{ l:'HIRA method', v:r=>hiraCls(r,'method') || 'zzz', c:r=>hiraCell(hiraCls(r,'method')) },
   hazardType:{ l:'Hazard type', v:r=>hiraCls(r,'type') || 'zzz', c:r=>hiraCell(hiraCls(r,'type')) },
   addMitig:{ l:'Additional mitigation', v:r=>hiraCls(r,'mitig') || 'zzz', c:hiraMitigCell },
-  hiraDue:{ l:'Due date by hazard', v:r=>hiraHazards(r).map(h => h.due || '').filter(Boolean).sort().join(', ') || 'zzz', c:hiraDueCell }
+  genHazard:{ l:'Generic Hazard', v:r=>hiraCls(r,'generic') || 'zzz', c:r=>{ const v = hiraCls(r,'generic'); return v ? '<span class="t-small od-clamp-3" style="min-width:200px;max-width:320px" title="'+esc(v)+'">'+esc(v)+'</span>' : '<span class="dim">—</span>'; } }
 });
 /* r173: the CAPA reports that name this HIRA in their Report Reference (classic loadCapa → hiraCapaMap).
    A CAPA number opens the Additional Mitigation register on that record. */
@@ -5227,7 +5233,7 @@ function showReport(id){
         ['Target by rule (raised + 45 d + 30 d per extension)', r.mcar_chk ? fdx(r.mcar_chk.exp_target) + ' · ' + r.mcar_chk.n + ' extension' + (r.mcar_chk.n === 1 ? '' : 's')
           + (r.mcar_chk.target_warn ? ' <span class="t-small dim">(Target date on Coruson differs)</span>' : '') : undefined, true],
         ['Extension 1', r.ext1_date ? fdx(r.ext1_date) : undefined],
-        ['Extension 2', r.ext2_date ? fdx(r.ext2_date) : undefined], ['Date completed', fdx(r.completed_date)], ['Date closed', fdx(r.close_date)]])
+        ['Extension 2', r.ext2_date ? fdx(r.ext2_date) : undefined], ['Date completed', fdx(r.completed_date)], ['Date verified', rep.gradedOnVerify ? (r.verified_date ? fdx(r.verified_date) : missingData('Missing')) : undefined, true], ['Date closed', fdx(r.close_date)]])
       + (rep.code === A.HIRA_TITLE ? hiraHazardBlock(id, 'rpt:'+id) : '')
       + block(isPvForm(rep.form) ? 'Request for verification' : 'Finding', isPvForm(rep.form) ? r.rfv : r.finding_desc)
       /* r190: MCAR extension reason / denial reason as entered on the form (Extension applies to MCAR only) */
@@ -5342,7 +5348,7 @@ function hiraHazardBlock(id, key){
   if(!L.length) return '';
   return '<div style="display:grid;gap:8px"><span class="t-micro">Hazards ('+L.length+')</span>'
     + plainTable('hira-h-'+id, [{l:'Specific component'},{l:'Current risk',fit:true},{l:'Due date',fit:true}],
-        L.map(h => [esc(h.comp || '—'), esc(h.risk || '—'), '<span class="num">'+fdx(h.due)+'</span>']), 30, 0, { compact:true })
+        L.map(h => [esc(h.comp || '—'), esc(h.risk || '—'), h.due ? '<span class="num">'+fdx(h.due)+'</span>' : missingData('Missing')]), 30, 0, { compact:true })
     + '</div>';
 }
 let HIRA_WAIT = null;
@@ -5817,7 +5823,7 @@ function scrGuideNew(){
     + '<tr><td>Lately Closed</td><td>Closed after the target date.</td></tr>'
     + '<tr><td>Closed</td><td>Closed, but without a target or close date, so timeliness cannot be graded.</td></tr></table>'
     + '<p><b>CAT</b> grades overdue reports by days past target: <b>CAT I</b> up to 30 days, <b>CAT II</b> 31–60 days, <b>CAT III</b> more than 60 days.</p>'
-    + '<p><b>Days to due</b> is the number of days left to the target date; a negative value means overdue. <b>Repetitive</b> marks a finding recorded as a repeat.</p>'
+    + '<p><b>Days to due</b> counts days against the target date: days left or over while the report is open, days early or late once it is closed. <b>Repetitive</b> marks a finding recorded as a repeat.</p>'
     + '<p>Status is shown with shape and label as well as colour: an open circle for Open, a solid mark for Overdue, a check for On-time Closed.</p>')
   + sec('kpi','KPI definitions',
     '<table><tr><th>Indicator</th><th>Definition</th></tr>'

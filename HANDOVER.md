@@ -5,6 +5,13 @@
 
 ---
 
+## ✅ r221 — AMO - HIRA chấm theo DUE DATE và DATE VERIFIED (04/11/2026, EricThai)
+- Eric chốt: mỗi Specific component là 1 mối nguy có DUE DATE riêng; Target = due lớn nhất; đúng hạn hay trễ so với DATE VERIFIED; thiếu dữ liệu báo đỏ, không suy từ nguồn khác.
+- ⚠ Phần đầu code HIRA (`loadHiraHazards`, `hiraHazardMap`) lọt vào commit r220-i3 (409056d) vì hai phiên cùng sửa một repo; Eric chọn commit nối tiếp, không viết lại lịch sử.
+- Kiểm local dữ liệu thật 04/11: 24 report = 17 On-time, 4 Lately (02, 06, 14, 15), 2 Closed thiếu ngày verify (18, 25), 1 Overdue (23). HIRA-05 có 1 mối nguy thiếu due. Dữ liệu HIRA đang được sửa trên Coruson nên số có thể đổi.
+- Coruson có 48 bản ghi form này: 24 Closed có số đang hiện, HIRA-24 đã xóa, 14 đã xóa không số, 9 Draft không số; các bản không số bị bộ lọc `report_number` loại như mọi form.
+- Days to due đổi cho mọi form. Chưa kiểm: điện thoại, chế độ tối. Còn tồn: `Cannot set properties of undefined (setting 'err')` trong `lazy` thỉnh thoảng hiện khi mở thẳng All forms lúc đang nạp, chưa rõ nguyên nhân.
+
 ## ✅ r220-i3 — đường xu hướng Overdue (04/11/2026, EricThai)
 - Tháng chưa hết thì so target với hôm nay, không với cuối tháng. Điểm cuối 59 → 25 trên dữ liệu live, 11 tháng trước không đổi. Đường xu hướng vẫn tính mọi năm nên có thể khác số trên ô khi lọc một năm.
 

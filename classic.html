@@ -2532,7 +2532,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.04-r220-i3';
+const APP_REV = '2026.11.04-r221';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3640,6 +3640,22 @@ async function loadData(forceRefresh=false, opts={}) {
     // đúng tên nhóm khi owner là group. Merge vào userMap (user_id/group_id đều UUID, không đụng nhau).
     grpRaw.forEach(gr => { if (gr.group_id && !userMap[gr.group_id]) userMap[gr.group_id] = gr.name || null; });
 
+    // [HIRA] Target = DUE DATE lớn nhất trong các mối nguy; On-time/Lately chấm theo DATE VERIFIED thay cho Closed
+    // date (Eric chốt 04/11/2026). Áp đúng luật, KHÔNG rơi về hạn workflow hay Closed date: thiếu ngày thì semCalc trả
+    // 'Closed' và giao diện báo thiếu dữ liệu màu đỏ. Lỗi nạp thì ghi loadFailures như mọi nguồn khác.
+    let hiraMaxDue = {}, hiraVerified = {}, hiraNoDue = {};
+    const hiraIds = summary.filter(r => r.report_title === HIRA_TITLE).map(r => r.report_id);
+    if (hiraIds.length) {
+      try {
+        const hz = await loadHiraHazards(hiraIds);
+        hiraVerified = hz.verified;
+        Object.keys(hz.hazards).forEach(id => {
+          hiraMaxDue[id] = hz.hazards[id].map(h => h.due).filter(Boolean).sort().pop() || null;
+          hiraNoDue[id] = hz.hazards[id].filter(h => !h.due).length;
+        });
+      } catch (e) { loadFailures.push('HIRA due dates: ' + ((e && e.message) ? e.message : String(e))); }
+    }
+
     // [r165] Nạp ngầm mà thiếu nguồn → GIỮ NGUYÊN bản cũ đầy đủ đang hiện, không thay bằng bản
     // khuyết (mất Target date/Overdue/KPI 7 như lượt 21/09/2026). Chưa đụng allData/auditData.
     if (bgLoad && loadFailures.length) {
@@ -3659,7 +3675,7 @@ async function loadData(forceRefresh=false, opts={}) {
       const sd = deriveStageDates(wfAllMap[r.report_id]);
       // Target date: ưu tiên custom field 'Target date' (Report — mốc chính thức theo QA) → stage Task target (fallback nếu Report trống) → ReportAcceptReject
       // (r102: revert r100. Report Target date mới là chuẩn; stage Workflow có thể lệch — vd MCAR-0363 Report 18/06 vs stage Final Action 22/06.)
-      const td = f['Target date'] || sd.td || wf?.stage_target_date || null;
+      const td = r.report_title === HIRA_TITLE ? (hiraMaxDue[r.report_id] || null) : (f['Target date'] || sd.td || wf?.stage_target_date || null);
       // Completed date: ngày làm xong báo cáo (stage Task)
       const completed_date = sd.completed || null;
       // Close date: đúng ô CLOSED DATE trên Coruson (report_summary.closed_date) — Eric chốt 02/11/2026. KHÔNG suy từ
@@ -3667,13 +3683,16 @@ async function loadData(forceRefresh=false, opts={}) {
       const cd = r.closed_date || null;
 
       const ag = ageCalc(td);
-      const sm = semCalc(r.report_status, cd, td);
+      const verified = r.report_title === HIRA_TITLE ? (hiraVerified[r.report_id] || null) : undefined;
+      const sm = semCalc(r.report_status, r.report_title === HIRA_TITLE ? verified : cd, td);
       const mcarChk = (r.report_title==='MCAR') ? buildMcarDeadlineChk(r.raised_date, f, td) : null;
 
       return {
         ...r,
         Target_date:   td,
         close_date:    cd,
+        verified_date: verified,
+        hazards_no_due: hiraNoDue[r.report_id] || 0,
         completed_date: completed_date,
         issue_date:    f['Issue Date']                || null,
         finding_level: f['Finding level']             || null,
@@ -4251,7 +4270,7 @@ function catCalc(ag, sm) {
 // cùng tên). Trả bản sao, không sửa mảng truyền vào.
 function regradeRows(rows) {
   return rows.map(r => {
-    const sm = semCalc(r.report_status, r.close_date, r.Target_date);
+    const sm = semCalc(r.report_status, r.report_title === HIRA_TITLE ? r.verified_date : r.close_date, r.Target_date);
     const ag = ageCalc(r.Target_date);
     return { ...r, semantic_status: sm, report_ageing: ag, overdue_cat: catCalc(ag, sm) };
   });
@@ -5325,15 +5344,17 @@ const HIRA_CLS = {'HIRA METHOD':'method','HAZARD TYPE':'type','ADDITIONAL MITIGA
 // [HIRA] Mỗi Specific component là 1 mối nguy, có DUE DATE riêng (Eric 04/11/2026). Probe 04/11: bảng
 // dwanalytics_report_field có section_id; mỗi mối nguy là 1 section SPECIFIC COMPONENTS, 50/50 ô DUE DATE ghép
 // đúng mối nguy. KHÔNG dùng dwanalytics_report_form_section_field: bảng đó không có section và còn ô thừa
-// (HIRA-11 có 3 DUE DATE cho 2 mối nguy). Chỉ để hiển thị: Target và trạng thái của report không đổi.
+// (HIRA-11 có 3 DUE DATE cho 2 mối nguy). DUE DATE lớn nhất là Target của report, xem loadData.
 let hiraLoaded=false, hiraClsMap={}, hiraHazardMap={};
 async function loadHiraHazards(ids){
   const list=[...ids], chunks=[];
   for(let i=0;i<list.length;i+=8) chunks.push(list.slice(i,i+8).map(id=>'report_id eq '+id).join(' or '));
-  const flt="(field_name eq 'SPECIFIC COMPONENTS OF THE GENERIC HAZARD' or field_name eq 'DUE DATE' or field_name eq 'CURRENT RISK RATING')";
+  const flt="(field_name eq 'SPECIFIC COMPONENTS OF THE GENERIC HAZARD' or field_name eq 'DUE DATE' or field_name eq 'CURRENT RISK RATING' or field_name eq 'DATE VERIFIED' or field_name eq 'Date verified')";
   const raw=(await Promise.all(chunks.map(c=>fetchAll(G_URL+'dwanalytics_report_field?$select=report_id,section_id,field_name,value_text&$filter='+encodeURIComponent('('+c+') and '+flt), true)))).flat();
-  const secs={};
+  const secs={}, verified={};
   raw.forEach(f=>{
+    // DATE VERIFIED ở mục VERIFICATION, 1 ô/report, không thuộc mối nguy nào
+    if(/^date verified$/i.test(f.field_name)){ const v=f.value_text?String(f.value_text).slice(0,10):null; if(v && !(verified[f.report_id]>v)) verified[f.report_id]=v; return; }
     const o=(secs[f.report_id+'|'+f.section_id] ||= {report_id:f.report_id,comp:'',due:null,risk:null});
     if(f.field_name==='DUE DATE') o.due=f.value_text ? String(f.value_text).slice(0,10) : null;
     else if(f.field_name==='CURRENT RISK RATING') o.risk=f.value_text||null;
@@ -5344,14 +5365,15 @@ async function loadHiraHazards(ids){
   const m={};
   Object.values(secs).forEach(o=>(m[o.report_id] ||= []).push(o));
   Object.values(m).forEach(a=>a.sort((x,y)=>no(x)-no(y)||x.comp.localeCompare(y.comp)));
-  return m;
+  return {hazards:m, verified};
 }
 async function loadHiraCls(){
   const ids=new Set(allData.filter(r=>r.report_title===HIRA_TITLE).map(r=>r.report_id));
   const flt=Object.keys(HIRA_CLS).map(n=>"list_name eq '"+n+"'").join(' or ');
-  const [raw,hazards]=await Promise.all([
+  const [raw,hz,generic]=await Promise.all([
     fetchAll(G_URL+'dwanalytics_report_classification_field?$select=report_id,list_name,value_text&$filter='+encodeURIComponent(flt), true),
-    loadHiraHazards(ids)
+    loadHiraHazards(ids),
+    fetchAll(CF_URL+'?$select=report_id,text_value&$filter='+encodeURIComponent("report_title eq '"+HIRA_TITLE+"' and field_name eq 'GENERIC HAZARD'"), true)
   ]);
   const m={};
   raw.forEach(r=>{
@@ -5360,7 +5382,9 @@ async function loadHiraCls(){
     const o=(m[r.report_id] ||= {});
     o[k]=o[k] ? o[k]+', '+r.value_text : r.value_text;
   });
-  hiraClsMap=m; hiraHazardMap=hazards; hiraLoaded=true;
+  // GENERIC HAZARD: cột Generic Hazard của All forms (Eric 04/11/2026); bản nháp, đã xóa không thuộc ids nên bị loại
+  generic.forEach(g=>{ const v=mosrPlain(g.text_value); if(v && ids.has(g.report_id)) (m[g.report_id] ||= {}).generic ||= v; });
+  hiraClsMap=m; hiraHazardMap=hz.hazards; hiraLoaded=true;
 }
 // [r172] AMO - Additional Mitigation (VJC-AMO-CAPA-xx) — theo dõi như PAVOI: từng Task/RFI của workflow,
 // hạn và overdue (Eric 28/09/2026). Probe 28/09: 8 report (Test-CAPA-01 là form khác, report_title
