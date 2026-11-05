@@ -5,6 +5,9 @@
 
 ---
 
+## ✅ r223-i1 — User guide, manual, tài liệu theo r222 và r223 (05/11/2026, EricThai)
+- Chỉ sửa chữ ở `beta-src/guide.js`. Manual rời: `HuongDan_SuDung_QA_AMO_Dashboard_r223.docx` từ `beta-src/manual.js`; ảnh `manual-shots-r220/` chụp lại 11-exports, 11b-mcar-export, thêm 03c-capa. `TECHNICAL_REFERENCE.md` thêm `loadCapaDue`, `exportSrq`.
+
 ## ✅ r223 — Export SR / QCSC (05/11/2026, EricThai)
 - Thẻ SR / QCSC report ở Admin › Export reports, 11 cột theo danh sách Eric, Excel và PDF letterhead. Eric bỏ attachment, picture sau khi biết Galileo chỉ có tên tệp và Coruson chặn tải chéo trang.
 - Tự chốt, chờ Eric xác nhận: QCSC = `QC Spot Check Report`, chưa gộp QC PI Report và AISC; Issue date của SR lấy ô Date; MNT No = số audit, không có thì tìm MNT-xxxx trong ô tham chiếu.
