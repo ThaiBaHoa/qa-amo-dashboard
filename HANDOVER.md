@@ -5,6 +5,11 @@
 
 ---
 
+## ✅ r223 — Export SR / QCSC (05/11/2026, EricThai)
+- Thẻ SR / QCSC report ở Admin › Export reports, 11 cột theo danh sách Eric, Excel và PDF letterhead. Eric bỏ attachment, picture sau khi biết Galileo chỉ có tên tệp và Coruson chặn tải chéo trang.
+- Tự chốt, chờ Eric xác nhận: QCSC = `QC Spot Check Report`, chưa gộp QC PI Report và AISC; Issue date của SR lấy ô Date; MNT No = số audit, không có thì tìm MNT-xxxx trong ô tham chiếu.
+- Kiểm local Edge dữ liệu 2026: 345 dòng (285 SR, 60 QCSC), PDF 62 trang. File chặn lại trong trình duyệt để đọc, chưa tải thật. Chưa kiểm quyền moderator. Manual rời chưa cập nhật.
+
 ## ✅ r222 — AMO - Additional Mitigation làm như HIRA (05/11/2026, EricThai)
 - Eric chọn cả luật chấm lẫn bảng. Mỗi action là 1 section MITIGATION ACTION có Target date riêng, Target của report là ngày lớn nhất, chấm theo Date verified. Bỏ `scrCapa`; 4 ô thống kê giữ lại trên bảng.
 - Kiểm local Edge dữ liệu thật 05/11: 8 report = 2 Overdue (07, 08), 3 On-time (01, 02, 04), 1 Lately (03), 2 Closed thiếu Target (05, 06); `consistency OK` năm 2026.
