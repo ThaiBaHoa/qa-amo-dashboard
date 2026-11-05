@@ -2532,7 +2532,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.04-r221-i3';
+const APP_REV = '2026.11.05-r222';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3643,6 +3643,7 @@ async function loadData(forceRefresh=false, opts={}) {
     // [HIRA] Target = DUE DATE lớn nhất trong các mối nguy; On-time/Lately chấm theo DATE VERIFIED thay cho Closed
     // date (Eric chốt 04/11/2026). Áp đúng luật, KHÔNG rơi về hạn workflow hay Closed date: thiếu ngày thì semCalc trả
     // 'Closed' và giao diện báo thiếu dữ liệu màu đỏ. Lỗi nạp thì ghi loadFailures như mọi nguồn khác.
+    // [r222] AMO - Additional Mitigation chấm cùng luật: Target = Target date lớn nhất của các MITIGATION ACTION (Eric 05/11/2026).
     let hiraMaxDue = {}, hiraVerified = {}, hiraNoDue = {};
     const hiraIds = summary.filter(r => r.report_title === HIRA_TITLE).map(r => r.report_id);
     if (hiraIds.length) {
@@ -3654,6 +3655,13 @@ async function loadData(forceRefresh=false, opts={}) {
           hiraNoDue[id] = hz.hazards[id].filter(h => !h.due).length;
         });
       } catch (e) { loadFailures.push('HIRA due dates: ' + ((e && e.message) ? e.message : String(e))); }
+    }
+    const capaDueIds = summary.filter(r => r.report_title === CAPA_TITLE).map(r => r.report_id);
+    if (capaDueIds.length) {
+      try {
+        const cd = await loadCapaDue(capaDueIds);
+        Object.assign(hiraMaxDue, cd.maxDue); Object.assign(hiraVerified, cd.verified); Object.assign(hiraNoDue, cd.noDue);
+      } catch (e) { loadFailures.push('Additional Mitigation target dates: ' + ((e && e.message) ? e.message : String(e))); }
     }
 
     // [r165] Nạp ngầm mà thiếu nguồn → GIỮ NGUYÊN bản cũ đầy đủ đang hiện, không thay bằng bản
@@ -3675,7 +3683,7 @@ async function loadData(forceRefresh=false, opts={}) {
       const sd = deriveStageDates(wfAllMap[r.report_id]);
       // Target date: ưu tiên custom field 'Target date' (Report — mốc chính thức theo QA) → stage Task target (fallback nếu Report trống) → ReportAcceptReject
       // (r102: revert r100. Report Target date mới là chuẩn; stage Workflow có thể lệch — vd MCAR-0363 Report 18/06 vs stage Final Action 22/06.)
-      const td = r.report_title === HIRA_TITLE ? (hiraMaxDue[r.report_id] || null) : (f['Target date'] || sd.td || wf?.stage_target_date || null);
+      const td = isVerifyGraded(r.report_title) ? (hiraMaxDue[r.report_id] || null) : (f['Target date'] || sd.td || wf?.stage_target_date || null);
       // Completed date: ngày làm xong báo cáo (stage Task)
       const completed_date = sd.completed || null;
       // Close date: đúng ô CLOSED DATE trên Coruson (report_summary.closed_date) — Eric chốt 02/11/2026. KHÔNG suy từ
@@ -3683,8 +3691,8 @@ async function loadData(forceRefresh=false, opts={}) {
       const cd = r.closed_date || null;
 
       const ag = ageCalc(td);
-      const verified = r.report_title === HIRA_TITLE ? (hiraVerified[r.report_id] || null) : undefined;
-      const sm = semCalc(r.report_status, r.report_title === HIRA_TITLE ? verified : cd, td);
+      const verified = isVerifyGraded(r.report_title) ? (hiraVerified[r.report_id] || null) : undefined;
+      const sm = semCalc(r.report_status, isVerifyGraded(r.report_title) ? (r.report_status==='Closed' ? verified : null) : cd, td);
       const mcarChk = (r.report_title==='MCAR') ? buildMcarDeadlineChk(r.raised_date, f, td) : null;
 
       return {
@@ -4270,7 +4278,7 @@ function catCalc(ag, sm) {
 // cùng tên). Trả bản sao, không sửa mảng truyền vào.
 function regradeRows(rows) {
   return rows.map(r => {
-    const sm = semCalc(r.report_status, r.report_title === HIRA_TITLE ? r.verified_date : r.close_date, r.Target_date);
+    const sm = semCalc(r.report_status, isVerifyGraded(r.report_title) ? (r.report_status==='Closed' ? r.verified_date : null) : r.close_date, r.Target_date);
     const ag = ageCalc(r.Target_date);
     return { ...r, semantic_status: sm, report_ageing: ag, overdue_cat: catCalc(ag, sm) };
   });
@@ -5404,6 +5412,29 @@ async function loadHiraCls(){
 // (số HIRA / Hazard Log / MCCF gốc) / Additional details, nhóm MITIGATION ACTION (Mitigation Action ·
 // Target date · Department, gom theo section_id), VERIFICATION (VOI · Date verified · Verified by).
 const CAPA_TITLE = 'AMO - Additional Mitigation';
+// [r222] Hai form chấm On-time/Lately theo Date verified thay cho Closed date. Report chưa đóng trên Coruson vẫn chấm như đang mở dù đã có Date verified (CAPA-07).
+const isVerifyGraded = t => t===HIRA_TITLE || t===CAPA_TITLE;
+// [r222] Probe 05/11: mỗi mitigation action là 1 section MITIGATION ACTION có Target date riêng, Date verified 1 ô ở
+// VERIFICATION. CAPA-05, CAPA-06 không có section nào (nội dung ghi ở Additional details) nên không có Target: báo thiếu, không suy.
+async function loadCapaDue(ids){
+  const list=[...ids], chunks=[];
+  for(let i=0;i<list.length;i+=8) chunks.push(list.slice(i,i+8).map(id=>'report_id eq '+id).join(' or '));
+  const flt="(field_name eq 'Mitigation Action' or field_name eq 'Target date' or field_name eq 'Date verified')";
+  const raw=(await Promise.all(chunks.map(c=>fetchAll(G_URL+'dwanalytics_report_field?$select=report_id,section_id,section_name,field_name,value_text&$filter='+encodeURIComponent('('+c+') and '+flt), true)))).flat();
+  const secs={}, verified={}, maxDue={}, noDue={};
+  raw.forEach(f=>{
+    const v=f.value_text ? String(f.value_text).slice(0,10) : null;
+    if(f.field_name==='Date verified'){ if(v && !(verified[f.report_id]>v)) verified[f.report_id]=v; return; }
+    if(f.section_name!=='MITIGATION ACTION' || !f.section_id) return;
+    const o=(secs[f.report_id+'|'+f.section_id] ||= {report_id:f.report_id,text:false,due:null});
+    if(f.field_name==='Target date') o.due=v; else o.text=!!v;
+  });
+  Object.values(secs).forEach(o=>{
+    if(o.due){ if(!(maxDue[o.report_id]>o.due)) maxDue[o.report_id]=o.due; }
+    else if(o.text) noDue[o.report_id]=(noDue[o.report_id]||0)+1;
+  });
+  return {maxDue,noDue,verified};
+}
 let capaLoaded=false, capaTaskMap={}, capaInfoMap={}, hiraCapaMap={};   // hiraCapaMap[HIRA report_id] = [CAPA report_id] (r173)
 const capaTaskSem = t => semCalc(t.task_status==='Completed' || t.task_completed_date ? 'Closed' : 'Open',
   t.task_completed_date, t.task_target_date);

@@ -1570,7 +1570,7 @@ function base(r, form){
     auditTitle: orDash(r.audit_title),
     location: orDash(auById[r.audit_id] && auById[r.audit_id].location_name),
     raised: day(r.raised_date), target: day(r.Target_date), closed: day(r.close_date),
-    gradedOnVerify: r.report_title === HIRA_TITLE, verified: day(r.verified_date), hazardsNoDue: r.hazards_no_due || 0,
+    gradedOnVerify: isVerifyGraded(r.report_title), verified: day(r.verified_date), hazardsNoDue: r.hazards_no_due || 0,
     status: r.semantic_status, cat: CAT[r.overdue_cat] || null, dtd: r.report_ageing,
     isClosed: CLOSED.has(r.semantic_status),
     progress: false, level: orDash(r.finding_level), repetitive: false, auditId: r.audit_id || null,
@@ -2853,14 +2853,14 @@ function extBtn(kind, id){
   return u ? '<a class="ext-btn" href="'+u+'" target="_blank" rel="noopener">Open in Coruson <span aria-hidden="true">↗</span></a>' : '';
 }
 function catChip(c){ return c ? '<span class="cat c'+({'I':1,'II':2,'III':3}[c])+'">CAT '+c+'</span>' : '<span class="dim">—</span>'; }
-/* AMO - HIRA: a date the rule needs is missing on Coruson (Eric 04/11/2026) */
+/* AMO - HIRA and AMO - Additional Mitigation: a date the rule needs is missing on Coruson (Eric 04/11/2026, 05/11/2026) */
 const missingData = t => '<span class="cat c3 od-nowrap">'+t+'</span>';
 function dueCell(r){
   if(!r.hazardsNoDue) return dueCount(r);
-  return '<span style="display:grid;gap:4px;justify-items:end">'+dueCount(r)+missingData(r.hazardsNoDue+(r.hazardsNoDue === 1 ? ' hazard' : ' hazards')+' no due date')+'</span>';
+  return '<span style="display:grid;gap:4px;justify-items:end">'+dueCount(r)+missingData(r.code === API().CAPA_TITLE ? r.hazardsNoDue+(r.hazardsNoDue === 1 ? ' action' : ' actions')+' no target date' : r.hazardsNoDue+(r.hazardsNoDue === 1 ? ' hazard' : ' hazards')+' no due date')+'</span>';
 }
 function dueCount(r){
-  if(r.gradedOnVerify && !r.target) return missingData('Missing due date');
+  if(r.gradedOnVerify && !r.target) return missingData(r.code === API().CAPA_TITLE ? 'Missing target date' : 'Missing due date');
   /* a closed report counts too (Eric 04/11/2026): closed date against target, by day as semCalc grades it.
      AMO - HIRA is graded on its verification date instead. */
   if(r.closed){
@@ -4561,23 +4561,33 @@ function scrAllForms(){
   const titles = [...new Set(REPORTS.map(r => r.code))].sort();
   const A = API();
   if(BS.afForm === A.EIS_TITLE || BS.afForm === A.QCS_TITLE) return scrFormDetail(titles);
-  if(BS.afForm === A.CAPA_TITLE) return scrCapa(titles);
   /* AMO - HIRA (r171): its three EVALUATION classifications replace Form and CAT */
   const hira = BS.afForm === A.HIRA_TITLE;
+  /* AMO - Additional Mitigation (Eric 05/11/2026): a register like HIRA; a row opens the record with its actions and tasks */
+  const capa = BS.afForm === A.CAPA_TITLE;
   /* r206 (Eric 02/11): PAVOI / MVOI read as Request For Verification + Raised by; no CAT, no Issued to */
   const pv = BS.afForm === 'PAVOI' || BS.afForm === 'MVOI';
   const w = hira && (lazyState('hira', () => A.loadHira(), () => A.hira().loaded, 'HIRA classifications')
     || lazyState('capa', () => A.loadCapa(), () => A.capa().loaded, 'Additional Mitigation (CAPA) links'));
-  if(w) return w;
+  const wc = capa && lazyState('capa', () => A.loadCapa(), () => A.capa().loaded, 'Additional Mitigation tasks');
+  if(w || wc) return w || wc;
   const cfg = { cols: hira ? ['number','genHazard','status','hiraMethod','hazardType','addMitig','owner','raised','target','dtd']
+                           : capa ? ['number','capaTitle','status','capaHira','capaActions','capaTasks','owner','raised','target','dtd']
                            : pv ? ['number','form','status','rfv','raisedBy','pvOwner','raised','target','dtd','rfi']
                            : BS.afForm === 'MCCF' ? ['number','orgUnit','status','summary','owner','issued','raised','target','dtd','cat','rfi']
                            : ['number','form','status','summary','owner','issued','raised','target','dtd','cat','rfi'],   /* r191: + Summary, RFI · r194: + Issued to */
                 rows: rs => BS.afForm ? rs.filter(r => r.code === BS.afForm) : rs };
-  if(REAL && !hira) lazy('rfisum:'+rxFrom(), loadRfiSum, rxReady);
-  let rows = cfg.rows(scoped().concat(hira ? [] : applyQuery(applyFilters(mccfOutRows()))));
+  if(REAL && !hira && !capa) lazy('rfisum:'+rxFrom(), loadRfiSum, rxReady);
+  let rows = cfg.rows(scoped().concat(hira || capa ? [] : applyQuery(applyFilters(mccfOutRows()))));
   if(state.cat) rows = rows.filter(r => r.cat === state.cat);
-  return '<section class="sec"><div class="card'+(hira ? ' af-hira' : '')+'"><div class="card-head"><h2>All forms</h2>'
+  const capaS = capa ? A.capaTaskStats(rows.map(x => x.id)) : null;
+  return (capa ? tiles([
+      stat('Additional Mitigation', String(rows.length), rows.filter(isOpen).length+' open · '+periodLabel()),
+      stat('Tasks', capaS.done+' / '+capaS.total, 'completed'),
+      stat('Tasks overdue', String(capaS.overdue), capaS.open+' open tasks', capaS.overdue > 0),
+      stat('Completed late', String(capaS.late), capaS.onTime+' on time', capaS.late > 0)
+    ]) : '')
+    + '<section class="sec"><div class="card'+(hira || capa ? ' af-hira' : '')+'"><div class="card-head"><h2>All forms</h2>'
     + '<span class="t-small dim od-fill">Every report type the dashboard loads — '+titles.length+' forms. The tabs above keep the five finding forms with their own columns.'+(BS.afForm === 'MCCF' ? (MCCF_OUT.st === 'ready' ? ' MCCF here covers every unit on Coruson; those outside QA AMO are not counted in KPIs or Overview.' : MCCF_OUT.st === 'error' ? ' Could not load the MCCF of units outside QA AMO: only QA AMO is listed.' : ' Loading the MCCF of units outside QA AMO…') : '')+'</span>'
     + sel('afForm', [['','All forms']].concat(titles.map(t => [t, t])), BS.afForm) + '</div>'
     + tableHTML('findings/all'+(BS.afForm ? '/'+BS.afForm : ''), cfg, rows) + '</div></section>';
@@ -4598,102 +4608,29 @@ Object.assign(COL, {
   hiraMethod:{ l:'HIRA method', v:r=>hiraCls(r,'method') || 'zzz', c:r=>hiraCell(hiraCls(r,'method')) },
   hazardType:{ l:'Hazard type', v:r=>hiraCls(r,'type') || 'zzz', c:r=>hiraCell(hiraCls(r,'type')) },
   addMitig:{ l:'Additional mitigation', v:r=>hiraCls(r,'mitig') || 'zzz', c:hiraMitigCell },
+  capaTitle:{ l:'Title', v:r=>capaInf(r).title || 'zzz', c:r=>{ const v = capaInf(r).title; return v ? '<span class="t-small od-clamp-3" style="min-width:200px;max-width:320px" title="'+esc(v)+'">'+esc(v)+'</span>' : '<span class="dim">—</span>'; } },
+  capaHira:{ l:'Source HIRA', fit:true, v:r=>(capaInf(r).hira || []).map(hiraNo).join(' ') || 'zzz', c:r=>capaHiraLinks(capaInf(r)) },
+  capaActions:{ l:'Actions', ar:true, fit:true, v:r=>(capaInf(r).actions || []).length, c:r=>'<span class="num">'+(capaInf(r).actions || []).length+'</span>' },
+  capaTasks:{ l:'Tasks', fit:true, v:r=>API().capaTaskStats(r.id).overdue, c:r=>{ const s = API().capaTaskStats(r.id);
+    return '<span style="display:grid;gap:2px;justify-items:start"><span class="t-small dim od-nowrap">'+s.done+'/'+s.total+' done</span>'+(s.overdue ? '<span class="cat c3 od-nowrap">'+s.overdue+' overdue</span>' : '')+'</span>'; } },
   genHazard:{ l:'Generic Hazard', v:r=>hiraCls(r,'generic') || 'zzz', c:r=>{ const v = hiraCls(r,'generic'); return v ? '<span class="t-small od-clamp-3" style="min-width:200px;max-width:320px" title="'+esc(v)+'">'+esc(v)+'</span>' : '<span class="dim">—</span>'; } }
 });
+const capaInf = r => (API().capa().info || {})[r.id] || {};
+/* r173: the HIRA a CAPA names in Report Reference — opens that HIRA report */
+const capaHiraLinks = inf => (inf.hira || []).length
+  ? inf.hira.map(h => '<button class="link-b row-id" type="button" data-act="breport" data-id="'+esc(h)+'">'+esc(hiraNo(h))+'</button>').join(' ')
+  : '<span class="cat c1" title="Report Reference does not name a VJC AMO-HIRA number">No HIRA</span>';
 /* r173: the CAPA reports that name this HIRA in their Report Reference (classic loadCapa → hiraCapaMap).
-   A CAPA number opens the Additional Mitigation register on that record. */
+   A CAPA number opens that report. */
 const hiraNo = id => { const x = API().allData().find(d => d.report_id === id); return x ? String(x.report_number).replace(/^VJC AMO-/, '') : '?'; };
 const capaNo = id => { const x = API().allData().find(d => d.report_id === id); return x ? String(x.report_number).replace(/^VJC-AMO-/, '') : '?'; };
 function hiraMitigCell(r){
   const A = API(), v = hiraCls(r,'mitig'), caps = (A.capa().byHira || {})[r.id] || [];
   const links = caps.map(id => { const s = A.capaTaskStats(id);
-    return '<span style="display:grid;gap:2px;justify-items:start"><button class="link-b row-id" type="button" data-act="bgocapa" data-id="'+esc(id)+'">'+esc(capaNo(id))+'</button>'
+    return '<span style="display:grid;gap:2px;justify-items:start"><button class="link-b row-id" type="button" data-act="breport" data-id="'+esc(id)+'">'+esc(capaNo(id))+'</button>'
       + (s.overdue ? '<span class="cat c3">'+s.overdue+' overdue</span>' : '<span class="t-small dim">'+s.done+'/'+s.total+' tasks</span>')+'</span>'; }).join('');
   const gap = v === 'Yes' && !caps.length ? '<span class="cat c1" title="Additional mitigation = Yes, but no AMO - Additional Mitigation report names this HIRA in its Report Reference">No CAPA</span>' : '';
   return '<span style="display:grid;gap:6px;justify-items:start">'+hiraCell(v)+links+gap+'</span>';
-}
-/* AMO - Additional Mitigation (r172): PAVOI-style register — list on the left, the record with its
-   mitigation actions, workflow tasks (graded by semCalc in classic loadCapa) and verification on the right */
-function scrCapa(titles){
-  const A = API();
-  const w = lazyState('capa', () => A.loadCapa(), () => A.capa().loaded, 'Additional Mitigation tasks');
-  const head = sel('afForm', [['','All forms']].concat(titles.map(t => [t, t])), BS.afForm);
-  if(w) return w;
-  const rows = scoped().filter(r => r.code === A.CAPA_TITLE)
-    .sort((a,b) => { const ao = isOpen(a)?0:1, bo = isOpen(b)?0:1; return ao-bo || a.dtd-b.dtd; });
-  if(!rows.length) return '<section class="sec"><div class="card"><div class="card-head"><h2>'+esc(A.CAPA_TITLE)+'</h2><span class="od-fill"></span>'+head+'</div>'+emptyState()+'</div></section>';
-  if(!BS.capaSel || !rows.some(r => r.id === BS.capaSel)) BS.capaSel = rows[0].id;
-  const r = rows.find(x => x.id === BS.capaSel);
-  const { tasks, info } = A.capa();
-  const all = A.capaTaskStats(rows.map(x => x.id)), S = A.capaTaskStats(r.id);
-  const inf = info[r.id] || { actions: [] };
-  const dueTxt = x => x.closed ? '' : '<span class="t-small dim od-nowrap">'+(x.dtd < 0 ? Math.abs(x.dtd)+'d over' : x.dtd+'d left')+'</span>';
-
-  const list = rows.map(x => {
-    const s = A.capaTaskStats(x.id);
-    return '<button class="rec" type="button" data-act="bcapa" data-id="'+x.id+'"'+(x.id === r.id ? ' aria-current="true"' : '')+'>'
-      + '<span class="rec-top"><span class="row-id">'+esc(x.number)+'</span>'+chip(x.status)+'</span>'
-      + '<span class="row-sub od-truncate">'+esc((info[x.id] || {}).title || '—')+'</span>'
-      + '<span class="od-row" style="--od-gap:8px">'
-      + (((info[x.id] || {}).hira || []).map(h => '<span class="tag">'+esc(hiraNo(h))+'</span>').join('') || '<span class="cat c1">No HIRA</span>')
-      + '<span class="tag">'+s.done+'/'+s.total+' tasks done</span>'
-      + (s.overdue ? '<span class="cat c3">'+s.overdue+' overdue</span>' : '') + dueTxt(x) + '</span></button>';
-  }).join('');
-
-  const flag = S.overdue
-    ? { cls:'warn', t: S.overdue+' task'+(S.overdue > 1 ? 's' : '')+' overdue', b: 'Longest '+S.worstDays+' day'+(S.worstDays === 1 ? '' : 's')+' past target. '+S.open+' of '+S.total+' tasks still open.' }
-    : S.open
-    ? { cls:'', t: S.open+' task'+(S.open > 1 ? 's' : '')+' in progress', b: 'All open tasks are inside their target date. '+S.done+' of '+S.total+' completed.' }
-    : S.total
-    ? { cls: S.late ? 'warn' : '', t: 'All '+S.total+' tasks completed', b: S.onTime+' on time · '+S.late+' late'+(S.noTarget ? ' · '+S.noTarget+' without target' : '')+'.' }
-    : { cls:'warn', t: 'No task raised', b: 'No Request For Information or task has been raised in the workflow of this report.' };
-
-  const meta = [['Status', null], ['Owner', r.owner], ['Raised', fmtDate(r.raised)], ['Target', fmtDate(r.target)],
-    ['Days to due', r.closed ? 'closed '+fmtDate(r.closed) : (r.dtd < 0 ? Math.abs(r.dtd)+(r.dtd === -1 ? ' day' : ' days')+' over' : r.dtd+(r.dtd === 1 ? ' day' : ' days')+' left')],
-    ['Report reference', inf.ref || '—']]
-    .map(m => '<div class="meta-i"><span class="meta-k">'+esc(m[0])+'</span>'
-      + (m[1] === null ? '<span class="meta-v">'+chip(r.status)+'</span>' : '<span class="meta-v'+(m[0] === 'Report reference' ? '' : ' od-truncate')+'" title="'+esc(m[1])+'">'+esc(m[1])+'</span>')+'</div>').join('')
-    /* r173: the HIRA this CAPA names in Report Reference — opens that HIRA report */
-    + '<div class="meta-i"><span class="meta-k">Source HIRA</span><span class="meta-v">'
-      + ((inf.hira || []).length ? inf.hira.map(h => '<button class="link-b row-id" type="button" data-act="breport" data-id="'+esc(h)+'">'+esc(hiraNo(h))+'</button>').join(' ')
-         : '<span class="cat c1" title="Report Reference does not name a VJC AMO-HIRA number">Not linked</span>')+'</span></div>';
-
-  const acts = inf.actions.length
-    ? plainTable('capa-a-'+r.id, [{l:'Mitigation action'},{l:'Department'},{l:'Target',fit:true}], inf.actions.map(a =>
-        ['<span class="t-small">'+esc(a.text || '—')+'</span>', '<span class="t-small">'+esc(a.dept || '—')+'</span>', '<span class="num">'+fdx(a.target)+'</span>']), 20, 640)
-    : '<p class="t-sub dim">No mitigation action recorded on the form.</p>';
-  const tl = tasks[r.id] || [];
-  const sdx = v => v ? '<span class="num od-nowrap">'+fmtShort(new Date(+String(v).slice(0,4), +String(v).slice(5,7)-1, +String(v).slice(8,10)))+'</span>' : '<span class="dim">—</span>';
-  const tasksTbl = tl.length
-    ? plainTable('capa-t-'+r.id, [{l:'Task'},{l:'Owner'},{l:'Status',fit:true},{l:'Target',fit:true},{l:'Completed',fit:true}], tl.map(t =>
-        ['<span class="t-small strong">'+esc(t.task_title)+'</span>'+(t.task_related_section_name ? ' <span class="tag">'+esc(t.task_related_section_name)+'</span>' : '')
-          + (t.task_instructions ? '<br><span class="t-small dim od-clamp-2" title="'+esc(t.task_instructions)+'">'+esc(t.task_instructions)+'</span>' : ''),
-         '<span class="t-small">'+esc(t.task_owner || '—')+'</span>', '<span class="od-nowrap">'+chip(t.sem)+'</span>',
-         sdx(t.task_target_date), sdx(t.task_completed_date)]), 25)
-    : '<p class="t-sub dim">No task raised.</p>';
-  const ver = inf.voi || inf.verDate
-    ? '<p class="t-sub">'+esc(inf.voi || '—')+'</p><span class="t-small dim">'+(inf.verDate ? fdx(inf.verDate) : 'no date')+' · '+esc(inf.verBy || '—')+'</span>'
-    : '<p class="t-sub dim">No verification recorded yet.</p>';
-
-  return tiles([
-      stat('Additional Mitigation', String(rows.length), rows.filter(isOpen).length+' open · '+periodLabel()),
-      stat('Tasks', all.done+' / '+all.total, 'completed'),
-      stat('Tasks overdue', String(all.overdue), all.open+' open tasks', all.overdue > 0),
-      stat('Completed late', String(all.late), all.onTime+' on time', all.late > 0)
-    ])
-    + '<section class="sec"><div class="split">'
-    + '<div class="card"><div class="card-head"><h2>Additional Mitigation</h2><span class="od-fill"></span>'+head+'</div>'
-      + '<div class="rec-list">'+list+'</div></div>'
-    + '<div class="card"><div class="card-head"><h2 class="mono">'+esc(r.number)+'</h2>'+chip(r.status)+'<span class="od-fill"></span>'+extBtn('report', r.id)+'</div>'
-      + '<div class="card-pad" style="display:grid;gap:24px">'
-      + '<div class="meta">'+meta+'</div>'
-      + '<div class="note '+flag.cls+'"><span class="note-hd">'+(flag.cls ? ic('alert',16) : ic('check',16))+esc(flag.t)+'</span><span class="t-small">'+esc(flag.b)+'</span></div>'
-      + '<div style="display:grid;gap:8px"><span class="t-micro">Title</span><p class="t-sub">'+esc(inf.title || '—')+'</p>'
-        + (inf.details ? '<details><summary class="t-small strong" style="cursor:pointer">Additional details</summary><p class="t-small dim" style="margin-top:6px">'+esc(inf.details)+'</p></details>' : '') + '</div>'
-      + '<div style="display:grid;gap:8px"><span class="t-micro">Mitigation actions ('+inf.actions.length+')</span>'+acts+'</div>'
-      + '<div style="display:grid;gap:8px"><span class="t-micro">Tasks ('+tl.length+')</span>'+tasksTbl+'</div>'
-      + '<div style="display:grid;gap:8px"><span class="t-micro">Verification of implementation</span>'+ver+'</div>'
-      + '</div></div></div></section>';
 }
 /* EIS / QC Spot Check register with the classic schema columns; a row opens its detail */
 function scrFormDetail(titles){
@@ -5236,6 +5173,7 @@ function showReport(id){
         ['Extension 1', r.ext1_date ? fdx(r.ext1_date) : undefined],
         ['Extension 2', r.ext2_date ? fdx(r.ext2_date) : undefined], ['Date completed', fdx(r.completed_date)], ['Date verified', rep.gradedOnVerify ? (r.verified_date ? fdx(r.verified_date) : missingData('Missing')) : undefined, true], ['Date closed', fdx(r.close_date)]])
       + (rep.code === A.HIRA_TITLE ? hiraHazardBlock(id, 'rpt:'+id) : '')
+      + (rep.code === A.CAPA_TITLE ? capaDetailBlock(id, 'rpt:'+id) : '')
       + block(isPvForm(rep.form) ? 'Request for verification' : 'Finding', isPvForm(rep.form) ? r.rfv : r.finding_desc)
       /* r190: MCAR extension reason / denial reason as entered on the form (Extension applies to MCAR only) */
       + block('Reason for extension', r.ext_reason) + block('Extension denied reason', r.ext_denied)
@@ -5353,6 +5291,35 @@ function hiraHazardBlock(id, key){
     + '</div>';
 }
 let HIRA_WAIT = null;
+/* AMO - Additional Mitigation: the form's actions, the workflow tasks graded by semCalc (classic loadCapa) and the verification */
+function capaDetailBlock(id, key){
+  const A = API();
+  if(!A.capa().loaded){
+    if(!CAPA_WAIT) CAPA_WAIT = A.loadCapa().catch(() => {}).then(() => { CAPA_WAIT = null; if(A.capa().loaded && MODAL_KEY === key && MODAL_REDRAW) MODAL_REDRAW(); });
+    return '<div style="display:grid;gap:8px"><span class="t-micro">Mitigation actions</span><span class="t-small dim">Loading…</span></div>';
+  }
+  const { tasks, info } = A.capa(), inf = info[id] || { actions: [] }, tl = tasks[id] || [];
+  const sdx = v => v ? '<span class="num od-nowrap">'+fmtShort(new Date(+String(v).slice(0,4), +String(v).slice(5,7)-1, +String(v).slice(8,10)))+'</span>' : '<span class="dim">—</span>';
+  const part = (t, b) => '<div style="display:grid;gap:8px"><span class="t-micro">'+t+'</span>'+b+'</div>';
+  return part('Title', '<p class="t-sub">'+esc(inf.title || '—')+'</p>')
+    + part('Report reference', '<p class="t-sub">'+esc(inf.ref || '—')+'</p><span>'+capaHiraLinks(inf)+'</span>')
+    + (inf.details ? part('Additional details', '<p class="t-small dim">'+esc(inf.details)+'</p>') : '')
+    + part('Mitigation actions ('+inf.actions.length+')', inf.actions.length
+        ? plainTable('capa-a-'+id, [{l:'Mitigation action'},{l:'Department'},{l:'Target',fit:true}], inf.actions.map(a =>
+            [esc(a.text || '—'), esc(a.dept || '—'), a.target ? '<span class="num">'+fdx(a.target)+'</span>' : missingData('Missing')]), 30, 0, { compact:true })
+        : '<p class="t-sub dim">No mitigation action recorded on the form.</p>')
+    + part('Tasks ('+tl.length+')', tl.length
+        ? plainTable('capa-t-'+id, [{l:'Task'},{l:'Owner'},{l:'Status',fit:true},{l:'Target',fit:true},{l:'Completed',fit:true}], tl.map(t =>
+            ['<span class="t-small strong">'+esc(t.task_title)+'</span>'+(t.task_related_section_name ? ' <span class="tag">'+esc(t.task_related_section_name)+'</span>' : '')
+              + (t.task_instructions ? '<br><span class="t-small dim od-clamp-2" title="'+esc(t.task_instructions)+'">'+esc(t.task_instructions)+'</span>' : ''),
+             '<span class="t-small">'+esc(t.task_owner || '—')+'</span>', '<span class="od-nowrap">'+chip(t.sem)+'</span>',
+             sdx(t.task_target_date), sdx(t.task_completed_date)]), 25, 0, { compact:true })
+        : '<p class="t-sub dim">No task raised.</p>')
+    + part('Verification of implementation', inf.voi || inf.verDate
+        ? '<p class="t-sub">'+esc(inf.voi || '—')+'</p><span class="t-small dim">'+(inf.verDate ? fdx(inf.verDate) : 'no date')+' · '+esc(inf.verBy || '—')+'</span>'
+        : '<p class="t-sub dim">No verification recorded yet.</p>');
+}
+let CAPA_WAIT = null;
 function wfStages(ctxId, key){
   const have = WF_STAGES[ctxId];
   if(have !== undefined) return have;          /* array, { err }, or null while loading */
@@ -5719,10 +5686,8 @@ setInterval(() => { if(REAL && !REAL.partial && Date.now() - (REAL.cacheTs || Da
 Object.assign(BETA_ACT, {
   bmodalclose: () => dismissModal(),
   beis: el => showEis(el.dataset.id),
-  bcapa: el => { BS.capaSel = el.dataset.id; render(); },
-  bgocapa: el => { BS.afForm = API().CAPA_TITLE; BS.capaSel = el.dataset.id; render(); window.scrollTo(0, 0); },
   /* an Overview tile that opens one form's register in Reports › All forms */
-  bovform: el => { BS.afForm = el.dataset.f; BS.capaSel = null; go('findings', 'all'); },
+  bovform: el => { BS.afForm = el.dataset.f; go('findings', 'all'); },
   bqcs: el => showQcs(el.dataset.id),
   breport: el => showReport(el.dataset.id),
   bdoc: el => showDoc(el.dataset.id),

@@ -5,6 +5,12 @@
 
 ---
 
+## ✅ r222 — AMO - Additional Mitigation làm như HIRA (05/11/2026, EricThai)
+- Eric chọn cả luật chấm lẫn bảng. Mỗi action là 1 section MITIGATION ACTION có Target date riêng, Target của report là ngày lớn nhất, chấm theo Date verified. Bỏ `scrCapa`; 4 ô thống kê giữ lại trên bảng.
+- Kiểm local Edge dữ liệu thật 05/11: 8 report = 2 Overdue (07, 08), 3 On-time (01, 02, 04), 1 Lately (03), 2 Closed thiếu Target (05, 06); `consistency OK` năm 2026.
+- ⚠ CAPA-05, CAPA-06 không có section action, nội dung ghi ở Additional details nên báo Missing target date. CAPA-07 còn Open có Date verified 14/10 nên vẫn Overdue; có 7 action, một dòng trùng nội dung. Chờ Eric xem trên Coruson.
+- Chưa kiểm: điện thoại, chế độ tối.
+
 ## ✅ r221-i3 — HIRA chỉ tính mối nguy theo ô HOW MANY (04/11/2026, EricThai)
 - Eric phát hiện HIRA-05 có due nhưng báo `1 hazard no due date`. Form khai 1 mối nguy; mục thứ 2 bị ẩn vẫn còn trong `dwanalytics_report_field`. Bảng không có cờ ẩn nên giữ các mục tạo sớm nhất theo HOW MANY.
 - Chưa xử lý: HIRA-09 khai 4 có 3, HIRA-17 khai 3 có 2. Giữ nguyên, không báo đỏ, chờ Eric quyết.
