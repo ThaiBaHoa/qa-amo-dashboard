@@ -2675,15 +2675,25 @@ const M = {
   /* audit progress against the plan (anh Ngọc email 30/09/2026; Eric 30/09: "audit chậm là vượt quá tháng
      được xếp theo schedule"). The plan is monthly (MOPM 4.14.7.3 a-3), so an audit is due once its scheduled
      month has ended; done = Performed or Closed (the Perform stage is complete); delayed = due and not done.
-     Cancelled / Deleted audits are not part of the plan. Works on raw auditData and on the mapped AUDITS. */
+     Cancelled / Deleted audits are not part of the plan, nor are the unscheduled RSP / SSP surveillances (11/11/2026).
+     Works on raw auditData and on the mapped AUDITS. */
   AUDIT_DONE: new Set(['Performed', 'Closed']),
+  /* Scheduled vs unscheduled (Eric 11/11/2026): the annual plan is the MNT programme. RSP (Random Surveillance) and SSP
+     (Specified Surveillance) are raised when the need arises, so they are NOT in the plan: they are listed and counted
+     apart and never enter plan progress / Delayed. Decided by the prefix of the audit number. */
+  AUDIT_UNSCHED: new Set(['RSP', 'SSP']),
+  auditPrefix: a => (String(a.number || '').match(/^[A-Za-z]+/) || [''])[0].toUpperCase(),
+  auditUnsched: a => M.AUDIT_UNSCHED.has(M.auditPrefix(a)),
+  auditSched: a => !M.auditUnsched(a),
+  AUDIT_PROG: { sched: 'Scheduled', unsched: 'Unscheduled' },
+  auditProg: a => M.auditUnsched(a) ? 'unsched' : 'sched',
   AUDIT_VOID: new Set(['Cancelled', 'Deleted']),
   auditDue: a => new Date(M.auditYear(a), M.auditMonth(a) + 1, 0) < TODAY,
   /* plan to date = scheduled month has started (includes the current month). Eric 30/09/2026: "160 / 160"
      over ended months only hid 17 September audits not yet performed and showed 163 done > 160 planned. */
   auditStarted: a => new Date(M.auditYear(a), M.auditMonth(a), 1) <= TODAY,
   auditProgress(list){
-    const plan = list.filter(a => !M.AUDIT_VOID.has(a.status)), due = plan.filter(M.auditDue);
+    const plan = list.filter(a => M.auditSched(a) && !M.AUDIT_VOID.has(a.status)), due = plan.filter(M.auditDue);
     const done = a => M.AUDIT_DONE.has(a.status), delayed = due.filter(a => !done(a));
     const toDate = plan.filter(M.auditStarted), thisMonth = toDate.filter(a => !M.auditDue(a));
     return { plan: plan.length, done: plan.filter(done).length, due: due.length, dueDone: due.length - delayed.length,
@@ -2961,7 +2971,7 @@ const state = {
   sort:{},
   page:{},
   sel:{ pavoi:null },
-  aud:{ type:'', show:'all' }   /* Audit Plan filters (location × month view) */
+  aud:{ type:'', show:'all', prog:'' }   /* Audit Plan filters (location × month view) */
 };
 const $  = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -3321,7 +3331,7 @@ function renderOverview(){
     kpiTile({label:'KPI 7 · PAVOI / MVOI assessed', value:(k7.rate === null ? '—' : k7.rate+'%'), note:k7.assessed+' of '+k7.total+' assessed (verification round recorded)', go:'findings', tab:'pavoi',
              series:k7Series, alarm:k7.rate !== null && k7.rate<50, trend:trendTag(k7Series[11], k7Series[10], 'up','pt')}),
     kpiTile({label:'Audits completed vs plan', value:AP.toDateDone+' / '+AP.toDate, go:'audit', tab:'list', alarm:AP.delayed>0,
-             note:'performed or closed, of those scheduled up to this month', mixSub:'PLANNED',
+             note:'scheduled audits performed or closed, of those planned up to this month · unscheduled RSP / SSP not counted', mixSub:'PLANNED',
              mix:[{k:'Performed / closed', v:AP.done, c:'var(--ok)'}, {k:'This month, not yet', v:AP.thisMonthOpen, c:'var(--info)'},
                   {k:'Delayed', v:AP.delayed, c:'var(--accent)'}, {k:'Later months', v:AP.upcoming, c:'var(--text-3)'}]}),
     kpiTile({label:'PAVOI / MVOI open', value:String(PV.open), go:'findings', tab:'pavoi', alarm:PV.overdue>0,
@@ -3696,28 +3706,36 @@ function renderAudit(tab){
      selected), one dot per audit in the month it is scheduled. Filters: type and show (all / upcoming / overdue). */
   const f = state.aud;
   const typeN = t => ALL.filter(a => a.type === t).length;
-  const AUD = ALL.filter(a => (!f.type || a.type === f.type)
+  const progN = p => ALL.filter(a => M.auditProg(a) === p).length;
+  const AUD = ALL.filter(a => (!f.type || a.type === f.type) && (!f.prog || M.auditProg(a) === f.prog)
     && (f.show === 'all' || (f.show === 'upcoming' ? M.AUDIT_PLANNED.has(a.status) : a.overdue > 0)));   /* metrics-ok: audit status, not report status */
   const multiYear = new Set(ALL.map(a=>a.year)).size > 1;
   const kind = a => (a.overdue>0 && !M.AUDIT_PLANNED.has(a.status)) ? 'k-overdue' : (AUD_KIND[a.status] || 'k-closed');   /* metrics-ok: audit status */
   const rowKey = a => (a.location || '—') + (multiYear && a.year ? ' · ' + a.year : '');
-  const groups = {};
-  AUD.forEach(a => { (groups[rowKey(a)] ||= { year: a.year || 0, list: [] }).list.push(a); });
-  const keys = Object.keys(groups).sort((x,y) => groups[y].year - groups[x].year || groups[y].list.length - groups[x].list.length || x.localeCompare(y));
   const short = l => String(l).replace(' Line Maintenance Station', ' Line');
   const dot = a => '<button type="button" class="am-d '+kind(a)+'" data-act="'+(REAL?'baudit':'toast')+'" data-id="'+esc(a.id)+'" data-t="'+esc(a.number)+'" '
     + 'data-b="'+esc(a.title+' · '+a.type+' · lead '+a.lead+' · '+a.location+' · '+a.status+' · '+a.findings+' findings, '+a.open+' still open'+(a.overdue?', '+a.overdue+' overdue':'')+'.')+'" '
     + 'title="'+esc(a.number+' · '+a.title+' — '+a.type+' · '+a.status+' · '+a.findings+' findings'+(a.open?', '+a.open+' open':'')+(a.overdue?', '+a.overdue+' overdue':''))+'" '
     + 'aria-label="'+esc(a.number+', '+a.status+(a.overdue?', '+a.overdue+' overdue findings':''))+'"></button>';
-  const grid = '<div class="am-wrap"><div class="am" aria-label="Audits by location and month">'
+  /* one grid per programme (Eric 11/11/2026): Scheduled = the annual plan (MNT), Unscheduled = RSP + SSP */
+  const gridOf = (list, label) => { const groups = {};
+    list.forEach(a => { (groups[rowKey(a)] ||= { year: a.year || 0, list: [] }).list.push(a); });
+    const keys = Object.keys(groups).sort((x,y) => groups[y].year - groups[x].year || groups[y].list.length - groups[x].list.length || x.localeCompare(y));
+    return '<div class="am-wrap"><div class="am" aria-label="'+esc(label)+' by location and month">'
     + '<div class="t-micro am-h" style="text-align:left;padding-left:10px">Location</div>'
     + MONTHS.map((m,i) => '<div class="t-micro am-h'+(i===now?' now':'')+'">'+m+'</div>').join('')
     + keys.map(k => { const g = groups[k].list;
         return '<div class="am-l t-small" title="'+esc(k)+'"><span class="strong od-truncate">'+esc(short(k))+'</span><span class="dim num">'+g.length+'</span></div>'
           + MONTHS.map((m,i) => '<div class="am-c'+(i===now?' now':'')+'">'+g.filter(a => a.start === i).map(dot).join('')+'</div>').join(''); }).join('')
-    + '</div></div>';
+    + '</div></div>'; };
+  const PROG_SUB = { sched: 'annual plan · counted in plan progress and Delayed', unsched: 'RSP · SSP · raised as required, not in the plan' };
+  const grid = ['sched', 'unsched'].map(p => { const list = AUD.filter(a => M.auditProg(a) === p);
+    return list.length ? '<div class="aud-prog"><h3 class="t-small strong">'+M.AUDIT_PROG[p]+' <span class="num">'+list.length+'</span>'
+      + ' <span class="dim" style="font-weight:400">· '+PROG_SUB[p]+'</span></h3>'+gridOf(list, M.AUDIT_PROG[p]+' audits')+'</div>' : ''; }).join('');
   const seg = (k, v, label) => '<button class="btn'+(f[k]===v?' primary':'')+'" type="button" data-act="audf" data-k="'+k+'" data-v="'+v+'" aria-pressed="'+(f[k]===v)+'">'+esc(label)+'</button>';
-  const filters = '<div class="od-row kiosk-off" style="--od-gap:6px;flex-wrap:wrap"><span class="t-small dim">Type</span>'
+  const filters = '<div class="od-row kiosk-off" style="--od-gap:6px;flex-wrap:wrap"><span class="t-small dim">Programme</span>'
+    + seg('prog', '', 'All '+ALL.length) + ['sched', 'unsched'].filter(progN).map(p => seg('prog', p, M.AUDIT_PROG[p]+' '+progN(p))).join('')
+    + '<span style="width:12px"></span><span class="t-small dim">Type</span>'
     + seg('type', '', 'All '+ALL.length) + ['Inspection','Audit','Surveillance','Other'].filter(typeN).map(t => seg('type', t, t+' '+typeN(t))).join('')
     + '<span style="width:12px"></span><span class="t-small dim">Show</span>'
     + seg('show', 'all', 'All') + seg('show', 'upcoming', 'Upcoming '+ALL.filter(a => M.AUDIT_PLANNED.has(a.status)).length)   /* metrics-ok: audit status */
@@ -3736,13 +3754,14 @@ function renderAudit(tab){
     + '<div class="card-head"><h2>'+(REAL ? 'Programme · '+esc(periodLabel()) : 'Annual programme 2026')+'</h2>'
     + '<span class="t-small dim od-fill">'+AUD.length+(AUD.length !== ALL.length ? ' of '+ALL.length : '')+' audits, inspections and surveillances · one dot per audit, in the month it is scheduled</span></div>'
     + '<div class="card-pad" style="display:grid;gap:12px;padding-bottom:0">'+filters+legend+'</div>'
-    + (AUD.length ? '<div class="card-pad">'+grid+'</div>' : '<div class="card-pad">'+emptyState()+'</div>')
+    + (AUD.length ? '<div class="card-pad" style="display:grid;gap:18px">'+grid+'</div>' : '<div class="card-pad">'+emptyState()+'</div>')
     + '<div class="tbl-foot">'+counts.map(c=>'<span class="t-small dim">'+c.s+' <span class="num strong">'+c.n+'</span></span>').join('')+'</div>'
     + '</div></section>';
 }
 /* Schedule list: split by type (shares state.aud.type with the timeline) + sortable headers (Eric 07/10/2026) */
 const AUD_COLS = [
   {l:'Audit',    v:a=>a.number},
+  {l:'Programme',v:a=>M.auditProg(a)},
   {l:'Type',     v:a=>a.type},
   {l:'Status',   v:a=>a.status},
   {l:'Window',   v:a=>(a.year||0)*100 + a.start},
@@ -3757,9 +3776,12 @@ function renderAuditList(){
   if(!ALL.length) return '<section class="sec"><div class="card">'+emptyState()+'</div></section>';
   const f = state.aud, st = state.sort.auditlist;
   const typeN = t => ALL.filter(a => a.type === t).length;
-  const AUD = ALL.filter(a => !f.type || a.type === f.type);
-  const seg = (v, label) => '<button class="btn'+(f.type===v?' primary':'')+'" type="button" data-act="audf" data-k="type" data-v="'+v+'" aria-pressed="'+(f.type===v)+'">'+esc(label)+'</button>';
-  const filters = '<div class="card-pad" style="padding-bottom:0"><div class="od-row" style="--od-gap:6px;flex-wrap:wrap"><span class="t-small dim">Type</span>'
+  const progN = p => ALL.filter(a => M.auditProg(a) === p).length;
+  const AUD = ALL.filter(a => (!f.type || a.type === f.type) && (!f.prog || M.auditProg(a) === f.prog));
+  const seg = (v, label, k) => { k = k || 'type'; return '<button class="btn'+(f[k]===v?' primary':'')+'" type="button" data-act="audf" data-k="'+k+'" data-v="'+v+'" aria-pressed="'+(f[k]===v)+'">'+esc(label)+'</button>'; };
+  const filters = '<div class="card-pad" style="padding-bottom:0"><div class="od-row" style="--od-gap:6px;flex-wrap:wrap"><span class="t-small dim">Programme</span>'
+    + seg('', 'All '+ALL.length, 'prog') + ['sched', 'unsched'].filter(progN).map(p => seg(p, M.AUDIT_PROG[p]+' '+progN(p), 'prog')).join('')
+    + '<span style="width:12px"></span><span class="t-small dim">Type</span>'
     + seg('', 'All '+ALL.length) + ['Audit','Inspection','Surveillance','Other'].filter(typeN).map(t => seg(t, t+' '+typeN(t))).join('') + '</div></div>';
   const cmp = st ? (a,b) => { const c = AUD_COLS[st.k], av = c.v(a), bv = c.v(b), r = av < bv ? -1 : av > bv ? 1 : 0; return st.dir === 'asc' ? r : -r; }
                  : (a,b) => (a.year||0)-(b.year||0) || a.start-b.start;
@@ -3767,6 +3789,7 @@ function renderAuditList(){
     '<tr tabindex="0" data-act="'+(REAL?'baudit':'toast')+'" data-id="'+esc(a.id)+'" data-t="'+esc(a.number)+'" data-b="'+esc(a.title+' — '+a.status+', '+a.findings+' findings.')+'">'
     + '<td class="t-main" data-l="Audit"><span class="row-main"><span class="row-id">'+esc(a.number)+extLink('audit', a.id, a.number)+'</span>'
       + '<span class="row-sub od-truncate">'+esc(a.title)+'</span></span></td>'
+    + '<td data-l="Programme"><span class="t-small'+(M.auditUnsched(a) ? ' strong' : ' dim')+'">'+M.AUDIT_PROG[M.auditProg(a)]+'</span></td>'
     + '<td data-l="Type"><span class="tag">'+esc(a.type)+'</span></td>'
     + '<td data-l="Status">'+chipAs(AUD_CHIP[a.status], a.status)+'</td>'
     + '<td data-l="Window"><span class="num od-nowrap">'+MONTHS[a.start]+(a.end!==a.start?' – '+MONTHS[a.end]:'')+(a.year?' '+a.year:'')+'</span></td>'
@@ -3776,13 +3799,13 @@ function renderAuditList(){
     + '<td class="ar" data-l="Open"><span class="num'+(a.open?' strong':' dim')+'">'+a.open+'</span></td>'
     + '<td class="ar" data-l="Overdue">'+(a.overdue?'<span class="cat c3">'+a.overdue+'</span>':'<span class="dim">—</span>')+'</td></tr>').join('');
   return '<section class="sec"><div class="card">'
-    + '<div class="card-head"><h2>Schedule list</h2><span class="t-small dim od-fill">'+AUD.length+(AUD.length !== ALL.length ? ' of '+ALL.length : '')+' audits · '+esc(periodLabel())+' · the same programme as a flat list.</span></div>'
+    + '<div class="card-head"><h2>Schedule list</h2><span class="t-small dim od-fill">'+AUD.length+(AUD.length !== ALL.length ? ' of '+ALL.length : '')+' audits · '+esc(periodLabel())+' · scheduled and unscheduled, as a flat list.</span></div>'
     + filters
     + '<div class="tbl-wrap"><table class="tbl"><thead><tr>'
     + AUD_COLS.map((c,i)=>{ const on = st && String(st.k) === String(i);
         return '<th scope="col"'+(on?' aria-sort="'+(st.dir==='asc'?'ascending':'descending')+'"':'')+(c.ar?' class="ar"':'')+'>'
           + '<button type="button" data-act="sort" data-key="auditlist" data-col="'+i+'">'+esc(c.l)+ic(on?(st.dir==='asc'?'sortUp':'sortDown'):'sortNone',13,'sort-ic')+'</button></th>'; }).join('')
-    + '</tr></thead><tbody>'+(rows || '<tr><td colspan="9">'+emptyState()+'</td></tr>')+'</tbody></table></div></div></section>';
+    + '</tr></thead><tbody>'+(rows || '<tr><td colspan="10">'+emptyState()+'</td></tr>')+'</tbody></table></div></div></section>';
 }
 
 /* ==========================================================================
@@ -6316,13 +6339,16 @@ function auditKpiTiles(){
   const S = M.auditSummary(data);
   /* 'Top stage InProgress' tile dropped (Eric 01/10/2026) and 'CAR follow-up' (Eric 02/10/2026, six tiles on one row):
      Audit Plan › Workflow stages shows every stage × status */
-  const years = [...new Set(data.map(a => a.sched_year).filter(Boolean))].sort();
   const P = M.auditProgress(data);   /* same figure as the Overview tile 'Audits completed vs plan' */
-  return tiles6([stat('Total audits', String(S.total), 'MNT · RSP · SSP · '+periodLabel()), stat('Closed', String(S.closed), 'status Closed'),
+  const sched = data.filter(M.auditSched), uns = data.filter(M.auditUnsched);
+  const pre = l => [...new Set(l.map(M.auditPrefix).filter(Boolean))].sort().join(' · ');
+  return tiles6([stat('Scheduled', String(sched.length), (pre(sched) || 'MNT')+' · annual plan · '+periodLabel()),
+    stat('Unscheduled', String(uns.length), 'RSP · SSP · raised as required, not in the plan'),
     stat('Delayed', String(P.delayed), P.delayed ? P.delayedList.map(a => a.number).slice(0, 6).join(', ')+(P.delayed > 6 ? '…' : '')
-      : 'scheduled month passed, not performed', P.delayed > 0, true, P.delayed ? 'bdelayed' : null),
-    stat('Open', String(S.open), 'in progress, performed or scheduled'), stat('Closure rate', S.rate+'%', S.closed+' of '+S.total, S.total > 0 && S.rate < 50),
-    stat('Years', years.length ? (years.length <= 3 ? years.join(', ') : years[0]+'–'+years[years.length-1]) : '—', years.length+' year(s)', false, true)]);
+      : 'scheduled audits · month passed, not performed', P.delayed > 0, true, P.delayed ? 'bdelayed' : null),
+    stat('Closed', String(S.closed), 'scheduled '+M.auditSummary(sched).closed+' · unscheduled '+M.auditSummary(uns).closed),
+    stat('Open', String(S.open), 'scheduled '+M.auditSummary(sched).open+' · unscheduled '+M.auditSummary(uns).open),
+    stat('Closure rate', S.rate+'%', S.closed+' of '+S.total+' · scheduled + unscheduled', S.total > 0 && S.rate < 50)]);
 }
 /* the audits behind the Delayed tile — the same M.auditProgress list, oldest scheduled month first */
 function delayedAuditList(){
@@ -6330,7 +6356,7 @@ function delayedAuditList(){
   const list = M.auditProgress(A.auditData().filter(a => a.is_qa_amo_scope && M.auditInPeriod(a))).delayedList.slice()
     .sort((x, y) => String(x.scheduled_start_date || '').localeCompare(String(y.scheduled_start_date || '')) || String(x.number).localeCompare(String(y.number)));
   MODAL_KEY = 'delayed'; MODAL_REDRAW = () => delayedAuditList();
-  openModal('Delayed audits', list.length+' audits · '+periodLabel()+' · scheduled month passed, not Performed / Closed · select an audit for its detail',
+  openModal('Delayed audits', list.length+' scheduled audits · '+periodLabel()+' · scheduled month passed, not Performed / Closed · select an audit for its detail',
     plainTable('aud-delayed', [{l:'Audit'},{l:'Location',w:'92px'},{l:'Scheduled',w:'112px'},{l:'Lead auditor'},{l:'Status'}], list.map(a => [
       '<button class="link-b" type="button" data-act="baudit" data-id="'+esc(a.audit_id)+'"><span class="row-id">'+esc(a.number)+'</span></button>'+extLink('audit', a.audit_id, a.number)+' <span class="t-small dim">'+esc(a.title || '')+'</span>',
       '<span class="t-small">'+esc(a.location_name || '—')+'</span>',
@@ -6410,7 +6436,7 @@ function scrGuideNew(){
     + '<li><b>Safety › MSAG status</b>: OSR and MOSR closed, open and total for each MSAG group on Coruson. It counts all the data of these groups and ignores the Year and Month filter, so its figures differ from Safety › MOSR register.</li>'
     + '<li><b>Safety › MOSR charts</b>: form MOSR by department, occurrence category and base, by submitted date. Year and month come from the filter bar, the quarter is chosen in the tab. A report with two departments counts in both; occurrence category holds the groups under Technical only, and the caption states the reports not classified or outside Technical.</li>'
     + '<li><b>Analytics › Event/IR report status</b>: EIS and F-088 completeness on Coruson; the tiles count the reports complete on each check, the table shows workflow, linked reports, final report and status per report.</li>'
-    + '<li><b>Audit Plan</b>: KPI tiles, a location × month view (one dot per audit, inspection or surveillance in its scheduled month; filter by type or show only upcoming / with overdue findings), and a schedule list. Select a dot or a row for its workflow stages and findings. A solid blue ring is an audit in status <b>Schedule Confirmed</b>; it counts as planned and open, like Scheduled. <b>Workflow stages</b>: for the QA AMO audits in the selected period, how many stages of each name are in each Galileo status; select an InProgress or PendingSignOff count for the audits concerned.</li>'
+    + '<li><b>Audit Plan</b>: audits are split into <b>Scheduled</b> (the annual plan, MNT numbers) and <b>Unscheduled</b> (RSP Random Surveillance and SSP Specified Surveillance, raised as required). Plan progress and <b>Delayed</b> count scheduled audits only; unscheduled ones have their own tile, their own grid on the timeline and a <b>Programme</b> filter and column. KPI tiles, a location × month view (one dot per audit, inspection or surveillance in its scheduled month; filter by type or show only upcoming / with overdue findings), and a schedule list. Select a dot or a row for its workflow stages and findings. A solid blue ring is an audit in status <b>Schedule Confirmed</b>; it counts as planned and open, like Scheduled. <b>Workflow stages</b>: for the QA AMO audits in the selected period, how many stages of each name are in each Galileo status; select an InProgress or PendingSignOff count for the audits concerned.</li>'
     + '<li><b>Library › Documents</b>: browse by document type; the document number opens copyholders (on time, late, overdue) and the workflow.</li></ul>')
   + sec('export','Exports',
     '<p><b>Admin › Export reports</b> (administrators and moderators):</p>'

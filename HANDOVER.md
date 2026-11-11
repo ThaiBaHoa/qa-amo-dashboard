@@ -5,6 +5,13 @@
 
 ---
 
+## ✅ r225 — Audit Plan tách Scheduled (MNT) / Unscheduled (RSP + SSP) (11/11/2026, EricThai)
+
+- **Yêu cầu (Eric 11/11):** RSP và SSP là hai chương trình không nằm trong schedule mà phát sinh; MNT = schedule, RSP + SSP = un-schedule.
+- **Đã làm:** `M.auditProg` theo tiền tố số audit; `M.auditProgress` chỉ tính Scheduled (Overview *Audits completed vs plan*, *Delayed*); Audit Plan có ô Scheduled / Unscheduled, hai lưới Timeline, bộ lọc và cột Programme; guide.js, manual.js (VERSION r225, chưa build docx).
+- **Kiểm trên dữ liệu thật 2026 (preview, 11/11):** 255 audit = Scheduled 236 (chỉ tiền tố MNT: Inspection 179, Audit 48, Other 9) + Unscheduled 19 (RSP 17, SSP 2). Delayed 9 → 4 (MNT-1045, 1048, 1064, 1065); 5 audit không còn tính Delayed: RSP-0010, 0011, 0014, 0017, SSP-0001. Completed vs plan 199 / 221. Không lỗi console.
+- **Chưa làm:** Workflow stages vẫn gộp cả hai; classic UI không đổi.
+
 ## ✅ r224-i2 — Sửa Reports › All forms không hiển thị (11/11/2026, EricThai)
 
 - **Triệu chứng (Eric):** bấm Reports thì thanh trên và menu đổi sang Reports nhưng nội dung vẫn là Work Queue; tưởng là load chậm.
