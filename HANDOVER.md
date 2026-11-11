@@ -5,6 +5,11 @@
 
 ---
 
+## ✅ r224-i1 — User guide và sổ tay theo r224 (11/11/2026, EricThai)
+- Chỉ sửa chữ ở `beta-src/guide.js` (Library › User guide) và `beta-src/manual.js`. Không đổi logic, không đổi số liệu.
+- Manual rời: `HuongDan_SuDung_QA_AMO_Dashboard_r224.docx` (workspace `MQA dashboard website/`), 34 trang; mục **4.5 Safety** mới, Audit Plan / Library / Admin lùi thành 4.6–4.8.
+- **Còn mở:** ảnh trong `manual-shots-r220/` chưa chụp lại (thanh điều hướng cũ chưa có mục Safety; chưa có hình HIRA register, Compliance checks). `callouts.json` mới đổi tiêu đề 3 hình sang Safety › …
+
 ## 🟡 r224 — Trang Safety, HIRA register theo VJC-MQA-F-118 (09/11/2026, EricThai) — đã commit + push 11/11/2026 theo lệnh Eric
 - Eric: gom report Safety về 1 trang; HIRA bảng ngoài + popup chi tiết theo file Excel F-118; màu theo AMO SMS Risk Rating.
 - Mục điều hướng mới **Safety**: HIRA register (mới), Additional mitigation (`scrAllForms(CAPA_TITLE)`, vẫn có ở Reports › All forms), OSR/MOSR status (từ Analytics), MOSR register (từ Reports › MOSR), MOSR charts, SPI (từ Analytics). Route cũ tự chuyển (`MOVED_ROUTES`); KIOSK_STEPS và User guide theo đường dẫn mới.
