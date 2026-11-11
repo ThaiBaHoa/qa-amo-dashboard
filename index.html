@@ -576,6 +576,7 @@ select.ctl{min-width:168px;cursor:pointer}
 /* Schedule Confirmed (Coruson status, 11/2026): planned like Scheduled, the ring is solid */
 .am-d.k-confirmed{background:transparent;border:1.5px solid var(--info)}
 .am-d.k-overdue{background:var(--accent);border-color:var(--accent)}
+.am-d.rs{box-shadow:0 0 0 2px var(--surface,#fff),0 0 0 3.5px var(--warn)}   /* rescheduled: amber outer ring, any status */
 .am-d:hover,.am-d:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .am-key{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:-1px;border:1.5px solid var(--ok);background:var(--ok)}
 
@@ -1678,7 +1679,8 @@ const audits = auditData
     const m = Number(String(a.scheduled_start_date).slice(5, 7)) - 1;
     return { id: a.audit_id, number: a.number, title: orDash(a.title), location: orDash(a.location_name),
       type: a.workflow_category, status: AUD_STATUS[a.status] || a.status, start: m, end: m, year: +a.sched_year,
-      findings: a.finding_count, open: a.open_count, overdue: a.overdue_count, lead: orDash(a.lead_auditor_name) };
+      findings: a.finding_count, open: a.open_count, overdue: a.overdue_count, lead: orDash(a.lead_auditor_name),
+      resched: a.has_been_rescheduled === true, reschedReason: a.reschedule_reason || '' };
   })
   .filter(a => a.start >= 0 && a.start <= 11)
   .sort((a, b) => a.year - b.year || a.start - b.start || String(a.number).localeCompare(String(b.number)));
@@ -2687,6 +2689,17 @@ const M = {
   auditSched: a => !M.auditUnsched(a),
   AUDIT_PROG: { sched: 'Scheduled', unsched: 'Unscheduled' },
   auditProg: a => M.auditUnsched(a) ? 'unsched' : 'sched',
+  /* Rescheduled (Eric 11/11/2026, MNT-1045 moved Oct → Nov): Coruson flags an audit whose dates were changed
+     (Galileo has_been_rescheduled, reschedule_reason). A scheduled audit moved to a later month is no longer Delayed
+     by the month rule, so it is warned on its own. Galileo keeps only the current dates: the original month is not
+     available. Works on raw auditData and on the mapped AUDITS. Scheduled (MNT) audits only, Cancelled / Deleted excluded. */
+  auditResched: a => a.resched !== undefined ? a.resched === true : a.has_been_rescheduled === true,
+  auditReschedReason: a => String((a.resched !== undefined ? a.reschedReason : a.reschedule_reason) || '').trim(),
+  auditRescheduled(list){
+    const all = list.filter(a => M.auditSched(a) && !M.AUDIT_VOID.has(a.status) && M.auditResched(a));
+    const pending = all.filter(a => !M.AUDIT_DONE.has(a.status));
+    return { total: all.length, list: all, pending: pending.length, pendingList: pending, noReason: all.filter(a => !M.auditReschedReason(a)).length };
+  },
   AUDIT_VOID: new Set(['Cancelled', 'Deleted']),
   auditDue: a => new Date(M.auditYear(a), M.auditMonth(a) + 1, 0) < TODAY,
   /* plan to date = scheduled month has started (includes the current month). Eric 30/09/2026: "160 / 160"
@@ -2817,6 +2830,7 @@ M.consistency = function(){
   const aud = A.auditData().filter(a => a.is_qa_amo_scope && M.auditInPeriod(a, f));
   say('Audit Plan rows vs audit KPI total', AUDITS.filter(a => M.auditInPeriod(a, f)).length, aud.length);
   { const p = M.auditProgress(aud); say('Audit donut parts vs plan', p.done + p.delayed + p.thisMonthOpen + p.upcoming, p.plan); }
+  say('Audits rescheduled (mapped) vs raw auditData', M.auditRescheduled(AUDITS.filter(a => M.auditInPeriod(a, f))).total, M.auditRescheduled(aud).total);
   say('Audits delayed (Overview) vs raw auditData', M.auditProgress(AUDITS.filter(a => M.auditInPeriod(a, f))).delayed, M.auditProgress(aud).delayed);
   say('PAVOI / MVOI open (Overview) vs classic', M.summary(qa.filter(r => r.form === 'pavoi' || r.form === 'mvoi')).open,
       raw.filter(r => (r.report_title === 'PAVOI' || r.report_title === 'MVOI') && !M.isClosed(r)).length);
@@ -3712,11 +3726,12 @@ function renderAudit(tab){
   const multiYear = new Set(ALL.map(a=>a.year)).size > 1;
   const kind = a => (a.overdue>0 && !M.AUDIT_PLANNED.has(a.status)) ? 'k-overdue' : (AUD_KIND[a.status] || 'k-closed');   /* metrics-ok: audit status */
   const rowKey = a => (a.location || '—') + (multiYear && a.year ? ' · ' + a.year : '');
+  const rs = a => M.auditSched(a) && M.auditResched(a);   /* the warning is for the scheduled programme */
   const short = l => String(l).replace(' Line Maintenance Station', ' Line');
-  const dot = a => '<button type="button" class="am-d '+kind(a)+'" data-act="'+(REAL?'baudit':'toast')+'" data-id="'+esc(a.id)+'" data-t="'+esc(a.number)+'" '
-    + 'data-b="'+esc(a.title+' · '+a.type+' · lead '+a.lead+' · '+a.location+' · '+a.status+' · '+a.findings+' findings, '+a.open+' still open'+(a.overdue?', '+a.overdue+' overdue':'')+'.')+'" '
-    + 'title="'+esc(a.number+' · '+a.title+' — '+a.type+' · '+a.status+' · '+a.findings+' findings'+(a.open?', '+a.open+' open':'')+(a.overdue?', '+a.overdue+' overdue':''))+'" '
-    + 'aria-label="'+esc(a.number+', '+a.status+(a.overdue?', '+a.overdue+' overdue findings':''))+'"></button>';
+  const dot = a => '<button type="button" class="am-d '+kind(a)+(rs(a) ? ' rs' : '')+'" data-act="'+(REAL?'baudit':'toast')+'" data-id="'+esc(a.id)+'" data-t="'+esc(a.number)+'" '
+    + 'data-b="'+esc(a.title+' · '+a.type+' · lead '+a.lead+' · '+a.location+' · '+a.status+' · '+a.findings+' findings, '+a.open+' still open'+(a.overdue?', '+a.overdue+' overdue':'')+(rs(a)?' · rescheduled':'')+'.')+'" '
+    + 'title="'+esc(a.number+' · '+a.title+' — '+a.type+' · '+a.status+' · '+a.findings+' findings'+(a.open?', '+a.open+' open':'')+(a.overdue?', '+a.overdue+' overdue':'')+(rs(a)?' · RESCHEDULED'+(a.reschedReason?': '+a.reschedReason:''):''))+'" '
+    + 'aria-label="'+esc(a.number+', '+a.status+(a.overdue?', '+a.overdue+' overdue findings':'')+(rs(a)?', rescheduled':''))+'"></button>';
   /* one grid per programme (Eric 11/11/2026): Scheduled = the annual plan (MNT), Unscheduled = RSP + SSP */
   const gridOf = (list, label) => { const groups = {};
     list.forEach(a => { (groups[rowKey(a)] ||= { year: a.year || 0, list: [] }).list.push(a); });
@@ -3746,6 +3761,7 @@ function renderAudit(tab){
     + key('background:var(--warn);border-color:var(--warn)', 'In Progress') + key('background:transparent;border:1.5px dashed var(--text-2)', 'Scheduled')
     + key('background:transparent;border:1.5px solid var(--info)', 'Schedule Confirmed')
     + key('background:var(--accent);border-color:var(--accent)', 'Has overdue findings')
+    + key('background:transparent;border-color:transparent;box-shadow:0 0 0 1.5px var(--warn)', 'Amber ring: rescheduled')
     + '<span class="legend-i dim">'+MONTHS[now]+' is the current month · select a dot for detail</span></div>';
 
   const counts = ['Closed','Performed','In Progress','Scheduled','Schedule Confirmed','Cancelled'].map(s=>({s, n:AUD.filter(a=>a.status===s).length})).filter(c=>c.n || (c.s!=='Cancelled' && c.s!=='Schedule Confirmed'));   /* metrics-ok: audit status legend counts */
@@ -3791,7 +3807,8 @@ function renderAuditList(){
       + '<span class="row-sub od-truncate">'+esc(a.title)+'</span></span></td>'
     + '<td data-l="Programme"><span class="t-small'+(M.auditUnsched(a) ? ' strong' : ' dim')+'">'+M.AUDIT_PROG[M.auditProg(a)]+'</span></td>'
     + '<td data-l="Type"><span class="tag">'+esc(a.type)+'</span></td>'
-    + '<td data-l="Status">'+chipAs(AUD_CHIP[a.status], a.status)+'</td>'
+    + '<td data-l="Status">'+chipAs(AUD_CHIP[a.status], a.status)
+      + (M.auditSched(a) && M.auditResched(a) ? ' <span class="tag" style="border-color:var(--warn);color:var(--warn)" title="'+esc('Dates changed on Coruson'+(a.reschedReason ? ': '+a.reschedReason : ''))+'">Rescheduled</span>' : '')+'</td>'
     + '<td data-l="Window"><span class="num od-nowrap">'+MONTHS[a.start]+(a.end!==a.start?' – '+MONTHS[a.end]:'')+(a.year?' '+a.year:'')+'</span></td>'
     + '<td data-l="Lead"><span class="od-truncate">'+esc(a.lead)+'</span></td>'
     + '<td data-l="Location"><span class="tag">'+esc(a.location)+'</span></td>'
@@ -6308,6 +6325,7 @@ Object.assign(BETA_ACT, {
   bdoctab: el => showDoc(el.dataset.id, el.dataset.t),
   baudit: el => showAudit(el.dataset.id),
   bdelayed: () => delayedAuditList(),
+  bresched: () => reschedAuditList(),
   bsignout: () => { if(confirm('Sign out of the QA AMO Dashboard?')) window.betaSignOut(); },
   bpassword: () => changePasswordModal(),
   bpwsave: () => savePassword(),
@@ -6340,15 +6358,32 @@ function auditKpiTiles(){
   /* 'Top stage InProgress' tile dropped (Eric 01/10/2026) and 'CAR follow-up' (Eric 02/10/2026, six tiles on one row):
      Audit Plan › Workflow stages shows every stage × status */
   const P = M.auditProgress(data);   /* same figure as the Overview tile 'Audits completed vs plan' */
-  const sched = data.filter(M.auditSched), uns = data.filter(M.auditUnsched);
+  const sched = data.filter(M.auditSched), uns = data.filter(M.auditUnsched), RS = M.auditRescheduled(data);
   const pre = l => [...new Set(l.map(M.auditPrefix).filter(Boolean))].sort().join(' · ');
   return tiles6([stat('Scheduled', String(sched.length), (pre(sched) || 'MNT')+' · annual plan · '+periodLabel()),
     stat('Unscheduled', String(uns.length), 'RSP · SSP · raised as required, not in the plan'),
     stat('Delayed', String(P.delayed), P.delayed ? P.delayedList.map(a => a.number).slice(0, 6).join(', ')+(P.delayed > 6 ? '…' : '')
       : 'scheduled audits · month passed, not performed', P.delayed > 0, true, P.delayed ? 'bdelayed' : null),
-    stat('Closed', String(S.closed), 'scheduled '+M.auditSummary(sched).closed+' · unscheduled '+M.auditSummary(uns).closed),
-    stat('Open', String(S.open), 'scheduled '+M.auditSummary(sched).open+' · unscheduled '+M.auditSummary(uns).open),
-    stat('Closure rate', S.rate+'%', S.closed+' of '+S.total+' · scheduled + unscheduled', S.total > 0 && S.rate < 50)]);
+    stat('Rescheduled', String(RS.total), RS.total ? RS.pending+' not yet performed'+(RS.pending ? ': '+RS.pendingList.map(a => a.number).slice(0, 4).join(', ')+(RS.pending > 4 ? '…' : '') : '')
+      : 'scheduled audits whose dates were changed', RS.pending > 0, true, RS.total ? 'bresched' : null),
+    stat('Closed', String(S.closed), S.rate+'% of '+S.total+' · scheduled '+M.auditSummary(sched).closed+' · unscheduled '+M.auditSummary(uns).closed),
+    stat('Open', String(S.open), 'scheduled '+M.auditSummary(sched).open+' · unscheduled '+M.auditSummary(uns).open)]);
+}
+/* the audits behind the Rescheduled tile — M.auditRescheduled, not yet performed first, then by scheduled month */
+function reschedAuditList(){
+  const A = API();
+  const done = a => M.AUDIT_DONE.has(a.status) ? 1 : 0;
+  const R = M.auditRescheduled(A.auditData().filter(a => a.is_qa_amo_scope && M.auditInPeriod(a)));
+  const list = R.list.slice().sort((x, y) => done(x) - done(y) || String(x.scheduled_start_date || '').localeCompare(String(y.scheduled_start_date || '')) || String(x.number).localeCompare(String(y.number)));
+  MODAL_KEY = 'resched'; MODAL_REDRAW = () => reschedAuditList();
+  openModal('Rescheduled audits', R.total+' scheduled audits · '+periodLabel()+' · dates changed on Coruson · '+R.pending+' not yet performed · '+R.noReason+' without a reschedule reason · the original month is not kept by Coruson reporting',
+    plainTable('aud-resched', [{l:'Audit'},{l:'Location',w:'92px'},{l:'Now scheduled',w:'120px'},{l:'Status',w:'130px'},{l:'Reschedule reason'}], list.map(a => [
+      '<button class="link-b" type="button" data-act="baudit" data-id="'+esc(a.audit_id)+'"><span class="row-id">'+esc(a.number)+'</span></button>'+extLink('audit', a.audit_id, a.number)+' <span class="t-small dim">'+esc(a.title || '')+'</span>',
+      '<span class="t-small">'+esc(a.location_name || '—')+'</span>',
+      '<span class="num od-nowrap">'+(a.scheduled_start_date ? MONTHS[M.auditMonth(a)]+' '+M.auditYear(a) : '—')+'</span>',
+      '<span class="t-small'+(done(a) ? '' : ' strong')+'">'+esc(a.status || '—')+'</span>',
+      M.auditReschedReason(a) ? '<span class="t-small">'+esc(M.auditReschedReason(a))+'</span>' : '<span class="t-small dim">Not recorded</span>'
+    ]), 30, 860));
 }
 /* the audits behind the Delayed tile — the same M.auditProgress list, oldest scheduled month first */
 function delayedAuditList(){
@@ -6436,7 +6471,7 @@ function scrGuideNew(){
     + '<li><b>Safety › MSAG status</b>: OSR and MOSR closed, open and total for each MSAG group on Coruson. It counts all the data of these groups and ignores the Year and Month filter, so its figures differ from Safety › MOSR register.</li>'
     + '<li><b>Safety › MOSR charts</b>: form MOSR by department, occurrence category and base, by submitted date. Year and month come from the filter bar, the quarter is chosen in the tab. A report with two departments counts in both; occurrence category holds the groups under Technical only, and the caption states the reports not classified or outside Technical.</li>'
     + '<li><b>Analytics › Event/IR report status</b>: EIS and F-088 completeness on Coruson; the tiles count the reports complete on each check, the table shows workflow, linked reports, final report and status per report.</li>'
-    + '<li><b>Audit Plan</b>: audits are split into <b>Scheduled</b> (the annual plan, MNT numbers) and <b>Unscheduled</b> (RSP Random Surveillance and SSP Specified Surveillance, raised as required). Plan progress and <b>Delayed</b> count scheduled audits only; unscheduled ones have their own tile, their own grid on the timeline and a <b>Programme</b> filter and column. KPI tiles, a location × month view (one dot per audit, inspection or surveillance in its scheduled month; filter by type or show only upcoming / with overdue findings), and a schedule list. Select a dot or a row for its workflow stages and findings. A solid blue ring is an audit in status <b>Schedule Confirmed</b>; it counts as planned and open, like Scheduled. <b>Workflow stages</b>: for the QA AMO audits in the selected period, how many stages of each name are in each Galileo status; select an InProgress or PendingSignOff count for the audits concerned.</li>'
+    + '<li><b>Audit Plan</b>: audits are split into <b>Scheduled</b> (the annual plan, MNT numbers) and <b>Unscheduled</b> (RSP Random Surveillance and SSP Specified Surveillance, raised as required). Plan progress and <b>Delayed</b> count scheduled audits only; unscheduled ones have their own tile, their own grid on the timeline and a <b>Programme</b> filter and column. The <b>Rescheduled</b> tile counts scheduled audits whose dates were changed on Coruson and opens their list with the reschedule reason; it turns red while any of them is not yet performed. On the timeline a rescheduled audit has an amber outer ring, and the schedule list shows a <b>Rescheduled</b> tag. Coruson reporting keeps only the current dates, so the original month is not shown. KPI tiles, a location × month view (one dot per audit, inspection or surveillance in its scheduled month; filter by type or show only upcoming / with overdue findings), and a schedule list. Select a dot or a row for its workflow stages and findings. A solid blue ring is an audit in status <b>Schedule Confirmed</b>; it counts as planned and open, like Scheduled. <b>Workflow stages</b>: for the QA AMO audits in the selected period, how many stages of each name are in each Galileo status; select an InProgress or PendingSignOff count for the audits concerned.</li>'
     + '<li><b>Library › Documents</b>: browse by document type; the document number opens copyholders (on time, late, overdue) and the workflow.</li></ul>')
   + sec('export','Exports',
     '<p><b>Admin › Export reports</b> (administrators and moderators):</p>'

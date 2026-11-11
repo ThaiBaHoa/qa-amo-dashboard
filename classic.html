@@ -2533,7 +2533,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.11-r225';
+const APP_REV = '2026.11.11-r226';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3634,7 +3634,8 @@ async function loadData(forceRefresh=false, opts={}) {
       par('Audit plan',
         G_URL + 'dwreporting_audit_summary' +
         '?$select=audit_id,number,title,audit_type,status,scheduled_start_date,' +
-        'actual_start_date,closed_date,lead_auditor_name,primary_scope_item_name,location_name',
+        'actual_start_date,closed_date,lead_auditor_name,primary_scope_item_name,location_name,' +
+        'has_been_rescheduled,reschedule_reason',   // [r226] Coruson 'Audit has been rescheduled'
         rows => { auRaw = rows; }),
     ]);
 

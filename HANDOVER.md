@@ -5,6 +5,14 @@
 
 ---
 
+## ✅ r226 — Cảnh báo audit MNT bị đổi lịch (11/11/2026, EricThai)
+
+- **Yêu cầu:** MNT-1045 được dời từ tháng 10 sang tháng 11 trên Coruson nên thoát khỏi Delayed; cần cảnh báo cho MNT bị reschedule. Cảnh báo riêng cho RSP / SSP quá tháng: Eric nói KHÔNG cần.
+- **Nguồn:** `dwreporting_audit_summary.has_been_rescheduled`, `reschedule_reason`. Galileo không giữ ngày gốc.
+- **Đã làm:** ô Rescheduled + danh sách, viền vàng trên Timeline, nhãn trong Schedule list; guide.js, manual.js (VERSION r226, chưa build docx).
+- **Kiểm preview dữ liệu thật 2026:** Rescheduled 14, chưa thực hiện 1 (MNT-1045), cả 14 không có reschedule reason; Delayed 4 → 3 (MNT-1048, 1064, 1065); 14 chấm có viền; không lỗi console.
+- **Hạn chế / ý tiếp:** muốn hiện "dời từ tháng nào" thì dashboard phải tự lưu tháng kế hoạch lần đầu thấy (bảng Supabase), hoặc người đổi lịch ghi Reschedule reason trên Coruson. Dòng History trên Coruson ("original date … new date …") KHÔNG có trong Galileo (đã dò 123 bảng; `dwanalytics_audit` chỉ có dòng hiện hành, `is_current eq false` rỗng). Hai hướng: (1) dashboard tự lưu tháng lần đầu thấy; (2) đọc tab History trên Coruson qua Edge cho các audit có cờ. **Eric 11/11: để tính sau.**
+
 ## ✅ r225 — Audit Plan tách Scheduled (MNT) / Unscheduled (RSP + SSP) (11/11/2026, EricThai)
 
 - **Yêu cầu (Eric 11/11):** RSP và SSP là hai chương trình không nằm trong schedule mà phát sinh; MNT = schedule, RSP + SSP = un-schedule.
