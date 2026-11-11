@@ -555,6 +555,7 @@ select.ctl{min-width:168px;cursor:pointer}
 .tl-bar.k-performed{background:var(--data-2);color:var(--on-data-2)}
 .tl-bar.k-progress{background:var(--data-1);color:var(--on-data-1)}
 .tl-bar.k-scheduled{background:repeating-linear-gradient(135deg,var(--hatch) 0 6px,transparent 6px 12px);border:1px dashed var(--border-strong);color:var(--text-2)}
+.tl-bar.k-confirmed{background:transparent;border:1px solid var(--info);color:var(--text-2)}
 .tl-bar.k-overdue{background:var(--accent);color:var(--on-accent)}
 /* Audit Plan · location × month (29/09/2026): one dot per audit. Every audit sits in one month, so the old
    one-row-per-audit timeline was 237 rows × 93 px (22,000 px) of mostly empty cells. */
@@ -572,6 +573,8 @@ select.ctl{min-width:168px;cursor:pointer}
 .am-d.k-performed{background:var(--info);border-color:var(--info)}
 .am-d.k-progress{background:var(--warn);border-color:var(--warn)}
 .am-d.k-scheduled{background:transparent;border:1.5px dashed var(--text-2)}
+/* Schedule Confirmed (Coruson status, 11/2026): planned like Scheduled, the ring is solid */
+.am-d.k-confirmed{background:transparent;border:1.5px solid var(--info)}
 .am-d.k-overdue{background:var(--accent);border-color:var(--accent)}
 .am-d:hover,.am-d:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .am-key{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:-1px;border:1.5px solid var(--ok);background:var(--ok)}
@@ -717,6 +720,8 @@ mark{background:var(--accent-34);color:var(--on-wash);border-radius:3px;padding:
   .tbl td.t-main::before{display:none}
   .tbl td.ar, .tbl td.ac{text-align:left}
   .tbl-wrap{overflow:visible}
+  /* grid tables (F-118 register, risk matrix) keep their columns on a phone: they scroll inside their card, not the page */
+  .tbl-wrap:has(> table.hx), .tbl-wrap:has(> table.rmx){overflow-x:auto}
   .botnav{
     display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:70;
     background:var(--surface);border-top:1px solid var(--border);padding-bottom:env(safe-area-inset-bottom);
@@ -857,7 +862,47 @@ body.kiosk .od-clamp-2{display:block;-webkit-line-clamp:unset;overflow:visible}
 /* r171 AMO - HIRA register: 9 columns fit a laptop width — headers may wrap, report number stays on one line */
 .af-hira .tbl th, .af-hira .tbl th button{white-space:normal;text-align:left}
 .af-hira .row-id{white-space:nowrap}
+/* a card body is a grid: without this its children grow to their widest table (MOSR register 1180px) and the page scrolls sideways
+   instead of the table inside its wrapper (Eric 11/11/2026) */
+.card-pad > *{min-width:0}
 .af-hira td[data-l="Days to due"], .af-hira td[data-l="Days to due"] *{white-space:normal}
+/* r224 Safety: risk rating chip and risk matrix. Band colours come from METRICS M.RISK (AMO SMS §9.4.3) inline;
+   dark ink on every band (contrast ≥ 5.2 : 1), the same fills in both themes. */
+.risk-chip{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;line-height:18px;white-space:nowrap}
+.risk-chip b{font-variant-numeric:tabular-nums;font-weight:800}
+.rmx{border-collapse:separate;border-spacing:4px;width:100%;max-width:860px;min-width:560px;table-layout:fixed}
+.rmx thead th:first-child,.rmx tbody th{width:170px}
+.rmx th{font-size:12px;font-weight:600;text-align:center;padding:4px 6px;vertical-align:middle}
+.rmx th span{display:block;font-weight:400}
+.rmx tbody th{text-align:left;white-space:nowrap}
+.rmx-c{background:var(--rmx);color:var(--rmx-ink);text-align:center;border-radius:6px;padding:6px 4px;height:52px}
+.rmx-c .num{display:block;font-size:20px;font-weight:700;line-height:1.1}
+.rmx-c .rmx-code{display:block;font-size:11px;font-weight:600;opacity:.75}
+/* every cell keeps its band colour (red / orange / green, Eric 11/11/2026); an empty cell only dims its count */
+.rmx-c.zero .num{opacity:.45}
+.rmx-c.zero .rmx-code{opacity:1}
+/* F-118 outer table: bordered grid, merged HIRA cells, filled rating cells, full text in the two long columns */
+.hx{border-collapse:collapse;width:100%;min-width:1080px;font-size:13px;line-height:1.45}
+.hx th,.hx td{border:1px solid var(--border);padding:6px 8px;vertical-align:middle}
+.hx thead th{font-size:11.5px;font-weight:700;text-transform:uppercase;text-align:center;letter-spacing:.02em;background:color-mix(in srgb,var(--text) 8%,var(--surface));color:var(--text)}
+.hx td.hx-c{text-align:center}
+.hx td.hx-gen{min-width:120px;font-weight:600}
+.hx td.hx-txt{min-width:220px;width:24%;white-space:normal;overflow-wrap:anywhere}
+.hx td.hx-fill{text-align:center;min-width:84px}
+.hx td.hx-c .chip{white-space:nowrap}
+.hx td.hx-fill b{display:block;font-size:15px}
+.hx td.hx-fill span{display:block;font-size:11px;font-weight:600}
+.hx td.hx-fill span.hx-off{margin-top:4px;padding-top:3px;border-top:1px solid currentColor;white-space:nowrap}
+.hx tbody tr{cursor:pointer}
+/* F-118 record ("Trang trong"): as wide as the screen, the grid scrolls inside with its header row kept in view */
+.beta-modal-panel.xwide{width:min(96vw,2000px)}
+.hx-pop{max-height:calc(min(88vh,900px) - 260px);min-height:240px;overflow:auto}
+.hx-pop .hx{min-width:2300px}
+.hx-pop .hx thead th{position:sticky;top:0;z-index:1;box-shadow:inset 0 -1px 0 var(--border)}
+.hx-pop .hx tbody tr{cursor:default}
+.hx td.hx-mid{min-width:160px;white-space:normal}
+.hx td.hx-sum{min-width:260px;white-space:normal;font-size:12.5px}
+.hx tbody tr:hover td:not(.hx-fill){background:color-mix(in srgb,var(--text) 5%,transparent)}
 .beta-docs .beta-sel .ctl{max-width:min(420px,100%)}
 .beta-guide h1,.beta-guide h2,.beta-guide h3{margin:var(--s4) 0 var(--s2)}
 .beta-guide p,.beta-guide li{color:var(--text-2);font-size:15px;line-height:1.6}
@@ -1625,7 +1670,7 @@ cmrData.forEach(r => { const o = base(r, 'cmrcar'); o.finding = orDash(r.finding
 ecarData.forEach(r => { const o = base(r, 'ecar'); o.finding = orDash(r.finding_desc); o.owner = '—'; o.issuedTo = '—'; o.issuedBy = orDash(r.issued_by); o.dept = '—'; aircraft(o, r.aircraft_reg); reports.push(o); });
 
 const YEAR = String(new Date().getFullYear());
-const AUD_STATUS = { InProgress: 'In Progress' };
+const AUD_STATUS = { InProgress: 'In Progress', ScheduleConfirmed: 'Schedule Confirmed' };
 const audits = auditData
   /* every year: the Audit Plan follows the Year × Month filter like every other screen */
   .filter(a => a.is_qa_amo_scope && /^\\d{4}$/.test(String(a.sched_year)))
@@ -1685,7 +1730,7 @@ const SCREEN_API = {
   AF_FORMS, EIS_TITLE, QCS_TITLE,
   loadEis: () => loadEisDetail(), eis: () => ({ loaded: eisLoaded, desc: eisDescMap, ca: eisCAMap }), enrichEis, enrichQcs,
   /* AMO - HIRA classifications (r171 loadHiraCls): HIRA method / hazard type / additional mitigation */
-  HIRA_TITLE, loadHira: () => loadHiraCls(), hira: () => ({ loaded: hiraLoaded, map: hiraClsMap, hazards: hiraHazardMap }),
+  HIRA_TITLE, loadHira: () => loadHiraCls(), hira: () => ({ loaded: hiraLoaded, map: hiraClsMap, hazards: hiraHazardMap, reg: hiraRegMap, regErr: hiraRegErr, fieldNames: hiraFieldNames }),
   /* AMO - Additional Mitigation (r172 loadCapa): tasks graded by semCalc + form content */
   CAPA_TITLE, loadCapa: () => loadCapa(), capa: () => ({ loaded: capaLoaded, tasks: capaTaskMap, info: capaInfoMap, byHira: hiraCapaMap }), capaTaskStats,
   /* Audit Plan bottleneck (system-wide $apply aggregate, invariant I7) */
@@ -2034,18 +2079,26 @@ const NAV = [
       {id:'cmrcar', label:'CMR-CAR'},
       {id:'ecar',   label:'ECAR'},
       {id:'amoecar',label:'AMO-ECAR'},
-      {id:'mcar',   label:'MCAR'},
-      {id:'osr',    label:'MOSR'}
+      {id:'mcar',   label:'MCAR'}
     ]},
   { id:'analytics', label:'Analytics',  icon:'chart',    task:'analyse', title:'Analytics',
     lead:'KPIs, SPIs and report status by period.',
     tabs:[
       {id:'kpi',    label:'KPI charts'},
-      {id:'spi',    label:'SPI'},
-      {id:'safety', label:'OSR/MOSR Status'},
-      {id:'mosr',   label:'MOSR charts'},
       {id:'early',  label:'Early detection'},
       {id:'status', label:'Event/IR report status'}
+    ]},
+  /* r224 (Eric 09/11/2026): the Safety reports gathered on one page — HIRA register (VJC-MQA-F-118 layout), AMO -
+     Additional Mitigation, MSAG status, MOSR register and charts, SPI. Their old routes redirect (MOVED_ROUTES). */
+  { id:'safety',    label:'Safety',     icon:'shield',   task:'safety',  title:'Safety',
+    lead:'AMO safety management: hazard register, risk mitigation, safety reports and safety performance.',
+    tabs:[
+      {id:'hira',      label:'HIRA register'},
+      {id:'mitigation',label:'Additional mitigation'},
+      {id:'msag',      label:'MSAG status'},
+      {id:'mosr',      label:'MOSR register'},
+      {id:'mosrcharts',label:'MOSR charts'},
+      {id:'spi',       label:'SPI'}
     ]},
   { id:'audit',     label:'Audit Plan', icon:'calendar', task:'audit',   title:'Audit Plan',
     lead:'Audit and inspection programme: schedule, status and findings.',
@@ -2068,7 +2121,7 @@ const NAV = [
       {id:'mydash',  label:'My dashboard'}
     ]}
 ];
-const TASK_LABEL = { monitor:'Dashboard', act:'Reports', analyse:'Analytics', audit:'Audit', reference:'Library', admin:'Administration' };
+const TASK_LABEL = { monitor:'Dashboard', act:'Reports', analyse:'Analytics', safety:'Safety', audit:'Audit', reference:'Library', admin:'Administration' };
 const NAV_BY_ID = Object.fromEntries(NAV.map(n=>[n.id,n]));
 
 /* ==========================================================================
@@ -2292,6 +2345,7 @@ function fromReal(r){
      late closed  = Lately Closed (summary.late).
      CA risk      = F-088 / EIS / Event Investigation Report overdue: report Overdue OR any CA Overdue (caRisk).
      mitigation   = HIRA with Additional mitigation = Yes · AMO - Additional Mitigation tasks (capaTaskStats).
+     risk         = AMO SMS §9.4.3 matrix (M.RISK); HIRA hazards = classic hiraHazardMap (HOW MANY rule, r221-i3).
      audits       = MNT + RSP + SSP scope (r204); year = scheduled year, month = scheduled start month;
                     open = InProgress / Performed / Scheduled (renderAuditKpi 7676).
                     delayed = scheduled month ended, not Performed / Closed (Eric 30/09/2026).
@@ -2441,6 +2495,157 @@ const M = {
              capa: capa.length, tasks: A.capaTaskStats(capa.map(r => r.id)) };
   },
 
+  /* risk rating (r224) — AMO SMS Iss01Rev02 §9.4.3 risk matrix (p. 9-17) and §9.5 actions. The ONE definition of
+     the bands, their colours and the cell → band map; Safety › HIRA register, its record and the matrix read it.
+     Code = probability digit + severity letter, as the form and VJC-MQA-F-118 write it ("4D").
+     Fills (Eric 11/11/2026): red, orange, green — the same red and green as M.EFFECT. Black ink: 5.3 : 1 on #FF0000,
+     9.5 : 1 on #FF9900, 7.3 : 1 on #00B050. The fills stay the same in the dark theme. */
+  RISK: {
+    bands: {
+      I: { key:'INTOLERABLE', label:'Intolerable', hex:'#FF0000', ink:'#000000', action:'Immediate action (§9.5)',
+           cells:['5A','5B','5C','4A','4B','3A'] },
+      T: { key:'TOLERABLE', label:'Tolerable', hex:'#FF9900', ink:'#000000', action:'Mitigation completed within 30 days (§9.5)',
+           cells:['5D','5E','4C','4D','4E','3B','3C','3D','2A','2B','2C','1A'] },
+      A: { key:'ACCEPTABLE', label:'Acceptable', hex:'#00B050', ink:'#000000', action:'Acceptable as is',
+           cells:['3E','2D','2E','1B','1C','1D','1E'] }
+    },
+    sev: { A:'Catastrophic', B:'Hazardous', C:'Major', D:'Minor', E:'Negligible' },
+    /* probability: meaning and the reference interval of the F-118 HIRA Matrix sheet */
+    prob: { 5:['Frequent','3 months'], 4:['Occasional','6 months'], 3:['Remote','1 year'], 2:['Improbable','5 years'], 1:['Extremely improbable','20 years'] }
+  },
+  /* effectiveness rating (r224) — the fills of VJC-MQA-F-118 (Effectiveness list: INEFFECTIVE / PARTIAL EFFECTIVE /
+     FULLY EFFECTIVE; the sheet also writes NOT YET EFFECTIVE in red). Black ink: 5.3 : 1 on #FF0000, 19.6 : 1 on
+     #FFFF00, 7.3 : 1 on #00B050 (#1a1a1a on the red would be 4.3 : 1). Same fills in the dark theme, as M.RISK. */
+  EFFECT: {
+    not:     { label:'Not effective',     hex:'#FF0000', ink:'#000000', values:['NOT YET EFFECTIVE', 'INEFFECTIVE', 'NOT EFFECTIVE'] },
+    partial: { label:'Partial effective', hex:'#FFFF00', ink:'#000000', values:['PARTIAL EFFECTIVE', 'PARTIALLY EFFECTIVE'] },
+    full:    { label:'Fully effective',   hex:'#00B050', ink:'#000000', values:['FULLY EFFECTIVE'] }
+  },
+  effectOf(v){
+    const t = String(v || '').toUpperCase().replace(/\s+/g, ' ').trim();
+    const k = Object.keys(M.EFFECT).find(x => M.EFFECT[x].values.includes(t));
+    return k ? Object.assign({ key: k }, M.EFFECT[k]) : null;
+  },
+  /* SEVERITY / LIKELIHOOD as the form writes them (words: Major, Remote…) → the F-118 code (C, 3), from M.RISK.sev /
+     M.RISK.prob; a value that already is the code is kept; anything else → null (the screen shows the text as written) */
+  sevCode(v){
+    const t = String(v || '').trim().toUpperCase();
+    if(/^[A-E]$/.test(t)) return t;
+    return Object.keys(M.RISK.sev).find(k => M.RISK.sev[k].toUpperCase() === t) || null;
+  },
+  probCode(v){
+    const t = String(v || '').trim().toUpperCase().replace('OCCASIONNAL', 'OCCASIONAL');
+    if(/^[1-5]$/.test(t)) return +t;
+    const k = Object.keys(M.RISK.prob).find(k => M.RISK.prob[k][0].toUpperCase() === t);
+    return k ? +k : null;
+  },
+  /* "4D", "D4", "4 - D", "4D - TOLERABLE" → { code:'4D', p:4, s:'D', band:'T', label, hex… }; anything else → null
+     (the screen then shows the text exactly as Galileo holds it) */
+  riskOf(v){
+    const t = String(v || '').toUpperCase();
+    let m = t.match(/(?:^|[^0-9A-Z])([1-5])\s*-?\s*([A-E])(?![A-Z])/), p, s;
+    if(m){ p = +m[1]; s = m[2]; }
+    else if((m = t.match(/(?:^|[^0-9A-Z])([A-E])\s*-?\s*([1-5])(?![0-9])/))){ s = m[1]; p = +m[2]; }
+    if(!p) return null;
+    const code = p + s, band = Object.keys(M.RISK.bands).find(k => M.RISK.bands[k].cells.includes(code));
+    return Object.assign({ code, p, s, band }, M.RISK.bands[band]);
+  },
+  /* AMO - HIRA hazards (r224): one entry per hazard of loadHiraCls, i.e. only the hazards the form declares in
+     HOW MANY (r221-i3, classic loadHiraHazards). f = the F-118 fields of the hazard's own section (classic
+     HIRA_REG_FIELDS). acts = its PREVENTIVE ACTION sections (classic buildHiraActions), null when the report's actions
+     could not be assigned to hazards (act.mode 'merged': shown for the whole HIRA); done = latest DATE COMPLETED of acts.
+     null until loadHira has run. */
+  hiraHazards(rows){
+    const A = API();
+    if(!A.hira().loaded) return null;
+    const hz = A.hira().hazards || {}, reg = A.hira().reg || {}, cls = A.hira().map || {}, out = [], regOk = !A.hira().regErr;
+    rows.filter(r => r.code === A.HIRA_TITLE).forEach(r => {
+      const L = hz[r.id] || [], g = reg[r.id] || { sec:{} }, act = g.actions || { mode:'none', bySec:{}, all:[] };
+      L.forEach((h, i) => {
+        const f = Object.assign({}, g.sec[h.sec] || {});
+        const acts = act.mode === 'merged' ? null : (act.bySec[h.sec] || []);
+        /* r224 (Eric 11/11/2026): Effectiveness = the report's Classification, one value per HIRA (the per-hazard form field is not used).
+           calc = the matrix code of the hazard's own SEVERITY × LIKELIHOOD; initOff = the recorded initial rating is another cell.
+           miss = required F-118 fields the hazard's section leaves empty (not judged when the form fields failed to load). */
+        const sv = M.sevCode(f.severity), pb = M.probCode(f.likelihood), init = M.riskOf(f.initRisk), calc = sv && pb ? M.riskOf(pb + sv) : null;
+        const miss = regOk ? [['Severity', f.severity], ['Likelihood', f.likelihood], ['Initial risk rating', f.initRisk], ['Current risk rating', h.risk],
+          ['Date assessed', f.assessed], ['Due date', h.due]].filter(p => !p[1]).map(p => p[0]) : [];
+        /* the HIRA has preventive actions, linked to hazards, and none under this one (a HIRA with no action at all is a report-level item) */
+        if(acts && !acts.length && (act.all || []).length) miss.push('Preventive action');
+        out.push({ r, h, i: i + 1, n: L.length, f, act, acts, done: acts ? acts.map(a => a.done).filter(Boolean).sort().pop() || null : null,
+                   effect: (cls[r.id] || {}).effect || '', init, cur: M.riskOf(h.risk), calc, initOff: !!(init && calc && init.code !== calc.code), miss });
+      });
+    });
+    return out;
+  },
+  /* data checks of the HIRA register (r224, Eric 11/11/2026) on a hiraHazards list:
+     off     = hazards whose recorded initial risk rating is not the cell of their Severity × Likelihood (AMO SMS §9.4.3);
+     missHz  = hazards with required fields empty (x.miss);
+     missRep = HIRA with report-level data missing: Effectiveness rating (Classification), preventive actions. */
+  hiraChecks(list){
+    const L = list || [], seen = {}, missRep = [], limit = [], intol = [], effect = [], today = M.isoToday(), S = M.SMS;
+    L.forEach(x => {
+      /* §9.5 d): the risk as categorised at the assessment (initial rating). acts = the hazard's own actions */
+      const acts = x.acts || x.act.all || [], open = !acts.length || acts.some(a => !a.done), day = /^\d{4}-\d{2}-\d{2}/.test(x.f.assessed || '') ? x.f.assessed : null;
+      if(x.init && x.init.band === 'T' && day){
+        const dDue = x.h.due ? M.daysBetween(day, x.h.due) : null, end = open ? today : acts.map(a => a.done).sort().pop(), dEnd = M.daysBetween(day, end);
+        if((dDue !== null && dDue > S.tolerableDays) || dEnd > S.tolerableDays) limit.push({ x, day, dDue, dEnd, end, open, none: !acts.length });
+      }
+      if(x.init && x.init.band === 'I' && open) intol.push({ x, none: !acts.length, left: acts.filter(a => !a.done).length });
+      if(seen[x.r.id]) return; seen[x.r.id] = 1;
+      const miss = []; if(!x.effect) miss.push('Effectiveness rating (Classification)'); if(!(x.act.all || []).length) miss.push('Preventive action');
+      if(miss.length) missRep.push({ r: x.r, miss });
+      /* §9.7: PARTIAL = no related incident within 3 months, FULLY = more than 6 months — counted from the HIRA's last completed action */
+      const e = M.effectOf(x.effect), need = e && e.key === 'full' ? S.fullyMonths : e && e.key === 'partial' ? S.partialMonths : 0, all = x.act.all || [];
+      if(need){ const last = all.map(a => a.done).filter(Boolean).sort().pop() || null, notDone = all.filter(a => !a.done).length;
+        if(!last || notDone || M.addMonths(last, need) > today) effect.push({ r: x.r, value: x.effect, need, last, notDone, months: last ? M.monthsBetween(last, today) : null }); }
+    });
+    const off = L.filter(x => x.initOff), missHz = L.filter(x => x.miss.length);
+    return { off, missHz, missRep, limit, intol, effect, sms: limit.length + intol.length + effect.length,
+             total: off.length + missHz.length + missRep.length + limit.length + intol.length + effect.length };
+  },
+  /* AMO SMS Iss01Rev02 time limits (review 11/11/2026): §9.5 d) Tolerable → mitigation finished in 30 days from the identified day
+     (taken as DATE ASSESSED); §9.7 effectiveness; §9.3.8.3 risk assessment by Occurrence Criticality (ORC) level: Low within 30 days,
+     Medium within 7 days, High immediately (to the MSC within 24 hours, §8.5.4 step 3). ORC names as the Coruson list writes them. */
+  SMS: { tolerableDays: 30, partialMonths: 3, fullyMonths: 6, orcDays: { 'VERY LOW':30, 'LOW':30, 'MEDIUM':7, 'HIGH':1, 'VERY HIGH':1 }, orcNone: 30 },
+  isoToday: () => new Date(TODAY.getTime() - TODAY.getTimezoneOffset() * 6e4).toISOString().slice(0, 10),
+  daysBetween: (a, b) => Math.round((Date.parse(String(b).slice(0, 10)) - Date.parse(String(a).slice(0, 10))) / 864e5),
+  addMonths(d, n){ const t = new Date(String(d).slice(0, 10) + 'T00:00:00Z'); t.setUTCMonth(t.getUTCMonth() + n); return t.toISOString().slice(0, 10); },
+  monthsBetween(a, b){ let n = 0; while(M.addMonths(a, n + 1) <= String(b).slice(0, 10)) n++; return n; },
+  /* open MOSR older than the time limit of their ORC level (the strictest when several are selected); no ORC = not assessed,
+     listed once past the longest limit. A report still Open is the only trace Coruson gives of an assessment not finished. */
+  mosrOrcLate(rows){
+    const today = M.isoToday(), S = M.SMS;
+    return (rows || []).filter(r => r.report_status === 'Open' && r.submitted_date).map(r => {
+      const lv = (r.orc || []).map(v => String(v).replace(/^\s*\d+\s*-\s*/, '').trim().toUpperCase()).filter(v => S.orcDays[v] !== undefined);
+      const limit = lv.length ? Math.min(...lv.map(v => S.orcDays[v])) : S.orcNone;
+      return { r, level: (r.orc || []).join(', '), limit, age: M.daysBetween(r.submitted_date, today) };
+    }).filter(x => x.age > x.limit);
+  },
+  /* hazards per matrix cell for one rating ('init' | 'cur'); none = rating missing or not a matrix code */
+  riskMatrix(list, which){
+    const cells = {}, bands = { I:0, T:0, A:0 }; let none = 0;
+    (list || []).forEach(x => { const k = x[which]; if(!k){ none++; return; } cells[k.code] = (cells[k.code] || 0) + 1; bands[k.band]++; });
+    return { cells, bands, none, total: (list || []).length };
+  },
+
+  /* MOSR scope (r224) — two screens, two scopes, both kept (Eric r120-i1 / r164 / r168-i1):
+     · Safety › MSAG status (classic loadSafety): reports owned by an MSAG group, all time, Confidential excluded,
+       counted when status is Closed or Open → M.msagTotals.
+     · Safety › MOSR register (classic loadMosr): every form MOSR. Its rows carry .msag = the loadSafety rule (classic
+       isMsagGroup + safetyFormKind), so the register splits into MSAG-owned + other owners → M.mosrSplit.
+     M.consistency checks register MSAG-owned (all time) = status table. Open / Closed = Coruson report_status. */
+  msagTotals(d){
+    return [...d.line, d.base, d.workshop].reduce((a, r) => ({ osrC:a.osrC+r.osrC, osrO:a.osrO+r.osrO, osrT:a.osrT+r.osrT, mosrC:a.mosrC+r.mosrC, mosrO:a.mosrO+r.mosrO, mosrT:a.mosrT+r.mosrT }),
+      { osrC:0, osrO:0, osrT:0, mosrC:0, mosrO:0, mosrT:0 });
+  },
+  mosrSplit(rows){
+    const z = () => ({ total:0, open:0, closed:0 });
+    const add = (o, r) => { o.total++; if(r.report_status === 'Open') o.open++; else if(r.report_status === 'Closed') o.closed++; };
+    const s = { all:z(), msag:z(), other:z(), owners:{} };
+    rows.forEach(r => { add(s.all, r); add(r.msag ? s.msag : s.other, r); if(!r.msag) add(s.owners[r.owner || '(no owner)'] = s.owners[r.owner || '(no owner)'] || z(), r); });
+    return s;
+  },
   /* KPI 7 = the classic function itself, fed the same period rule */
   kpi7(f){
     const st = API().kpi7Stats(r => M.inPeriodDay(M.dayOf(r.raised_date), f));
@@ -2458,7 +2663,9 @@ const M = {
     f = f || state.filters;
     return (!f.years.length || f.years.includes(M.auditYear(a))) && (!f.months.length || f.months.includes(M.auditMonth(a)));
   },
-  AUDIT_OPEN: new Set(['InProgress', 'In Progress', 'Performed', 'Scheduled']),
+  AUDIT_OPEN: new Set(['InProgress', 'In Progress', 'Performed', 'Scheduled', 'ScheduleConfirmed', 'Schedule Confirmed']),
+  /* planned, not yet started: Scheduled and Schedule Confirmed (Coruson status added 11/2026, its own status) */
+  AUDIT_PLANNED: new Set(['Scheduled', 'ScheduleConfirmed', 'Schedule Confirmed']),
   auditSummary(list){
     const closed = list.filter(a => a.status === 'Closed').length, open = list.filter(a => M.AUDIT_OPEN.has(a.status)).length;
     return { total: list.length, closed, open, inProgress: list.filter(a => a.status === 'InProgress' || a.status === 'In Progress').length,
@@ -2554,6 +2761,40 @@ M.consistency = function(){
   { const mi = M.mitigation(qa);
     if(mi) say('Mitigation tasks overdue vs classic capaTaskStats', mi.tasks.overdue,
       A.capaTaskStats(raw.filter(r => r.report_title === A.CAPA_TITLE).map(r => r.report_id)).overdue); }
+  /* r224: Safety › HIRA register and risk matrix count the same hazards as classic (HOW MANY rule) */
+  { const hz = M.hiraHazards(qa);
+    if(hz){ const mx = M.riskMatrix(hz, 'cur'), inCells = Object.values(mx.cells).reduce((a, b) => a + b, 0);
+      say('Safety › HIRA hazards vs classic hiraHazardMap', hz.length,
+        raw.filter(r => r.report_title === A.HIRA_TITLE).reduce((t, r) => t + ((A.hira().hazards || {})[r.report_id] || []).length, 0));
+      say('Safety › risk matrix cells + unrated vs hazards', inCells + mx.none, hz.length);
+      say('Safety › risk bands vs matrix cells', mx.bands.I + mx.bands.T + mx.bands.A, inCells);
+      /* the hazard with the latest due date carries the report's own status (classic h.sem, same rule as semantic_status) */
+      const last = {}; hz.forEach(x => { if(x.h.due && !(last[x.r.id] && last[x.r.id].h.due >= x.h.due)) last[x.r.id] = x; });
+      /* every PREVENTIVE ACTION on the forms is shown once: under its hazard (numbered groups, classic buildHiraActions)
+         or across the HIRA when not assignable. Keyed report|section: form-template section ids repeat across reports. */
+      { const shown = [], all = new Set(); hz.forEach(x => { (x.act.all || []).forEach(a => all.add(x.r.id + '|' + a.sec));
+          (x.acts || (x.i === 1 && x.act.mode === 'merged' ? x.act.all : [])).forEach(a => shown.push(x.r.id + '|' + a.sec)); });
+        say('Safety › HIRA preventive actions shown vs on the forms', shown.length, all.size);
+        say('Safety › HIRA preventive actions shown twice', shown.length - new Set(shown).size, 0); }
+      /* r224: the initial-risk check against a recount straight from the form fields (words → matrix cell, no M.sevCode / M.riskOf) */
+      { const SV = { CATASTROPHIC:'A', HAZARDOUS:'B', MAJOR:'C', MINOR:'D', NEGLIGIBLE:'E' }, PB = { FREQUENT:5, OCCASIONAL:4, REMOTE:3, IMPROBABLE:2, 'EXTREMELY IMPROBABLE':1 };
+        const up = v => String(v || '').trim().toUpperCase(); let n = 0;
+        raw.filter(r => r.report_title === A.HIRA_TITLE).forEach(r => ((A.hira().hazards || {})[r.report_id] || []).forEach(h => {
+          const f = (((A.hira().reg || {})[r.report_id] || { sec:{} }).sec[h.sec]) || {}, s = SV[up(f.severity)] || (/^[A-E]$/.test(up(f.severity)) ? up(f.severity) : ''),
+            p = PB[up(f.likelihood)] || (/^[1-5]$/.test(up(f.likelihood)) ? +up(f.likelihood) : 0), c = up(f.initRisk).match(/^([1-5])\s*-?\s*([A-E])(?![A-Z])/);
+          if(s && p && c && c[1] + c[2] !== p + s) n++; }));
+        say('Safety › HIRA initial risk off the matrix vs recount from the form', M.hiraChecks(hz).off.length, n); }
+      say('Safety › HIRA status of the latest-due hazard vs report status', Object.values(last).filter(x => x.r.hazardsNoDue === 0 && x.h.sem !== M.st(x.r)).length, 0); } }
+  /* r224: the MOSR register's MSAG-owned rows (all time) are exactly the MOSR of Safety › MSAG status */
+  /* r224: MOSR past the ORC time limit against a recount with the limits written out (no M.SMS, no M.mosrOrcLate) */
+  if(A.mosr().loaded){ const t = M.isoToday();
+    say('Safety › MOSR past ORC time limit vs recount', M.mosrOrcLate(A.mosr().rows).length,
+      A.mosr().rows.filter(r => { if(r.report_status !== 'Open' || !r.submitted_date) return false;
+        const o = (r.orc || []).join(' ').toUpperCase(), lim = /HIGH/.test(o) ? 1 : /MEDIUM/.test(o) ? 7 : 30;
+        return (Date.parse(t) - Date.parse(String(r.submitted_date).slice(0, 10))) / 864e5 > lim; }).length); }
+  if(A.mosr().loaded && A.safety().loaded && A.safety().data){ const sp = M.mosrSplit(A.mosr().rows), st = M.msagTotals(A.safety().data);
+    say('Safety › MOSR register MSAG-owned (all time) vs MSAG status total', sp.msag.open + sp.msag.closed, st.mosrT);
+    say('Safety › MOSR register MSAG-owned open (all time) vs MSAG status open', sp.msag.open, st.mosrO); }
   if(A.eis().loaded){
     const cr = M.caReports(f), all = cr.flatMap(x => x.cas), cs = M.caSummary(all);
     say('Corrective actions: closed + open vs total', cs.closed + cs.open, cs.total);
@@ -2802,7 +3043,11 @@ function go(screen, tab, opts){
   if(hashPath() === next) route();      /* same route, filters changed */
   else location.hash = next;            /* hashchange drives the render */
 }
+/* r224: Safety screens moved out of Reports and Analytics; an old link or bookmark lands on the new tab */
+const MOVED_ROUTES = { 'findings/osr':'safety/mosr', 'analytics/safety':'safety/msag', 'analytics/mosr':'safety/mosrcharts', 'analytics/spi':'safety/spi' };
 function route(fromUrl){
+  { const mv = MOVED_ROUTES[hashPath().replace(/^#\/?/,'')];
+    if(mv) history.replaceState(history.state, '', location.pathname + location.search + '#/' + mv + (location.hash.includes('?') ? '?' + location.hash.split('?')[1] : '')); }
   if(fromUrl) readUrlFilters();
   if(listReturn && hashPath() === listReturn.path){
     state.cat = listReturn.cat; state.rowQuery = listReturn.q; listRestore = listReturn; listReturn = null;
@@ -2960,12 +3205,13 @@ function renderChrome(){
 }
 /* The filter bar is persistent across every data screen; reference and
    admin screens have nothing to filter, so it steps out of the way. */
-const FILTERED_SCREENS = ['overview','work','findings','audit','analytics'];
+const FILTERED_SCREENS = ['overview','work','findings','audit','analytics','safety'];
 /* No Department filter (Eric 23/09/2026): the field means a different thing per form (PAVOI owner
    section, CMR-CAR department, none on ECAR), so filtering by it emptied whole tabs */
 function renderFilterBar(){
   /* Admin › Export reports reads the period from this bar (Eric 04/11/2026) */
-  const on = FILTERED_SCREENS.includes(state.screen) || (state.screen === 'admin' && state.tab.admin === 'exports');
+  /* r224: Safety › MSAG status counts all time (classic loadSafety has no dates): no period bar there */
+  const on = (FILTERED_SCREENS.includes(state.screen) && !(state.screen === 'safety' && state.tab.safety === 'msag')) || (state.screen === 'admin' && state.tab.admin === 'exports');
   $('#filterbar').hidden = !on;
   if(!on) return;
   const f = state.filters, chips = [];
@@ -3437,7 +3683,7 @@ function renderPavoi(){
 /* ==========================================================================
    SCREEN · AUDIT PLAN
    ========================================================================== */
-const AUD_KIND = {'Closed':'k-closed','Performed':'k-performed','In Progress':'k-progress','Scheduled':'k-scheduled','Cancelled':'k-closed'};
+const AUD_KIND = {'Closed':'k-closed','Performed':'k-performed','In Progress':'k-progress','Scheduled':'k-scheduled','Schedule Confirmed':'k-confirmed','Cancelled':'k-closed'};
 function renderAudit(tab){
   const kpis = (REAL && typeof auditKpiTiles === 'function') ? auditKpiTiles() : '';
   if(tab === 'list') return kpis + renderAuditList();
@@ -3451,9 +3697,9 @@ function renderAudit(tab){
   const f = state.aud;
   const typeN = t => ALL.filter(a => a.type === t).length;
   const AUD = ALL.filter(a => (!f.type || a.type === f.type)
-    && (f.show === 'all' || (f.show === 'upcoming' ? a.status === 'Scheduled' : a.overdue > 0)));   /* metrics-ok: audit status, not report status */
+    && (f.show === 'all' || (f.show === 'upcoming' ? M.AUDIT_PLANNED.has(a.status) : a.overdue > 0)));   /* metrics-ok: audit status, not report status */
   const multiYear = new Set(ALL.map(a=>a.year)).size > 1;
-  const kind = a => (a.overdue>0 && a.status!=='Scheduled') ? 'k-overdue' : (AUD_KIND[a.status] || 'k-closed');   /* metrics-ok: audit status */
+  const kind = a => (a.overdue>0 && !M.AUDIT_PLANNED.has(a.status)) ? 'k-overdue' : (AUD_KIND[a.status] || 'k-closed');   /* metrics-ok: audit status */
   const rowKey = a => (a.location || '—') + (multiYear && a.year ? ' · ' + a.year : '');
   const groups = {};
   AUD.forEach(a => { (groups[rowKey(a)] ||= { year: a.year || 0, list: [] }).list.push(a); });
@@ -3474,16 +3720,17 @@ function renderAudit(tab){
   const filters = '<div class="od-row kiosk-off" style="--od-gap:6px;flex-wrap:wrap"><span class="t-small dim">Type</span>'
     + seg('type', '', 'All '+ALL.length) + ['Inspection','Audit','Surveillance','Other'].filter(typeN).map(t => seg('type', t, t+' '+typeN(t))).join('')
     + '<span style="width:12px"></span><span class="t-small dim">Show</span>'
-    + seg('show', 'all', 'All') + seg('show', 'upcoming', 'Upcoming '+ALL.filter(a => a.status === 'Scheduled').length)   /* metrics-ok: audit status */
+    + seg('show', 'all', 'All') + seg('show', 'upcoming', 'Upcoming '+ALL.filter(a => M.AUDIT_PLANNED.has(a.status)).length)   /* metrics-ok: audit status */
     + seg('show', 'overdue', 'With overdue '+ALL.filter(a => a.overdue > 0).length) + '</div>';
   const key = (style, label) => '<span class="legend-i"><span class="am-key" style="'+style+'"></span>'+label+'</span>';
   const legend = '<div class="legend">'
     + key('', 'Closed') + key('background:var(--info);border-color:var(--info)', 'Performed')
     + key('background:var(--warn);border-color:var(--warn)', 'In Progress') + key('background:transparent;border:1.5px dashed var(--text-2)', 'Scheduled')
+    + key('background:transparent;border:1.5px solid var(--info)', 'Schedule Confirmed')
     + key('background:var(--accent);border-color:var(--accent)', 'Has overdue findings')
     + '<span class="legend-i dim">'+MONTHS[now]+' is the current month · select a dot for detail</span></div>';
 
-  const counts = ['Closed','Performed','In Progress','Scheduled','Cancelled'].map(s=>({s, n:AUD.filter(a=>a.status===s).length})).filter(c=>c.n || c.s!=='Cancelled');   /* metrics-ok: audit status legend counts */
+  const counts = ['Closed','Performed','In Progress','Scheduled','Schedule Confirmed','Cancelled'].map(s=>({s, n:AUD.filter(a=>a.status===s).length})).filter(c=>c.n || (c.s!=='Cancelled' && c.s!=='Schedule Confirmed'));   /* metrics-ok: audit status legend counts */
 
   return kpis + '<section class="sec"><div class="card">'
     + '<div class="card-head"><h2>'+(REAL ? 'Programme · '+esc(periodLabel()) : 'Annual programme 2026')+'</h2>'
@@ -3545,16 +3792,16 @@ function renderAuditList(){
 function chipAs(statusKey, label){
   return '<span class="chip '+(SCLASS[statusKey]||'s-neutral')+'">'+mark(statusKey)+esc(label)+'</span>';
 }
-const AUD_CHIP = {'Closed':'On-time Closed','Performed':'In Progress','In Progress':'In Progress','Scheduled':'Open'};
+const AUD_CHIP = {'Closed':'On-time Closed','Performed':'In Progress','In Progress':'In Progress','Scheduled':'Open','Schedule Confirmed':'Open'};
 
 const PH = {
   'analytics/kpi':    ['The seven departmental KPIs over time, each with its target line and the records behind it.',
                        ['KPI 1–7 as small multiples, one card each','Target line and breach months marked','Every point opens the matching filtered register','Year and month comparison against the same period last year']],
-  'analytics/spi':    ['Safety performance indicators against the SPT (ALOS) approved by CAAV.',
+  'safety/spi':       ['Safety performance indicators against the SPT (ALOS) approved by CAAV.',
                        ['One row per SPI with its alert and target level','Rolling 12-month view with breach months called out','Link from a breach straight to the contributing occurrences']],
-  'analytics/safety': ['MSAG report status — OSR and MOSR progress.',
+  'safety/msag':      ['MSAG report status — OSR and MOSR progress.',
                        ['Status of each safety report through the MSAG workflow','Ageing of reports still awaiting a decision','Owner and next action for anything stalled']],
-  'analytics/mosr':   ['MOSR by department, occurrence category and base.',
+  'safety/mosrcharts':['MOSR by department, occurrence category and base.',
                        ['Three charts over the selected year, quarter or month','Counts by submitted date','Reports not classified are stated, not hidden']],
   'analytics/early':  ['KPI 2 — how much the organisation finds before the authority does.',
                        ['MCAR ÷ AMO-ECAR as a rate over time','Split by ATA chapter and by department','The internal and authority findings side by side for the same scope']],
@@ -3600,7 +3847,7 @@ const IA_MAP = [
   ['Main','Overdue','Work Queue › Overdue','Was a separate destination; overdue is the same list with one more condition. It also surfaces on Overview, so it no longer needs to be hunted for.'],
   ['Main','KPI Charts','Analytics › KPI charts','Trends over time are a different job from clearing a queue. Grouping them stops the two modes competing in one sidebar.'],
   ['Main','SPI','Analytics › SPI','Same reason. SPI is read monthly, not daily.'],
-  ['Main','Safety','Analytics › OSR/MOSR Status','MSAG report status is a monitoring view, not an action list for the QA team.'],
+  ['Main','Safety','Safety › MSAG status','MSAG report status is a monitoring view, not an action list for the QA team.'],
   ['Main','Report Status','Analytics › Event/IR report status','An extract view of a source system. It belongs with the other read-and-compare screens.'],
   ['Main','Audit Plan','Audit Plan › Timeline','Promoted to its own top-level entry: the annual programme is its own planning job, and it now opens on a timeline rather than a table.'],
   ['Detail','All Forms','Findings › All forms','The register, unfiltered.'],
@@ -4416,9 +4663,7 @@ function scrSafety(){
   const A = API();
   const w = lazyState('safety', () => A.loadSafety(), () => A.safety().loaded, 'MSAG report status');
   if(w) return w;
-  const d = A.safety().data, all = [...d.line, d.base, d.workshop];
-  const t = all.reduce((a,r) => ({osrC:a.osrC+r.osrC, osrO:a.osrO+r.osrO, osrT:a.osrT+r.osrT, mosrC:a.mosrC+r.mosrC, mosrO:a.mosrO+r.mosrO, mosrT:a.mosrT+r.mosrT}),
-    {osrC:0, osrO:0, osrT:0, mosrC:0, mosrO:0, mosrT:0});
+  const d = A.safety().data, t = M.msagTotals(d);
   const n = v => '<span class="num">'+v+'</span>', o = v => v > 0 ? '<span class="num red strong">'+v+'</span>' : '<span class="num dim">0</span>';
   const row = r => ['<span class="t-grp">'+esc(r.coruson)+'</span>', n(r.osrC), o(r.osrO), n(r.osrT), n(r.mosrC), o(r.mosrO), n(r.mosrT)];
   const head = l => ['<span class="t-micro t-grp-h">'+esc(l)+'</span>','','','','','',''];
@@ -4426,11 +4671,13 @@ function scrSafety(){
     ['<span class="strong">Total of report</span>', n(t.osrC), o(t.osrO), n(t.osrT), n(t.mosrC), o(t.mosrO), n(t.mosrT)]]);
   return tiles([
       stat('Total reports', (t.osrT + t.mosrT).toLocaleString('en-US'), 'OSR '+t.osrT+' · MOSR '+t.mosrT),
-      stat('OSR', t.osrT.toLocaleString('en-US'), 'Closed '+t.osrC+' · Open '+t.osrO),
-      stat('MOSR', t.mosrT.toLocaleString('en-US'), 'Closed '+t.mosrC+' · Open '+t.mosrO),
+      stat('OSR (MSAG-owned)', t.osrT.toLocaleString('en-US'), 'Closed '+t.osrC+' · Open '+t.osrO),
+      stat('MOSR (MSAG-owned)', t.mosrT.toLocaleString('en-US'), 'Closed '+t.mosrC+' · Open '+t.mosrO),
       stat('Open reports', String(t.osrO + t.mosrO), 'awaiting action', (t.osrO + t.mosrO) > 0)
     ])
-    + '<section class="sec">' + card('MSAG report status', 'OSR / MOSR owned by an MSAG group · loaded '+esc(d.updated),
+    /* r224: scope said in QA terms — this table is not the MOSR register (every owner, period filter); M.consistency reconciles them */
+    + '<section class="sec">' + card('MSAG report status', 'Reports owned by MSAG groups on Coruson · all time (the period filter does not apply) · Confidential excluded · loaded '+esc(d.updated)
+        + ' · Safety › MOSR register lists every MOSR, whatever the owner',
       plainTable('safety', [{l:'Group on Coruson',w:'240px'},{l:'OSR closed',ac:true},{l:'OSR open',ac:true},{l:'OSR total',ac:true},{l:'MOSR closed',ac:true},{l:'MOSR open',ac:true},{l:'MOSR total',ac:true}], rows, 40, 0, {full:true, compact:true, nosort:true}))   /* group headings between rows: order is the layout */
     + '</section>';
 }
@@ -4458,6 +4705,9 @@ function spiChart(spi){
     + '<line x1="'+L+'" x2="'+(W-R)+'" y1="'+(T+ih)+'" y2="'+(T+ih)+'" stroke="var(--hairline)"/>' + sptLine
     + '<path d="'+path+'" fill="none" stroke="var(--text-2)" stroke-width="1.8"/>' + pts + xl + '</svg>';
 }
+/* the action AMO SMS §10.6 c), d) requires at each alert level */
+const SPI_ACTION = { 1:'Close monitoring and trend analysis.', 2:'Investigation into potential root causes.',
+  3:'Immediate risk assessment; the Accountable Manager must be informed immediately.' };
 function scrSpi(){
   const A = API();
   const w = lazyState('spi', () => A.loadSPI(), () => !!(LAZY.spi && LAZY.spi.value), 'SPI forms');
@@ -4479,6 +4729,7 @@ function scrSpi(){
     return '<div class="card"><div class="card-head"><h2 class="od-truncate">'+esc(spi.title || spi.number)+'</h2>'+badge+'</div>'
       + '<div class="card-pad" style="display:grid;gap:8px"><span class="t-small dim">'+esc(spi.number)
       + ' · SPT (CAAV) '+esc(spi.sptApproved ?? '—')+' · previous year '+esc(spi.prevYear ?? '—')+' · '+(spi.direction === 'higher' ? 'higher' : 'lower')+' is better</span>'
+      + (e.status !== 'na' && e.currentLevel >= 1 ? '<span class="t-small"><b>Required action (AMO SMS §10.6):</b> '+SPI_ACTION[Math.min(3, e.currentLevel)]+'</span>' : '')
       + spiChart(spi) + (spi.remark ? '<span class="t-small">'+esc(spi.remark)+'</span>' : '') + '</div></div>';
   }).join('');
   return tiles([
@@ -4558,16 +4809,19 @@ function mccfOutRows(){
   if(RX.rfi){ Object.assign(RX.rfi, d.tasks); Object.assign(RX.sum, MCCF_OUT.sum); }
   return MCCF_OUT.rows;
 }
-function scrAllForms(){
+/* r224: forced = a form title — Safety › Additional mitigation shows the AMO - Additional Mitigation register here,
+   without the form picker (form of All forms is left as the user set it) */
+function scrAllForms(forced){
+  const form = forced || form;
   const titles = [...new Set(REPORTS.map(r => r.code))].sort();
   const A = API();
-  if(BS.afForm === A.EIS_TITLE || BS.afForm === A.QCS_TITLE) return scrFormDetail(titles);
+  if(form === A.EIS_TITLE || form === A.QCS_TITLE) return scrFormDetail(titles);
   /* AMO - HIRA (r171): its three EVALUATION classifications replace Form and CAT */
-  const hira = BS.afForm === A.HIRA_TITLE;
+  const hira = form === A.HIRA_TITLE;
   /* AMO - Additional Mitigation (Eric 05/11/2026): a register like HIRA; a row opens the record with its actions and tasks */
-  const capa = BS.afForm === A.CAPA_TITLE;
+  const capa = form === A.CAPA_TITLE;
   /* r206 (Eric 02/11): PAVOI / MVOI read as Request For Verification + Raised by; no CAT, no Issued to */
-  const pv = BS.afForm === 'PAVOI' || BS.afForm === 'MVOI';
+  const pv = form === 'PAVOI' || form === 'MVOI';
   const w = hira && (lazyState('hira', () => A.loadHira(), () => A.hira().loaded, 'HIRA classifications')
     || lazyState('capa', () => A.loadCapa(), () => A.capa().loaded, 'Additional Mitigation (CAPA) links'));
   const wc = capa && lazyState('capa', () => A.loadCapa(), () => A.capa().loaded, 'Additional Mitigation tasks');
@@ -4575,9 +4829,9 @@ function scrAllForms(){
   const cfg = { cols: hira ? ['number','genHazard','status','hiraMethod','hazardType','addMitig','owner','raised','target','dtd']
                            : capa ? ['number','capaTitle','status','capaHira','capaActions','capaTasks','owner','raised','target','dtd']
                            : pv ? ['number','form','status','rfv','raisedBy','pvOwner','raised','target','dtd','rfi']
-                           : BS.afForm === 'MCCF' ? ['number','orgUnit','status','summary','owner','issued','raised','target','dtd','cat','rfi']
+                           : form === 'MCCF' ? ['number','orgUnit','status','summary','owner','issued','raised','target','dtd','cat','rfi']
                            : ['number','form','status','summary','owner','issued','raised','target','dtd','cat','rfi'],   /* r191: + Summary, RFI · r194: + Issued to */
-                rows: rs => BS.afForm ? rs.filter(r => r.code === BS.afForm) : rs };
+                rows: rs => form ? rs.filter(r => r.code === form) : rs };
   if(REAL && !hira && !capa) lazy('rfisum:'+rxFrom(), loadRfiSum, rxReady);
   let rows = cfg.rows(scoped().concat(hira || capa ? [] : applyQuery(applyFilters(mccfOutRows()))));
   if(state.cat) rows = rows.filter(r => r.cat === state.cat);
@@ -4588,10 +4842,11 @@ function scrAllForms(){
       stat('Tasks overdue', String(capaS.overdue), capaS.open+' open tasks', capaS.overdue > 0),
       stat('Completed late', String(capaS.late), capaS.onTime+' on time', capaS.late > 0)
     ]) : '')
-    + '<section class="sec"><div class="card'+(hira || capa ? ' af-hira' : '')+'"><div class="card-head"><h2>All forms</h2>'
-    + '<span class="t-small dim od-fill">Every report type the dashboard loads — '+titles.length+' forms. The tabs above keep the five finding forms with their own columns.'+(BS.afForm === 'MCCF' ? (MCCF_OUT.st === 'ready' ? ' MCCF here covers every unit on Coruson; those outside QA AMO are not counted in KPIs or Overview.' : MCCF_OUT.st === 'error' ? ' Could not load the MCCF of units outside QA AMO: only QA AMO is listed.' : ' Loading the MCCF of units outside QA AMO…') : '')+'</span>'
-    + sel('afForm', [['','All forms']].concat(titles.map(t => [t, t])), BS.afForm) + '</div>'
-    + tableHTML('findings/all'+(BS.afForm ? '/'+BS.afForm : ''), cfg, rows) + '</div></section>';
+    + '<section class="sec"><div class="card'+(hira || capa ? ' af-hira' : '')+'"><div class="card-head"><h2>'+(forced ? esc(forced) : 'All forms')+'</h2>'
+    + (forced ? '<span class="t-small dim od-fill">VJC-AMO-CAPA records, one row per report: a row opens its mitigation actions, tasks and verification. The same register is under Reports › All forms.</span>'
+      : '<span class="t-small dim od-fill">Every report type the dashboard loads — '+titles.length+' forms. The tabs above keep the five finding forms with their own columns.'+(form === 'MCCF' ? (MCCF_OUT.st === 'ready' ? ' MCCF here covers every unit on Coruson; those outside QA AMO are not counted in KPIs or Overview.' : MCCF_OUT.st === 'error' ? ' Could not load the MCCF of units outside QA AMO: only QA AMO is listed.' : ' Loading the MCCF of units outside QA AMO…') : '')+'</span>')
+    + (forced ? '' : sel('afForm', [['','All forms']].concat(titles.map(t => [t, t])), form)) + '</div>'
+    + tableHTML('findings/all'+(form ? '/'+form : ''), cfg, rows) + '</div></section>';
 }
 /* AMO - HIRA classification columns (values from loadHiraCls; '—' when the report has none) */
 const hiraCls = (r, k) => ((API().hira().map || {})[r.id] || {})[k] || '';
@@ -4676,14 +4931,16 @@ function scrMosr(){
     .sort((a,b) => String(b.report_number).localeCompare(String(a.report_number), undefined, { numeric:true }));
   const open = scope.filter(r => r.report_status === 'Open').length;   /* metrics-ok: MOSR Coruson status */
   const closed = scope.filter(r => r.report_status === 'Closed').length;   /* metrics-ok: MOSR Coruson status */
-  const noClass = scope.filter(r => !r.occ_raw.length).length;
+  const noClass = scope.filter(r => !r.occ_raw.length).length, late = M.mosrOrcLate(scope);
   const txt = (v, n) => { const t = v || ''; return t ? '<span class="t-small od-clamp-'+n+'" title="'+esc(t)+'">'+esc(t)+'</span>' : '—'; };
   return tiles([
-      stat('MOSR', String(scope.length), periodLabel()),
+      stat('MOSR (all owners)', String(scope.length), periodLabel()),
       stat('Open', String(open), 'status on Coruson', open > 0),
       stat('Closed', String(closed), 'status on Coruson'),
-      stat('Not classified', String(noClass), 'no Occurrence Category on Coruson')
+      stat('Not classified', String(noClass), 'no Occurrence Category on Coruson'),
+      stat('Past ORC time limit', String(late.length), 'open · Low 30 days · Medium 7 days · High 24 h · AMO SMS §9.3.8.3', late.length > 0, false, late.length ? 'bmosrorc' : null)
     ])
+    + mosrReconcile(scope)
     + '<section class="sec">' + card('MOSR register', 'form MOSR, by submitted date · classifications from tab EVALUATION on Coruson · Occurrence Category: the groups under Technical only',
       '<div class="od-row" style="--od-gap:12px;flex-wrap:wrap">'
       + segs('mosrSF', [['all','All'],['Open','Open'],['Closed','Closed']], BS.mosrSF)
@@ -4698,6 +4955,34 @@ function scrMosr(){
           { sortVals: rows.map(r => [String(r.submitted_date || '').slice(0, 10), r.report_number, r.short, r.summary, r.base, r.owner, r.dept.join(', '), r.orc.join(', '), r.hazard.join(', '), r.hazard_type.join(', '), r.occ.join(', '), r.report_status]) }) + '</div>') + '</section>';
 }
 
+/* The list behind the 'Past ORC time limit' tile (M.mosrOrcLate): open MOSR of the period older than the risk-assessment time limit
+   of their Occurrence Criticality level, AMO SMS §9.3.8.3 */
+function showMosrOrc(){
+  const A = API(), list = M.mosrOrcLate(A.mosr().rows.filter(r => inPeriod(r.submitted_date))).sort((a, b) => (b.age - b.limit) - (a.age - a.limit));
+  MODAL_REDRAW = null; MODAL_KEY = 'mosrorc';
+  openModal('Open MOSR past the ORC time limit', list.length+' report'+(list.length === 1 ? '' : 's')+' · '+periodLabel()+' · risk assessment: Low within 30 days, Medium within 7 days, High immediately (AMO SMS §9.3.8.3)',
+    list.length ? '<div class="tbl-wrap"><table class="hx" style="min-width:0;width:100%"><thead><tr>'+['Report number','Submitted','Report owner','ORC','Days open','Time limit'].map(h => '<th scope="col">'+h+'</th>').join('')+'</tr></thead><tbody>'
+        + list.map(x => '<tr style="cursor:default"><td class="hx-c od-nowrap"><span class="row-id">'+esc(x.r.report_number)+extLink('report', x.r.report_id, x.r.report_number)+'</span></td>'
+          + '<td class="hx-c od-nowrap">'+esc(fdx(x.r.submitted_date))+'</td><td class="hx-mid" style="white-space:normal">'+esc(x.r.owner || '—')+'</td>'
+          + '<td class="hx-c">'+(x.level ? esc(x.level) : missingData('Not assessed'))+'</td><td class="hx-c"><b>'+x.age+'</b></td><td class="hx-c">'+x.limit+' day'+(x.limit === 1 ? '' : 's')+'</td></tr>').join('')
+        + '</tbody></table></div>'
+      : '<p class="t-sub dim">No open MOSR past its time limit for the current filters.</p>');
+  $('#betaModal .beta-modal-panel').classList.add('wide');
+}
+/* r224: the register (every owner, period filter) against Safety › MSAG status (MSAG-owned, all time), from the same rows */
+function mosrReconcile(scope){
+  const s = M.mosrSplit(scope);
+  const owners = Object.keys(s.owners).map(k => ({ k, t:s.owners[k].total, o:s.owners[k].open })).sort((a, b) => b.t - a.t || a.k.localeCompare(b.k));
+  return '<section class="sec"><div class="card"><div class="card-pad" style="display:grid;gap:8px">'
+    + '<p class="t-small"><b>MOSR '+s.all.total+'</b> = <b>'+s.msag.total+'</b> owned by MSAG groups (the reports counted in Safety › MSAG status) + <b>'+s.other.total+'</b> other owners'
+    + ' · <b>Open '+s.all.open+'</b> = '+s.msag.open+' MSAG-owned + '+s.other.open+' other owners'
+    + ' · '+esc(periodLabel())+' (MSAG status counts all time, so its MOSR figures differ unless every year is selected).</p>'
+    + (owners.length ? '<details><summary class="t-small" style="cursor:pointer">Other owners ('+owners.length+')</summary>'
+      + plainTable('mosr-owners', [{l:'Report owner on Coruson'},{l:'MOSR',ar:true},{l:'Open',ar:true}],
+          owners.map(x => ['<span class="t-small">'+esc(x.k)+'</span>', '<span class="num">'+x.t+'</span>', x.o ? '<span class="num red strong">'+x.o+'</span>' : '<span class="num dim">0</span>']), 50, 0, { compact:true })
+      + '</details>' : '')
+    + '</div></div></section>';
+}
 /* ANALYTICS · MOSR charts: Year and Month from the filter bar, Quarter here. One report with two selected values counts once in each. */
 const mosrQuarterOk = v => !BS.mosrQ || Math.ceil((+String(v).slice(5, 7)) / 3) === +BS.mosrQ;
 function mosrCount(rows, get){
@@ -4971,14 +5256,300 @@ async function sendFeedback(){
   }catch(e){ toast('Could not send feedback', e.message || String(e)); }
 }
 
+/* ==========================================================================
+   SAFETY · HIRA REGISTER (r224, Eric 09/11/2026) — the layout of VJC-MQA-F-118 Risk Register:
+   "Trang ngoài" = this table (one row per hazard), "Trang trong" = the record a row opens (showHira).
+   Data: classic loadHiraCls (classifications, hazards with the HOW MANY rule of r221-i3, F-118 form fields);
+   hazards, ratings and matrix counts through METRICS (M.hiraHazards, M.riskOf, M.riskMatrix, M.RISK).
+   ========================================================================== */
+const HIRA_F118 = { source:'Hazard source', existing:'Existing controls', consequence:'Potential specific consequence', severity:'Severity',
+  likelihood:'Likelihood', initRisk:'Initial risk rating', assessed:'Date assessed', nextReview:'Next review date', effect:'Effectiveness rating' };
+/* a rating chip: code + band label on the band colour of AMO SMS §9.4.3; a value that is not a matrix code is shown as written */
+function riskChip(k, raw){
+  if(!k) return raw ? '<span class="t-small" title="Not a risk matrix code">'+esc(raw)+'</span>' : '<span class="dim">—</span>';
+  const tip = k.label+' · severity '+k.s+' '+M.RISK.sev[k.s]+' · probability '+k.p+' '+M.RISK.prob[k.p][0]+' · '+k.action;
+  return '<span class="risk-chip" style="background:'+k.hex+';color:'+k.ink+'" title="'+esc(tip)+'"><b>'+k.code+'</b>'+esc(k.label)+'</span>';
+}
+/* Text as F-118 writes it: line breaks kept (numbered lists), a line wholly in brackets — the source, e.g.
+   "(Reactive SGN A532 RAG IN ENGINE)" — in bold italic. Every F-118 field is listed, '—' when the form has none. */
+function hiraKv(v){
+  if(!v) return '<span class="dim">—</span>';
+  return String(v).split('\n').map(l => /^\(.*\)$/.test(l.trim()) ? '<b><i>'+esc(l.trim())+'</i></b>' : esc(l)).join('<br>');
+}
+/* F-118 cells filled edge to edge: risk rating on the M.RISK band colour (code, band underneath), effectiveness on M.EFFECT */
+/* calc (optional) = the cell Severity × Likelihood gives when the recorded rating is another one: marked in the cell */
+const hiraRiskTd = (k, raw, calc) => k
+  ? '<td class="hx-fill" style="background:'+k.hex+';color:'+k.ink+'" title="'+esc(k.label+' · '+M.RISK.sev[k.s]+' × '+M.RISK.prob[k.p][0]+' · '+k.action)+'"><b>'+k.code+'</b><span>'+esc(k.label)+'</span>'
+    + (calc ? '<span class="hx-off" title="'+esc('Severity × Likelihood on the form gives '+calc.code+' '+calc.label+' ('+M.RISK.sev[calc.s]+' × '+M.RISK.prob[calc.p][0]+', AMO SMS §9.4.3)')+'">⚠ Matrix: '+calc.code+'</span>' : '')+'</td>'
+  : '<td class="hx-c">'+(raw ? '<span title="Not a risk matrix code">'+esc(raw)+'</span>' : missingData('Missing'))+'</td>';
+/* one value per HIRA (the report's Classification): the cell spans the HIRA's hazards */
+const hiraEffectTd = (v, span) => { const e = M.effectOf(v);
+  return e ? '<td class="hx-fill"'+(span || '')+' style="background:'+e.hex+';color:'+e.ink+'"><b>'+esc(String(v).toUpperCase())+'</b></td>'
+           : '<td class="hx-c"'+(span || '')+'>'+(v ? esc(v) : missingData('Missing'))+'</td>'; };
+const hiraStatus = (x, r) => chip(x && x.h.sem ? x.h.sem : r.status);
+/* the specific component with its HAZARD SOURCE underneath in brackets — bold italic, as F-118 writes "(Reactive SGN A532 …)" */
+const hiraComp = x => hiraKv(x.f.comp || x.h.comp) + (x.f.source ? '<br><b><i>('+esc(String(x.f.source).replace(/^\(|\)$/g, ''))+')</i></b>' : '');
+/* one block per action, a gap between them; an action the form leaves unnumbered gets its order number, as Responsible department does (hiraNoOf) */
+const hiraActText = L => L && L.length
+  ? L.map((a, i) => '<div'+(i ? ' style="margin-top:8px"' : '')+'>'+hiraKv((/^\s*\d+\s*[.)]/.test(a.text || '') ? '' : (i + 1)+'. ')+(a.text || '—'))+'</div>').join('')
+  : '<span class="dim">—</span>';
+const hiraMergedNote = act => '<span class="cat c1" style="display:inline-block;margin-top:6px" title="'+esc('PREVENTIVE ACTION sections carry no link to a hazard; '+act.reason+'.')+'">Not linked to a hazard</span>';
+/* a date, or the text as written (NEXT REVIEW DATE holds e.g. "NEXT MSAG MEETING") */
+const hiraWhen = v => v ? (/^\d{4}-\d{2}-\d{2}/.test(v) ? fdx(v) : v) : '';
+/* "Trang ngoài" of F-118: one group per HIRA — NO., HIRA NUMBER and GENERIC HAZARD merged over its hazards (rowspan),
+   then one row per hazard. Not paged or sorted, so the groups stay whole. A row or the number opens the record. */
+function hiraRegisterTable(reps, byRep){
+  if(!reps.length) return '<div class="empty"><h3>No records</h3><p class="t-sub">Nothing matches the current filters.</p></div>';
+  const head = ['No.','HIRA number','Generic hazard','Specific components of the generic hazard','Initial risk rating',
+    'Preventive control / recovery measures','Current risk rating','Effectiveness rating','Additional mitigation?','Status'];
+  const body = reps.map((r, ri) => { const L = byRep[r.id] || [null], span = L.length > 1 ? ' rowspan="'+L.length+'"' : '';
+    return L.map((x, i) => '<tr data-act="bhira" data-id="'+esc(r.id)+'">'
+      + (i ? '' : '<td class="hx-c"'+span+'>'+(ri + 1)+'</td>'
+        + '<td class="hx-c"'+span+'><button class="link-b row-id" type="button" data-act="bhira" data-id="'+esc(r.id)+'">'+esc(r.number)+'</button></td>'
+        + '<td class="hx-c hx-gen"'+span+'>'+hiraKv(hiraCls(r, 'generic'))+'</td>')
+      + (x ? '<td class="hx-txt">'+hiraComp(x)+'</td>' + hiraRiskTd(x.init, x.f.initRisk)
+           /* actions not assignable to a hazard: one cell over the HIRA's hazards, marked */
+           + (x.acts ? '<td class="hx-txt">'+hiraActText(x.acts)+'</td>'
+              : i ? '' : '<td class="hx-txt"'+span+'>'+hiraActText(x.act.all)+'<br>'+hiraMergedNote(x.act)+'</td>')
+           + hiraRiskTd(x.cur, x.h.risk) + (i ? '' : hiraEffectTd(x.effect, span))
+         : '<td class="hx-txt" colspan="5"><span class="dim">No hazard recorded on the form</span></td>')
+      + '<td class="hx-c">'+hiraMitigCell(r)+'</td><td class="hx-c">'+hiraStatus(x, r)+'</td></tr>').join(''); }).join('');
+  return '<div class="tbl-wrap"><table class="hx"><thead><tr>'+head.map(h => '<th scope="col">'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+body+'</tbody></table></div>';
+}
+function riskMatrixCard(hz, which){
+  const mx = M.riskMatrix(hz, which), R = M.RISK, sevs = Object.keys(R.sev);
+  const cell = code => { const k = M.riskOf(code), n = mx.cells[code] || 0;
+    return '<td class="rmx-c'+(n ? '' : ' zero')+'" style="--rmx:'+k.hex+';--rmx-ink:'+k.ink+'" title="'+esc(code+' · '+k.label+' · '+n+' hazard'+(n === 1 ? '' : 's'))+'">'
+      + '<span class="num">'+(n || '·')+'</span><span class="rmx-code">'+code+'</span></td>'; };
+  const table = '<div class="tbl-wrap"><table class="rmx"><thead><tr><th scope="col">Probability \\ Severity</th>'
+    + sevs.map(s => '<th scope="col">'+s+'<span class="t-small dim">'+esc(R.sev[s])+'</span></th>').join('') + '</tr></thead><tbody>'
+    + [5,4,3,2,1].map(p => '<tr><th scope="row">'+p+' '+esc(R.prob[p][0])+'<span class="t-small dim">'+esc(R.prob[p][1])+'</span></th>'
+      + sevs.map(s => cell(p + s)).join('') + '</tr>').join('') + '</tbody></table></div>';
+  const legend = '<div class="od-row" style="--od-gap:14px;flex-wrap:wrap">' + Object.keys(R.bands).map(b => { const x = R.bands[b];
+    return '<span class="od-row t-small" style="--od-gap:6px"><span class="risk-chip" style="background:'+x.hex+';color:'+x.ink+'">'+esc(x.label)+'</span>'
+      + '<span class="num strong">'+mx.bands[b]+'</span><span class="dim">'+esc(x.action)+'</span></span>'; }).join('') + '</div>';
+  return card('Risk matrix', 'Hazards per cell, '+(which === 'init' ? 'initial' : 'current')+' risk rating · AMO SMS §9.4.3'
+      + (mx.none ? ' · '+mx.none+' hazard'+(mx.none === 1 ? '' : 's')+' without a matrix code' : ''),
+    segs('hiraRisk', [['cur','Current risk'],['init','Initial risk']], which) + table + legend);
+}
+function scrHira(){
+  const A = API();
+  const w = lazyState('hira', () => A.loadHira(), () => A.hira().loaded, 'HIRA register')
+    || lazyState('capa', () => A.loadCapa(), () => A.capa().loaded, 'Additional Mitigation (CAPA) links');
+  if(w) return w;
+  const which = BS.hiraRisk === 'init' ? 'init' : 'cur';
+  const reps = scoped().filter(r => r.code === A.HIRA_TITLE)
+    .sort((a, b) => String(a.number).localeCompare(String(b.number), undefined, { numeric:true }));
+  const hz = M.hiraHazards(reps), cur = M.riskMatrix(hz, 'cur');
+  const byRep = {}; hz.forEach(x => (byRep[x.r.id] = byRep[x.r.id] || []).push(x));
+  const regErr = A.hira().regErr;
+  const absent = Object.keys(HIRA_F118).filter(k => !hz.some(x => x.f[k] || (k === 'effect' && x.effect)));
+  const merged = reps.filter(r => (byRep[r.id] || []).some(x => !x.acts)).length;
+  /* data checks (M.hiraChecks): counted on the tile, which opens the list (showHiraChecks); the record marks the cells */
+  const ck = M.hiraChecks(hz), nMiss = ck.missHz.length + ck.missRep.length;
+  const note = (merged ? '<p class="t-small dim">'+merged+' HIRA: the preventive actions could not be assigned to a hazard from the form (no link, numbering and creation time do not separate them) — shown across the HIRA and marked.</p>' : '')
+    + (regErr ? '<p class="t-small" style="color:var(--danger,#e5484d)">The form fields of the HIRA reports could not be loaded ('+esc(regErr)+'): the F-118 columns read from the form show —.</p>' : '')
+    + (!regErr && absent.length && hz.length ? '<p class="t-small dim">Not found on the Coruson form, shown as —: '+esc(absent.map(k => HIRA_F118[k]).join(', '))+'.</p>' : '');
+  return tiles([
+      stat('HIRA', String(reps.length), reps.filter(isOpen).length+' open · '+periodLabel()),
+      stat('Hazards', String(hz.length), 'as declared in HOW MANY'),
+      stat('Intolerable', String(cur.bands.I), 'current risk · immediate action', cur.bands.I > 0),
+      stat('Tolerable', String(cur.bands.T), 'current risk · mitigation within 30 days'),
+      stat('Compliance checks', String(ck.total), 'risk rating off the matrix '+ck.off.length+' · missing data '+nMiss+' · AMO SMS time limits '+ck.sms, ck.total > 0, false, ck.total ? 'bhirachecks' : null)
+    ])
+    + '<section class="sec">' + riskMatrixCard(hz, which) + '</section>'
+    + '<section class="sec"><div class="card af-hira"><div class="card-head"><h2>HIRA register</h2>'
+    + '<span class="t-small dim od-fill">VJC-MQA-F-118 Risk Register · one row per hazard · select a row for the full record</span>'
+    + (CAN_EXPORT() && reps.length ? '<span class="od-row" style="--od-gap:8px"><button class="btn" type="button" data-act="bhiraexp" data-k="xlsx">Export Excel</button>'
+        + '<button class="btn" type="button" data-act="bhiraexp" data-k="pdf">Export PDF</button></span>' : '') + '</div>'
+    + (note ? '<div class="card-pad">'+note+'</div>' : '')
+    + hiraRegisterTable(reps, byRep) + '</div></section>';
+}
+/* EXPORT of the HIRA register (Eric 11/11/2026): Excel and PDF with the 20 columns of the record ("Trang trong" of F-118), for the HIRA
+   of the current filters. One model (hiraExportModel) feeds both files: plain text per cell, the rating cells carry their M.RISK /
+   M.EFFECT fill, the per-HIRA columns span the HIRA's hazards. */
+const HIRA_EXP_COLS = [['No.',5],['HIRA number',16],['Generic hazard',22],['Specific components of the generic hazard',34],['Existing controls',30],
+  ['Potential specific consequence',28],['Severity',9],['Likelihood',10],['Initial risk rating',12],['Preventive control / recovery measures',48],
+  ['Responsible department',24],['Current risk rating',12],['Date assessed',13],['Due date',13],['Next review date',16],['Effectiveness rating',15],
+  ['HIRA method',13],['Hazard type',13],['Additional mitigation?',14],['Report summary',50]];
+const HIRA_EXP_SPAN = [0, 1, 2, 15, 16, 17, 18, 19];   /* one cell per HIRA */
+function hiraExportModel(reps){
+  const A = API(), hz = M.hiraHazards(reps) || [], byRep = {}; hz.forEach(x => (byRep[x.r.id] = byRep[x.r.id] || []).push(x));
+  const fill = k => k ? { fill: k.hex.replace('#', ''), ink: k.ink.replace('#', '') } : {};
+  const acts = L => (L || []).map((a, i) => (/^\s*\d+\s*[.)]/.test(a.text || '') ? '' : (i + 1)+'. ')+(a.text || '—')).join('\n');
+  const depts = L => (L || []).some(a => a.dept) ? L.map((a, i) => hiraNoOf(a, i)+'. '+(a.dept || '—')).join('\n') : '';
+  const groups = reps.map((r, ri) => {
+    const cls = (A.hira().map || {})[r.id] || {}, L = byRep[r.id] || [], caps = ((A.capa().byHira || {})[r.id] || []).map(capaNo);
+    const mitig = [cls.mitig || '', caps.join(', ')].filter(Boolean).join('\n'), sum = (typeof RX !== 'undefined' && RX.sum && RX.sum[r.id]) || '';
+    const rows = (L.length ? L : [null]).map(x => {
+      if(!x) return [ri + 1, r.number, cls.generic || '', 'No hazard recorded on the form', '', '', '', '', '', '', '', '', '', '', '', cls.effect || '', cls.method || '', cls.type || '', mitig, sum].map(v => ({ v }));
+      const e = M.effectOf(x.effect), L2 = x.acts || x.act.all;
+      return [{ v: ri + 1 }, { v: r.number }, { v: cls.generic || '' },
+        { v: (x.f.comp || x.h.comp || '') + (x.f.source ? '\n('+String(x.f.source).replace(/^\(|\)$/g, '')+')' : '') },
+        { v: x.f.existing || '' }, { v: x.f.consequence || '' },
+        { v: M.sevCode(x.f.severity) || x.f.severity || '', c: 1 }, { v: M.probCode(x.f.likelihood) || x.f.likelihood || '', c: 1 },
+        Object.assign({ v: x.init ? x.init.code+'\n'+x.init.label : (x.f.initRisk || ''), c: 1 }, fill(x.init)),
+        { v: acts(L2) }, { v: depts(L2) },
+        Object.assign({ v: x.cur ? x.cur.code+'\n'+x.cur.label : (x.h.risk || ''), c: 1 }, fill(x.cur)),
+        { v: x.f.assessed ? hiraWhen(x.f.assessed) : '', c: 1 }, { v: x.h.due ? fdx(x.h.due) : '', c: 1 }, { v: hiraWhen(x.f.nextReview) || '', c: 1 },
+        Object.assign({ v: String(x.effect || '').toUpperCase(), c: 1 }, fill(e)),
+        { v: cls.method || '', c: 1 }, { v: cls.type || '', c: 1 }, { v: mitig, c: 1 }, { v: sum }];
+    });
+    return rows;
+  });
+  return { groups, hazards: hz.length };
+}
+async function hiraExport(kind){
+  if(!CAN_EXPORT()) return toast('Only admins and moderators can export reports', '');
+  try{
+    toast('Preparing the HIRA export…', '');
+    await window.betaLoadExportLibs();
+    const A = API();
+    if(!A.capa().loaded) await A.loadCapa().catch(() => {});
+    if(REAL && typeof rxReady === 'function' && !rxReady()) await loadRfiSum().catch(() => {});   /* Report summary column */
+    const reps = scoped().filter(r => r.code === A.HIRA_TITLE).sort((a, b) => String(a.number).localeCompare(String(b.number), undefined, { numeric:true }));
+    if(!reps.length) throw new Error('No HIRA matches the filters.');
+    const mdl = hiraExportModel(reps), day = M.isoToday();
+    const title = 'VJC-MQA-F-118 RISK REGISTER — AMO HIRA', sub = reps.length+' HIRA · '+mdl.hazards+' hazards · '+periodLabel()+' · source: Coruson · exported '+fdx(day);
+    const fname = 'HIRA_Risk_Register_'+periodLabel().replace(/[^\w]+/g, '_')+'_'+day;
+    if(kind === 'xlsx') hiraExportXlsx(mdl, title, sub, fname); else hiraExportPdf(mdl, title, sub, fname);
+    toast('Export ready', fname+(kind === 'xlsx' ? '.xlsx' : '.pdf'));
+  }catch(e){ console.warn('[hira export]', e); toast('Export failed', e.message || String(e)); }
+}
+function hiraExportXlsx(mdl, title, sub, fname){
+  const X = window.XLSX, n = HIRA_EXP_COLS.length, edge = { style:'thin', color:{ rgb:'808080' } }, border = { top:edge, bottom:edge, left:edge, right:edge };
+  const aoa = [[title], [sub], HIRA_EXP_COLS.map(c => c[0].toUpperCase())], merges = [{ s:{ r:0, c:0 }, e:{ r:0, c:n - 1 } }, { s:{ r:1, c:0 }, e:{ r:1, c:n - 1 } }];
+  const meta = [];   /* [row, col, cell] for the styles */
+  mdl.groups.forEach(g => { const r0 = aoa.length;
+    g.forEach((row, i) => { aoa.push(row.map((c, ci) => (i && HIRA_EXP_SPAN.includes(ci)) ? '' : c.v)); row.forEach((c, ci) => meta.push([r0 + i, ci, c])); });
+    if(g.length > 1) HIRA_EXP_SPAN.forEach(ci => merges.push({ s:{ r:r0, c:ci }, e:{ r:r0 + g.length - 1, c:ci } })); });
+  const ws = X.utils.aoa_to_sheet(aoa);
+  ws['!merges'] = merges; ws['!cols'] = HIRA_EXP_COLS.map(c => ({ wch:c[1] }));
+  ws['!rows'] = [{ hpt:22 }, { hpt:16 }, { hpt:34 }];
+  const cell = (r, c) => { const k = X.utils.encode_cell({ r, c }); return ws[k] || (ws[k] = { t:'s', v:'' }); };
+  cell(0, 0).s = { font:{ bold:true, sz:14 } }; cell(1, 0).s = { font:{ sz:10, color:{ rgb:'555555' } } };
+  for(let c = 0; c < n; c++) cell(2, c).s = { font:{ bold:true, sz:10 }, fill:{ fgColor:{ rgb:'D9D9D9' } }, border, alignment:{ horizontal:'center', vertical:'center', wrapText:true } };
+  meta.forEach(([r, c, m]) => { cell(r, c).s = { font:{ sz:10, bold:!!m.fill, color:{ rgb:m.ink || '000000' } }, border,
+    alignment:{ vertical:'center', horizontal:(m.c || c < 3) ? 'center' : 'left', wrapText:true }, ...(m.fill ? { fill:{ fgColor:{ rgb:m.fill } } } : {}) }; });
+  ws['!views'] = [{ state:'frozen', ySplit:3, xSplit:3 }];
+  const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, 'HIRA register');
+  X.writeFile(wb, fname+'.xlsx');
+}
+function hiraExportPdf(mdl, title, sub, fname){
+  const doc = new window.jspdf.jsPDF({ orientation:'landscape', unit:'mm', format:'a3' });
+  let font = 'helvetica';
+  if(window.VJ_FONT){ try{ doc.addFileToVFS('Roboto-Regular.ttf', window.VJ_FONT); doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal'); doc.addFont('Roboto-Regular.ttf', 'Roboto', 'bold'); font = 'Roboto'; }catch(e){ console.warn('[hira pdf] font', e); } }
+  const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), total = HIRA_EXP_COLS.reduce((t, c) => t + c[1], 0), usable = W - 16;
+  const rgb = h => [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  const body = [];
+  mdl.groups.forEach(g => g.forEach((row, i) => { const out = [];
+    row.forEach((c, ci) => { if(i && HIRA_EXP_SPAN.includes(ci)) return;
+      out.push({ content: String(c.v == null ? '' : c.v), rowSpan: HIRA_EXP_SPAN.includes(ci) ? g.length : 1,
+        styles: Object.assign({ halign: (c.c || ci < 3) ? 'center' : 'left' }, c.fill ? { fillColor: rgb(c.fill), textColor: rgb(c.ink), fontStyle:'bold' } : {}) }); });
+    body.push(out); }));
+  doc.setFont(font, 'normal'); doc.setFontSize(13); doc.text(title, 8, 11); doc.setFontSize(8); doc.setTextColor(90); doc.text(sub, 8, 16); doc.setTextColor(0);
+  doc.autoTable({ startY: 20, margin:{ left:8, right:8, top:12, bottom:10 }, head:[HIRA_EXP_COLS.map(c => c[0].toUpperCase())], body, theme:'grid', rowPageBreak:'avoid',
+    styles:{ font, fontSize:6, cellPadding:1, valign:'middle', overflow:'linebreak', lineColor:[128, 128, 128], lineWidth:0.1, textColor:[0, 0, 0] },
+    headStyles:{ fillColor:[217, 217, 217], textColor:[0, 0, 0], fontStyle:'bold', halign:'center', fontSize:6 },
+    columnStyles: Object.fromEntries(HIRA_EXP_COLS.map((c, i) => [i, { cellWidth: usable * c[1] / total }])),
+    didDrawPage: d => { doc.setFontSize(7); doc.setTextColor(110); doc.text('VJC-MQA-F-118 · page '+d.pageNumber, W - 8, H - 4, { align:'right' }); doc.setTextColor(0); } });
+  doc.save(fname+'.pdf');
+}
+/* The list behind the Compliance checks tile: every item of M.hiraChecks for the HIRA of the current filters. A row opens the record. */
+function showHiraChecks(){
+  const A = API(), reps = scoped().filter(r => r.code === A.HIRA_TITLE)
+    .sort((a, b) => String(a.number).localeCompare(String(b.number), undefined, { numeric:true }));
+  const ck = M.hiraChecks(M.hiraHazards(reps) || []);
+  const row = (r, hz, type, detail) => '<tr data-act="bhira" data-id="'+esc(r.id)+'"><td class="hx-c od-nowrap"><button class="link-b row-id" type="button" data-act="bhira" data-id="'+esc(r.id)+'">'+esc(r.number)+'</button></td>'
+    + '<td class="hx-c od-nowrap">'+hz+'</td><td class="hx-mid" style="white-space:normal">'+esc(type)+'</td><td class="hx-mid" style="white-space:normal">'+detail+'</td></tr>';
+  const rows = ck.off.map(x => row(x.r, 'Hazard '+x.i, 'Initial risk rating not consistent with Severity × Likelihood',
+        'Recorded <b>'+x.init.code+'</b> '+esc(x.init.label)+' · Severity × Likelihood on the form ('+esc(M.RISK.sev[x.calc.s]+' × '+M.RISK.prob[x.calc.p][0])+') gives <b>'+x.calc.code+'</b> '+esc(x.calc.label)))
+    .concat(ck.limit.map(q => row(q.x.r, 'Hazard '+q.x.i, 'Tolerable risk: mitigation to be finished within '+M.SMS.tolerableDays+' days (AMO SMS §9.5 d)',
+        'Initial risk <b>'+q.x.init.code+'</b> · date assessed '+esc(fdx(q.day))
+        + (q.dDue !== null ? ' · due date '+esc(fdx(q.x.h.due))+' (<b>'+q.dDue+'</b> days)' : ' · no due date')
+        + (q.none ? ' · no preventive action under this hazard after <b>'+q.dEnd+'</b> days' : q.open ? ' · actions not all completed after <b>'+q.dEnd+'</b> days' : ' · last action completed '+esc(fdx(q.end))+' (<b>'+q.dEnd+'</b> days)'))))
+    .concat(ck.intol.map(q => row(q.x.r, 'Hazard '+q.x.i, 'Intolerable risk: immediate action, report to the Accountable Manager (AMO SMS §9.5 d)',
+        'Initial risk <b>'+q.x.init.code+'</b> · '+(q.none ? 'no preventive action under this hazard' : q.left+' preventive action'+(q.left === 1 ? '' : 's')+' without a date completed'))))
+    .concat(ck.effect.map(q => row(q.r, 'All hazards', 'Effectiveness rating earlier than its monitoring period (AMO SMS §9.7)',
+        '<b>'+esc(String(q.value).toUpperCase())+'</b> needs '+(q.need === M.SMS.fullyMonths ? 'more than '+q.need : q.need)+' months without a related incident · '
+        + (q.notDone ? q.notDone+' action'+(q.notDone === 1 ? '' : 's')+' without a date completed' : !q.last ? 'no action completed' : 'last action completed '+esc(fdx(q.last))+' (<b>'+q.months+'</b> month'+(q.months === 1 ? '' : 's')+' ago)'))))
+    .concat(ck.missRep.map(q => row(q.r, 'All hazards', 'Missing data', esc(q.miss.join(', ')))))
+    .concat(ck.missHz.map(x => row(x.r, 'Hazard '+x.i, 'Missing data', esc(x.miss.join(', ')))));
+  MODAL_REDRAW = null; MODAL_KEY = 'hirachecks';
+  openModal('HIRA compliance checks', ck.total+' item'+(ck.total === 1 ? '' : 's')+' · '+periodLabel()+' · risk matrix AMO SMS §9.4.3 · select a row for the HIRA record',
+    rows.length ? '<div class="tbl-wrap"><table class="hx" style="min-width:0;width:100%"><thead><tr>'+['HIRA number','Hazard','Check','Detail'].map(h => '<th scope="col">'+h+'</th>').join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>'
+                : '<p class="t-sub dim">No item for the current filters.</p>');
+  $('#betaModal .beta-modal-panel').classList.add('wide');
+}
+/* The record — sheet "Trang trong" of F-118 (Eric 09/11/2026): one bordered grid for the clicked HIRA, one row per hazard,
+   NO. / HIRA NUMBER / GENERIC HAZARD merged over the hazards, the 20 columns of the sheet in its order. HIRA METHOD,
+   HAZARD TYPE, ADDITIONAL MITIGATION? and Report Summary are per report on Coruson: one cell over the hazards. What the
+   sheet does not hold (status, dates of the report, verification) sits in the strip above. Dates: dashboard format (fdx). */
+const hiraCode = (code, word) => code != null ? '<b title="'+esc(word)+'">'+esc(code)+'</b>' : (word ? esc(word) : '<span class="dim">—</span>');
+const hiraNoOf = (a, i) => { const m = String(a.text || '').match(/^\s*(\d+)\s*[.)]/); return m ? +m[1] : i + 1; };
+const hiraDeptList = L => L && L.length && L.some(a => a.dept)
+  ? L.map((a, i) => esc(hiraNoOf(a, i)+'. '+(a.dept || '—'))).join('<br>') : '<span class="dim">—</span>';
+function showHira(id){
+  const A = API(), r = REPORTS.find(x => x.id === id); if(!r) return;
+  MODAL_REDRAW = () => showHira(id); MODAL_KEY = 'hira:'+id;
+  if(!A.hira().loaded && !HIRA_WAIT) HIRA_WAIT = A.loadHira().catch(() => {}).then(() => { HIRA_WAIT = null; if(MODAL_KEY === 'hira:'+id) showHira(id); });
+  /* Report summary: the same source as the Summary column of All forms (loadRfiSum, dwanalytics_report_users) */
+  if(REAL && !rxReady() && !HIRA_SUM_WAIT){
+    lazy('rfisum:'+rxFrom(), loadRfiSum, rxReady);
+    HIRA_SUM_WAIT = setInterval(() => { const L = LAZY['rfisum:'+rxFrom()] || {};
+      if(rxReady() || L.err){ clearInterval(HIRA_SUM_WAIT); HIRA_SUM_WAIT = null; if(MODAL_KEY === 'hira:'+id) showHira(id); } }, 400);
+  }
+  const hz = M.hiraHazards([r]) || [], raw = A.allData().find(d => d.report_id === id) || {};
+  const cls = (A.hira().map || {})[id] || {}, ver = ((A.hira().reg || {})[id] || {}).ver || {};
+  const sumErr = (LAZY['rfisum:'+rxFrom()] || {}).err;
+  const sum = !rxReady() ? '<span class="dim">'+(sumErr ? 'Could not load: '+esc(sumErr) : 'Loading…')+'</span>'
+    : RX.sum[id] ? hiraKv(RX.sum[id])
+    : RX.big && RX.big.has(id) ? '<span class="dim">Too large to show here (images pasted in the summary) — open the report on Coruson.</span>' : '<span class="dim">—</span>';
+  const latestDone = hz.map(x => x.done).concat(hz.length && !hz[0].acts ? hz[0].act.all.map(a => a.done) : []).filter(Boolean).sort().pop();
+  const strip = kv([['Status', chip(r.status), true], ['Raised date', fdx(raw.raised_date)], ['Target (latest due date)', fdx(raw.Target_date)],
+      ['Date completed (latest action)', latestDone ? fdx(latestDone) : null], ['Date verified', raw.verified_date ? fdx(raw.verified_date) : missingData('Missing'), true],
+      ['Verified by', ver.by || null], ['Verification of implementation (VOI)', ver.voi ? hiraKv(ver.voi) : null, !!ver.voi]]);
+  const head = ['No.','HIRA number','Generic hazard','Specific components of the generic hazard','Existing controls','Potential specific consequence',
+    'Severity','Likelihood','Initial risk rating','Preventive control / recovery measures','Responsible department','Current risk rating',
+    'Date assessed','Due date','Next review date','Effectiveness rating','HIRA method','Hazard type','Additional mitigation?','Report summary'];
+  const n = hz.length, span = n > 1 ? ' rowspan="'+n+'"' : '', merged = n && !hz[0].acts;
+  const rows = hz.map((x, i) => '<tr>'
+    + (i ? '' : '<td class="hx-c"'+span+'>1</td><td class="hx-c od-nowrap"'+span+'><b>'+esc(r.number)+'</b></td><td class="hx-c hx-gen"'+span+'>'+hiraKv(cls.generic)+'</td>')
+    + '<td class="hx-txt">'+hiraComp(x)+'</td><td class="hx-mid">'+hiraKv(x.f.existing)+'</td><td class="hx-mid">'+hiraKv(x.f.consequence)+'</td>'
+    + '<td class="hx-c">'+hiraCode(M.sevCode(x.f.severity), x.f.severity)+'</td><td class="hx-c">'+hiraCode(M.probCode(x.f.likelihood), x.f.likelihood)+'</td>'
+    + hiraRiskTd(x.init, x.f.initRisk, x.initOff && x.calc)
+    + (x.acts ? '<td class="hx-txt">'+hiraActText(x.acts)+'</td><td class="hx-mid">'+hiraDeptList(x.acts)+'</td>'
+       : i ? '' : '<td class="hx-txt"'+span+'>'+hiraActText(x.act.all)+'<br>'+hiraMergedNote(x.act)+'<div class="t-small dim">'+esc(x.act.reason)+'</div></td><td class="hx-mid"'+span+'>'+hiraDeptList(x.act.all)+'</td>')
+    + hiraRiskTd(x.cur, x.h.risk)
+    + '<td class="hx-c od-nowrap">'+(x.f.assessed ? hiraKv(hiraWhen(x.f.assessed)) : '<span class="dim">—</span>')+'</td>'
+    + '<td class="hx-c od-nowrap">'+(x.h.due ? esc(fdx(x.h.due)) : missingData('Missing'))+'</td>'
+    + '<td class="hx-c">'+hiraKv(hiraWhen(x.f.nextReview))+'</td>' + (i ? '' : hiraEffectTd(x.effect, span))
+    + (i ? '' : '<td class="hx-c"'+span+'>'+hiraKv(cls.method)+'</td><td class="hx-c"'+span+'>'+hiraKv(cls.type)+'</td>'
+       + '<td class="hx-c"'+span+'>'+(A.capa().loaded ? hiraMitigCell(r) : hiraKv(cls.mitig))+'</td><td class="hx-sum"'+span+'>'+sum+'</td>')
+    + '</tr>').join('');
+  const table = !A.hira().loaded ? '<p class="t-small dim">Loading…</p>'
+    : !n ? '<p class="t-sub dim">No hazard recorded on the form.</p>'
+    : '<div class="tbl-wrap hx-pop"><table class="hx"><thead><tr>'+head.map(h => '<th scope="col">'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
+  const body = strip + table
+    + '<p class="t-small dim">HIRA method, Hazard type, Effectiveness rating, Additional mitigation? and Report summary are recorded once per report on Coruson (Evaluation › Classifications).'
+    + (merged ? ' The preventive actions of this HIRA are not linked to a hazard on the form ('+esc(hz[0].act.reason)+'), so they span all its hazards.' : '') + '</p>'
+    + '<div><button class="btn" type="button" data-act="breport" data-id="'+esc(id)+'">Workflow stages of this report</button></div>';
+  openModal(r.number, A.HIRA_TITLE + ' · VJC-MQA-F-118 record', body, extBtn('report', id));
+  $('#betaModal .beta-modal-panel').classList.add('xwide');
+}
+let HIRA_SUM_WAIT = null;
+
 /* ---- screen registry, action handlers, form controls ---- */
 const BETA_SCREENS = REAL ? {
-  'findings/all': scrAllForms, 'findings/osr': scrMosr,
+  'findings/all': scrAllForms,
   'findings/cmrcar': whenFull('CMR-CAR', () => renderLane('findings','cmrcar')),
   'findings/ecar':   whenFull('ECAR', () => renderLane('findings','ecar')),
   'findings/pavoi':  whenFull('PAVOI / MVOI verification rounds', () => renderPavoi()),
   'work/verify':     whenFull('PAVOI / MVOI verification rounds', () => renderLane('work','verify')),
-  'analytics/kpi': scrKpi, 'analytics/spi': scrSpi, 'analytics/safety': scrSafety, 'analytics/mosr': scrMosrCharts,
+  'analytics/kpi': scrKpi,
+  /* r224: the Safety page — the old routes redirect (MOVED_ROUTES in the template) */
+  'safety/hira': scrHira, 'safety/mitigation': () => scrAllForms(API().CAPA_TITLE),
+  'safety/msag': scrSafety, 'safety/mosr': scrMosr, 'safety/mosrcharts': scrMosrCharts, 'safety/spi': scrSpi,
   'analytics/early': scrEarly, 'analytics/status': scrStatus,
   'audit/bottleneck': scrBottleneck,
   'library/documents': scrDocs, 'library/guide': scrGuide,
@@ -5034,7 +5605,7 @@ document.addEventListener('input', e => {
 let MODAL_RETURN = null;
 function openModal(title, sub, body, link){
   if($('#betaModal').hidden) MODAL_RETURN = document.activeElement;   /* not on a redraw of the same modal */
-  $('#betaModal .beta-modal-panel').classList.remove('wide');
+  $('#betaModal .beta-modal-panel').classList.remove('wide', 'xwide');
   $('#betaModalTitle').textContent = title; $('#betaModalSub').textContent = sub || '';
   $('#betaModalBody').innerHTML = body; $('#betaModal').hidden = false;
   $('#betaModalLink').innerHTML = link || '';   /* "Open in Coruson" for a report or an audit */
@@ -5635,8 +6206,8 @@ const KIOSK_STEPS = [
   { l:'Overview', go:() => go('overview') },
   { l:'Report status · EIS', go:() => { BS.rsTab = 'eis'; go('analytics','status'); } },
   { l:'Report status · F-088', go:() => { BS.rsTab = 'f088'; go('analytics','status'); } },
-  { l:'SPI', go:() => go('analytics','spi') },
-  { l:'OSR/MOSR Status', go:() => go('analytics','safety') },
+  { l:'SPI', go:() => go('safety','spi') },
+  { l:'MSAG status', go:() => go('safety','msag') },
   { l:'Audit Plan · Timeline', go:() => go('audit','timeline') }
 ];
 /* LED wall layout (Eric 03/11/2026): nobody touches the wall, so no search, filters or tabs (CSS body.kiosk), and
@@ -5699,6 +6270,10 @@ Object.assign(BETA_ACT, {
   bovform: el => { BS.afForm = el.dataset.f; go('findings', 'all'); },
   bqcs: el => showQcs(el.dataset.id),
   breport: el => showReport(el.dataset.id),
+  bhira: el => showHira(el.dataset.id),
+  bhirachecks: () => showHiraChecks(),
+  bmosrorc: () => showMosrOrc(),
+  bhiraexp: el => hiraExport(el.dataset.k),
   bdoc: el => showDoc(el.dataset.id),
   bdoctab: el => showDoc(el.dataset.id, el.dataset.t),
   baudit: el => showAudit(el.dataset.id),
@@ -5781,8 +6356,9 @@ function scrGuideNew(){
     + '<table><tr><th>Section</th><th>Use it to</th></tr>'
     + '<tr><td>Overview</td><td>See key indicators for the selected period. Every tile goes to the screen behind it.</td></tr>'
     + '<tr><td>Work Queue</td><td>Act on reports: Open reports, Overdue, and PAVOI / MVOI awaiting verification.</td></tr>'
-    + '<tr><td>Reports</td><td>Read the register by form: All forms, PAVOI / MVOI, CMR-CAR, ECAR, AMO-ECAR, MCAR, MOSR.</td></tr>'
-    + '<tr><td>Analytics</td><td>KPI charts, SPI, OSR/MOSR Status, MOSR charts, Early detection (KPI 2) and Event/IR report status on Coruson.</td></tr>'
+    + '<tr><td>Reports</td><td>Read the register by form: All forms, PAVOI / MVOI, CMR-CAR, ECAR, AMO-ECAR, MCAR.</td></tr>'
+    + '<tr><td>Analytics</td><td>KPI charts, Early detection (KPI 2) and Event/IR report status on Coruson.</td></tr>'
+    + '<tr><td>Safety</td><td>HIRA register, Additional mitigation, MSAG status, MOSR register, MOSR charts and SPI. Old links to these screens open here.</td></tr>'
     + '<tr><td>Audit Plan</td><td>The audit and inspection programme: timeline, schedule list and workflow stages.</td></tr>'
     + '<tr><td>Library</td><td>Controlled documents and this guide.</td></tr>'
     + '<tr><td>Admin</td><td>User management, report export and pinned widgets (administrators; a moderator sees report export only).</td></tr></table>'
@@ -5815,10 +6391,12 @@ function scrGuideNew(){
     + '<li><b>Work Queue</b>: Open reports (nearest target first), Overdue (with CAT), Awaiting verification (open PAVOI / MVOI with no verification round). Select a row to open the report.</li>'
     + '<li><b>Reports › All forms</b>: every report type. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings). With <b>MCCF</b> selected the list covers every unit on Coruson, with an Org unit column; MCCF outside QA AMO appear only here and are not counted in KPIs, Overview, Work Queue or Export. <b>AMO - Additional Mitigation</b> lists the title, source HIRA, actions and tasks, and a row opens its actions, tasks and verification. Its Target is the latest Target date of the actions; on-time or late compares <b>Date verified</b> with it, and a missing date shows in red.</li>'
     + '<li><b>Reports › PAVOI / MVOI</b>: register on the left (Form filter: PAVOI or MVOI), record on the right with the verification history and the RFI / Task list of open records. KPI 7 counts PAVOI and MVOI.</li>'
-    + '<li><b>Reports › MOSR</b>: every MOSR by submitted date, with its classifications from Coruson. OSR forms carry no classifications; their counts are in Analytics › OSR/MOSR Status.</li>'
+    + '<li><b>Safety › HIRA register</b>: the AMO - HIRA records in the layout of VJC-MQA-F-118 Risk Register, one row per hazard declared on the form, with the initial and current risk rating in the colours of the AMO SMS risk matrix (§9.4.3: Intolerable, Tolerable, Acceptable). The risk matrix counts the hazards per cell. Select a HIRA number for the full record: every hazard with its controls, measures, department and dates, and the report summary. A field the Coruson form does not hold shows —.</li>'
+    + '<li><b>Safety › Additional mitigation</b>: the AMO - Additional Mitigation register, the same as Reports › All forms with that form chosen.</li>'
+    + '<li><b>Safety › MOSR register</b>: every MOSR by submitted date, with its classifications from Coruson. OSR forms carry no classifications; their counts are in Safety › MSAG status.</li>'
     + '<li><b>Analytics › KPI charts</b>: summary tiles, Closure by quarter, KPI 2, KPI 7 and KPI QC. Select a tile or a count for the reports behind it; closing a detail returns to that list.</li>'
-    + '<li><b>Analytics › OSR/MOSR Status</b>: OSR and MOSR closed, open and total for each MSAG group on Coruson. It counts all the data of these groups and ignores the Year and Month filter, so its figures differ from Reports › MOSR.</li>'
-    + '<li><b>Analytics › MOSR charts</b>: form MOSR by department, occurrence category and base, by submitted date. Year and month come from the filter bar, the quarter is chosen in the tab. A report with two departments counts in both; occurrence category holds the groups under Technical only, and the caption states the reports not classified or outside Technical.</li>'
+    + '<li><b>Safety › MSAG status</b>: OSR and MOSR closed, open and total for each MSAG group on Coruson. It counts all the data of these groups and ignores the Year and Month filter, so its figures differ from Safety › MOSR register.</li>'
+    + '<li><b>Safety › MOSR charts</b>: form MOSR by department, occurrence category and base, by submitted date. Year and month come from the filter bar, the quarter is chosen in the tab. A report with two departments counts in both; occurrence category holds the groups under Technical only, and the caption states the reports not classified or outside Technical.</li>'
     + '<li><b>Analytics › Event/IR report status</b>: EIS and F-088 completeness on Coruson; the tiles count the reports complete on each check, the table shows workflow, linked reports, final report and status per report.</li>'
     + '<li><b>Audit Plan</b>: KPI tiles, a location × month view (one dot per audit, inspection or surveillance in its scheduled month; filter by type or show only upcoming / with overdue findings), and a schedule list. Select a dot or a row for its workflow stages and findings. <b>Workflow stages</b>: for the QA AMO audits in the selected period, how many stages of each name are in each Galileo status; select an InProgress or PendingSignOff count for the audits concerned.</li>'
     + '<li><b>Library › Documents</b>: browse by document type; the document number opens copyholders (on time, late, overdue) and the workflow.</li></ul>')
@@ -5837,7 +6415,7 @@ function scrGuideNew(){
     + '<li>A tile or table that shows a dash or "Loading…" is waiting for its data; it never shows 0 for data that has not arrived.</li>'
     + '<li>If a number looks wrong, check the record in Coruson first: the dashboard shows what Coruson holds.</li></ul>')
   + sec('led','LED wall mode',
-    '<p>Open the dashboard with <b>?kiosk=1</b> at the end of the address (30 seconds per page), or <b>?kiosk=60</b> for 60 seconds per page (5 to 600 seconds). The screen rotates Overview → Report status EIS → Report status F-088 → SPI → OSR/MOSR Status → Audit Plan timeline, without navigation, search, tabs or filters. Pages scale to the height of the wall. A page still longer than the wall stays 4 seconds at the top, scrolls slowly to the bottom and stays 4 seconds, so it can stay longer than the seconds you set. Press Esc to stop. Sign in on the tab on show and keep it open; use one browser window. The data refreshes itself every 12 hours, and the page reloads when a new day starts.</p>')
+    '<p>Open the dashboard with <b>?kiosk=1</b> at the end of the address (30 seconds per page), or <b>?kiosk=60</b> for 60 seconds per page (5 to 600 seconds). The screen rotates Overview → Report status EIS → Report status F-088 → SPI → MSAG status → Audit Plan timeline, without navigation, search, tabs or filters. Pages scale to the height of the wall. A page still longer than the wall stays 4 seconds at the top, scrolls slowly to the bottom and stays 4 seconds, so it can stay longer than the seconds you set. Press Esc to stop. Sign in on the tab on show and keep it open; use one browser window. The data refreshes itself every 12 hours, and the page reloads when a new day starts.</p>')
   + sec('faq','Questions',
     '<p><b>The first opening is slow.</b> The first load of the day on a computer fetches everything from Galileo. Later openings use the saved copy.</p>'
     + '<p><b>I cannot see Admin screens, export buttons or the AI Assistant.</b> The User role is view only. Ask an administrator to change your role.</p>'

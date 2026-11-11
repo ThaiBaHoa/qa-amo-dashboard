@@ -1040,7 +1040,7 @@ body.kiosk .mob-menu{display:none!important}
                 <option value="">All owners</option>
                 <option value="MQA - Licensing and Authorization Section">MQA - Licensing and Authorization Section</option>
                 <option value="MQA - Quality Control Section">MQA - Quality Control Section</option>
-                <option value="AMO - Safety Section">AMO - Safety Section</option>
+                <option value="MQA - Safety Section">MQA - Safety Section</option>
                 <option value="MQA - Standard and Compliance Section">MQA - Standard and Compliance Section</option>
               </select>
               <div class="srch-wrap"><span class="srch-icon">🔍</span>
@@ -1292,6 +1292,7 @@ body.kiosk .mob-menu{display:none!important}
                 <button class="pill" onclick="setAuditF('Closed','status',this)">Closed</button>
                 <button class="pill" onclick="setAuditF('Performed','status',this)">Performed</button>
                 <button class="pill" onclick="setAuditF('Scheduled','status',this)">Scheduled</button>
+                <button class="pill" onclick="setAuditF('ScheduleConfirmed','status',this)">Schedule Confirmed</button>
                 <button class="pill" onclick="setAuditF('InProgress','status',this)">In Progress</button>
               </div>
 
@@ -2532,7 +2533,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.05-r223-i1';
+const APP_REV = '2026.11.11-r224';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2550,12 +2551,14 @@ if (window.Chart) {
 // 1) Trạng thái AUDIT (dwreporting_audit_summary.status) — Overview, Audit Plan
 const AUDIT_STATUS = {
   Scheduled : { label:'Scheduled',   color:'#58A6FF' },
+  // [r224, Eric 11/11/2026] new Coruson status (MNT-1084, MNT-1086): its own status, not merged into Scheduled
+  ScheduleConfirmed: { label:'Schedule Confirmed', color:'#39C5CF' },
   InProgress: { label:'In Progress', color:'#D29922' },
   Performed : { label:'Performed',   color:'#A78BFA' },
   Closed    : { label:'Closed',      color:'#3FB950' },
   Cancelled : { label:'Cancelled',   color:'#6E7681' },
 };
-const AUDIT_STATUS_ORDER = ['Scheduled','InProgress','Performed','Closed','Cancelled'];
+const AUDIT_STATUS_ORDER = ['Scheduled','ScheduleConfirmed','InProgress','Performed','Closed','Cancelled'];
 
 // 2) Semantic status của REPORT (semCalc) — mọi donut/badge/bảng report (màn hình)
 //    Biến thể IN/PDF cố tình khác (xem SYNC ở buildReportPdf ~L5752 & renderReportCharts ~L6855).
@@ -2583,7 +2586,7 @@ const isCancelled = a => !!a && a.status === 'Cancelled';
 // CỐ Ý viết tay danh sách này thay vì suy từ AUDIT_STATUS_ORDER: nếu ai thêm status mới vào
 // CFG.AUDIT_STATUS mà quên thêm ở đây thì tie-out lệch → self-check kêu. Suy tự động sẽ luôn
 // khớp và không ai phát hiện ra là đã âm thầm xếp status mới vào "đang tiến hành".
-const AUDIT_ACTIVE = new Set(['Scheduled','InProgress','Performed']);
+const AUDIT_ACTIVE = new Set(['Scheduled','ScheduleConfirmed','InProgress','Performed']);
 const isActive    = a => !!a && AUDIT_ACTIVE.has(a.status);
 
 // 4) Mốc thời gian theo quy trình, tính từ ngày Raise (ngày) — 1 nơi khai báo
@@ -2790,9 +2793,12 @@ const isPavoiRfi  = t => !!(t && t.task_title === PAVOI_RFI_TITLE);
 const KPI7_SECTIONS = [                      // phải khớp TUYỆT ĐỐI owner_name (= 4 option của #pavoiSectF)
   'MQA - Licensing and Authorization Section',
   'MQA - Quality Control Section',
-  'AMO - Safety Section',
+  'MQA - Safety Section',
   'MQA - Standard and Compliance Section'
 ];
+// [r224] Coruson renamed the group AMO - Safety Section to MQA - Safety Section (Eric 11/11/2026). Both names fall in the same section,
+// so reports still carrying the old owner name are not dropped into Unassigned.
+const sectName = n => /^(AMO|MQA) - Safety Section$/i.test(n||'') ? 'MQA - Safety Section' : n;
 // [r199] MVOI (form mới 10/2026, cùng khuôn PAVOI) tính CHUNG KPI 7, luật Withdrawn, cờ 30 ngày — Eric chốt 19/10/2026.
 // Chia ban vẫn theo owner_name như PAVOI: owner MVOI đang là cá nhân → rơi vào Unassigned cho tới khi Coruson chuyển về Section.
 const isPvReport = r => r.report_title==='PAVOI' || r.report_title==='MVOI';
@@ -3469,7 +3475,7 @@ function resetLazyStores(){
   try{ localStorage.removeItem(KPI7_CACHE_KEY); }catch{}
   eisLoaded=false; eisCAMap={}; eisDescMap={};   // reset EIS per-CA cache để Refresh kéo lại
   qcsLoaded=false; qcsMap={};                     // reset QC Spot Check cache để Refresh kéo lại
-  hiraLoaded=false; hiraClsMap={}; hiraHazardMap={};                // [r173] HIRA classifications + CAPA (r171/r172)
+  hiraLoaded=false; hiraClsMap={}; hiraHazardMap={}; hiraRegMap={}; hiraRegErr=null; hiraFieldNames=[];   // [r173] HIRA classifications + CAPA (r171/r172) · [r224] register
   capaLoaded=false; capaTaskMap={}; capaInfoMap={}; hiraCapaMap={};
   auditStageRows=null;                            // [r178] bước audit của màn Workflow stages
 }
@@ -5348,12 +5354,107 @@ const AF_FORM_SET = new Set(AF_FORMS);
 // toàn hệ thống, 1,2s — form khác (Hazard Log…) dùng trùng tên list nên phải lọc lại theo report_id HIRA.
 // 24/24 report HIRA đủ cả 3 trường; nếu một trường chọn nhiều giá trị thì nối bằng ', '.
 const HIRA_TITLE = 'AMO - HIRA';
-const HIRA_CLS = {'HIRA METHOD':'method','HAZARD TYPE':'type','ADDITIONAL MITIGATION?':'mitig'};
+const HIRA_CLS = {'HIRA METHOD':'method','HAZARD TYPE':'type','ADDITIONAL MITIGATION?':'mitig','EFFECTIVENESS RATING':'effect'};
+// [r224] Safety › HIRA register (layout of VJC-MQA-F-118 Risk Register). Probe 09/11/2026 (main session, 24 HIRA, 48
+// hazards), dwanalytics_report_field by section_name:
+//  · HIRA HEADER: HIRA NUMBER, GENERIC HAZARD, HOW MANY…, copies "SPECIFIC COMPONENTS 1/2/3" (not used).
+//  · SPECIFIC COMPONENTS, one section per hazard: SPECIFIC COMPONENTS OF THE GENERIC HAZARD, EXISTING CONTROLS,
+//    POTENTIAL SPECIFIC CONSEQUENCE, SEVERITY (word: Major…), LIKELIHOOD (word: Remote…), INITIAL RISK RATING
+//    (ACCEPTABLE?), CURRENT RISK RATING, DATE ASSESSED, DUE DATE, NEXT REVIEW DATE (free text, e.g. NEXT MSAG MEETING),
+//    EFFECTIVENESS RATING, HAZARD SOURCE, SAFETY AREA, SPI RELATED, NOTE (IF ANY).
+//  · PREVENTIVE ACTION, one section per action, NOT linked to a hazard: see buildHiraActions.
+//  · VERIFICATION: DATE VERIFIED, VOI, VERIFIED BY (VOI and VERIFIED BY kept in .ver for the record).
+// A value is taken when its field_name equals one of these names (upper case, punctuation ignored); none → '—'.
+// hiraFieldNames keeps every name Galileo has. ADDITIONAL MITIGATION? is not a form field: classification (HIRA_CLS).
+const HIRA_REG_FIELDS = {
+  comp:['SPECIFIC COMPONENTS OF THE GENERIC HAZARD'],   // the full text with its line breaks (loadHiraHazards .comp is flattened)
+  source:['HAZARD SOURCE'],
+  existing:['EXISTING CONTROLS'],
+  consequence:['POTENTIAL SPECIFIC CONSEQUENCE'],
+  severity:['SEVERITY'],
+  likelihood:['LIKELIHOOD'],
+  initRisk:['INITIAL RISK RATING (ACCEPTABLE?)','INITIAL RISK RATING'],
+  assessed:['DATE ASSESSED'],
+  nextReview:['NEXT REVIEW DATE'],
+  effect:['EFFECTIVENESS RATING']
+};
+const hiraKey = s => String(s||'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim();
+const hiraTxt = t => mosrEnt(mosrEnt(String(t||''))).replace(/<br\s*\/?>|<\/p>|<\/li>|<\/div>/gi,'\n').replace(/<[^>]*>/g,' ')
+  .replace(/[ \t]+/g,' ').replace(/ *\n */g,'\n').replace(/\n{2,}/g,'\n').trim();
+// Per report: values of the hazard sections (section_name SPECIFIC COMPONENTS) by section_id — the hazard's own section
+// is loadHiraHazards .sec. A value is never spread from one hazard to another; a hazard lacking it shows '—'.
+function buildHiraReg(raw, ids){
+  const want={}; Object.entries(HIRA_REG_FIELDS).forEach(([k,names])=>names.forEach(n=>{ want[hiraKey(n)]=k; }));
+  const names=new Set(), m={};
+  raw.forEach(f=>{
+    if(!ids.has(f.report_id)) return;
+    names.add(f.field_name);
+    // VERIFICATION (one per report): VOI and Verified by for the record's summary strip (DATE VERIFIED is already in loadData)
+    if(hiraKey(f.section_name)==='VERIFICATION'){ const vk=hiraKey(f.field_name), v=hiraTxt(f.value_text); if(!v) return;
+      const ver=((m[f.report_id] ||= {sec:{}}).ver ||= {});
+      if(/^(VOI|VERIFICATION OF IMPLEMENTATION)/.test(vk)) ver.voi ||= v; else if(/^VERIFIED BY/.test(vk)) ver.by ||= v; return; }
+    if(hiraKey(f.section_name)!=='SPECIFIC COMPONENTS') return;
+    const k=want[hiraKey(f.field_name)]; if(!k) return;
+    let v=hiraTxt(f.value_text); if(!v) return;
+    if(/^\d{4}-\d{2}-\d{2}T/.test(v)) v=v.slice(0,10);
+    const sec=((m[f.report_id] ||= {sec:{}}).sec[f.section_id] ||= {}); if(!sec[k]) sec[k]=v;
+  });
+  return {map:m, names:[...names].sort()};
+}
+// PREVENTIVE ACTION: one section per action — MITIGATION ACTION ("1. …"), RESPONSIBLE DEPARTMENT, DATE COMPLETED.
+// [r224, 11/11/2026] The link to its hazard is parent_section_id (see below); the numbering rule that follows is only the
+// fallback for an action without such a parent. Fallback rule (Eric / real-data check 09/11/2026): creation time says nothing — the first hazard
+// section of many reports is a form-template section whose section_id is shared across reports and created months earlier.
+//  1. hazards in component order: leading "N." of SPECIFIC COMPONENTS OF THE GENERIC HAZARD, else the N of the HIRA HEADER
+//     copy "SPECIFIC COMPONENTS N" holding the same text, else section creation;
+//  2. actions by report_field_created_date, a new group at each action starting "1.";
+//  3. group i → hazard i only when every action is numbered, the first is "1." and groups = hazards (one hazard: all).
+// Anything else is mode 'merged' with the reason: the register shows the HIRA's actions across its hazards, marked.
+// Real data 09/11: byHazard HIRA-01, 07, 12, 13 (+ single-hazard HIRA); merged 09, 14, 15, 17, 21, 22, 23; none 25.
+function buildHiraActions(raw, hazards){
+  const acts={}, head={};
+  raw.forEach(f=>{
+    if(!hazards[f.report_id] || !f.section_id) return;
+    const sn=hiraKey(f.section_name), k=hiraKey(f.field_name);
+    if(sn==='HIRA HEADER'){ const m=k.match(/^SPECIFIC COMPONENTS (\d+)$/); if(m && f.value_text) (head[f.report_id] ||= []).push({n:+m[1], text:mosrPlain(f.value_text)}); return; }
+    if(sn!=='PREVENTIVE ACTION') return;
+    const o=((acts[f.report_id] ||= {})[f.section_id] ||= {sec:f.section_id,parent:f.parent_section_id||null,text:'',dept:'',done:null,created:f.report_field_created_date||''});
+    if(f.report_field_created_date && f.report_field_created_date<o.created) o.created=f.report_field_created_date;
+    const v=hiraTxt(f.value_text);
+    if(k==='MITIGATION ACTION') o.text=v;
+    else if(k==='RESPONSIBLE DEPARTMENT') o.dept=v;
+    else if(k==='DATE COMPLETED') o.done=v ? v.slice(0,10) : null;
+  });
+  const num=t=>{ const m=String(t||'').match(/^\s*(\d+)\s*[.)]/); return m ? +m[1] : null; };
+  const byTime=(x,y)=>String(x.created).localeCompare(String(y.created));
+  const out={};
+  Object.entries(hazards).forEach(([id,H])=>{
+    const L=Object.values(acts[id]||{}).filter(a=>a.text||a.dept||a.done).sort(byTime);
+    const res=out[id]={mode:L.length ? 'merged' : 'none', reason:'', bySec:{}, all:L};
+    if(!L.length) return;
+    if(!H.length){ res.reason='the form has no hazard section'; return; }
+    if(H.length===1){ res.mode='byHazard'; res.rule='one hazard'; res.bySec[H[0].sec]=L; return; }
+    // [r224, probe 11/11/2026] each PREVENTIVE ACTION section sits under its hazard's section on the form: parent_section_id =
+    // the hazard's section_id (HIRA-21: 2 hazards, 2 actions each, unnumbered). Used whenever every action has such a parent.
+    { const secs=new Set(H.map(h=>h.sec));
+      if(L.every(a=>a.parent && secs.has(a.parent))){ res.mode='byHazard'; res.rule='parent section';
+        L.forEach(a=>{ (res.bySec[a.parent] ||= []).push(a); }); return; } }
+    if(!L.every(a=>num(a.text)!==null)){ res.reason='unnumbered actions'; return; }
+    if(num(L[0].text)!==1){ res.reason='the first action is not numbered 1'; return; }
+    const groups=[]; L.forEach((a,i)=>{ if(!i || num(a.text)===1) groups.push([]); groups[groups.length-1].push(a); });
+    if(groups.length!==H.length){ res.reason=H.length+' hazards, '+groups.length+' numbered group'+(groups.length===1?'':'s'); return; }
+    const hd=head[id]||[], ord=h=>num(h.comp) ?? (hd.find(x=>x.text && x.text===h.comp)||{}).n ?? Infinity;
+    const hs=[...H].sort((x,y)=>ord(x)-ord(y) || byTime(x,y));
+    res.mode='byHazard'; res.rule='numbered groups';
+    hs.forEach((h,i)=>{ res.bySec[h.sec]=groups[i]; });
+  });
+  return out;
+}
 // [HIRA] Mỗi Specific component là 1 mối nguy, có DUE DATE riêng (Eric 04/11/2026). Probe 04/11: bảng
 // dwanalytics_report_field có section_id; mỗi mối nguy là 1 section SPECIFIC COMPONENTS, 50/50 ô DUE DATE ghép
 // đúng mối nguy. KHÔNG dùng dwanalytics_report_form_section_field: bảng đó không có section và còn ô thừa
 // (HIRA-11 có 3 DUE DATE cho 2 mối nguy). DUE DATE lớn nhất là Target của report, xem loadData.
-let hiraLoaded=false, hiraClsMap={}, hiraHazardMap={};
+let hiraLoaded=false, hiraClsMap={}, hiraHazardMap={}, hiraRegMap={}, hiraRegErr=null, hiraFieldNames=[];
 async function loadHiraHazards(ids){
   const list=[...ids], chunks=[];
   for(let i=0;i<list.length;i+=8) chunks.push(list.slice(i,i+8).map(id=>'report_id eq '+id).join(' or '));
@@ -5364,7 +5465,7 @@ async function loadHiraHazards(ids){
     // DATE VERIFIED ở mục VERIFICATION, 1 ô/report, không thuộc mối nguy nào
     if(/^date verified$/i.test(f.field_name)){ const v=f.value_text?String(f.value_text).slice(0,10):null; if(v && !(verified[f.report_id]>v)) verified[f.report_id]=v; return; }
     if(f.field_name.startsWith('HOW MANY')){ howMany[f.report_id]=parseInt(f.value_text,10)||0; return; }
-    const o=(secs[f.report_id+'|'+f.section_id] ||= {report_id:f.report_id,comp:'',due:null,risk:null,created:f.report_field_created_date});
+    const o=(secs[f.report_id+'|'+f.section_id] ||= {report_id:f.report_id,sec:f.section_id,comp:'',due:null,risk:null,created:f.report_field_created_date});
     if(f.report_field_created_date<o.created) o.created=f.report_field_created_date;
     if(f.field_name==='DUE DATE') o.due=f.value_text ? String(f.value_text).slice(0,10) : null;
     else if(f.field_name==='CURRENT RISK RATING') o.risk=f.value_text||null;
@@ -5386,11 +5487,22 @@ async function loadHiraHazards(ids){
 async function loadHiraCls(){
   const ids=new Set(allData.filter(r=>r.report_title===HIRA_TITLE).map(r=>r.report_id));
   const flt=Object.keys(HIRA_CLS).map(n=>"list_name eq '"+n+"'").join(' or ');
-  const [raw,hz,generic]=await Promise.all([
+  // [r224] every form field of the HIRA reports for the Safety register (report_id, chunks of 8 as loadHiraHazards).
+  // Its failure must not take the HIRA columns of All forms down with it: kept in hiraRegErr and shown on the register.
+  const list=[...ids], regChunks=[]; for(let i=0;i<list.length;i+=8) regChunks.push(list.slice(i,i+8));
+  const reg=Promise.all(regChunks.map(c=>fetchAll(G_URL+'dwanalytics_report_field?$select=report_id,section_id,parent_section_id,section_name,field_name,value_text,report_field_created_date&$filter='
+    +encodeURIComponent(c.map(id=>'report_id eq '+id).join(' or ')), true))).then(a=>[].concat.apply([],a))
+    .then(r=>({r}), e=>({e:(e && e.message) ? e.message : String(e)}));
+  const [raw,hz,generic,regRes]=await Promise.all([
     fetchAll(G_URL+'dwanalytics_report_classification_field?$select=report_id,list_name,value_text&$filter='+encodeURIComponent(flt), true),
     loadHiraHazards(ids),
-    fetchAll(CF_URL+'?$select=report_id,text_value&$filter='+encodeURIComponent("report_title eq '"+HIRA_TITLE+"' and field_name eq 'GENERIC HAZARD'"), true)
+    fetchAll(CF_URL+'?$select=report_id,text_value&$filter='+encodeURIComponent("report_title eq '"+HIRA_TITLE+"' and field_name eq 'GENERIC HAZARD'"), true),
+    reg
   ]);
+  if(regRes.e){ hiraRegMap={}; hiraFieldNames=[]; hiraRegErr=regRes.e; console.error('[HIRA register] form fields failed:', regRes.e); }
+  else { const b=buildHiraReg(regRes.r, ids), act=buildHiraActions(regRes.r, hz.hazards);
+    Object.entries(act).forEach(([id,a])=>{ (b.map[id] ||= {sec:{}}).actions=a; });
+    hiraRegMap=b.map; hiraFieldNames=b.names; hiraRegErr=null; }
   const m={};
   raw.forEach(r=>{
     const k=HIRA_CLS[r.list_name];
@@ -5400,6 +5512,12 @@ async function loadHiraCls(){
   });
   // GENERIC HAZARD: cột Generic Hazard của All forms (Eric 04/11/2026); bản nháp, đã xóa không thuộc ids nên bị loại
   generic.forEach(g=>{ const v=mosrPlain(g.text_value); if(v && ids.has(g.report_id)) (m[g.report_id] ||= {}).generic ||= v; });
+  // [r224] Status of each hazard (STATUS column of F-118): the report's own rule (loadData / regradeRows: isVerifyGraded)
+  // applied to the hazard's DUE DATE — DATE VERIFIED counts only once the report is Closed. The hazard with the latest
+  // due therefore has the report's semantic_status (checked in M.consistency).
+  const repOf={}; allData.forEach(r=>{ if(ids.has(r.report_id)) repOf[r.report_id]=r; });
+  Object.entries(hz.hazards).forEach(([id,L])=>{ const r=repOf[id]; if(!r) return;
+    L.forEach(h=>{ h.sem=semCalc(r.report_status, r.report_status==='Closed' ? r.verified_date : null, h.due); }); });
   hiraClsMap=m; hiraHazardMap=hz.hazards; hiraLoaded=true;
 }
 // [r172] AMO - Additional Mitigation (VJC-AMO-CAPA-xx) — theo dõi như PAVOI: từng Task/RFI của workflow,
@@ -6138,7 +6256,7 @@ function renderPavoi() {
     if(!isPvReport(r) || (form && r.report_title!==form)) return false;   // [r200] + MVOI
     // [r158] Lọc theo `report_status` cho khớp cột Status (r157), KHÔNG theo `semantic_status`.
     if(ts.sf!=='all' && r.report_status!==ts.sf) return false;
-    if(sect && r.owner_name!==sect) return false;      // owner của PAVOI trùng đúng tên nhóm Section
+    if(sect && sectName(r.owner_name)!==sect) return false;      // owner của PAVOI trùng đúng tên nhóm Section
     if(!ymHas('pavoiYearF', r.raised_year)) return false;
     if(srch){
       const t=[r.report_number,r.semantic_status,r.audit_title,
@@ -6567,9 +6685,9 @@ function kpi7Stats(pass){
     // (đúng: không có ngày phát hành thì không thuộc tháng nào), nhưng vẫn vào khi "All months".
     if(!keep(r)) return;
     tot.all++;
-    const inGroup = KPI7_SECTIONS.includes(r.owner_name);
+    const ownSect = sectName(r.owner_name), inGroup = KPI7_SECTIONS.includes(ownSect);
     if(inGroup) tot.inGroup++;
-    const row = rows[inGroup ? r.owner_name : KPI7_UNASSIGNED];
+    const row = rows[inGroup ? ownSect : KPI7_UNASSIGNED];
     // [r152] Đang Withdrawn → ra khỏi CẢ tử số lẫn mẫu số, nhưng vẫn ĐẾM và GIỮ DANH SÁCH.
     // Không xoá âm thầm: người đọc phải thấy mẫu số vừa bị rút bớt bao nhiêu, và bấm xem được
     // là hồ sơ nào — nếu không, một hồ sơ sai trạng thái sẽ biến mất khỏi mọi báo cáo.
@@ -8048,7 +8166,7 @@ function renderAuditKpi(data) {
   const el = g('auditKpiRow'); if (!el) return;
   const total    = data.length;
   const closed   = data.filter(a => a.status === 'Closed').length;
-  const open     = data.filter(a => ['InProgress','Performed','Scheduled'].includes(a.status)).length;
+  const open     = data.filter(a => ['InProgress','Performed','Scheduled','ScheduleConfirmed'].includes(a.status)).length;
   const rate     = total ? Math.round(closed/total*100) : 0;
   // [r177] active_stages (bước InProgress / PendingSignOff, nạp mỗi lượt) thay cho audit_stages (luôn rỗng khi > 50
   // audit). Định nghĩa GIỮ NGUYÊN như trước (Eric 29/09: Galileo ghi gì thì ghi đúng thế, không tự gộp):
@@ -8214,7 +8332,7 @@ function getCurrentStageIdx(audit, stages) {
   const auditStages = auditStageCache[audit.audit_id] || audit.audit_stages || [];
   if (!auditStages.length) {
     // Heuristic from audit.status
-    const statusMap = { Scheduled:0, InProgress:1, Performed:3, Closed:5 };
+    const statusMap = { Scheduled:0, ScheduleConfirmed:0, InProgress:1, Performed:3, Closed:5 };
     return statusMap[audit.status] ?? -1;
   }
   // Find the last InProgress stage, else last Completed
@@ -8436,7 +8554,7 @@ function renderAudit() {
   renderAuditKpi(data);
 
   const STATUS_COLOR = {
-    'Closed':'b-on','Performed':'b-late','Scheduled':'b-open',
+    'Closed':'b-on','Performed':'b-late','Scheduled':'b-open','ScheduleConfirmed':'b-open',
     'InProgress':'b-open','Cancelled':'b-with'
   };
   const WF_CAT_BADGE = {
@@ -8554,7 +8672,7 @@ function getAuditStageFallback(audit) {
     : ['Preplanning','Perform','Audit Report',      'Finding follow up','Audit closure'];
   // Số stages "Completed" theo status:
   // Scheduled=0, InProgress=1, Performed=4, Closed=5
-  const doneCount = {Scheduled:0, InProgress:1, Performed:4, Closed:5}[audit.status] ?? 0;
+  const doneCount = {Scheduled:0, ScheduleConfirmed:0, InProgress:1, Performed:4, Closed:5}[audit.status] ?? 0;
   return names.map((name,i) => ({
     stage_type:           name,
     stage_status:         i < doneCount ? 'Completed' : i === doneCount && doneCount < names.length ? 'InProgress' : 'NotStarted',
@@ -9744,6 +9862,11 @@ const PT={overview:'Overview',openrfi:'Open Reports',overdue:'Overdue',kpi:'KPI 
 // Closed = status Closed, Open = status Open. Không lọc category.
 let safetyLoaded=false, safetyData=null;
 const SAFETY_ROLE_RE=/Coordinator|Member|Team Leader|Evaluator/i;   // loại nhóm role, giữ nhóm trạm/dept
+// [r224] MỘT luật "owned by an MSAG group" cho Safety › OSR/MOSR status (loadSafety) và MOSR register (loadMosr .msag):
+// tên nhóm có MSAG, không archived, không phải nhóm role; form phân theo form_name, bỏ Confidential (r120-i1).
+// Không đổi phạm vi cũ (r120-i1/r164/r168-i1): chỉ dùng chung để hai màn đối chiếu được (M.mosrSplit, M.consistency).
+const isMsagGroup=x=>/MSAG/i.test(x.name||'') && !x.is_archived && !SAFETY_ROLE_RE.test(x.name||'');
+const safetyFormKind=f=>{ f=f||''; if(/confidential/i.test(f)) return null; return /MOSR/i.test(f)?'MOSR':/OSR/i.test(f)?'OSR':null; };
 const SAFETY_LINE_ORDER=["AMO - Line MSAG","AMO - TPS MSAG","AMO - Line MSAG - Store","AMO - Line MSAG - SGN","AMO - Line MSAG - HAN","AMO - Line MSAG - DAD","AMO - Line MSAG - CXR","AMO - Line MSAG - PQC","AMO - Line MSAG - VCA","AMO - Line MSAG - HPH","AMO - Line MSAG - VII"];
 function safetyDateStr(){const d=new Date();const m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];return String(d.getDate()).padStart(2,'0')+'-'+m[d.getMonth()]+'-'+d.getFullYear();}
 async function loadSafety(){
@@ -9751,7 +9874,7 @@ async function loadSafety(){
   try{
     // 1) nhóm MSAG (owner) — loại role + archived
     const gr=await fetchAll(G_URL+'dwanalytics_user_group?$select=group_id,name,is_archived&$filter='+encodeURIComponent("contains(name,'MSAG')"));
-    const groups=gr.filter(x=>!x.is_archived && !SAFETY_ROLE_RE.test(x.name||''));
+    const groups=gr.filter(isMsagGroup);
     const id2name={}; groups.forEach(x=>id2name[x.group_id]=(x.name||'').trim());
     const ids=groups.map(x=>x.group_id);
     if(!ids.length) throw new Error('No MSAG group found');
@@ -9763,7 +9886,7 @@ async function loadSafety(){
     // 3) phân OSR/MOSR theo form_name (Coruson categorize theo form), KHÔNG theo report_number.
     //    LOẠI các form "Confidential OSR"/"4. Confidential OSR" — Coruson không tính vào thống kê.
     //    (r120-i1: trước đây lọc theo report_number → gộp nhầm Confidential OSR làm Closed cao hơn.)
-    const cls=r=>{const f=r.form_name||''; if(/confidential/i.test(f)) return null; return /MOSR/i.test(f)?'MOSR':/OSR/i.test(f)?'OSR':null;};
+    const cls=r=>safetyFormKind(r.form_name);
     const A={}; ids.forEach(i=>{A[id2name[i]]={OSR:{C:0,O:0},MOSR:{C:0,O:0}};});
     rows.forEach(r=>{const nm=id2name[r.owner_id],f=cls(r);if(!nm||!f)return;
       if(r.report_status==='Closed')A[nm][f].C++; else if(r.report_status==='Open')A[nm][f].O++;});
@@ -9911,13 +10034,14 @@ const mosrPlain = t => mosrEnt(mosrEnt(String(t||''))).replace(/<(style|script)[
 let mosrLoaded=false, mosrRows=[];
 async function loadMosr(){
   const [raw,fields,sums,items,groups,users]=await Promise.all([
-    fetchAll(G_URL+'dwreporting_report_summary?$select=report_id,report_number,report_status,owner_id,submitted_date,modified_date&$filter='+encodeURIComponent("valid_to eq null and report_title eq 'MOSR'"), true),
+    fetchAll(G_URL+'dwreporting_report_summary?$select=report_id,report_number,report_status,owner_id,form_name,submitted_date,modified_date&$filter='+encodeURIComponent("valid_to eq null and report_title eq 'MOSR'"), true),
     fetchAll(G_URL+'dwanalytics_report_form_section_field?$select=report_id,field_name,text_value&$filter='+encodeURIComponent("report_title eq 'MOSR' and (startswith(field_name,'SHORT SUMMARY') or startswith(field_name,'BASE'))"), true),
     fetchAll(G_URL+'dwanalytics_report?$select=id,report_id,summary&$filter='+encodeURIComponent("form_name eq 'MOSR' and summary ne null and valid_to eq null and length(summary) lt 30000"), true),
     fetchAll(G_URL+'dwanalytics_lists?$select=list_item_id,list_item_name,list_item_parent_id&$filter='+encodeURIComponent("list_name eq 'OCCURRENCE CATEGORY'"), true),
-    fetchAll(G_URL+'dwanalytics_user_group?$select=group_id,name', true),
+    fetchAll(G_URL+'dwanalytics_user_group?$select=group_id,name,is_archived', true),
     fetchAll(G_URL+'dwreporting_users?$select=user_id,full_name', true)
   ]);
+  const msagIds=new Set(groups.filter(isMsagGroup).map(g=>g.group_id));   // [r224] same rule as loadSafety
   // Classifications: ORC / HAZARD có ở cả OSR nên quét theo list_name là toàn hệ thống. Lấy theo report_id, chỉ report từ 2026
   // (trước đó chưa phân loại), mỗi lô 15 id như loadCapa (lô 40 bị Galileo trả 400).
   const clsIds=[...new Set(raw.filter(r=>String(r.submitted_date)>='2026').map(r=>r.report_id))], clsChunks=[];
@@ -9941,7 +10065,7 @@ async function loadMosr(){
   });
   const out={};
   Object.values(m).forEach(r=>{ out[r.report_id]={report_id:r.report_id, report_number:r.report_number, report_status:r.report_status, submitted_date:r.submitted_date,
-    owner:ownerName[r.owner_id]||'', short:'', summary:'', base:'', base_group:'', dept:[], orc:[], hazard:[], hazard_type:[], occ:[], occ_raw:[]}; });
+    owner:ownerName[r.owner_id]||'', owner_id:r.owner_id||null, msag:msagIds.has(r.owner_id) && safetyFormKind(r.form_name)==='MOSR', short:'', summary:'', base:'', base_group:'', dept:[], orc:[], hazard:[], hazard_type:[], occ:[], occ_raw:[]}; });
   fields.forEach(f=>{ const o=out[f.report_id]; if(!o || !f.text_value) return;
     if(f.field_name.startsWith('BASE')){ o.base=f.text_value.trim(); o.base_group=mosrBaseGroup(f.text_value); } else o.short=f.text_value.trim(); });
   sums.forEach(x=>{ if(out[x.report_id]) out[x.report_id].summary=mosrPlain(x.summary); });
