@@ -5,6 +5,13 @@
 
 ---
 
+## ✅ r224-i2 — Sửa Reports › All forms không hiển thị (11/11/2026, EricThai)
+
+- **Triệu chứng (Eric):** bấm Reports thì thanh trên và menu đổi sang Reports nhưng nội dung vẫn là Work Queue; tưởng là load chậm.
+- **Nguyên nhân:** `scrAllForms(forced)` trong `beta-src/screens.js` có `const form = forced || form` (thay hàng loạt `BS.afForm` → `form` ở r224 ăn luôn dòng khai báo) → `ReferenceError`, `render()` dừng trước khi ghi `#screen`. Safety › Additional mitigation không lỗi vì có `forced`.
+- **Sửa:** `forced || BS.afForm`; `render()` bắt lỗi dựng màn hình và hiện "This page could not be displayed" thay vì giữ trang cũ.
+- **Bài học:** kiểm r224 đã đi 11 route nhưng chỉ đo tràn ngang, không kiểm nội dung trang đổi theo. Sau mỗi lần build, đi hết các route và so `h1` + số phần tử, bắt `window.onerror`.
+
 ## ✅ r224-i1 — User guide và sổ tay theo r224 (11/11/2026, EricThai)
 - Chỉ sửa chữ ở `beta-src/guide.js` (Library › User guide) và `beta-src/manual.js`. Không đổi logic, không đổi số liệu.
 - Manual rời: `HuongDan_SuDung_QA_AMO_Dashboard_r224.docx` (workspace `MQA dashboard website/`), 34 trang; mục **4.5 Safety** mới, Audit Plan / Library / Admin lùi thành 4.6–4.8.

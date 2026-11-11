@@ -4012,11 +4012,18 @@ function render(){
           + '</div>' : '')
       + '</div>';
     const beta = BETA_SCREENS[s+'/'+tab];
-    if(beta) html += beta();
-    else if(s === 'overview') html += renderOverview();
-    else if(s === 'work' || s === 'findings') html += renderLane(s, tab);
-    else if(s === 'audit') html += renderAudit(tab);
-    else html += placeholder(nav, nav.tabs.find(t=>t.id===tab));
+    /* a screen that throws must not leave the previous screen on display under the new title (r224: Reports › All forms) */
+    try{
+      if(beta) html += beta();
+      else if(s === 'overview') html += renderOverview();
+      else if(s === 'work' || s === 'findings') html += renderLane(s, tab);
+      else if(s === 'audit') html += renderAudit(tab);
+      else html += placeholder(nav, nav.tabs.find(t=>t.id===tab));
+    }catch(e){
+      console.error('[render]', s+'/'+(tab || ''), e);
+      html += '<section class="sec"><div class="card"><div class="card-pad"><strong>This page could not be displayed.</strong>'
+        + '<p class="t-small dim">'+esc(e && e.message || String(e))+'</p></div></div></section>';
+    }
   }
   const route = s + '/' + (state.tab[s] || ''), scr = $('#screen'), ae = document.activeElement;
   /* exact match first; then, for a labelled control whose data changes (pager "Next page" moves
@@ -4812,7 +4819,7 @@ function mccfOutRows(){
 /* r224: forced = a form title — Safety › Additional mitigation shows the AMO - Additional Mitigation register here,
    without the form picker (form of All forms is left as the user set it) */
 function scrAllForms(forced){
-  const form = forced || form;
+  const form = forced || BS.afForm;
   const titles = [...new Set(REPORTS.map(r => r.code))].sort();
   const A = API();
   if(form === A.EIS_TITLE || form === A.QCS_TITLE) return scrFormDetail(titles);
