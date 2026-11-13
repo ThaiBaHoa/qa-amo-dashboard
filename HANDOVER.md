@@ -5,6 +5,14 @@
 
 ---
 
+## ✅ r227 — Màn LED tự làm mới dữ liệu mỗi giờ (13/11/2026, EricThai)
+
+- **Yêu cầu:** Eric thấy trang trình chiếu trên màn LED hình như không tự refresh data.
+- **Nguyên nhân tìm được trong code:** chỉ refresh 12 giờ một lần + reload khi sang ngày; ở `body.kiosk` nhãn "refresh failed" và nút ↻ bị ẩn nên lượt refresh hỏng cũng không ai thấy. **Chưa xác nhận trên máy LED** là chạy đúng chu kỳ hay refresh lỗi.
+- **Đã làm** (vault `beta-src/screens2.js`): `AUTO_REFRESH` 12 giờ / LED 1 giờ, lượt hỏng thử lại sau 15 phút; thanh trên cùng của màn LED ghi `Data as of HH:MM · DD/MM` và `· last refresh failed`. `guide.js`, `manual.js` (VERSION r227, chưa build docx).
+- **Kiểm:** build `BODY + UI SYNTAX OK`; logic trích từ `index.html` chạy với đồng hồ giả đúng cả 4 trường hợp. **Chưa kiểm dữ liệu thật / máy LED thật** — preview local bị galileo-proxy trả 401 (cần đăng nhập thật).
+- **Còn:** tải lại tab trên máy LED để nhận r227, rồi xem dòng `Data as of`: nếu hiện `last refresh failed` thì đọc console (`[beta] refresh failed: …`) để biết nguồn nào hỏng.
+
 ## ✅ r226 — Cảnh báo audit MNT bị đổi lịch (11/11/2026, EricThai)
 
 - **Yêu cầu:** MNT-1045 được dời từ tháng 10 sang tháng 11 trên Coruson nên thoát khỏi Delayed; cần cảnh báo cho MNT bị reschedule. Cảnh báo riêng cho RSP / SSP quá tháng: Eric nói KHÔNG cần.

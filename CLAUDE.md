@@ -195,6 +195,10 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
 - `startAutoRefresh` — kiosk/LED auto-refresh: wall-clock heartbeat every 5 min that
   calls `loadData(true)` in place every 12h. No page reload — sessionStorage safe.
   Started at the end of `initApp`; no-ops after logout via `if(!curUser)` guard.
+  **That is classic.html. In index.html (vault `beta-src/screens2.js`, `AUTO_REFRESH`) the cycle is 12h for a
+  user and 1h on the LED wall (r227)**; a failed refresh waits 15 min before the next try, and in kiosk mode
+  `topExtras()` prints `Data as of HH:MM · DD/MM` plus `· last refresh failed` — `.demo-tag` and ↻ are hidden
+  by `body.kiosk`, so that line is the only place the wall shows the state of its data.
 - `fetchAll(url, skipOv=false)` — paginated OData fetch, **90s** AbortController timeout
   (`FETCH_TIMEOUT_MS`) plus **2 retries** with 2s/5s backoff on timeout/5xx/429/network
   errors (`fetchWithRetry`). Keep `FETCH_TIMEOUT_MS` equal to the `galileo-proxy`
@@ -532,7 +536,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.11.11-r226
+Rev current: 2026.11.13-r227
 
 ORG_UNIT_IDS          ← main pages: 'QA AMO' + ALL its sub-units, resolved at load
                          from dwreporting_organisational_unit_hierarchy (r143).
