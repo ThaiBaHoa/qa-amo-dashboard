@@ -5,6 +5,14 @@
 
 ---
 
+## ✅ r227-i1 — HTTP 408 từ Galileo được thử lại (13/11/2026, EricThai)
+
+- **Yêu cầu:** Eric báo trang SPI và nhiều trang khác hay lỗi 408.
+- **Đo trên live** (ghi mọi request qua proxy, đi qua 14 trang): 2/24 request trả 408 sau 2,4 s, thân `Timeout performing EVAL, inst: 1, queue: 4…` = lỗi hết giờ Redis phía Galileo, ngẫu nhiên; lần đo trúng trang MOSR (`dwanalytics_report_classification_field`), SPI lần đó tải được.
+- **Đã làm:** thêm `HTTP 408` vào `RETRIABLE_RE` trong `classic.html` (trước chỉ timeout / 5xx / 429 / lỗi mạng).
+- **Kiểm:** harness Node trích `fetchWithRetry` từ `classic.html`. Chưa thấy một lượt 408 thật được cứu trên live (lỗi ngẫu nhiên).
+- **Còn:** nếu 408 đến theo đợt dài hơn 7 s (2 lần thử lại) thì trang vẫn báo lỗi; khi đó báo Ideagen. `loadSPI` vẫn lọc bảng custom field theo `report_id` (trái I1) — chưa đo, chưa sửa. Các `gFetch` trực tiếp (Query Builder, công cụ probe ở classic) không có thử lại.
+
 ## ✅ r227 — Màn LED tự làm mới dữ liệu mỗi giờ (13/11/2026, EricThai)
 
 - **Yêu cầu:** Eric thấy trang trình chiếu trên màn LED hình như không tự refresh data.

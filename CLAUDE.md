@@ -201,7 +201,9 @@ There is no build step, no `package.json`, no `node_modules`, no framework.
   by `body.kiosk`, so that line is the only place the wall shows the state of its data.
 - `fetchAll(url, skipOv=false)` — paginated OData fetch, **90s** AbortController timeout
   (`FETCH_TIMEOUT_MS`) plus **2 retries** with 2s/5s backoff on timeout/5xx/429/network
-  errors (`fetchWithRetry`). Keep `FETCH_TIMEOUT_MS` equal to the `galileo-proxy`
+  errors (`fetchWithRetry`). **HTTP 408 is retried too (r227-i1)**: Galileo answers 408 within ~2 s with
+  `{"Message":"Timeout performing EVAL, …"}` (a Redis timeout on their side, measured live 13/11/2026), at
+  random on any request; it is not a slow query and not the proxy (which only emits 504/502 itself). Keep `FETCH_TIMEOUT_MS` equal to the `galileo-proxy`
   Worker timeout (`worker.js` L52) — see Known issues. [r141]
   **Since r173-i1 the timeout covers the body too** (a fresh `FETCH_TIMEOUT_MS` starts when the 200
   headers arrive; before, a body that stalled mid-download hung `loadData` forever), and **hedging
@@ -536,7 +538,7 @@ Deploy:      vjc-qa-amo.com  (GitHub Pages, push to main)
 Proxy:       galileo-proxy.thaibahoa2308.workers.dev
 Galileo:     vietjet.ideagendata.com/odata/
 Supabase:    czftzgdcnpnspbbegwjt.supabase.co
-Rev current: 2026.11.13-r227
+Rev current: 2026.11.13-r227-i1
 
 ORG_UNIT_IDS          ← main pages: 'QA AMO' + ALL its sub-units, resolved at load
                          from dwreporting_organisational_unit_hierarchy (r143).

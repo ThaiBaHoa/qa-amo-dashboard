@@ -2533,7 +2533,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.13-r227';
+const APP_REV = '2026.11.13-r227-i1';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3877,7 +3877,12 @@ const RETRY_DELAY_MS   = [2000, 5000];   // backoff giữa các lần
 
 // Lỗi ĐÁNG thử lại: hết giờ, 5xx, 429, đứt mạng. KHÔNG thử lại 4xx khác — HTTP 400 nghĩa là
 // query sai (vd MaxNodeCount), gọi lại 3 lần vẫn sai mà mất thêm 2 lượt chờ.
-const RETRIABLE_RE = /timed out|HTTP 5\d\d|HTTP 429|Failed to fetch|NetworkError|Load failed|network error/i;
+// [r227-i1] HTTP 408 CŨNG thử lại. Đo live 13/11/2026: Galileo trả 408 sau 2,4s, thân
+// {"Message":"Timeout performing EVAL, inst: 1, queue: 4, …"} — lỗi hết giờ ở Redis PHÍA Galileo, không phải
+// query chậm và không phải proxy (proxy chỉ tự sinh 504/502). Nó rơi ngẫu nhiên vào bất kỳ request nào
+// (lần đo: dwanalytics_report_classification_field của trang MOSR, 2/24 request), gọi lại là được.
+// Trước đây 408 không khớp regex này nên một lần 408 là trang báo lỗi 'HTTP 408' ngay.
+const RETRIABLE_RE = /timed out|HTTP 5\d\d|HTTP 429|HTTP 408|Failed to fetch|NetworkError|Load failed|network error/i;
 
 const _sleep = ms => new Promise(r => setTimeout(r, ms));
 
