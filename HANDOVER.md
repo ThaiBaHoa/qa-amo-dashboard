@@ -5,6 +5,16 @@
 
 ---
 
+## ✅ r229 — Safety › MOSR charts theo cấp phân loại (14/11/2026, EricThai) — commit + push 14/11 theo lệnh Eric
+
+- **Yêu cầu:** `MQA dashboard website/MOSR Chart.docx` + `Taxanomy - Safety AMO - Updated 29-Sep-2026.xlsx` (Downloads của Eric): 2 biểu đồ Department responsible lv 1 và lv 2, ORC dạng donut, Occurrence category 1 biểu đồ lv 1 + mỗi lv 1 có con một biểu đồ lv 2 (4 cái). Dữ liệu từ tab Evaluation › Classifications.
+- **Probe 14/11:** cây phân cấp có sẵn ở `dwanalytics_lists` (`list_item_parent_id`, node gốc tên null). DEPARTMENT RESPONSIBLE 59 mục = 7 lv 1 + lv 2 + các trạm dưới Line › Maintenance Station (lv 3); OCCURRENCE CATEGORY 141 mục = 6 lv 1 + lv 2 + lv 3; ORC phẳng 4 mức. Khớp file Taxonomy (Galileo có thêm `Human Factor › Operational`, và nhiều mã trạm hơn).
+- **Đã làm:** classic `mosrLevels` + `loadMosr` thêm `dept_lv`, `occ_lv` (`[lv1, lv2]` mỗi giá trị) và `mosrTax`; `M.mosrLevels`, `M.mosrOrc`; `scrMosrCharts` vẽ lại (bỏ biểu đồ tròn department cũ và cột occurrence "chỉ nhóm Technical"), giữ By base. `value_id` không còn trong danh sách thì tra theo chữ. Bảng MOSR register không đổi.
+- **Kiểm local dữ liệu thật 2026 (208 MOSR):** Department lv 1 Line 106 · Others 48 · Contractor/Sub-contractor 22 · AMO Support 19 · Base 3 · AMO SQA & Secutity 2 · Workshop 1 (9 chưa có); ORC Very low 62 · Low 48 · Medium 5 (93 chưa có); Occurrence lv 1 Technical 65 · Standard & Compliance 61 · Others 30 · Contractor, Sub-contractor 18 · Operational 17 · Human Factor 8 (10 chưa có). Khớp đếm tay trên `dwanalytics_report_classification_field`. Không có dòng `Consistency`.
+- **Bố cục (Eric: nhiều thẻ thừa khoảng trắng):** hàng 1 Department lv 1 · ORC · By base (cùng chiều cao); Department lv 2 một thẻ ngang, các nhóm chảy thành cột (`.mosr-flow`); Occurrence lv 1 cùng các lv 2 ít giá trị (≤ 6, vẽ cột) xếp 2 thẻ một hàng; lv 2 nhiều giá trị (Standard & Compliance) một thẻ ngang, thanh chảy 3 cột. Đo ở 1500 px: khoảng trống trong mỗi thẻ ≤ 38 px (trước tới 1.080 px).
+- **Tự chốt:** trạm (lv 3) gộp vào Maintenance Station; report chọn 2 giá trị đếm ở cả hai; thứ tự cột theo số lượng giảm dần; giá trị chỉ chọn tới lv 1 ghi chú "at level 1 only" trên thẻ.
+- r228 và r229 làm chung một phiên nhưng commit tách riêng.
+
 ## ✅ r228 — Safety › HIRA sửa theo `page safety revise.docx` (14/11/2026, EricThai) — commit + push 14/11 theo lệnh Eric
 
 - **Yêu cầu:** file Word của Eric trong workspace (`MQA dashboard website/page safety revise.docx`), 7 điểm bảng ngoài + 4 điểm popup.

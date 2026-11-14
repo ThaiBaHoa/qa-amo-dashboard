@@ -2533,7 +2533,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.14-r228';
+const APP_REV = '2026.11.14-r229';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -10051,13 +10051,38 @@ const mosrBaseGroup = t => { const s=String(t||'').trim().toUpperCase(); const m
 // Giải mã trước rồi mới bỏ thẻ (HTML encode 2 lần); có report nhúng ảnh base64 tới 1 triệu ký tự nên cắt 1500.
 const mosrEnt = t => t.replace(/&amp;/g,'&').replace(/&nbsp;/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'");
 const mosrPlain = t => mosrEnt(mosrEnt(String(t||''))).replace(/<(style|script)[\s\S]*?<\/\1>/gi,' ').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim().slice(0,1500);
-let mosrLoaded=false, mosrRows=[];
+let mosrLoaded=false, mosrRows=[], mosrTax={dept:[],occ:[]};
+// [r229] MOSR charts by level (Eric 14/11/2026, "MOSR Chart.docx" + Taxonomy Safety AMO 29/09/2026). DEPARTMENT RESPONSIBLE and
+// OCCURRENCE CATEGORY are trees in dwanalytics_lists (list_item_parent_id; the root item has a null name). Probe 14/11:
+// DEPARTMENT RESPONSIBLE 59 items = 7 level-1 areas (Line, Base, Workshop, AMO Support, AMO SQA & Secutity,
+// Contractor/Sub-contractor, Others), their level-2 units, and the stations under Line > Maintenance Station (level 3);
+// OCCURRENCE CATEGORY 141 items = 6 level-1 (Technical, Standard & Compliance, Human Factor, Operational, Contractor,
+// Sub-contractor, Others), level 2, and level 3 (ATA chapters…). A classification holds the selected item (value_id) at
+// any depth: its level 1 / level 2 are the first two names of its path. ORC is a flat list (1 - VERY LOW … 4 - HIGH).
+// A value_id no longer in the list (probe: 4 department, 5 occurrence values of 2026) is looked up by its text; not found
+// → level 1 = the text as recorded.
+const MOSR_TREES = {'DEPARTMENT RESPONSIBLE':'dept','OCCURRENCE CATEGORY':'occ'};
+function mosrLevels(items){
+  const by={}, byName={}; items.forEach(x=>{by[x.list_item_id]=x;});
+  const path=x=>{ const p=[], seen=new Set(); let c=x; while(c && !seen.has(c)){ seen.add(c); if(c.list_item_name) p.unshift(c.list_item_name); c=by[c.list_item_parent_id]; } return p; };
+  items.forEach(x=>{ if(x.list_item_name) ((byName[x.list_name] ||= {})[x.list_item_name] ||= []).push(x); });
+  const tax={dept:[],occ:[]};
+  items.forEach(x=>{ const k=MOSR_TREES[x.list_name]; if(!k || !x.list_item_name || x.list_item_status==='Archived') return;
+    const p=path(x); if(p.length===1 && !tax[k].some(t=>t.k===p[0])) tax[k].push({k:p[0], sub:[]}); });
+  items.forEach(x=>{ const k=MOSR_TREES[x.list_name]; if(!k || !x.list_item_name || x.list_item_status==='Archived') return;
+    const p=path(x), t=p.length===2 && tax[k].find(t=>t.k===p[0]); if(t && !t.sub.includes(p[1])) t.sub.push(p[1]); });
+  // [level 1, level 2 or ''] of one classification value
+  const of=(list,id,text)=>{ let x=by[id];
+    if(!x){ const c=(byName[list]||{})[text]||[]; if(c.length===1) x=c[0]; }
+    const p=x ? path(x) : []; return p.length ? [p[0], p[1]||''] : [String(text||'').trim(), '']; };
+  return {tax, of};
+}
 async function loadMosr(){
   const [raw,fields,sums,items,groups,users]=await Promise.all([
     fetchAll(G_URL+'dwreporting_report_summary?$select=report_id,report_number,report_status,owner_id,form_name,submitted_date,modified_date&$filter='+encodeURIComponent("valid_to eq null and report_title eq 'MOSR'"), true),
     fetchAll(G_URL+'dwanalytics_report_form_section_field?$select=report_id,field_name,text_value&$filter='+encodeURIComponent("report_title eq 'MOSR' and (startswith(field_name,'SHORT SUMMARY') or startswith(field_name,'BASE'))"), true),
     fetchAll(G_URL+'dwanalytics_report?$select=id,report_id,summary&$filter='+encodeURIComponent("form_name eq 'MOSR' and summary ne null and valid_to eq null and length(summary) lt 30000"), true),
-    fetchAll(G_URL+'dwanalytics_lists?$select=list_item_id,list_item_name,list_item_parent_id&$filter='+encodeURIComponent("list_name eq 'OCCURRENCE CATEGORY'"), true),
+    fetchAll(G_URL+'dwanalytics_lists?$select=list_name,list_item_id,list_item_name,list_item_parent_id,list_item_status&$filter='+encodeURIComponent("list_name eq 'OCCURRENCE CATEGORY' or list_name eq 'DEPARTMENT RESPONSIBLE'"), true),
     fetchAll(G_URL+'dwanalytics_user_group?$select=group_id,name,is_archived', true),
     fetchAll(G_URL+'dwreporting_users?$select=user_id,full_name', true)
   ]);
@@ -10071,6 +10096,7 @@ async function loadMosr(){
   // Occurrence Category (Eric chốt 03/11): chỉ 3 nhóm dưới Technical. Giá trị con gộp lên nhóm cha; 'Others' gốc = Others;
   // nhánh khác (Human Factor, Standard & Compliance…) = không có nhóm. Cây có node gốc tên null: dừng khi gặp lại node đã đi qua.
   const itemById={}; items.forEach(x=>{itemById[x.list_item_id]=x;});
+  const lv=mosrLevels(items);
   const occGroup=id=>{
     const names=[], seen=new Set(); let c=itemById[id];
     while(c && !seen.has(c)){ seen.add(c); if(c.list_item_name) names.unshift(c.list_item_name); c=itemById[c.list_item_parent_id]; }
@@ -10085,14 +10111,17 @@ async function loadMosr(){
   });
   const out={};
   Object.values(m).forEach(r=>{ out[r.report_id]={report_id:r.report_id, report_number:r.report_number, report_status:r.report_status, submitted_date:r.submitted_date,
-    owner:ownerName[r.owner_id]||'', owner_id:r.owner_id||null, msag:msagIds.has(r.owner_id) && safetyFormKind(r.form_name)==='MOSR', short:'', summary:'', base:'', base_group:'', dept:[], orc:[], hazard:[], hazard_type:[], occ:[], occ_raw:[]}; });
+    owner:ownerName[r.owner_id]||'', owner_id:r.owner_id||null, msag:msagIds.has(r.owner_id) && safetyFormKind(r.form_name)==='MOSR', short:'', summary:'', base:'', base_group:'', dept:[], orc:[], hazard:[], hazard_type:[], occ:[], occ_raw:[], dept_lv:[], occ_lv:[]}; });
   fields.forEach(f=>{ const o=out[f.report_id]; if(!o || !f.text_value) return;
     if(f.field_name.startsWith('BASE')){ o.base=f.text_value.trim(); o.base_group=mosrBaseGroup(f.text_value); } else o.short=f.text_value.trim(); });
   sums.forEach(x=>{ if(out[x.report_id]) out[x.report_id].summary=mosrPlain(x.summary); });
   cls.forEach(c=>{ const o=out[c.report_id], k=MOSR_CLS[c.list_name]; if(!o || !k || !c.value_text) return;
     if(!o[k].includes(c.value_text)) o[k].push(c.value_text);
-    if(k==='occ_raw'){ const g=occGroup(c.value_id); if(g && !o.occ.includes(g)) o.occ.push(g); } });
-  mosrRows=Object.values(out); mosrLoaded=true;
+    if(k==='occ_raw'){ const g=occGroup(c.value_id); if(g && !o.occ.includes(g)) o.occ.push(g); }
+    // [r229] level 1 / level 2 of the value, once per report ([lv1, lv2]; lv2 '' = selected at level 1)
+    const tk=MOSR_TREES[c.list_name]; if(tk){ const p=lv.of(c.list_name, c.value_id, c.value_text), L=o[tk+'_lv'];
+      if(!L.some(q=>q[0]===p[0] && q[1]===p[1])) L.push(p); } });
+  mosrRows=Object.values(out); mosrTax=lv.tax; mosrLoaded=true;
 }
 // ── MCCF NGOÀI QA AMO (Eric chốt 03/11/2026) ─────────────────────
 // Probe 03/11: 61 MCCF, 46 thuộc Line Maintenance / Workshop / Store nên orgUnitFilter loại khỏi allData.

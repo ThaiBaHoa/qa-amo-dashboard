@@ -828,6 +828,11 @@ body.rail .acct-t{display:none}
 .mosr-leg{list-style:none;margin:0;padding:0;display:grid;gap:var(--s2)}
 .mosr-leg li{display:flex;align-items:center;gap:var(--s2);min-width:0}
 .mosr-leg i{width:10px;height:10px;border-radius:2px;flex:none}
+/* r229: long bar lists and the level-2 groups flow into as many columns as the card's width holds, so a card is never taller than its content */
+.mosr-flow{columns:3 300px;column-gap:var(--s6,32px)}
+.mosr-flow>*{break-inside:avoid}
+.bars.mosr-flow{display:block}
+.mosr-flow>.mosr-grp{margin-bottom:var(--s4)}
 @media (max-width:767px){.mosr-pie{grid-template-columns:minmax(0,1fr)}.mosr-pie svg{max-width:190px;margin-inline:auto}}
 /* LED wall (?kiosk=): no sidebar, no bottom bar, no assistant — same as classic body.kiosk */
 body.kiosk .sidebar, body.kiosk .botnav, body.kiosk #betaAiBtn, body.kiosk .beta-ai, body.kiosk .filterbar{display:none !important}
@@ -1726,7 +1731,7 @@ const SCREEN_API = {
   /* OSR / MOSR (AMO + QA AMO) */
   loadOsr: () => loadOsr(), osr: () => ({ loaded: osrLoaded, rows: osrRows }),
   /* MOSR register (classic loadMosr): table in Reports, charts in Analytics */
-  loadMosr: () => loadMosr(), mosr: () => ({ loaded: mosrLoaded, rows: mosrRows }),
+  loadMosr: () => loadMosr(), mosr: () => ({ loaded: mosrLoaded, rows: mosrRows, tax: mosrTax }),
   /* MCCF outside QA AMO: All forms only, never in REPORTS (classic loadMccfOut) */
   loadMccfOut: () => loadMccfOut(), mccfOut: () => ({ loaded: mccfOutLoaded, rows: mccfOutRows, tasks: mccfOutTasks }),
   /* All forms (15 AF_FORMS) with EIS / QC Spot Check detail */
@@ -2650,6 +2655,29 @@ const M = {
       if(c){ const ids = new Set(c.ids); return { label: 'Category ' + c.title, rows: reps.filter(r => ids.has(r.id)) }; } }
     return null;
   },
+  /* MOSR by classification level (r229, Eric 14/11/2026 — Safety › MOSR charts). which = 'dept' (DEPARTMENT RESPONSIBLE) or
+     'occ' (OCCURRENCE CATEGORY); rows carry <which>_lv = [[level 1, level 2 or ''], …] (classic loadMosr / mosrLevels), the
+     level names come from the Coruson list (A.mosr().tax, list order). A report counts once in each level-1 value it holds
+     and once in each level-2 value. lv1 = every level 1 of the list (0 included) plus any value outside it;
+     lv2[level 1] = its level-2 values that have reports; only1[level 1] = reports recorded at level 1 with no level 2;
+     none = reports without this classification. */
+  mosrLevels(rows, which){
+    const tax = (API().mosr().tax || {})[which] || [], c1 = {}, c2 = {}, only1 = {}; let none = 0;
+    tax.forEach(t => { c1[t.k] = 0; });
+    (rows || []).forEach(r => { const L = r[which + '_lv'] || []; if(!L.length){ none++; return; }
+      [...new Set(L.map(p => p[0]))].forEach(a => { c1[a] = (c1[a] || 0) + 1; });
+      L.forEach(p => { if(p[1]) ((c2[p[0]] = c2[p[0]] || {})[p[1]] = (c2[p[0]][p[1]] || 0) + 1); });
+      [...new Set(L.filter(p => !p[1]).map(p => p[0]))].forEach(a => { only1[a] = (only1[a] || 0) + 1; }); });
+    const sorted = o => Object.keys(o).map(k => ({ k, n: o[k] })).sort((a, b) => b.n - a.n || a.k.localeCompare(b.k));
+    const lv2 = {}; Object.keys(c2).forEach(a => { lv2[a] = sorted(c2[a]); });
+    return { lv1: sorted(c1), lv2, only1, none, total: (rows || []).length, parents: tax.filter(t => t.sub.length).map(t => t.k) };
+  },
+  /* MOSR by ORC level, in the order of the Coruson list; none = no ORC recorded */
+  mosrOrc(rows){
+    const c = {}; let none = 0;
+    (rows || []).forEach(r => { if(!(r.orc || []).length){ none++; return; } r.orc.forEach(v => { c[v] = (c[v] || 0) + 1; }); });
+    return { list: Object.keys(c).sort().map(k => ({ k, n: c[k] })), none };
+  },
   /* hazards per matrix cell for one rating ('init' | 'cur'); none = rating missing or not a matrix code */
   riskMatrix(list, which){
     const cells = {}, bands = { I:0, T:0, A:0 }; let none = 0;
@@ -2842,6 +2870,12 @@ M.consistency = function(){
       say('Safety › HIRA status of the latest-due hazard vs report status', Object.values(last).filter(x => x.r.hazardsNoDue === 0 && x.h.sem !== M.st(x.r)).length, 0); } }
   /* r224: the MOSR register's MSAG-owned rows (all time) are exactly the MOSR of Safety › MSAG status */
   /* r224: MOSR past the ORC time limit against a recount with the limits written out (no M.SMS, no M.mosrOrcLate) */
+  /* r229: MOSR charts by level against the register's own columns (every report with a value is in the level charts, none twice at level 1) */
+  if(A.mosr().loaded){ const R = A.mosr().rows;
+    [['dept', r => r.dept], ['occ', r => r.occ_raw]].forEach(([w, raw]) => { const m = M.mosrLevels(R, w);
+      say('Safety › MOSR charts ' + w + ' classified vs register column', m.total - m.none, R.filter(r => raw(r).length).length);
+      say('Safety › MOSR charts ' + w + ' level 1 vs recount', m.lv1.reduce((t, x) => t + x.n, 0), R.reduce((t, r) => t + new Set((r[w + '_lv'] || []).map(p => p[0])).size, 0)); });
+    say('Safety › MOSR charts ORC vs register column', M.mosrOrc(R).list.reduce((t, x) => t + x.n, 0), R.reduce((t, r) => t + r.orc.length, 0)); }
   if(A.mosr().loaded){ const t = M.isoToday();
     say('Safety › MOSR past ORC time limit vs recount', M.mosrOrcLate(A.mosr().rows).length,
       A.mosr().rows.filter(r => { if(r.report_status !== 'Open' || !r.submitted_date) return false;
@@ -5082,32 +5116,58 @@ function mosrColumns(items){
     '<div class="mosr-col" title="'+esc(x.k+': '+x.n)+'"><span class="num strong">'+x.n+'</span>'
     + '<span class="mosr-bar" style="height:'+Math.max(1, x.n/max*78).toFixed(1)+'%"></span><span class="mosr-lbl t-small">'+esc(x.k)+'</span></div>').join('') + '</div>';
 }
-/* colour follows the department, not its rank: a filter must not repaint the survivors */
-const MOSR_DEPT_SLOT = { 'Maintenance Station':1, 'Others':2, 'Line Store':3, 'Contractor':4, 'Technology Information':5 };
-function mosrPie(items){
+/* colour follows the value, not its rank: a filter must not repaint the survivors (slots = value → colour 1…5) */
+const MOSR_ORC_SLOT = { '1 - VERY LOW':3, '2 - LOW':1, '3 - MEDIUM':4, '4 - HIGH':2 };
+function mosrPie(items, slots){
   if(!items.length) return mosrEmpty;
-  const total = items.reduce((a,x) => a + x.n, 0), R = 42, C = 2*Math.PI*R, free = [1,2,3,4,5].filter(s => !items.some(x => MOSR_DEPT_SLOT[x.k] === s));
-  const colour = x => x.other ? 'var(--text-3)' : 'var(--mosr-'+(MOSR_DEPT_SLOT[x.k] || free.shift())+')';
+  const S = slots || {}, total = items.reduce((a,x) => a + x.n, 0), R = 42, C = 2*Math.PI*R, free = [1,2,3,4,5].filter(s => !items.some(x => S[x.k] === s));
+  const colour = x => x.other ? 'var(--text-3)' : 'var(--mosr-'+(S[x.k] || free.shift() || 5)+')';
   let at = 0; const parts = items.map(x => { const c = colour(x), len = x.n/total*C, draw = Math.max(0.5, len - (items.length > 1 ? 1.5 : 0)); const seg = '<circle cx="60" cy="60" r="'+R+'" fill="none" stroke="'+c+'" stroke-width="20" stroke-dasharray="'+draw.toFixed(2)+' '+(C-draw).toFixed(2)+'" stroke-dashoffset="'+(-at).toFixed(2)+'" transform="rotate(-90 60 60)"><title>'+esc(x.k+': '+x.n)+'</title></circle>'; at += len; return { x, c, seg }; });
   return '<div class="mosr-pie"><svg viewBox="0 0 120 120" role="img" aria-label="'+esc(items.map(x => x.k+': '+x.n).join(', '))+'">'+parts.map(p => p.seg).join('')+'</svg>'
     + '<ul class="mosr-leg">'+parts.map(p => '<li><i style="background:'+p.c+'"></i><span class="t-small od-fill">'+esc(p.x.k)+'</span><span class="num strong">'+p.x.n+'</span><span class="t-small dim num">'+M.pct(p.x.n, total)+'%</span></li>').join('')+'</ul></div>';
 }
+/* horizontal bars with the full label (level-2 names are long): the label wraps, the count sits right */
+function mosrBars(items, flow){
+  const max = Math.max(1, ...items.map(x => x.n));
+  return '<div class="bars'+(flow ? ' mosr-flow' : '')+'">' + items.map(x =>
+    '<div class="bar-row" style="cursor:default;grid-template-columns:minmax(120px,1.3fr) minmax(0,1.4fr) auto" title="'+esc(x.k+': '+x.n)+'"><span class="t-small" style="overflow-wrap:anywhere">'+esc(x.k)+'</span>'
+    + '<span class="bar-track"><span class="bar-fill" style="width:'+(x.n/max*100)+'%"></span></span><span class="num strong od-nowrap">'+x.n+'</span></div>').join('') + '</div>';
+}
+/* r229 (Eric 14/11/2026, "MOSR Chart.docx"): DEPARTMENT RESPONSIBLE at level 1 and level 2, ORC as a donut, OCCURRENCE
+   CATEGORY at level 1 and one level-2 chart per level 1 that has a level 2 (Technical, Standard & Compliance, Human Factor,
+   Contractor, Sub-contractor). Levels = the Coruson lists (Taxonomy Safety AMO); counts through M.mosrLevels / M.mosrOrc. */
 function scrMosrCharts(){
   const A = API();
   const w = lazyState('mosr', () => A.loadMosr(), () => A.mosr().loaded, 'MOSR');
   if(w) return w;
   const rows = A.mosr().rows.filter(r => inPeriod(r.submitted_date) && mosrQuarterOk(r.submitted_date));
-  const noClass = rows.filter(r => !r.occ_raw.length).length, outside = rows.filter(r => r.occ_raw.length && !r.occ.length).length;
-  const occ = MOSR_OCC.map(k => ({ k, n:rows.filter(r => r.occ.includes(k)).length }));
+  const dept = M.mosrLevels(rows, 'dept'), occ = M.mosrLevels(rows, 'occ'), orc = M.mosrOrc(rows);
   const period = periodLabel() + (BS.mosrQ ? ' · Q'+BS.mosrQ : '');
+  const only1 = (m, a) => m.only1[a] ? ' · '+m.only1[a]+' at level 1 only' : '';
+  const any = L => L.some(x => x.n);
+  /* level 2 of the departments, grouped under their level 1 in the order of the level-1 chart */
+  const deptLv2 = dept.lv1.filter(x => (dept.lv2[x.k] || []).length).map(x =>
+    '<div class="mosr-grp" style="display:grid;gap:4px"><span class="t-micro">'+esc(x.k)+' <span class="dim">'+x.n+only1(dept, x.k)+'</span></span>'+mosrBars(dept.lv2[x.k])+'</div>').join('');
+  /* layout: charts of one height share a row; a level-2 chart with few values is a column chart beside the level-1 chart,
+     one with many values takes the full width and flows its bars into columns */
+  const occCards = occ.lv1.map(x => x.k).filter(a => occ.parents.includes(a)).map(a => { const L = occ.lv2[a] || [], n = (occ.lv1.find(x => x.k === a) || { n:0 }).n;
+    return { wide: L.length > 6, html: card('Occurrence category · '+a, 'level 2 · '+n+' report'+(n === 1 ? '' : 's')+only1(occ, a), !L.length ? mosrEmpty : L.length > 6 ? mosrBars(L, true) : mosrColumns(L)) }; });
   return '<section class="sec"><div class="od-row" style="--od-gap:12px;flex-wrap:wrap;align-items:center">'
     + sel('mosrQ', [['','All quarters'],['1','Q1'],['2','Q2'],['3','Q3'],['4','Q4']], BS.mosrQ, 'Quarter')
-    + '<span class="t-small dim">'+esc(period)+' · '+rows.length+' MOSR by submitted date · '+noClass+' not classified · '+outside+' with a category outside Technical</span></div></section>'
+    + '<span class="t-small dim">'+esc(period)+' · '+rows.length+' MOSR by submitted date · classifications from tab EVALUATION on Coruson · without Department responsible '+dept.none
+    + ' · without ORC '+orc.none+' · without Occurrence category '+occ.none+'</span></div></section>'
     + '<section class="sec beta-cards">'
-    + card('By department responsible', 'a report with two departments counts in both', mosrPie(mosrFold(mosrCount(rows, r => r.dept), 6)))
-    + card('By occurrence category', 'groups under Technical only', occ.some(x => x.n) ? mosrColumns(occ) : mosrEmpty)
+    + card('Department responsible · level 1', 'area · a report with two areas counts in both', any(dept.lv1) ? mosrColumns(dept.lv1) : mosrEmpty)
+    + card('ORC', 'Occurrence Reached Criticality · reports per level'+(orc.none ? ' · '+orc.none+' without ORC' : ''), mosrPie(orc.list, MOSR_ORC_SLOT))
     + card('By base', 'station code when the typed text carries one · blank not counted', mosrColumns(mosrFold(mosrCount(rows, r => r.base_group), 9)))
-    + '</section>';
+    + '</section>'
+    + '<section class="sec">' + card('Department responsible · level 2', 'unit within each area · stations count under Maintenance Station', deptLv2 ? '<div class="mosr-flow">'+deptLv2+'</div>' : mosrEmpty) + '</section>'
+    /* an even number of cards that is not a multiple of three sits two to a row, so no card is left alone on a row */
+    + '<section class="sec beta-cards"'+((1 + occCards.filter(c => !c.wide).length) % 3 && !((1 + occCards.filter(c => !c.wide).length) % 2) ? ' style="grid-template-columns:repeat(auto-fit,minmax(min(480px,100%),1fr))"' : '')+'>'
+    + card('Occurrence category · level 1', 'a report with two categories counts in both', any(occ.lv1) ? mosrColumns(occ.lv1) : mosrEmpty)
+    + occCards.filter(c => !c.wide).map(c => c.html).join('')
+    + '</section>'
+    + occCards.filter(c => c.wide).map(c => '<section class="sec">'+c.html+'</section>').join('');
 }
 
 /* ==========================================================================
@@ -6562,7 +6622,7 @@ function scrGuideNew(){
     + '<li><b>Safety › SPI</b>: one card per safety performance indicator, monthly rate against the SPT. A card at a trigger level states the action AMO SMS §10.6 requires: Level 1 close monitoring and trend analysis; Level 2 investigation into potential root causes; Level 3 immediate risk assessment, with the Accountable Manager informed immediately.</li>'
     + '<li><b>Analytics › KPI charts</b>: summary tiles, Closure by quarter, KPI 2, KPI 7 and KPI QC. Select a tile or a count for the reports behind it; closing a detail returns to that list.</li>'
     + '<li><b>Safety › MSAG status</b>: OSR and MOSR closed, open and total for each MSAG group on Coruson. It counts all the data of these groups and ignores the Year and Month filter, so its figures differ from Safety › MOSR register.</li>'
-    + '<li><b>Safety › MOSR charts</b>: form MOSR by department, occurrence category and base, by submitted date. Year and month come from the filter bar, the quarter is chosen in the tab. A report with two departments counts in both; occurrence category holds the groups under Technical only, and the caption states the reports not classified or outside Technical.</li>'
+    + '<li><b>Safety › MOSR charts</b>: form MOSR by submitted date, from the classifications of tab EVALUATION on Coruson. <b>Department responsible</b> at level 1 (area) and level 2 (unit within the area), <b>ORC</b> as a donut, <b>Occurrence category</b> at level 1 and one level-2 chart for each level 1 that has a level 2 (Technical, Standard &amp; Compliance, Human Factor, Contractor, Sub-contractor), and the base. Year and month come from the filter bar, the quarter is chosen in the tab. A report with two values counts in both; the caption states the reports without each classification, and a card states the reports recorded at level 1 only.</li>'
     + '<li><b>Analytics › Event/IR report status</b>: EIS and F-088 completeness on Coruson; the tiles count the reports complete on each check, the table shows workflow, linked reports, final report and status per report.</li>'
     + '<li><b>Audit Plan</b>: audits are split into <b>Scheduled</b> (the annual plan, MNT numbers) and <b>Unscheduled</b> (RSP Random Surveillance and SSP Specified Surveillance, raised as required). Plan progress and <b>Delayed</b> count scheduled audits only; unscheduled ones have their own tile, their own grid on the timeline and a <b>Programme</b> filter and column. The <b>Rescheduled</b> tile counts scheduled audits whose dates were changed on Coruson and opens their list with the reschedule reason; it turns red while any of them is not yet performed. On the timeline a rescheduled audit has an amber outer ring, and the schedule list shows a <b>Rescheduled</b> tag. Coruson reporting keeps only the current dates, so the original month is not shown. KPI tiles, a location × month view (one dot per audit, inspection or surveillance in its scheduled month; filter by type or show only upcoming / with overdue findings), and a schedule list. Select a dot or a row for its workflow stages and findings. A solid blue ring is an audit in status <b>Schedule Confirmed</b>; it counts as planned and open, like Scheduled. <b>Workflow stages</b>: for the QA AMO audits in the selected period, how many stages of each name are in each Galileo status; select an InProgress or PendingSignOff count for the audits concerned.</li>'
     + '<li><b>Library › Documents</b>: browse by document type; the document number opens copyholders (on time, late, overdue) and the workflow.</li></ul>')
