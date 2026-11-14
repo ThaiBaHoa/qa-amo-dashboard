@@ -2533,7 +2533,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.13-r227-i1';
+const APP_REV = '2026.11.14-r228';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -3475,7 +3475,7 @@ function resetLazyStores(){
   try{ localStorage.removeItem(KPI7_CACHE_KEY); }catch{}
   eisLoaded=false; eisCAMap={}; eisDescMap={};   // reset EIS per-CA cache để Refresh kéo lại
   qcsLoaded=false; qcsMap={};                     // reset QC Spot Check cache để Refresh kéo lại
-  hiraLoaded=false; hiraClsMap={}; hiraHazardMap={}; hiraRegMap={}; hiraRegErr=null; hiraFieldNames=[];   // [r173] HIRA classifications + CAPA (r171/r172) · [r224] register
+  hiraLoaded=false; hiraClsMap={}; hiraHazardMap={}; hiraRegMap={}; hiraRegErr=null; hiraFieldNames=[]; hiraCatErr=null;   // [r173] HIRA classifications + CAPA (r171/r172) · [r224] register
   capaLoaded=false; capaTaskMap={}; capaInfoMap={}; hiraCapaMap={};
   auditStageRows=null;                            // [r178] bước audit của màn Workflow stages
 }
@@ -5360,7 +5360,10 @@ const AF_FORM_SET = new Set(AF_FORMS);
 // toàn hệ thống, 1,2s — form khác (Hazard Log…) dùng trùng tên list nên phải lọc lại theo report_id HIRA.
 // 24/24 report HIRA đủ cả 3 trường; nếu một trường chọn nhiều giá trị thì nối bằng ', '.
 const HIRA_TITLE = 'AMO - HIRA';
-const HIRA_CLS = {'HIRA METHOD':'method','HAZARD TYPE':'type','ADDITIONAL MITIGATION?':'mitig','EFFECTIVENESS RATING':'effect'};
+// [r228] Eric 14/11/2026: EFFECTIVENESS RATING is no longer read from the Classification — the register takes the report's
+// Category (report_summary.category_title), see loadHiraCls → .effect. Probe 14/11/2026, 24 HIRA: one current row per
+// report, FULLY EFFECTIVE 18, MVOI 3MT 3, MVOI 6MT 3 (category_id a511a477…, bd3d88eb…, f16dbcba…).
+const HIRA_CLS = {'HIRA METHOD':'method','HAZARD TYPE':'type','ADDITIONAL MITIGATION?':'mitig'};
 // [r224] Safety › HIRA register (layout of VJC-MQA-F-118 Risk Register). Probe 09/11/2026 (main session, 24 HIRA, 48
 // hazards), dwanalytics_report_field by section_name:
 //  · HIRA HEADER: HIRA NUMBER, GENERIC HAZARD, HOW MANY…, copies "SPECIFIC COMPONENTS 1/2/3" (not used).
@@ -5460,7 +5463,7 @@ function buildHiraActions(raw, hazards){
 // dwanalytics_report_field có section_id; mỗi mối nguy là 1 section SPECIFIC COMPONENTS, 50/50 ô DUE DATE ghép
 // đúng mối nguy. KHÔNG dùng dwanalytics_report_form_section_field: bảng đó không có section và còn ô thừa
 // (HIRA-11 có 3 DUE DATE cho 2 mối nguy). DUE DATE lớn nhất là Target của report, xem loadData.
-let hiraLoaded=false, hiraClsMap={}, hiraHazardMap={}, hiraRegMap={}, hiraRegErr=null, hiraFieldNames=[];
+let hiraLoaded=false, hiraClsMap={}, hiraHazardMap={}, hiraRegMap={}, hiraRegErr=null, hiraFieldNames=[], hiraCatErr=null;
 async function loadHiraHazards(ids){
   const list=[...ids], chunks=[];
   for(let i=0;i<list.length;i+=8) chunks.push(list.slice(i,i+8).map(id=>'report_id eq '+id).join(' or '));
@@ -5499,11 +5502,16 @@ async function loadHiraCls(){
   const reg=Promise.all(regChunks.map(c=>fetchAll(G_URL+'dwanalytics_report_field?$select=report_id,section_id,parent_section_id,section_name,field_name,value_text,report_field_created_date&$filter='
     +encodeURIComponent(c.map(id=>'report_id eq '+id).join(' or ')), true))).then(a=>[].concat.apply([],a))
     .then(r=>({r}), e=>({e:(e && e.message) ? e.message : String(e)}));
-  const [raw,hz,generic,regRes]=await Promise.all([
+  // [r228] Category of each HIRA report (Eric 14/11/2026): report_summary is append-only (I6), the row with the latest
+  // modified_date is the current one. Its failure keeps the rest of the register: hiraCatErr, shown on the screen.
+  const cat=fetchAll(G_URL+'dwreporting_report_summary?$select=report_id,category_id,category_title,modified_date&$filter='
+    +encodeURIComponent("report_title eq '"+HIRA_TITLE+"'"), true).then(r=>({r}), e=>({e:(e && e.message) ? e.message : String(e)}));
+  const [raw,hz,generic,regRes,catRes]=await Promise.all([
     fetchAll(G_URL+'dwanalytics_report_classification_field?$select=report_id,list_name,value_text&$filter='+encodeURIComponent(flt), true),
     loadHiraHazards(ids),
     fetchAll(CF_URL+'?$select=report_id,text_value&$filter='+encodeURIComponent("report_title eq '"+HIRA_TITLE+"' and field_name eq 'GENERIC HAZARD'"), true),
-    reg
+    reg,
+    cat
   ]);
   if(regRes.e){ hiraRegMap={}; hiraFieldNames=[]; hiraRegErr=regRes.e; console.error('[HIRA register] form fields failed:', regRes.e); }
   else { const b=buildHiraReg(regRes.r, ids), act=buildHiraActions(regRes.r, hz.hazards);
@@ -5516,6 +5524,12 @@ async function loadHiraCls(){
     const o=(m[r.report_id] ||= {});
     o[k]=o[k] ? o[k]+', '+r.value_text : r.value_text;
   });
+  // [r228] .effect = the report's Category (title as Coruson writes it), .catId = its category_id
+  if(catRes.e){ hiraCatErr=catRes.e; console.error('[HIRA register] Category failed:', catRes.e); }
+  else { hiraCatErr=null; const last={};
+    catRes.r.forEach(r=>{ if(!ids.has(r.report_id)) return; const ex=last[r.report_id];
+      if(!ex || String(r.modified_date||'')>String(ex.modified_date||'')) last[r.report_id]=r; });
+    Object.values(last).forEach(r=>{ if(!r.category_title) return; const o=(m[r.report_id] ||= {}); o.effect=String(r.category_title).trim(); o.catId=r.category_id||null; }); }
   // GENERIC HAZARD: cột Generic Hazard của All forms (Eric 04/11/2026); bản nháp, đã xóa không thuộc ids nên bị loại
   generic.forEach(g=>{ const v=mosrPlain(g.text_value); if(v && ids.has(g.report_id)) (m[g.report_id] ||= {}).generic ||= v; });
   // [r224] Status of each hazard (STATUS column of F-118): the report's own rule (loadData / regradeRows: isVerifyGraded)

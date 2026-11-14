@@ -414,6 +414,7 @@ select.ctl{min-width:168px;cursor:pointer}
   transition:background var(--dur-in) var(--ease-out),border-color var(--dur-in) var(--ease-out);
 }
 .kpi:hover{background:var(--raised);border-color:var(--border-strong)}
+.kpi[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}   /* r228: a tile that filters the list under it */
 .kpi>*{display:block}
 .kpi-lbl{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);font-weight:650}
 .kpi-val{font-family:var(--mono);font-size:clamp(28px,3vw,38px);font-weight:700;line-height:1.05;letter-spacing:-.03em;color:var(--text)}
@@ -1732,7 +1733,7 @@ const SCREEN_API = {
   AF_FORMS, EIS_TITLE, QCS_TITLE,
   loadEis: () => loadEisDetail(), eis: () => ({ loaded: eisLoaded, desc: eisDescMap, ca: eisCAMap }), enrichEis, enrichQcs,
   /* AMO - HIRA classifications (r171 loadHiraCls): HIRA method / hazard type / additional mitigation */
-  HIRA_TITLE, loadHira: () => loadHiraCls(), hira: () => ({ loaded: hiraLoaded, map: hiraClsMap, hazards: hiraHazardMap, reg: hiraRegMap, regErr: hiraRegErr, fieldNames: hiraFieldNames }),
+  HIRA_TITLE, loadHira: () => loadHiraCls(), hira: () => ({ loaded: hiraLoaded, map: hiraClsMap, hazards: hiraHazardMap, reg: hiraRegMap, regErr: hiraRegErr, fieldNames: hiraFieldNames, catErr: hiraCatErr }),
   /* AMO - Additional Mitigation (r172 loadCapa): tasks graded by semCalc + form content */
   CAPA_TITLE, loadCapa: () => loadCapa(), capa: () => ({ loaded: capaLoaded, tasks: capaTaskMap, info: capaInfoMap, byHira: hiraCapaMap }), capaTaskStats,
   /* Audit Plan bottleneck (system-wide $apply aggregate, invariant I7) */
@@ -2095,7 +2096,7 @@ const NAV = [
   { id:'safety',    label:'Safety',     icon:'shield',   task:'safety',  title:'Safety',
     lead:'AMO safety management: hazard register, risk mitigation, safety reports and safety performance.',
     tabs:[
-      {id:'hira',      label:'HIRA register'},
+      {id:'hira',      label:'HIRA'},
       {id:'mitigation',label:'Additional mitigation'},
       {id:'msag',      label:'MSAG status'},
       {id:'mosr',      label:'MOSR register'},
@@ -2566,7 +2567,9 @@ const M = {
       L.forEach((h, i) => {
         const f = Object.assign({}, g.sec[h.sec] || {});
         const acts = act.mode === 'merged' ? null : (act.bySec[h.sec] || []);
-        /* r224 (Eric 11/11/2026): Effectiveness = the report's Classification, one value per HIRA (the per-hazard form field is not used).
+        /* r228 (Eric 14/11/2026): Effectiveness = the report's Category on Coruson (classic loadHiraCls .effect), one value per HIRA,
+           shown as written — a Category that is not an effectiveness rating (MVOI 3MT, MVOI 6MT) has no M.EFFECT fill
+           (r224: it was the Classification; the per-hazard form field is not used).
            calc = the matrix code of the hazard's own SEVERITY × LIKELIHOOD; initOff = the recorded initial rating is another cell.
            miss = required F-118 fields the hazard's section leaves empty (not judged when the form fields failed to load). */
         const sv = M.sevCode(f.severity), pb = M.probCode(f.likelihood), init = M.riskOf(f.initRisk), calc = sv && pb ? M.riskOf(pb + sv) : null;
@@ -2583,7 +2586,7 @@ const M = {
   /* data checks of the HIRA register (r224, Eric 11/11/2026) on a hiraHazards list:
      off     = hazards whose recorded initial risk rating is not the cell of their Severity × Likelihood (AMO SMS §9.4.3);
      missHz  = hazards with required fields empty (x.miss);
-     missRep = HIRA with report-level data missing: Effectiveness rating (Classification), preventive actions. */
+     missRep = HIRA with report-level data missing: Effectiveness rating (Category), preventive actions. */
   hiraChecks(list){
     const L = list || [], seen = {}, missRep = [], limit = [], intol = [], effect = [], today = M.isoToday(), S = M.SMS;
     L.forEach(x => {
@@ -2595,7 +2598,7 @@ const M = {
       }
       if(x.init && x.init.band === 'I' && open) intol.push({ x, none: !acts.length, left: acts.filter(a => !a.done).length });
       if(seen[x.r.id]) return; seen[x.r.id] = 1;
-      const miss = []; if(!x.effect) miss.push('Effectiveness rating (Classification)'); if(!(x.act.all || []).length) miss.push('Preventive action');
+      const miss = []; if(!x.effect) miss.push('Effectiveness rating (Category)'); if(!(x.act.all || []).length) miss.push('Preventive action');
       if(miss.length) missRep.push({ r: x.r, miss });
       /* §9.7: PARTIAL = no related incident within 3 months, FULLY = more than 6 months — counted from the HIRA's last completed action */
       const e = M.effectOf(x.effect), need = e && e.key === 'full' ? S.fullyMonths : e && e.key === 'partial' ? S.partialMonths : 0, all = x.act.all || [];
@@ -2623,6 +2626,29 @@ const M = {
       const limit = lv.length ? Math.min(...lv.map(v => S.orcDays[v])) : S.orcNone;
       return { r, level: (r.orc || []).join(', '), limit, age: M.daysBetween(r.submitted_date, today) };
     }).filter(x => x.age > x.limit);
+  },
+  /* HIRA per Category (r228, Eric 14/11/2026): the tiles of Safety › HIRA, which also filter the register (M.hiraFilter).
+     One entry per Category found on any AMO - HIRA report (all time, so a Category with no HIRA in the period still shows
+     0), grouped by category_id (invariant I10), the title as Coruson writes it — probe 14/11/2026: FULLY EFFECTIVE 18,
+     MVOI 3MT 3, MVOI 6MT 3. Plus one fixed entry, key 'not' = NOT EFFECTIVE (Eric 14/11/2026: shown even at 0): the HIRA
+     whose Category is NOT YET EFFECTIVE or INEFFECTIVE (M.EFFECT.not; both are in the Coruson master list, no HIRA uses
+     them yet). ids = the HIRA of `reps` in the entry, n = their count; none = HIRA of `reps` without a Category. */
+  hiraByCategory(reps){
+    const A = API(), cls = A.hira().map || {}, by = {}, isNot = c => (M.effectOf(c.effect) || {}).key === 'not'; let none = 0, total = 0;
+    const not = { id: 'not', title: 'NOT EFFECTIVE', note: 'HIRA · Category NOT YET EFFECTIVE or INEFFECTIVE', ids: [] };
+    Object.values(cls).forEach(c => { if(c.catId && !isNot(c)) by[c.catId] = by[c.catId] || { id: c.catId, title: c.effect, note: 'HIRA · Category on Coruson', ids: [] }; });
+    (reps || []).filter(r => r.code === A.HIRA_TITLE).forEach(r => { const c = cls[r.id] || {}; total++;
+      if(!c.catId) none++; else (isNot(c) ? not : by[c.catId]).ids.push(r.id); });
+    const list = Object.values(by).concat(not).sort((a, b) => String(a.title).localeCompare(String(b.title)));
+    list.forEach(x => { x.n = x.ids.length; });
+    return { list, none, total };
+  },
+  /* the register filter the tiles set (BS.hiraF): 'open' = HIRA still open, 'cat:<id>' = HIRA of that Category entry */
+  hiraFilter(reps, key){
+    if(key === 'open') return { label: 'Open HIRA', rows: reps.filter(r => M.isOpen(r)) };
+    if(String(key || '').startsWith('cat:')){ const c = M.hiraByCategory(reps).list.find(x => 'cat:' + x.id === key);
+      if(c){ const ids = new Set(c.ids); return { label: 'Category ' + c.title, rows: reps.filter(r => ids.has(r.id)) }; } }
+    return null;
   },
   /* hazards per matrix cell for one rating ('init' | 'cur'); none = rating missing or not a matrix code */
   riskMatrix(list, which){
@@ -2790,7 +2816,13 @@ M.consistency = function(){
       say('Safety › HIRA hazards vs classic hiraHazardMap', hz.length,
         raw.filter(r => r.report_title === A.HIRA_TITLE).reduce((t, r) => t + ((A.hira().hazards || {})[r.report_id] || []).length, 0));
       say('Safety › risk matrix cells + unrated vs hazards', inCells + mx.none, hz.length);
-      say('Safety › risk bands vs matrix cells', mx.bands.I + mx.bands.T + mx.bands.A, inCells);
+      /* r228: the Category tiles add up to the HIRA of the scope, and each agrees with a recount on the Category titles of allData's HIRA */
+      { const c = M.hiraByCategory(qa), hr = raw.filter(r => r.report_title === A.HIRA_TITLE), ti = r => ((A.hira().map || {})[r.report_id] || {}).effect || '';
+        say('Safety › HIRA Category tiles + no Category vs HIRA count', c.list.reduce((t, x) => t + x.n, 0) + c.none, qa.filter(r => r.code === A.HIRA_TITLE).length);
+        c.list.forEach(x => say('Safety › HIRA Category ' + x.title + ' vs recount on the titles', x.n,
+          hr.filter(r => x.id === 'not' ? /^(NOT YET EFFECTIVE|INEFFECTIVE|NOT EFFECTIVE)$/.test(ti(r).toUpperCase()) : ti(r) === x.title).length));
+        say('Safety › HIRA filter Open vs open HIRA', M.hiraFilter(qa.filter(r => r.code === A.HIRA_TITLE), 'open').rows.length, hr.filter(r => r.semantic_status === 'Open' || r.semantic_status === 'Overdue').length);   /* metrics-ok: the classic formula being checked against */
+        c.list.forEach(x => say('Safety › HIRA filter ' + x.title + ' vs its tile', M.hiraFilter(qa.filter(r => r.code === A.HIRA_TITLE), 'cat:' + x.id).rows.length, x.n)); }
       /* the hazard with the latest due date carries the report's own status (classic h.sem, same rule as semantic_status) */
       const last = {}; hz.forEach(x => { if(x.h.due && !(last[x.r.id] && last[x.r.id].h.due >= x.h.due)) last[x.r.id] = x; });
       /* every PREVENTIVE ACTION on the forms is shown once: under its hazard (numbered groups, classic buildHiraActions)
@@ -5309,7 +5341,7 @@ async function sendFeedback(){
    Data: classic loadHiraCls (classifications, hazards with the HOW MANY rule of r221-i3, F-118 form fields);
    hazards, ratings and matrix counts through METRICS (M.hiraHazards, M.riskOf, M.riskMatrix, M.RISK).
    ========================================================================== */
-const HIRA_F118 = { source:'Hazard source', existing:'Existing controls', consequence:'Potential specific consequence', severity:'Severity',
+const HIRA_F118 = { existing:'Existing controls', consequence:'Potential specific consequence', severity:'Severity',
   likelihood:'Likelihood', initRisk:'Initial risk rating', assessed:'Date assessed', nextReview:'Next review date', effect:'Effectiveness rating' };
 /* a rating chip: code + band label on the band colour of AMO SMS §9.4.3; a value that is not a matrix code is shown as written */
 function riskChip(k, raw){
@@ -5329,13 +5361,12 @@ const hiraRiskTd = (k, raw, calc) => k
   ? '<td class="hx-fill" style="background:'+k.hex+';color:'+k.ink+'" title="'+esc(k.label+' · '+M.RISK.sev[k.s]+' × '+M.RISK.prob[k.p][0]+' · '+k.action)+'"><b>'+k.code+'</b><span>'+esc(k.label)+'</span>'
     + (calc ? '<span class="hx-off" title="'+esc('Severity × Likelihood on the form gives '+calc.code+' '+calc.label+' ('+M.RISK.sev[calc.s]+' × '+M.RISK.prob[calc.p][0]+', AMO SMS §9.4.3)')+'">⚠ Matrix: '+calc.code+'</span>' : '')+'</td>'
   : '<td class="hx-c">'+(raw ? '<span title="Not a risk matrix code">'+esc(raw)+'</span>' : missingData('Missing'))+'</td>';
-/* one value per HIRA (the report's Classification): the cell spans the HIRA's hazards */
+/* one value per HIRA (r228: the report's Category on Coruson): the cell spans the HIRA's hazards */
 const hiraEffectTd = (v, span) => { const e = M.effectOf(v);
   return e ? '<td class="hx-fill"'+(span || '')+' style="background:'+e.hex+';color:'+e.ink+'"><b>'+esc(String(v).toUpperCase())+'</b></td>'
            : '<td class="hx-c"'+(span || '')+'>'+(v ? esc(v) : missingData('Missing'))+'</td>'; };
-const hiraStatus = (x, r) => chip(x && x.h.sem ? x.h.sem : r.status);
-/* the specific component with its HAZARD SOURCE underneath in brackets — bold italic, as F-118 writes "(Reactive SGN A532 …)" */
-const hiraComp = x => hiraKv(x.f.comp || x.h.comp) + (x.f.source ? '<br><b><i>('+esc(String(x.f.source).replace(/^\(|\)$/g, ''))+')</i></b>' : '');
+/* r228 (Eric 14/11/2026): HAZARD SOURCE is no longer shown under the specific component */
+const hiraComp = x => hiraKv(x.f.comp || x.h.comp);
 /* one block per action, a gap between them; an action the form leaves unnumbered gets its order number, as Responsible department does (hiraNoOf) */
 const hiraActText = L => L && L.length
   ? L.map((a, i) => '<div'+(i ? ' style="margin-top:8px"' : '')+'>'+hiraKv((/^\s*\d+\s*[.)]/.test(a.text || '') ? '' : (i + 1)+'. ')+(a.text || '—'))+'</div>').join('')
@@ -5344,7 +5375,8 @@ const hiraMergedNote = act => '<span class="cat c1" style="display:inline-block;
 /* a date, or the text as written (NEXT REVIEW DATE holds e.g. "NEXT MSAG MEETING") */
 const hiraWhen = v => v ? (/^\d{4}-\d{2}-\d{2}/.test(v) ? fdx(v) : v) : '';
 /* "Trang ngoài" of F-118: one group per HIRA — NO., HIRA NUMBER and GENERIC HAZARD merged over its hazards (rowspan),
-   then one row per hazard. Not paged or sorted, so the groups stay whole. A row or the number opens the record. */
+   then one row per hazard; EFFECTIVENESS RATING, ADDITIONAL MITIGATION? and STATUS are one cell per HIRA. Not
+   paged or sorted, so the groups stay whole. A row or the number opens the record. */
 function hiraRegisterTable(reps, byRep){
   if(!reps.length) return '<div class="empty"><h3>No records</h3><p class="t-sub">Nothing matches the current filters.</p></div>';
   const head = ['No.','HIRA number','Generic hazard','Specific components of the generic hazard','Initial risk rating',
@@ -5360,7 +5392,8 @@ function hiraRegisterTable(reps, byRep){
               : i ? '' : '<td class="hx-txt"'+span+'>'+hiraActText(x.act.all)+'<br>'+hiraMergedNote(x.act)+'</td>')
            + hiraRiskTd(x.cur, x.h.risk) + (i ? '' : hiraEffectTd(x.effect, span))
          : '<td class="hx-txt" colspan="5"><span class="dim">No hazard recorded on the form</span></td>')
-      + '<td class="hx-c">'+hiraMitigCell(r)+'</td><td class="hx-c">'+hiraStatus(x, r)+'</td></tr>').join(''); }).join('');
+      /* r228 (Eric 14/11/2026): one status per HIRA — the report's, graded on its latest due date */
+      + (i ? '' : '<td class="hx-c"'+span+'>'+hiraMitigCell(r)+'</td><td class="hx-c"'+span+'>'+chip(r.status)+'</td>')+'</tr>').join(''); }).join('');
   return '<div class="tbl-wrap"><table class="hx"><thead><tr>'+head.map(h => '<th scope="col">'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+body+'</tbody></table></div>';
 }
 function riskMatrixCard(hz, which){
@@ -5370,7 +5403,7 @@ function riskMatrixCard(hz, which){
       + '<span class="num">'+(n || '·')+'</span><span class="rmx-code">'+code+'</span></td>'; };
   const table = '<div class="tbl-wrap"><table class="rmx"><thead><tr><th scope="col">Probability \\ Severity</th>'
     + sevs.map(s => '<th scope="col">'+s+'<span class="t-small dim">'+esc(R.sev[s])+'</span></th>').join('') + '</tr></thead><tbody>'
-    + [5,4,3,2,1].map(p => '<tr><th scope="row">'+p+' '+esc(R.prob[p][0])+'<span class="t-small dim">'+esc(R.prob[p][1])+'</span></th>'
+    + [5,4,3,2,1].map(p => '<tr><th scope="row">'+esc(R.prob[p][0])+'<span class="t-small dim">'+esc(R.prob[p][1])+'</span></th>'
       + sevs.map(s => cell(p + s)).join('') + '</tr>').join('') + '</tbody></table></div>';
   const legend = '<div class="od-row" style="--od-gap:14px;flex-wrap:wrap">' + Object.keys(R.bands).map(b => { const x = R.bands[b];
     return '<span class="od-row t-small" style="--od-gap:6px"><span class="risk-chip" style="background:'+x.hex+';color:'+x.ink+'">'+esc(x.label)+'</span>'
@@ -5387,30 +5420,41 @@ function scrHira(){
   const which = BS.hiraRisk === 'init' ? 'init' : 'cur';
   const reps = scoped().filter(r => r.code === A.HIRA_TITLE)
     .sort((a, b) => String(a.number).localeCompare(String(b.number), undefined, { numeric:true }));
-  const hz = M.hiraHazards(reps), cur = M.riskMatrix(hz, 'cur');
+  const hz = M.hiraHazards(reps);
   const byRep = {}; hz.forEach(x => (byRep[x.r.id] = byRep[x.r.id] || []).push(x));
   const regErr = A.hira().regErr;
   const absent = Object.keys(HIRA_F118).filter(k => !hz.some(x => x.f[k] || (k === 'effect' && x.effect)));
   const merged = reps.filter(r => (byRep[r.id] || []).some(x => !x.acts)).length;
   /* data checks (M.hiraChecks): counted on the tile, which opens the list (showHiraChecks); the record marks the cells */
   const ck = M.hiraChecks(hz), nMiss = ck.missHz.length + ck.missRep.length;
+  /* r228 (Eric 14/11/2026): HIRA closed + open; hazards = specific components; the other three tiles count the HIRA by Category */
+  const nOpen = reps.filter(isOpen).length, cat = M.hiraByCategory(reps), catErr = A.hira().catErr;
+  /* the tiles filter the register (BS.hiraF, M.hiraFilter): HIRA → the open ones, a Category tile → its HIRA; a second click clears */
+  const flt = M.hiraFilter(reps, BS.hiraF), shown = flt ? flt.rows : reps;
+  const fTile = (label, value, sub, key) => stat(label, value, sub, false, false, 'bset',
+    ' data-k="hiraF" data-v="'+(BS.hiraF === key ? '' : esc(key))+'" aria-pressed="'+(BS.hiraF === key)+'" title="'+(BS.hiraF === key ? 'Show all HIRA' : 'Show these HIRA in the register')+'"');
   const note = (merged ? '<p class="t-small dim">'+merged+' HIRA: the preventive actions could not be assigned to a hazard from the form (no link, numbering and creation time do not separate them) — shown across the HIRA and marked.</p>' : '')
+    + (catErr ? '<p class="t-small" style="color:var(--danger,#e5484d)">The Category of the HIRA reports could not be loaded ('+esc(catErr)+'): Effectiveness rating shows Missing and the Category tiles show —.</p>' : '')
+    + (!catErr && cat.none ? '<p class="t-small dim">'+cat.none+' HIRA without a Category on Coruson — not counted in the Category tiles.</p>' : '')
     + (regErr ? '<p class="t-small" style="color:var(--danger,#e5484d)">The form fields of the HIRA reports could not be loaded ('+esc(regErr)+'): the F-118 columns read from the form show —.</p>' : '')
     + (!regErr && absent.length && hz.length ? '<p class="t-small dim">Not found on the Coruson form, shown as —: '+esc(absent.map(k => HIRA_F118[k]).join(', '))+'.</p>' : '');
   return tiles([
-      stat('HIRA', String(reps.length), reps.filter(isOpen).length+' open · '+periodLabel()),
-      stat('Hazards', String(hz.length), 'as declared in HOW MANY'),
-      stat('Intolerable', String(cur.bands.I), 'current risk · immediate action', cur.bands.I > 0),
-      stat('Tolerable', String(cur.bands.T), 'current risk · mitigation within 30 days'),
-      stat('Compliance checks', String(ck.total), 'risk rating off the matrix '+ck.off.length+' · missing data '+nMiss+' · AMO SMS time limits '+ck.sms, ck.total > 0, false, ck.total ? 'bhirachecks' : null)
-    ])
+      fTile('HIRA', String(reps.length), (reps.length - nOpen)+' closed · '+nOpen+' open · '+periodLabel(), 'open'),
+      stat('Hazards', String(hz.length), 'specific components of the generic hazards'),
+    ].concat(catErr ? [stat('Category', '—', 'could not be loaded from Coruson', true)]
+      : cat.list.map(c => fTile(c.title, String(c.n), c.note, 'cat:'+c.id))))
     + '<section class="sec">' + riskMatrixCard(hz, which) + '</section>'
     + '<section class="sec"><div class="card af-hira"><div class="card-head"><h2>HIRA register</h2>'
     + '<span class="t-small dim od-fill">VJC-MQA-F-118 Risk Register · one row per hazard · select a row for the full record</span>'
-    + (CAN_EXPORT() && reps.length ? '<span class="od-row" style="--od-gap:8px"><button class="btn" type="button" data-act="bhiraexp" data-k="xlsx">Export Excel</button>'
-        + '<button class="btn" type="button" data-act="bhiraexp" data-k="pdf">Export PDF</button></span>' : '') + '</div>'
+    /* r228: the Compliance checks tile gave its place to the Category tiles; the list stays one click away */
+    + '<span class="od-row" style="--od-gap:8px">'
+    + (ck.total ? '<button class="btn" type="button" data-act="bhirachecks" title="'+esc('Risk rating off the matrix '+ck.off.length+' · missing data '+nMiss+' · AMO SMS time limits '+ck.sms)+'">Compliance checks ('+ck.total+')</button>' : '')
+    + (CAN_EXPORT() && reps.length ? '<button class="btn" type="button" data-act="bhiraexp" data-k="xlsx">Export Excel</button>'
+        + '<button class="btn" type="button" data-act="bhiraexp" data-k="pdf">Export PDF</button>' : '') + '</span></div>'
     + (note ? '<div class="card-pad">'+note+'</div>' : '')
-    + hiraRegisterTable(reps, byRep) + '</div></section>';
+    + (flt ? '<div class="card-pad od-row" style="--od-gap:10px;flex-wrap:wrap"><span class="t-small"><b>'+esc(flt.label)+'</b> · '+shown.length+' of '+reps.length+' HIRA</span>'
+        + '<button class="btn" type="button" data-act="bset" data-k="hiraF" data-v="">Show all</button></div>' : '')
+    + hiraRegisterTable(shown, byRep) + '</div></section>';
 }
 /* EXPORT of the HIRA register (Eric 11/11/2026): Excel and PDF with the 20 columns of the record ("Trang trong" of F-118), for the HIRA
    of the current filters. One model (hiraExportModel) feeds both files: plain text per cell, the rating cells carry their M.RISK /
@@ -5432,7 +5476,7 @@ function hiraExportModel(reps){
       if(!x) return [ri + 1, r.number, cls.generic || '', 'No hazard recorded on the form', '', '', '', '', '', '', '', '', '', '', '', cls.effect || '', cls.method || '', cls.type || '', mitig, sum].map(v => ({ v }));
       const e = M.effectOf(x.effect), L2 = x.acts || x.act.all;
       return [{ v: ri + 1 }, { v: r.number }, { v: cls.generic || '' },
-        { v: (x.f.comp || x.h.comp || '') + (x.f.source ? '\n('+String(x.f.source).replace(/^\(|\)$/g, '')+')' : '') },
+        { v: x.f.comp || x.h.comp || '' },
         { v: x.f.existing || '' }, { v: x.f.consequence || '' },
         { v: M.sevCode(x.f.severity) || x.f.severity || '', c: 1 }, { v: M.probCode(x.f.likelihood) || x.f.likelihood || '', c: 1 },
         Object.assign({ v: x.init ? x.init.code+'\n'+x.init.label : (x.f.initRisk || ''), c: 1 }, fill(x.init)),
@@ -5552,9 +5596,8 @@ function showHira(id){
   const sum = !rxReady() ? '<span class="dim">'+(sumErr ? 'Could not load: '+esc(sumErr) : 'Loading…')+'</span>'
     : RX.sum[id] ? hiraKv(RX.sum[id])
     : RX.big && RX.big.has(id) ? '<span class="dim">Too large to show here (images pasted in the summary) — open the report on Coruson.</span>' : '<span class="dim">—</span>';
-  const latestDone = hz.map(x => x.done).concat(hz.length && !hz[0].acts ? hz[0].act.all.map(a => a.done) : []).filter(Boolean).sort().pop();
-  const strip = kv([['Status', chip(r.status), true], ['Raised date', fdx(raw.raised_date)], ['Target (latest due date)', fdx(raw.Target_date)],
-      ['Date completed (latest action)', latestDone ? fdx(latestDone) : null], ['Date verified', raw.verified_date ? fdx(raw.verified_date) : missingData('Missing'), true],
+  /* r228 (Eric 14/11/2026): Raised date and Date completed (latest action) left out of the strip */
+  const strip = kv([['Status', chip(r.status), true], ['Target (latest due date)', fdx(raw.Target_date)], ['Date verified', raw.verified_date ? fdx(raw.verified_date) : missingData('Missing'), true],
       ['Verified by', ver.by || null], ['Verification of implementation (VOI)', ver.voi ? hiraKv(ver.voi) : null, !!ver.voi]]);
   const head = ['No.','HIRA number','Generic hazard','Specific components of the generic hazard','Existing controls','Potential specific consequence',
     'Severity','Likelihood','Initial risk rating','Preventive control / recovery measures','Responsible department','Current risk rating',
@@ -5578,9 +5621,9 @@ function showHira(id){
     : !n ? '<p class="t-sub dim">No hazard recorded on the form.</p>'
     : '<div class="tbl-wrap hx-pop"><table class="hx"><thead><tr>'+head.map(h => '<th scope="col">'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
   const body = strip + table
-    + '<p class="t-small dim">HIRA method, Hazard type, Effectiveness rating, Additional mitigation? and Report summary are recorded once per report on Coruson (Evaluation › Classifications).'
+    + '<p class="t-small dim">HIRA method, Hazard type, Additional mitigation? (Evaluation › Classifications), Effectiveness rating (the Category of the report) and Report summary are recorded once per report on Coruson.'
     + (merged ? ' The preventive actions of this HIRA are not linked to a hazard on the form ('+esc(hz[0].act.reason)+'), so they span all its hazards.' : '') + '</p>'
-    + '<div><button class="btn" type="button" data-act="breport" data-id="'+esc(id)+'">Workflow stages of this report</button></div>';
+    + '<div><button class="btn" type="button" data-act="breport" data-id="'+esc(id)+'">Workflow stages, RFI and tasks of this report</button></div>';
   openModal(r.number, A.HIRA_TITLE + ' · VJC-MQA-F-118 record', body, extBtn('report', id));
   $('#betaModal .beta-modal-panel').classList.add('xwide');
 }
@@ -5804,7 +5847,8 @@ function showReport(id){
          : (MODAL_KEY = 'rpt:'+id, Promise.resolve(A.loadEis()).then(() => { if(MODAL_KEY === 'rpt:'+id) showReport(id); }),
             '<p class="t-small dim">Loading corrective actions…</p>'))
       + '<div style="display:grid;gap:8px"><span class="t-micro">Workflow stages'+(Array.isArray(st) && st.length ? ' ('+st.length+')' : '')+'</span>'
-        + stagesTable('rpt-stages', st) + '</div>';
+        + stagesTable('rpt-stages', st) + '</div>'
+      + (rep.code === A.HIRA_TITLE ? wfTasksBlock(id, 'rpt:'+id) : '');
   }
   openModal(r.report_number || rep.number, rep.code + (rep.auditTitle && rep.auditTitle !== '—' ? ' · ' + rep.auditTitle : ''), body, extBtn('report', id));
 }
@@ -5967,6 +6011,36 @@ function stageOwnerCell(s){
   if(s.completed_by) return esc(s.completed_by)+' <span class="dim">· completed by</span>';
   if(s.stage_type === 'ReportAcceptReject' && s.status === 'InProgress') return '<span class="dim">no acceptor assigned</span>';
   return '—';
+}
+/* Every RFI / task of a report's workflow, as the WORKFLOW tab of Coruson lists them under the stage (r228, Eric 14/11/2026:
+   AMO - HIRA). Source: dwreporting_report_task by report_id — the columns classic loadCapa / loadPavoiRfi read; rows without
+   a title (stage placeholders), Deleted and Cancelled are left out (classic isPavoiItem). Status = the Coruson value as is.
+   One request per report, on opening its record. */
+const WF_TASKS = {};
+function wfTasks(id, key){
+  const have = WF_TASKS[id];
+  if(have !== undefined) return have;          /* array, { err }, or null while loading */
+  WF_TASKS[id] = null;
+  const A = API();
+  A.fetchAll(A.G_URL + 'dwreporting_report_task?$select=report_id,task_id,task_title,task_owner,task_status,task_target_date,task_completed_date,'
+      + 'task_instructions,task_response,task_related_section_name&$filter=' + encodeURIComponent('report_id eq ' + id), true)
+    .then(rows => { WF_TASKS[id] = rows.filter(t => t.task_title && String(t.task_title).trim() && !['Deleted','Cancelled'].includes(t.task_status) && !/^All Stages were completed/i.test(t.task_title))
+        .sort((a, b) => String(a.task_completed_date || a.task_target_date || '9').localeCompare(String(b.task_completed_date || b.task_target_date || '9'))); })
+    .catch(e => { WF_TASKS[id] = { err: e && e.message ? e.message : String(e) }; })
+    .then(() => { if(MODAL_KEY === key && MODAL_REDRAW) MODAL_REDRAW(); });
+  return null;
+}
+function wfTasksBlock(id, key){
+  const L = wfTasks(id, key), head = n => '<div style="display:grid;gap:8px"><span class="t-micro">RFI and tasks of the workflow'+(n == null ? '' : ' ('+n+')')+'</span>';
+  if(L === null) return head() + '<p class="t-small dim">Loading RFI and tasks…</p></div>';
+  if(L.err) return head() + '<p class="t-sub red">Could not load the RFI and tasks: '+esc(L.err)+'</p></div>';
+  if(!L.length) return head(0) + '<p class="t-sub dim">No RFI or task raised.</p></div>';
+  const txt = (l, v) => v ? '<br><span class="t-small dim od-clamp-2" title="'+esc(v)+'">'+l+': '+esc(v)+'</span>' : '';
+  return head(L.length) + plainTable('wf-t-'+id, [{l:'RFI / task'},{l:'Section'},{l:'Task owner'},{l:'Status',fit:true},{l:'Target',fit:true},{l:'Completed',fit:true}], L.map((t, i) =>
+      ['<span class="t-small"><span class="dim num">'+(i+1)+'.</span> <span class="strong">'+esc(t.task_title)+'</span></span>'+txt('Instructions', t.task_instructions)+txt('Response', t.task_response),
+       '<span class="t-small">'+esc(t.task_related_section_name || '—')+'</span>', '<span class="t-small">'+esc(t.task_owner || '—')+'</span>',
+       '<span class="tag">'+esc(t.task_status || '—')+'</span>', '<span class="num">'+fdx(t.task_target_date)+'</span>', '<span class="num">'+fdx(t.task_completed_date)+'</span>']), 50, 760, { compact:true })
+    + '</div>';
 }
 function stagesTable(tableKey, stages){
   if(stages === null) return '<p class="t-small dim">Loading workflow stages…</p>';
@@ -6445,7 +6519,7 @@ function scrGuideNew(){
     + '<tr><td>Work Queue</td><td>Act on reports: Open reports, Overdue, and PAVOI / MVOI awaiting verification.</td></tr>'
     + '<tr><td>Reports</td><td>Read the register by form: All forms, PAVOI / MVOI, CMR-CAR, ECAR, AMO-ECAR, MCAR.</td></tr>'
     + '<tr><td>Analytics</td><td>KPI charts, Early detection (KPI 2) and Event/IR report status on Coruson.</td></tr>'
-    + '<tr><td>Safety</td><td>HIRA register, Additional mitigation, MSAG status, MOSR register, MOSR charts and SPI. Old links to these screens open here.</td></tr>'
+    + '<tr><td>Safety</td><td>HIRA, Additional mitigation, MSAG status, MOSR register, MOSR charts and SPI. Old links to these screens open here.</td></tr>'
     + '<tr><td>Audit Plan</td><td>The audit and inspection programme: timeline, schedule list and workflow stages.</td></tr>'
     + '<tr><td>Library</td><td>Controlled documents and this guide.</td></tr>'
     + '<tr><td>Admin</td><td>User management, report export and pinned widgets (administrators; a moderator sees report export only).</td></tr></table>'
@@ -6481,8 +6555,8 @@ function scrGuideNew(){
     + '<li><b>Work Queue</b>: Open reports (nearest target first), Overdue (with CAT), Awaiting verification (open PAVOI / MVOI with no verification round). Select a row to open the report.</li>'
     + '<li><b>Reports › All forms</b>: every report type. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings). With <b>MCCF</b> selected the list covers every unit on Coruson, with an Org unit column; MCCF outside QA AMO appear only here and are not counted in KPIs, Overview, Work Queue or Export. <b>AMO - Additional Mitigation</b> lists the title, source HIRA, actions and tasks, and a row opens its actions, tasks and verification. Its Target is the latest Target date of the actions; on-time or late compares <b>Date verified</b> with it, and a missing date shows in red.</li>'
     + '<li><b>Reports › PAVOI / MVOI</b>: register on the left (Form filter: PAVOI or MVOI), record on the right with the verification history and the RFI / Task list of open records. KPI 7 counts PAVOI and MVOI.</li>'
-    + '<li><b>Safety › HIRA register</b>: the AMO - HIRA records in the layout of VJC-MQA-F-118 Risk Register, one row per hazard declared on the form. Initial and current risk rating are filled in the colour of their band on the AMO SMS risk matrix (§9.4.3): Intolerable red, Tolerable orange, Acceptable green. The risk matrix counts the hazards per cell. Each preventive action sits under the hazard it belongs to on the Coruson form. <b>Effectiveness rating</b> is the Classification of the report, one value per HIRA. Select a HIRA number for the full record (20 columns): every hazard with its controls, measures, department and dates, and the report summary.</li>'
-    + '<li><b>Safety › HIRA register · Compliance checks</b>: the tile counts the items below for the HIRA of the period; select it for the list, and a row for the record. (1) Initial risk rating that is not the cell of Severity × Likelihood on the form; the record marks the cell with the matrix code. (2) Missing data: Severity, Likelihood, Initial or Current risk rating, Date assessed, Due date, a preventive action, the Effectiveness rating. (3) Tolerable initial risk whose due date or completion is more than 30 days after Date assessed (AMO SMS §9.5 d). (4) Intolerable initial risk with an action not completed. (5) Fully effective recorded less than 6 months, or Partial effective less than 3 months, after the last completed action (§9.7).</li>'
+    + '<li><b>Safety › HIRA</b>: the AMO - HIRA records in the layout of VJC-MQA-F-118 Risk Register, one row per hazard (specific component) declared on the form. The tiles give the HIRA of the period, closed and open, the hazards, and the HIRA per <b>Category</b> on Coruson, one tile per Category (FULLY EFFECTIVE, MVOI 3MT, MVOI 6MT, NOT EFFECTIVE). Select a tile to filter the register: HIRA shows the open ones, a Category tile shows its HIRA; select it again, or <b>Show all</b>, to clear. <b>Status</b> is one value per HIRA, graded on its latest due date. Initial and current risk rating are filled in the colour of their band on the AMO SMS risk matrix (§9.4.3): Intolerable red, Tolerable orange, Acceptable green. The risk matrix counts the hazards per cell. Each preventive action sits under the hazard it belongs to on the Coruson form. <b>Effectiveness rating</b> is the Category of the report as Coruson writes it, one value per HIRA; an effectiveness rating is filled in its colour. Select a HIRA number for the full record (20 columns): every hazard with its controls, measures, department and dates, and the report summary. <b>Workflow stages, RFI and tasks of this report</b> under the record lists the stages and every RFI and task of the workflow with its owner, section, status and dates.</li>'
+    + '<li><b>Safety › HIRA · Compliance checks</b>: the button on the register card counts the items below for the HIRA of the period; select it for the list, and a row for the record. (1) Initial risk rating that is not the cell of Severity × Likelihood on the form; the record marks the cell with the matrix code. (2) Missing data: Severity, Likelihood, Initial or Current risk rating, Date assessed, Due date, a preventive action, the Effectiveness rating. (3) Tolerable initial risk whose due date or completion is more than 30 days after Date assessed (AMO SMS §9.5 d). (4) Intolerable initial risk with an action not completed. (5) Fully effective recorded less than 6 months, or Partial effective less than 3 months, after the last completed action (§9.7).</li>'
     + '<li><b>Safety › Additional mitigation</b>: the AMO - Additional Mitigation register, the same as Reports › All forms with that form chosen.</li>'
     + '<li><b>Safety › MOSR register</b>: every MOSR by submitted date, with its classifications from Coruson. OSR forms carry no classifications; their counts are in Safety › MSAG status. The tile <b>Past ORC time limit</b> counts the MOSR still open after the risk-assessment time limit of their ORC level (AMO SMS §9.3.8.3): Very low and Low 30 days, Medium 7 days, High 24 hours; an open MOSR without ORC is listed after 30 days. Select the tile for the list.</li>'
     + '<li><b>Safety › SPI</b>: one card per safety performance indicator, monthly rate against the SPT. A card at a trigger level states the action AMO SMS §10.6 requires: Level 1 close monitoring and trend analysis; Level 2 investigation into potential root causes; Level 3 immediate risk assessment, with the Accountable Manager informed immediately.</li>'
@@ -6498,7 +6572,7 @@ function scrGuideNew(){
     + '<li><b>Export Excel</b>: KPI summary, form summary and every record.</li>'
     + '<li><b>SR / QCSC report</b>: Surveillance Report and QC Spot Check Report, one row per finding, in Excel or PDF. Year and month come from the filter bar.</li>'
     + '<li><b>Overdue workbook / Overdue PDF</b>: the weekly overdue report — every overdue report and every open report due within 7 days, with department, owner, who it is pending with, deadline and extensions. It ignores the year and month filters; only the form applies.</li>'
-    + '<li><b>HIRA register</b> (Safety › HIRA register, not on this screen): <b>Export Excel</b> and <b>Export PDF</b> on the register card give the 20 columns of the HIRA record for the HIRA of the filter bar, with the rating cells in their band colour. The PDF is A3 landscape.</li>'
+    + '<li><b>HIRA register</b> (Safety › HIRA, not on this screen): <b>Export Excel</b> and <b>Export PDF</b> on the register card give the 20 columns of the HIRA record for the HIRA of the filter bar, with the rating cells in their band colour. The PDF is A3 landscape.</li>'
     + '<li><b>MCAR &amp; Surveillance report</b>: every MCAR and Surveillance Report submitted in a date range, any status, in the layout of the S&amp;C analysis workbook. It ignores the filter bar.</li></ul>'
     + '<p>For Export PDF and Export Excel, year and month come from the filter bar; form and status are chosen on the screen. CMR-CAR and ECAR (TQA), and MCCF outside QA AMO, are not part of these two exports. A list opened from KPI charts has its own <b>Export Excel</b> button.</p>')
   + sec('data','Data sources and refresh',

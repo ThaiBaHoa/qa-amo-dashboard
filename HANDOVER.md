@@ -5,6 +5,15 @@
 
 ---
 
+## ✅ r228 — Safety › HIRA sửa theo `page safety revise.docx` (14/11/2026, EricThai) — commit + push 14/11 theo lệnh Eric
+
+- **Yêu cầu:** file Word của Eric trong workspace (`MQA dashboard website/page safety revise.docx`), 7 điểm bảng ngoài + 4 điểm popup.
+- **Đã làm:** tab `HIRA register` → **HIRA**. Effectiveness rating = **Category của report** (`dwreporting_report_summary.category_title`, `loadHiraCls` → `.effect` + `.catId`, lỗi ở `hiraCatErr`); bỏ `EFFECTIVENESS RATING` khỏi `HIRA_CLS`. Bỏ Hazard source (bảng ngoài, popup, file xuất). Status một ô cho mỗi HIRA = trạng thái report. Ô thống kê: HIRA (closed · open), Hazards (specific components), mỗi Category một ô (`M.hiraByCategory`, nhóm theo `category_id`). Popup bỏ Raised date, Date completed. Trang chi tiết report HIRA có bảng **RFI and tasks of the workflow** (`wfTasks`/`wfTasksBlock` ở `screens2.js`, `dwreporting_report_task` theo `report_id`).
+- **Eric bổ sung cùng ngày (đã làm):** ma trận rủi ro bỏ số đầu dòng Probability (dễ nhầm với số lượng); thêm ô **NOT EFFECTIVE** luôn hiện kể cả 0 (đếm Category NOT YET EFFECTIVE hoặc INEFFECTIVE, cả hai có trong danh mục gốc `dwanalytics_report_category`, chưa HIRA nào dùng); cột **Additional mitigation? gộp một ô cho mỗi HIRA**; **ô thống kê là bộ lọc** của bảng register (`BS.hiraF`, `M.hiraFilter`): ô HIRA → các HIRA đang open, ô Category → HIRA của Category đó, bấm lại hoặc **Show all** để bỏ lọc. Ma trận và file xuất không theo bộ lọc ô này.
+- **Tự chốt, chờ Eric xem:** (1) Category trên Coruson hiện là FULLY EFFECTIVE / MVOI 3MT / MVOI 6MT, không còn PARTIAL / NOT YET; ô Effectiveness hiện đúng chữ Category, chỉ FULLY EFFECTIVE có màu. (2) "3 phần còn lại đếm theo Category" hiểu là 3 ô Intolerable / Tolerable / Compliance checks nhường chỗ cho các ô Category; Compliance checks thành nút trên thẻ register, không mất. (3) "Hazard = specific component": số đếm giữ luật HOW MANY (r221-i3), chỉ đổi chú thích.
+- **Kiểm local dữ liệu thật 14/11** (preview `beta-local`, Eric đăng nhập): 2025+2026 = 24 HIRA (24 closed, 0 open), 39 hazards, FULLY EFFECTIVE 18 · MVOI 3MT 3 · MVOI 6MT 3, khớp đếm tay trên phản hồi Galileo (24 dòng). HIRA-01: 8 RFI, owner / section / ngày khớp ảnh Coruson trong file yêu cầu. Bấm ô MVOI 3MT (2026): bảng còn HIRA-23, HIRA-25 (2 of 5); ô HIRA: 0 open → bảng trống; Show all trả lại 5. Không có dòng `Consistency` nào trên console. Build `lint metrics-only: OK`, `BODY + UI SYNTAX OK`.
+- **Chưa làm:** sổ tay rời (`manual.js`) và ảnh chụp còn tên tab cũ, 10 cột cũ; chưa kiểm điện thoại, chế độ tối, file xuất Excel/PDF sau khi bỏ Hazard source; bản classic chỉ kiểm cú pháp qua build.
+
 ## ✅ r227-i1 — HTTP 408 từ Galileo được thử lại (13/11/2026, EricThai)
 
 - **Yêu cầu:** Eric báo trang SPI và nhiều trang khác hay lỗi 408.
