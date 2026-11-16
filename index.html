@@ -1152,6 +1152,9 @@ function authUI(sb, mode){
         + '<label class="beta-auth-f"><span>Password</span><input class="ctl" id="rPass" type="password" autocomplete="new-password"></label>'
         + '<label class="beta-auth-f"><span>Confirm password</span><input class="ctl" id="rPass2" type="password" autocomplete="new-password"></label>'
         + '<p class="t-small dim">At least 8 characters, one uppercase letter and one number. An administrator approves new accounts.</p>'
+        /* r230 (Eric 16/11/2026): consent to the collection of account data — required, recorded in the account's metadata (signUp options.data) */
+        + '<p class="t-small dim">Your full name, email and password are collected to sign you in and to let an administrator approve the account. Name, email and role are kept in the dashboard user list, which dashboard administrators can see; the password is kept by the sign-in service and nobody can read it. You can ask an administrator to delete the account at any time.</p>'
+        + '<label class="t-small" style="display:flex;gap:8px;align-items:flex-start;cursor:pointer"><input id="rConsent" type="checkbox" style="margin-top:3px;flex:none"><span>I consent to the collection and use of this account data.</span></label>'
         + alertBox('rAlert') + '<button class="btn primary" type="button" id="rGo">Submit request</button>'
         + '<div class="beta-auth-links"><button class="link-b" type="button" data-av="login">Back to sign in</button></div>',
       forgot: () => '<h1 id="authTitle">Reset password</h1>'
@@ -1209,9 +1212,10 @@ function authUI(sb, mode){
           if(!/[A-Z]/.test(pass)) return showAlert('rAlert','error','Password must contain at least one uppercase letter.');
           if(!/[0-9]/.test(pass)) return showAlert('rAlert','error','Password must contain at least one number.');
           if(pass !== pass2) return showAlert('rAlert','error','Passwords do not match.');
+          if(!(document.getElementById('rConsent') || {}).checked) return showAlert('rAlert','error','Please tick the consent box to submit the request.');
           const btn = document.getElementById('rGo'); btn.disabled = true; showAlert('rAlert','info','Submitting…');
           try{
-            const { data:auth, error } = await sb.auth.signUp({ email, password:pass });
+            const { data:auth, error } = await sb.auth.signUp({ email, password:pass, options:{ data:{ consent_account_data_at:new Date().toISOString(), consent_version:'r230' } } });
             if(error) throw error;
             if(!auth.user) throw new Error('Registration failed, please try again.');
             const { error:ie } = await sb.from('users').insert({ supabase_id:auth.user.id, email, full_name:name, role:'pending' });
@@ -2116,10 +2120,14 @@ const NAV = [
       {id:'bottleneck',label:'Workflow stages'}
     ]},
   { id:'library',   label:'Library',    icon:'book',     task:'reference', title:'Library',
-    lead:'Controlled documents and user guide.',
+    lead:'Controlled documents, user guide, privacy policy and terms of use.',
     tabs:[
       {id:'documents',label:'Documents'},
-      {id:'guide',    label:'User guide'}
+      {id:'guide',    label:'User guide'},
+      /* r230: text pages of beta-src/legal.js */
+      {id:'privacy',  label:'Privacy policy'},
+      {id:'terms',    label:'Terms of use'},
+      {id:'about',    label:'About'}
     ]},
   { id:'admin',     label:'Admin',      icon:'cog',      task:'admin',   title:'Admin',
     lead:'User access and report export.',
@@ -6591,7 +6599,7 @@ function scrGuideNew(){
     + '<tr><td>Analytics</td><td>KPI charts, Early detection (KPI 2) and Event/IR report status on Coruson.</td></tr>'
     + '<tr><td>Safety</td><td>HIRA, Additional mitigation, OSR/MOSR status, MOSR report, MOSR charts and SPI. Old links to these screens open here.</td></tr>'
     + '<tr><td>Audit Plan</td><td>The audit and inspection programme: timeline, schedule list and workflow stages.</td></tr>'
-    + '<tr><td>Library</td><td>Controlled documents and this guide.</td></tr>'
+    + '<tr><td>Library</td><td>Controlled documents, this guide, the Privacy policy, the Terms of use and About.</td></tr>'
     + '<tr><td>Admin</td><td>User management, report export and pinned widgets (administrators; a moderator sees report export only).</td></tr></table>'
     + '<p><b>Roles.</b> <b>User</b>: view only, no Admin section. <b>Moderator</b>: also report exports and the AI Assistant. <b>Admin</b>: also User management and My dashboard.</p>'
     + '<p><b>Filter bar.</b> <b>Year</b> and <b>Month</b> are multi-select (for example Jul–Sep, or 2025 and 2026 together; the Q1–Q4 buttons pick a quarter). The filter stays when you change section. The chips on the right of the bar show what is filtered; <b>Clear all</b> returns to the current year. Library and Admin do not show the bar, except Admin › Export reports.</p>'
@@ -6662,6 +6670,166 @@ function scrGuideNew(){
 }
 BETA_ACT.bgoto = el => { const t = document.getElementById(el.dataset.id); if(t) t.scrollIntoView({ behavior:'smooth', block:'start' }); };
 BETA_SCREENS['library/guide'] = scrGuideNew;
+
+
+/* ==========================================================================
+   LIBRARY › PRIVACY POLICY · TERMS OF USE · ABOUT
+   Three text-only screens in the family of the User guide (guide.js).
+
+   Proposed routes:  library/privacy · library/terms · library/about
+
+   To wire (main session — this file registers nothing by itself):
+   1. build.mjs: add legal.js to the SCR list, after guide.js.
+   2. BETA_SCREENS (end of this file, commented): 'library/privacy': scrPrivacy,
+      'library/terms': scrTerms, 'library/about': scrAbout.
+   3. beta-template.html NAV, { id:'library' … tabs:[ … ] }: add
+      {id:'privacy',label:'Privacy policy'}, {id:'terms',label:'Terms of use'}, {id:'about',label:'About'}.
+      Also the Library lead ('Controlled documents and user guide.') and the Library row of the User guide table.
+   4. Sign-in page footer (loader.js authUI): links to the three pages. Before sign-in the UI script is not
+      running and REAL does not exist; the three functions only need esc() and tolerate a missing REAL.
+   5. Sidebar account block / phone More menu, next to Send feedback: optional link to About.
+
+   Depends on: esc() (UI script), REAL.appRev (optional), hash routes '#/library/<tab>', CSS classes
+   sec, card, card-head, card-pad, prose, beta-guide, t-micro, od-row, link-b. Nothing else.
+
+   Every statement about data below was checked in the code on 16/11/2026 (file:line in the handover note).
+   Do not add a statement that the code does not support.
+   ========================================================================== */
+
+/* TODO(Eric): fill these in. A null value leaves the line out of the page; nothing is invented.
+   - effective:  date the policy and the terms take effect, e.g. '01/12/2026'
+   - author:     name to show as author, as it should be printed
+   - authorRole: position / section of the author
+   - contact:    contact for privacy requests (email or extension). While null the pages point to
+                 Send feedback and to a dashboard administrator.
+   - legalRef:   the Vietnamese personal-data instrument to cite, after checking which one is in force
+                 (Decree 13/2023/ND-CP and / or the Law on Personal Data Protection). Not cited while null. */
+/* Eric 16/11/2026: author as below; owner line, acceptance clause and Confidentiality approved; providers stated by role, not by name */
+const LEGAL_META = { effective:null, author:'Thái Bá Hòa', authorRole:'QC Inspector', contact:null, legalRef:null };
+
+function legalShell(here, title, blocks){
+  const rev = (typeof REAL !== 'undefined' && REAL && REAL.appRev) ? REAL.appRev : '';
+  const pages = [['privacy','Privacy policy'],['terms','Terms of use'],['about','About']];
+  const sec = b => '<section class="sec"><div class="card"><div class="card-head"><h2>'+b[0]+'</h2></div>'
+    + '<div class="card-pad prose beta-guide">'+b[1]+'</div></div></section>';
+  return '<section class="sec"><div class="card"><div class="card-pad" style="display:grid;gap:8px">'
+    + '<span class="t-micro">'+title+(rev ? ' · '+esc(rev) : '')+(LEGAL_META.effective ? ' · effective '+esc(LEGAL_META.effective) : '')+'</span>'
+    + '<div class="od-row" style="--od-gap:8px;flex-wrap:wrap">'
+    + pages.filter(p => p[0] !== here).map(p => '<a class="link-b" href="#/library/'+p[0]+'">'+p[1]+'</a>').join('')
+    + '</div></div></div></section>'
+    + blocks.map(sec).join('');
+}
+function legalContact(){
+  return LEGAL_META.contact
+    ? 'Contact: <b>'+esc(LEGAL_META.contact)+'</b>, or use <b>Send feedback</b> in the dashboard.'
+    : 'Use <b>Send feedback</b> in the dashboard, or contact a dashboard administrator.';
+}
+
+function scrPrivacy(){
+  return legalShell('privacy', 'Privacy policy', [
+    ['Scope',
+      '<p>The QA AMO Dashboard is an internal tool of the QA AMO department (MQA) of VietJet Air. This policy states which personal data the dashboard handles, where it is kept and who can see it.'
+      + (LEGAL_META.legalRef ? ' Personal data is handled in line with '+esc(LEGAL_META.legalRef)+'.' : '')+'</p>'],
+    ['Account data',
+      '<table><tr><th>Data</th><th>Purpose</th><th>Where it is kept</th></tr>'
+      + '<tr><td>Email and password</td><td>Sign-in and password reset. The password-reset link is sent to this email.</td><td>The sign-in service of the dashboard. The dashboard does not keep the password and administrators cannot read it.</td></tr>'
+      + '<tr><td>Full name, email, role, date the account was requested</td><td>Approval of the account request and access by role (User, Moderator, Admin).</td><td>The dashboard user list.</td></tr></table>'
+      + '<p>Administrators see the user list in Admin › User management and approve, reject, change the role of, or delete an account.</p>'],
+    ['Consent',
+      '<ul><li>An account request can only be submitted after ticking the consent box on the request form. By doing so you consent to the collection and use of the account data above for the purposes stated.</li>'
+      + '<li>The date of the consent is recorded with the account.</li>'
+      + '<li>You can withdraw the consent at any time by asking a dashboard administrator to delete the account. The account is then removed and can no longer be used to sign in.</li>'
+      + '<li>The holder of an account created before the consent box was introduced who does not agree with this policy can ask for the account to be deleted in the same way.</li></ul>'],
+    ['Quality data from Coruson',
+      '<p>Reports, audits, workflow, tasks and documents are read from Coruson through the Galileo reporting service. These records carry the names of staff as Coruson holds them, for example report owners, task owners and document copyholders.</p>'
+      + '<ul><li>The dashboard only reads this data. It has no function that creates, changes or deletes a record on Coruson.</li>'
+      + '<li>Requests go through a proxy that accepts read requests only, from a signed-in dashboard account.</li>'
+      + '<li>Every signed-in, approved user can view this data. Report exports are limited to Moderator and Admin.</li></ul>'],
+    ['Data kept in your browser',
+      '<table><tr><th>Item</th><th>Storage</th><th>Removed</th></tr>'
+      + '<tr><td>Sign-in session and your profile (name, email, role)</td><td>Session storage of the browser tab</td><td>When the tab is closed, or on Sign out</td></tr>'
+      + '<tr><td>Copy of the dashboard data, for fast opening</td><td>IndexedDB of the browser</td><td>The main copy is removed on Sign out. The raw workflow and custom-field copies stay until the site data of the browser is cleared.</td></tr>'
+      + '<tr><td>Theme (dark or light); pinned widgets of My dashboard</td><td>Local storage of the browser</td><td>When the site data of the browser is cleared</td></tr></table>'
+      + '<p>The dashboard sets no cookie of its own and loads no analytics or advertising script.</p>'
+      + '<p>On a shared computer, choose <b>Sign out</b> when you finish.</p>'],
+    ['Feedback and AI Assistant',
+      '<ul><li><b>Send feedback</b> sends your message to the dashboard owner, together with your name, email, role, the screen you are on, the application revision and the browser identification (user agent).</li>'
+      + '<li><b>AI Assistant</b> (Moderator and Admin) sends your questions, and the dashboard data needed to answer them, to an external AI service. Do not enter personal data that the question does not need.</li></ul>'],
+    ['Service providers',
+      '<p>The dashboard relies on third-party service providers for account sign-in, hosting of the pages, the read-only relay to Coruson / Galileo, delivery of script libraries, delivery of feedback messages and the AI Assistant. The relay services check the sign-in session and keep technical request logs. Ideagen (Coruson, Galileo) is the source of the quality data.</p>'],
+    ['Your requests',
+      '<ul><li><b>Change password</b> is at the bottom of the left navigation (on a phone: <b>More</b>).</li>'
+      + '<li>To correct your name or role, or to have your account deleted, ask a dashboard administrator. Deletion removes the account from the sign-in service and from the user list.</li>'
+      + '<li>Records on Coruson are not affected by the dashboard account. Requests about them follow the Coruson process.</li>'
+      + '<li>'+legalContact()+'</li></ul>'],
+    ['Changes to this policy',
+      '<p>This policy is updated when the dashboard changes the data it handles. The revision at the top of this page identifies the version in use.</p>']
+  ]);
+}
+
+function scrTerms(){
+  return legalShell('terms', 'Terms of use', [
+    ['Authorised users',
+      '<ul><li>The dashboard is for VietJet Air staff whose account request was approved by a dashboard administrator.</li>'
+      + '<li>Access follows the role: <b>User</b> view only; <b>Moderator</b> also report exports and the AI Assistant; <b>Admin</b> also User management and My dashboard.</li>'
+      + '<li>An administrator can change the role of an account, reject it or delete it.</li></ul>'],
+    ['Status of the data',
+      '<ul><li>The dashboard is a monitoring view of the data held on Coruson. It shows a copy that can be several hours old; the top bar shows the age of the data.</li>'
+      + '<li>The record of reference is Coruson and the controlled documents. If a figure differs from Coruson, Coruson prevails.</li>'
+      + '<li>Indicators are calculated as defined in Library › User guide.</li>'
+      + '<li>AI Assistant answers are generated from the loaded data and are to be verified against the dashboard or Coruson before use.</li></ul>'],
+    ['Not a maintenance record',
+      '<ul><li>The dashboard is not a maintenance record and is not a controlled document.</li>'
+      + '<li>It is not to be used as the basis for an airworthiness decision, a certificate of release to service, or the closure or verification of a finding. These follow the approved procedures and are recorded on Coruson and the applicable systems.</li>'
+      + '<li>A document shown in Library › Documents is listed for reference; the valid revision is the one distributed through document control.</li></ul>'],
+    ['Account security',
+      '<ul><li>Your account is personal. Do not share the password or let another person use your session.</li>'
+      + '<li>Choose <b>Sign out</b> on a shared computer. On the LED wall, sign in only on the display tab.</li>'
+      + '<li>Report a suspected misuse of your account to a dashboard administrator without delay.</li></ul>'],
+    ['Confidentiality',
+      '<ul><li>The data is VietJet Air internal information. Screens, exports and screenshots are for work purposes only.</li>'
+      + '<li>Do not disclose them outside VietJet Air unless company procedures permit it.</li>'
+      + '<li>Exported PDF and Excel files are the responsibility of the person who exported them.</li></ul>'],
+    ['Availability',
+      '<ul><li>The dashboard is provided as is, without a guaranteed service level. It depends on Coruson / Galileo and on the service providers described in the <a href="#/library/privacy">Privacy policy</a>; when one of them is unavailable the dashboard can be slow, incomplete or unavailable.</li>'
+      + '<li>The label at the top right shows <b>Incomplete</b> when a data source failed. Do not rely on a figure while it is shown.</li>'
+      + '<li>Screens, indicators and exports can change with a new revision.</li></ul>'],
+    ['Changes to these terms',
+      '<p>These terms are updated with the dashboard. The revision at the top of this page identifies the version in use. Continued use of the dashboard means acceptance of the current terms.</p>'
+      + '<p>'+legalContact()+'</p>']
+  ]);
+}
+
+function scrAbout(){
+  const rev = (typeof REAL !== 'undefined' && REAL && REAL.appRev) ? REAL.appRev : '';
+  const row = (k, v) => v ? '<tr><td>'+k+'</td><td>'+v+'</td></tr>' : '';
+  return legalShell('about', 'About', [
+    ['QA AMO Dashboard',
+      '<p>The QA AMO Dashboard shows the quality reports, audits, safety records and indicators of the QA AMO department (MQA) of VietJet Air from Coruson (Galileo), in one place. It is a monitoring view; it does not replace Coruson.</p>'
+      + '<table><tr><th>Item</th><th>Detail</th></tr>'
+      + row('Revision', rev ? esc(rev) : '')
+      + row('Owner', 'QA AMO department (MQA), VietJet Air')
+      + row('Developed by', LEGAL_META.author ? esc(LEGAL_META.author)+(LEGAL_META.authorRole ? ' — '+esc(LEGAL_META.authorRole) : '') : 'QA AMO Team')
+      + row('Contact', LEGAL_META.contact ? esc(LEGAL_META.contact) : 'Send feedback in the dashboard')
+      + row('Use', 'Internal. Not a commercial product.')
+      + '</table>'],
+    ['Scope',
+      '<ul><li><b>Reports</b>: the QA AMO report forms on Coruson, including PAVOI / MVOI, MCAR, AMO-ECAR, CMR-CAR and ECAR, with status, target dates and overdue category.</li>'
+      + '<li><b>Analytics</b>: KPI charts, Early detection (KPI 2) and Event/IR report status.</li>'
+      + '<li><b>Safety</b>: HIRA, Additional mitigation, OSR/MOSR status, MOSR report, MOSR charts and SPI.</li>'
+      + '<li><b>Audit Plan</b>: the audit and inspection programme, scheduled and unscheduled.</li>'
+      + '<li><b>Library</b>: controlled documents, the User guide, the Privacy policy and the Terms of use.</li></ul>'],
+    ['Data source',
+      '<p>All quality data is read from Coruson through the Galileo reporting service. The dashboard does not write to Coruson. Accounts are kept in the dashboard user list. See the <a href="#/library/privacy">Privacy policy</a> and the <a href="#/library/terms">Terms of use</a>.</p>'],
+    ['Report a problem',
+      '<p><b>Send feedback</b> (under your name in the sidebar, or in the More menu on a phone) sends your message to the dashboard owner, with the screen you are on. The previous dashboard is kept as a backup at <b>/classic.html</b>.</p>']
+  ]);
+}
+
+/* registration (r230): legal.js is built after screens.js, where BETA_SCREENS is declared */
+BETA_SCREENS['library/privacy'] = scrPrivacy;
+BETA_SCREENS['library/terms'] = scrTerms;
+BETA_SCREENS['library/about'] = scrAbout;
 
 /* BETA-SCREENS:END */
 

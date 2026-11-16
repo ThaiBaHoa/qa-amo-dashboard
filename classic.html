@@ -516,6 +516,9 @@ body.kiosk .mob-menu{display:none!important}
         <input class="form-input" id="rPass" type="password" placeholder="Min 8 chars, 1 uppercase, 1 number" autocomplete="new-password"></div>
       <div class="form-group"><label class="form-label">Confirm Password</label>
         <input class="form-input" id="rPass2" type="password" placeholder="Repeat password" autocomplete="new-password" onkeydown="if(event.key==='Enter')doRegister()"></div>
+      <!-- [r230] Eric 16/11/2026: consent to the collection of account data, required; recorded in the account's metadata -->
+      <p style="font-size:12px;color:var(--muted);margin:0 0 8px">Your full name, email and password are collected to sign you in and to let an administrator approve the account. Name, email and role are kept in the dashboard user list, which dashboard administrators can see; the password is kept by the sign-in service and nobody can read it. You can ask an administrator to delete the account at any time.</p>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;margin:0 0 12px;cursor:pointer"><input id="rConsent" type="checkbox" style="margin-top:2px;flex:none"><span>I consent to the collection and use of this account data.</span></label>
       <button class="btn-primary" id="btnRegister" onclick="doRegister()">Submit Registration</button>
       <div class="auth-alert" id="registerAlert"></div>
     </div>
@@ -2533,7 +2536,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.16-r229-i1';
+const APP_REV = '2026.11.16-r230';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -2895,10 +2898,11 @@ async function doRegister() {
   if(!/[A-Z]/.test(pass)){showAl(al,'error','Password must contain at least one uppercase letter.');return;}
   if(!/[0-9]/.test(pass)){showAl(al,'error','Password must contain at least one number.');return;}
   if(pass!==pass2){showAl(al,'error','Passwords do not match.');return;}
+  if(!g('rConsent').checked){showAl(al,'error','Please tick the consent box to submit the request.');return;}
   g('btnRegister').disabled=true; showAl(al,'info','Submitting...');
   try {
     // Create Auth user — Supabase hashes with bcrypt automatically
-    const {data:auth,error:authErr}=await sb.auth.signUp({email,password:pass});
+    const {data:auth,error:authErr}=await sb.auth.signUp({email,password:pass,options:{data:{consent_account_data_at:new Date().toISOString(),consent_version:'r230'}}});
     if(authErr) throw authErr;
     if(!auth.user) throw new Error('Registration failed, please try again.');
 

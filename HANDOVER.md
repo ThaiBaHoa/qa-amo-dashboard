@@ -5,6 +5,13 @@
 
 ---
 
+## ✅ r230 — Trang Privacy policy · Terms of use · About + đồng ý thu thập dữ liệu tài khoản (16/11/2026, EricThai)
+
+- **Yêu cầu:** Eric: trang đang thiếu chính sách, điều khoản, tác giả; sau khi xem nháp chốt: tác giả **Thái Bá Hòa — QC Inspector**; dòng Owner và câu "Continued use … means acceptance" OK; không cần công bố chi tiết nhà cung cấp; thêm phần **đồng ý thu thập dữ liệu tài khoản**.
+- **Đã làm:** vault `beta-src/legal.js` (`scrPrivacy`, `scrTerms`, `scrAbout`, `LEGAL_META`), nối vào `build.mjs`, 3 tab mới ở Library (`#/library/privacy`, `#/library/terms`, `#/library/about`), dòng Library của User guide. Nhà cung cấp nêu theo vai trò, không nêu tên (trừ Ideagen là nguồn dữ liệu). Biểu mẫu **Request an account** ở cả `index.html` (`loader.js`) và `classic.html`: đoạn nêu dữ liệu thu, mục đích, ai xem được + ô tick bắt buộc; thời điểm đồng ý ghi vào metadata tài khoản Supabase Auth (`signUp options.data`: `consent_account_data_at`, `consent_version`), không đổi schema. Privacy policy có mục Consent (rút đồng ý = yêu cầu xoá tài khoản).
+- **Kiểm local:** 3 trang hiện đúng, About ghi "Developed by Thái Bá Hòa — QC Inspector", không còn tên nhà cung cấp; biểu mẫu đăng ký không tick thì báo "Please tick the consent box…" và không gửi yêu cầu. CHƯA đăng ký thử một tài khoản thật để xem metadata trên Supabase; biểu mẫu classic chỉ kiểm cú pháp.
+- **Còn mở:** `LEGAL_META` chưa có ngày hiệu lực, đầu mối liên hệ, văn bản pháp lý dẫn chiếu; chưa có link 3 trang ở màn đăng nhập (đoạn đồng ý nằm ngay trên biểu mẫu); tài khoản cũ chưa có bản ghi đồng ý; sổ tay rời.
+
 ## ✅ r229-i1 — Safety: MVOI gộp vào Partial / Not yet effective, action từ MITIGATION ACTION, đổi tên tab (16/11/2026, EricThai)
 
 - **Yêu cầu (Eric 16/11, nối việc r228):** (1) thêm ô PARTIAL EFFECTIVE đếm chung MVOI 3MT, ô NOT YET EFFECTIVE đếm chung MVOI 6MT, bảng tô màu MVOI theo hai mức đó; (2) cột Preventive control lấy thêm action ở trường mới "Mitigation action"; (3) tab `MOSR register` → **MOSR report**, `MSAG status` → **OSR/MOSR status**.
