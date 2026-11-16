@@ -5,6 +5,12 @@
 
 ---
 
+## ✅ r231 — Safety › MOSR charts chia khối theo bước phân loại (16/11/2026, EricThai)
+
+- **Yêu cầu:** Eric: các biểu đồ Department responsible và Occurrence category phải sắp xếp khoa học, phân biệt, nhìn vào biết ngay biểu đồ nào cho cái gì; có thể chia dạng stage.
+- **Đã làm:** `scrMosrCharts` gom biểu đồ vào các khối (`.mosr-stage`) theo bước phân loại trên Coruson: **1 Department responsible** (xanh dương: Level 1 · Area, Level 2 · Unit within each area), **2 ORC** (cam, donut) đứng cạnh khối **Reporting base** (không đánh số, không phải phân loại), **3 Occurrence category** (xanh lá: Level 1 · Category, rồi các Level 2). Mỗi khối có số bước, câu hỏi nó trả lời, màu thanh riêng và số report đã phân loại / chưa có giá trị. Số liệu không đổi (`M.mosrLevels`, `M.mosrOrc`).
+- **Kiểm local dữ liệu thật:** 4 khối hiện đúng, khoảng trống trong thẻ ≤ 38 px ở 1500 px, không lỗi console. Chưa xem chế độ tối và điện thoại.
+
 ## ✅ r230 — Trang Privacy policy · Terms of use · About + đồng ý thu thập dữ liệu tài khoản (16/11/2026, EricThai)
 
 - **Yêu cầu:** Eric: trang đang thiếu chính sách, điều khoản, tác giả; sau khi xem nháp chốt: tác giả **Thái Bá Hòa — QC Inspector**; dòng Owner và câu "Continued use … means acceptance" OK; không cần công bố chi tiết nhà cung cấp; thêm phần **đồng ý thu thập dữ liệu tài khoản**.
