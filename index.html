@@ -906,6 +906,13 @@ body.kiosk .od-clamp-2{display:block;-webkit-line-clamp:unset;overflow:visible}
 .hx td.hx-c{text-align:center}
 .hx td.hx-gen{min-width:120px;font-weight:600}
 .hx td.hx-txt{min-width:220px;width:24%;white-space:normal;overflow-wrap:anywhere}
+/* r231-i1 (Eric 16/11/2026): the HIRA screen takes the full width of the window and the register a taller frame; the width goes
+   to Preventive control / recovery measures, the longest text of the register */
+.wrap:has(.af-hira){max-width:none}
+.af-hira .tbl-wrap{max-height:min(82vh,1100px)}
+.af-hira .hx td.hx-comp{width:18%;min-width:200px}
+.af-hira .hx td.hx-act{width:44%;min-width:360px}
+.af-hira .hx thead th{position:sticky;top:0;z-index:1;box-shadow:inset 0 -1px 0 var(--border)}
 .hx td.hx-fill{text-align:center;min-width:84px}
 .hx td.hx-c .chip{white-space:nowrap}
 .hx td.hx-fill b{display:block;font-size:15px}
@@ -5483,10 +5490,10 @@ function hiraRegisterTable(reps, byRep){
       + (i ? '' : '<td class="hx-c"'+span+'>'+(ri + 1)+'</td>'
         + '<td class="hx-c"'+span+'><button class="link-b row-id" type="button" data-act="bhira" data-id="'+esc(r.id)+'">'+esc(r.number)+'</button></td>'
         + '<td class="hx-c hx-gen"'+span+'>'+hiraKv(hiraCls(r, 'generic'))+'</td>')
-      + (x ? '<td class="hx-txt">'+hiraComp(x)+'</td>' + hiraRiskTd(x.init, x.f.initRisk)
+      + (x ? '<td class="hx-txt hx-comp">'+hiraComp(x)+'</td>' + hiraRiskTd(x.init, x.f.initRisk)
            /* actions not assignable to a hazard: one cell over the HIRA's hazards, marked */
-           + (x.acts ? '<td class="hx-txt">'+hiraActText(x.acts)+'</td>'
-              : i ? '' : '<td class="hx-txt"'+span+'>'+hiraActText(x.act.all)+'<br>'+hiraMergedNote(x.act)+'</td>')
+           + (x.acts ? '<td class="hx-txt hx-act">'+hiraActText(x.acts)+'</td>'
+              : i ? '' : '<td class="hx-txt hx-act"'+span+'>'+hiraActText(x.act.all)+'<br>'+hiraMergedNote(x.act)+'</td>')
            + hiraRiskTd(x.cur, x.h.risk) + (i ? '' : hiraEffectTd(x.effect, span))
          : '<td class="hx-txt" colspan="5"><span class="dim">No hazard recorded on the form</span></td>')
       /* r228 (Eric 14/11/2026): one status per HIRA — the report's, graded on its latest due date */
