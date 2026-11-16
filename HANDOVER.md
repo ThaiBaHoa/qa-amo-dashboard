@@ -5,6 +5,14 @@
 
 ---
 
+## ✅ r231-i1 → i3 — bố cục rộng hết cửa sổ, risk matrix làm nổi số đếm (16/11/2026, EricThai)
+
+- **r231-i1** (`e3f7ccf`): HIRA register — cột Preventive control / recovery measures 44% bảng (`td.hx-act`), Specific components 18% (`td.hx-comp`), khung bảng cao tới 82vh, dòng tiêu đề sticky.
+- **r231-i2** (`455ecbe`): bỏ `max-width:1560px` của `.wrap` cho MỌI màn (Eric: nhiều trang còn trống hai bên). Trang chữ (`.prose`, `.beta-guide`) và risk matrix (860px) giữ bề rộng riêng, căn trái.
+- **r231-i3** (`ca51219`): risk matrix — ô có mối nguy viền vòng + bóng, số đếm trong đĩa trắng; ô trống chỉ hiện mã ô. **Quy tắc Eric chốt: mọi ô giữ ĐÚNG màu gốc của dải rủi ro (AMO SMS §9.4.3), không tint / fade / gradient** — hai bản demo làm nhạt ô trống đã bị bác.
+- **Kiểm local dữ liệu thật:** 8 route rộng hết ở 2560px, không tràn ngang; màu ô đo được `#FF0000` / `#00B050`; nền sáng và tối. Live trả `APP_REV` r231-i3.
+- **Còn mở:** chưa kiểm điện thoại, màn LED/kiosk; biểu đồ cột MOSR Level 1 và ô KPI bị giãn thưa trên màn rất rộng; ảnh trang HIRA trong sổ tay r231 chụp trước các thay đổi này.
+
 ## ✅ Sổ tay rời r231 (16/11/2026, EricThai)
 
 - `HuongDan_SuDung_QA_AMO_Dashboard_r231.docx` (workspace, 25 hình) dựng từ vault `beta-src/manual.js`: mục "Điểm mới" thêm r228–r231; đăng nhập có ô đồng ý; 4.5 Safety viết lại phần HIRA và MOSR charts, tên tab MOSR report và OSR/MOSR status; 4.7 Library thêm Privacy policy, Terms of use, About.
