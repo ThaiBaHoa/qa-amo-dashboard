@@ -5,6 +5,11 @@
 
 ---
 
+## 🟡 Sổ tay rời r231 (16/11/2026, EricThai) — chữ đã cập nhật, ẢNH CHƯA CHỤP LẠI
+
+- `HuongDan_SuDung_QA_AMO_Dashboard_r231.docx` (workspace) dựng từ vault `beta-src/manual.js`: mục "Điểm mới" thêm r228–r231; đăng nhập có ô đồng ý; 4.5 Safety viết lại phần HIRA (ô Category kiêm bộ lọc, MVOI, Mitigation action, hồ sơ có RFI/task), MOSR charts theo khối, tên tab MOSR report và OSR/MOSR status; 4.7 Library thêm Privacy policy, Terms of use, About.
+- **Ảnh:** chưa chụp được ảnh mới (cách chụp qua html2canvas + `/__shot` bị chặn trong phiên). Bỏ hình MOSR charts cũ (`07b-mosr-charts.png`, bố cục trước r229) khỏi sổ tay; chưa có hình HIRA; hình MOSR report (`05-mosr.png`) và SPI (`07-spi.png`) còn dải tab tên cũ. Cần chụp 1280×800: `05a-hira`, `05b-hira-register`, `05-mosr`, `07b-mosr-charts`, `07-spi`, rồi thêm lại dòng `IMG(...)` và callout trong `manual-shots-r220/callouts.json`.
+
 ## ✅ r231 — Safety › MOSR charts chia khối theo bước phân loại (16/11/2026, EricThai)
 
 - **Yêu cầu:** Eric: các biểu đồ Department responsible và Occurrence category phải sắp xếp khoa học, phân biệt, nhìn vào biết ngay biểu đồ nào cho cái gì; có thể chia dạng stage.
