@@ -2533,7 +2533,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.14-r229';
+const APP_REV = '2026.11.16-r229-i1';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -5426,13 +5426,19 @@ function buildHiraActions(raw, hazards){
     if(!hazards[f.report_id] || !f.section_id) return;
     const sn=hiraKey(f.section_name), k=hiraKey(f.field_name);
     if(sn==='HIRA HEADER'){ const m=k.match(/^SPECIFIC COMPONENTS (\d+)$/); if(m && f.value_text) (head[f.report_id] ||= []).push({n:+m[1], text:mosrPlain(f.value_text)}); return; }
-    if(sn!=='PREVENTIVE ACTION') return;
-    const o=((acts[f.report_id] ||= {})[f.section_id] ||= {sec:f.section_id,parent:f.parent_section_id||null,text:'',dept:'',done:null,created:f.report_field_created_date||''});
+    // [r229-i1] Eric 16/11/2026: newer reports record the action in a section named MITIGATION ACTION (fields Mitigation Action ·
+    // Department · Target date) instead of PREVENTIVE ACTION — both count. Probe 16/11: 14 such sections on HIRA-14, 15, 23, 25
+    // (HIRA-25 has only these), each with parent_section_id = its hazard. That section has no DATE COMPLETED: noDone marks the
+    // action so the completion checks do not read it as open; target = its Target date.
+    const isMit=sn==='MITIGATION ACTION';
+    if(sn!=='PREVENTIVE ACTION' && !isMit) return;
+    const o=((acts[f.report_id] ||= {})[f.section_id] ||= {sec:f.section_id,parent:f.parent_section_id||null,text:'',dept:'',done:null,created:f.report_field_created_date||'',noDone:isMit,target:null});
     if(f.report_field_created_date && f.report_field_created_date<o.created) o.created=f.report_field_created_date;
     const v=hiraTxt(f.value_text);
     if(k==='MITIGATION ACTION') o.text=v;
-    else if(k==='RESPONSIBLE DEPARTMENT') o.dept=v;
+    else if(k==='RESPONSIBLE DEPARTMENT' || (isMit && k==='DEPARTMENT')) o.dept=v;
     else if(k==='DATE COMPLETED') o.done=v ? v.slice(0,10) : null;
+    else if(isMit && k==='TARGET DATE') o.target=v ? v.slice(0,10) : null;
   });
   const num=t=>{ const m=String(t||'').match(/^\s*(\d+)\s*[.)]/); return m ? +m[1] : null; };
   const byTime=(x,y)=>String(x.created).localeCompare(String(y.created));

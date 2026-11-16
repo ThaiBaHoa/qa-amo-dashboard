@@ -2103,8 +2103,8 @@ const NAV = [
     tabs:[
       {id:'hira',      label:'HIRA'},
       {id:'mitigation',label:'Additional mitigation'},
-      {id:'msag',      label:'MSAG status'},
-      {id:'mosr',      label:'MOSR register'},
+      {id:'msag',      label:'OSR/MOSR status'},
+      {id:'mosr',      label:'MOSR report'},
       {id:'mosrcharts',label:'MOSR charts'},
       {id:'spi',       label:'SPI'}
     ]},
@@ -2525,15 +2525,19 @@ const M = {
      FULLY EFFECTIVE; the sheet also writes NOT YET EFFECTIVE in red). Black ink: 5.3 : 1 on #FF0000, 19.6 : 1 on
      #FFFF00, 7.3 : 1 on #00B050 (#1a1a1a on the red would be 4.3 : 1). Same fills in the dark theme, as M.RISK. */
   EFFECT: {
-    not:     { label:'Not effective',     hex:'#FF0000', ink:'#000000', values:['NOT YET EFFECTIVE', 'INEFFECTIVE', 'NOT EFFECTIVE'] },
-    partial: { label:'Partial effective', hex:'#FFFF00', ink:'#000000', values:['PARTIAL EFFECTIVE', 'PARTIALLY EFFECTIVE'] },
+    /* r229-i1 (Eric 16/11/2026): the Categories MVOI 3MT and MVOI 6MT (HIRA under verification of implementation, 3 / 6 months)
+       count and colour as PARTIAL EFFECTIVE and NOT YET EFFECTIVE; M.effectOf marks them .mvoi */
+    not:     { label:'Not yet effective', hex:'#FF0000', ink:'#000000', values:['NOT YET EFFECTIVE', 'INEFFECTIVE', 'NOT EFFECTIVE', 'MVOI 6MT'] },
+    partial: { label:'Partial effective', hex:'#FFFF00', ink:'#000000', values:['PARTIAL EFFECTIVE', 'PARTIALLY EFFECTIVE', 'MVOI 3MT'] },
     full:    { label:'Fully effective',   hex:'#00B050', ink:'#000000', values:['FULLY EFFECTIVE'] }
   },
   effectOf(v){
     const t = String(v || '').toUpperCase().replace(/\s+/g, ' ').trim();
     const k = Object.keys(M.EFFECT).find(x => M.EFFECT[x].values.includes(t));
-    return k ? Object.assign({ key: k }, M.EFFECT[k]) : null;
+    return k ? Object.assign({ key: k, mvoi: /^MVOI/.test(t) }, M.EFFECT[k]) : null;
   },
+  /* an action still to complete: no DATE COMPLETED — an action of the MITIGATION ACTION section has no such field (classic noDone) and is not judged */
+  actOpen: a => !a.done && !a.noDone,
   /* SEVERITY / LIKELIHOOD as the form writes them (words: Major, Remote…) → the F-118 code (C, 3), from M.RISK.sev /
      M.RISK.prob; a value that already is the code is kept; anything else → null (the screen shows the text as written) */
   sevCode(v){
@@ -2596,18 +2600,20 @@ const M = {
     const L = list || [], seen = {}, missRep = [], limit = [], intol = [], effect = [], today = M.isoToday(), S = M.SMS;
     L.forEach(x => {
       /* §9.5 d): the risk as categorised at the assessment (initial rating). acts = the hazard's own actions */
-      const acts = x.acts || x.act.all || [], open = !acts.length || acts.some(a => !a.done), day = /^\d{4}-\d{2}-\d{2}/.test(x.f.assessed || '') ? x.f.assessed : null;
+      const acts = x.acts || x.act.all || [], open = !acts.length || acts.some(M.actOpen), day = /^\d{4}-\d{2}-\d{2}/.test(x.f.assessed || '') ? x.f.assessed : null;
       if(x.init && x.init.band === 'T' && day){
-        const dDue = x.h.due ? M.daysBetween(day, x.h.due) : null, end = open ? today : acts.map(a => a.done).sort().pop(), dEnd = M.daysBetween(day, end);
-        if((dDue !== null && dDue > S.tolerableDays) || dEnd > S.tolerableDays) limit.push({ x, day, dDue, dEnd, end, open, none: !acts.length });
+        /* end = today while an action is open, else the last DATE COMPLETED; null when the actions carry no completion date at all */
+        const dDue = x.h.due ? M.daysBetween(day, x.h.due) : null, end = open ? today : acts.map(a => a.done).filter(Boolean).sort().pop() || null, dEnd = end ? M.daysBetween(day, end) : null;
+        if((dDue !== null && dDue > S.tolerableDays) || (dEnd !== null && dEnd > S.tolerableDays)) limit.push({ x, day, dDue, dEnd, end, open, none: !acts.length });
       }
-      if(x.init && x.init.band === 'I' && open) intol.push({ x, none: !acts.length, left: acts.filter(a => !a.done).length });
+      if(x.init && x.init.band === 'I' && open) intol.push({ x, none: !acts.length, left: acts.filter(M.actOpen).length });
       if(seen[x.r.id]) return; seen[x.r.id] = 1;
       const miss = []; if(!x.effect) miss.push('Effectiveness rating (Category)'); if(!(x.act.all || []).length) miss.push('Preventive action');
       if(miss.length) missRep.push({ r: x.r, miss });
       /* §9.7: PARTIAL = no related incident within 3 months, FULLY = more than 6 months — counted from the HIRA's last completed action */
-      const e = M.effectOf(x.effect), need = e && e.key === 'full' ? S.fullyMonths : e && e.key === 'partial' ? S.partialMonths : 0, all = x.act.all || [];
-      if(need){ const last = all.map(a => a.done).filter(Boolean).sort().pop() || null, notDone = all.filter(a => !a.done).length;
+      /* a Category MVOI 3MT / 6MT is a HIRA still under verification, not a rating recorded early: not judged */
+      const e = M.effectOf(x.effect), need = !e || e.mvoi ? 0 : e.key === 'full' ? S.fullyMonths : e.key === 'partial' ? S.partialMonths : 0, all = x.act.all || [];
+      if(need){ const last = all.map(a => a.done).filter(Boolean).sort().pop() || null, notDone = all.filter(M.actOpen).length;
         if(!last || notDone || M.addMonths(last, need) > today) effect.push({ r: x.r, value: x.effect, need, last, notDone, months: last ? M.monthsBetween(last, today) : null }); }
     });
     const off = L.filter(x => x.initOff), missHz = L.filter(x => x.miss.length);
@@ -2632,19 +2638,21 @@ const M = {
       return { r, level: (r.orc || []).join(', '), limit, age: M.daysBetween(r.submitted_date, today) };
     }).filter(x => x.age > x.limit);
   },
-  /* HIRA per Category (r228, Eric 14/11/2026): the tiles of Safety › HIRA, which also filter the register (M.hiraFilter).
-     One entry per Category found on any AMO - HIRA report (all time, so a Category with no HIRA in the period still shows
-     0), grouped by category_id (invariant I10), the title as Coruson writes it — probe 14/11/2026: FULLY EFFECTIVE 18,
-     MVOI 3MT 3, MVOI 6MT 3. Plus one fixed entry, key 'not' = NOT EFFECTIVE (Eric 14/11/2026: shown even at 0): the HIRA
-     whose Category is NOT YET EFFECTIVE or INEFFECTIVE (M.EFFECT.not; both are in the Coruson master list, no HIRA uses
-     them yet). ids = the HIRA of `reps` in the entry, n = their count; none = HIRA of `reps` without a Category. */
+  /* HIRA per Category (r228, Eric 14/11/2026; r229-i1, 16/11/2026): the tiles of Safety › HIRA, which also filter the register
+     (M.hiraFilter). Three fixed entries, shown even at 0, by the effectiveness group of the report's Category (M.EFFECT):
+     full = FULLY EFFECTIVE · partial = PARTIAL EFFECTIVE + MVOI 3MT · not = NOT YET EFFECTIVE + INEFFECTIVE + MVOI 6MT.
+     A Category outside these groups gets its own entry, by category_id (invariant I10), under its title on Coruson.
+     Probe 14/11/2026: FULLY EFFECTIVE 18, MVOI 3MT 3, MVOI 6MT 3. ids = the HIRA of `reps` in the entry, n = their count;
+     none = HIRA of `reps` without a Category. */
   hiraByCategory(reps){
-    const A = API(), cls = A.hira().map || {}, by = {}, isNot = c => (M.effectOf(c.effect) || {}).key === 'not'; let none = 0, total = 0;
-    const not = { id: 'not', title: 'NOT EFFECTIVE', note: 'HIRA · Category NOT YET EFFECTIVE or INEFFECTIVE', ids: [] };
-    Object.values(cls).forEach(c => { if(c.catId && !isNot(c)) by[c.catId] = by[c.catId] || { id: c.catId, title: c.effect, note: 'HIRA · Category on Coruson', ids: [] }; });
-    (reps || []).filter(r => r.code === A.HIRA_TITLE).forEach(r => { const c = cls[r.id] || {}; total++;
-      if(!c.catId) none++; else (isNot(c) ? not : by[c.catId]).ids.push(r.id); });
-    const list = Object.values(by).concat(not).sort((a, b) => String(a.title).localeCompare(String(b.title)));
+    const A = API(), cls = A.hira().map || {}, by = {}; let none = 0, total = 0;
+    const fixed = { full:    { id: 'full', title: 'FULLY EFFECTIVE', note: 'HIRA · Category on Coruson', ids: [] },
+                    partial: { id: 'partial', title: 'PARTIAL EFFECTIVE', note: 'HIRA · Category PARTIAL EFFECTIVE or MVOI 3MT', ids: [] },
+                    not:     { id: 'not', title: 'NOT YET EFFECTIVE', note: 'HIRA · Category NOT YET EFFECTIVE, INEFFECTIVE or MVOI 6MT', ids: [] } };
+    Object.values(cls).forEach(c => { if(c.catId && !M.effectOf(c.effect)) by[c.catId] = by[c.catId] || { id: c.catId, title: c.effect, note: 'HIRA · Category on Coruson', ids: [] }; });
+    (reps || []).filter(r => r.code === A.HIRA_TITLE).forEach(r => { const c = cls[r.id] || {}, e = M.effectOf(c.effect); total++;
+      if(e) fixed[e.key].ids.push(r.id); else if(c.catId) by[c.catId].ids.push(r.id); else none++; });
+    const list = [fixed.full, fixed.partial, fixed.not].concat(Object.values(by).sort((a, b) => String(a.title).localeCompare(String(b.title))));
     list.forEach(x => { x.n = x.ids.length; });
     return { list, none, total };
   },
@@ -2686,9 +2694,9 @@ const M = {
   },
 
   /* MOSR scope (r224) — two screens, two scopes, both kept (Eric r120-i1 / r164 / r168-i1):
-     · Safety › MSAG status (classic loadSafety): reports owned by an MSAG group, all time, Confidential excluded,
+     · Safety › OSR/MOSR status (classic loadSafety): reports owned by an MSAG group, all time, Confidential excluded,
        counted when status is Closed or Open → M.msagTotals.
-     · Safety › MOSR register (classic loadMosr): every form MOSR. Its rows carry .msag = the loadSafety rule (classic
+     · Safety › MOSR report (classic loadMosr): every form MOSR. Its rows carry .msag = the loadSafety rule (classic
        isMsagGroup + safetyFormKind), so the register splits into MSAG-owned + other owners → M.mosrSplit.
      M.consistency checks register MSAG-owned (all time) = status table. Open / Closed = Coruson report_status. */
   msagTotals(d){
@@ -2847,8 +2855,9 @@ M.consistency = function(){
       /* r228: the Category tiles add up to the HIRA of the scope, and each agrees with a recount on the Category titles of allData's HIRA */
       { const c = M.hiraByCategory(qa), hr = raw.filter(r => r.report_title === A.HIRA_TITLE), ti = r => ((A.hira().map || {})[r.report_id] || {}).effect || '';
         say('Safety › HIRA Category tiles + no Category vs HIRA count', c.list.reduce((t, x) => t + x.n, 0) + c.none, qa.filter(r => r.code === A.HIRA_TITLE).length);
-        c.list.forEach(x => say('Safety › HIRA Category ' + x.title + ' vs recount on the titles', x.n,
-          hr.filter(r => x.id === 'not' ? /^(NOT YET EFFECTIVE|INEFFECTIVE|NOT EFFECTIVE)$/.test(ti(r).toUpperCase()) : ti(r) === x.title).length));
+        { const RX = { full: /^FULLY EFFECTIVE$/, partial: /^(PARTIAL(LY)? EFFECTIVE|MVOI 3MT)$/, not: /^(NOT YET EFFECTIVE|INEFFECTIVE|NOT EFFECTIVE|MVOI 6MT)$/ };
+          c.list.forEach(x => say('Safety › HIRA Category ' + x.title + ' vs recount on the titles', x.n,
+            hr.filter(r => RX[x.id] ? RX[x.id].test(ti(r).toUpperCase().replace(/\s+/g, ' ').trim()) : ti(r) === x.title).length)); }
         say('Safety › HIRA filter Open vs open HIRA', M.hiraFilter(qa.filter(r => r.code === A.HIRA_TITLE), 'open').rows.length, hr.filter(r => r.semantic_status === 'Open' || r.semantic_status === 'Overdue').length);   /* metrics-ok: the classic formula being checked against */
         c.list.forEach(x => say('Safety › HIRA filter ' + x.title + ' vs its tile', M.hiraFilter(qa.filter(r => r.code === A.HIRA_TITLE), 'cat:' + x.id).rows.length, x.n)); }
       /* the hazard with the latest due date carries the report's own status (classic h.sem, same rule as semantic_status) */
@@ -2868,7 +2877,7 @@ M.consistency = function(){
           if(s && p && c && c[1] + c[2] !== p + s) n++; }));
         say('Safety › HIRA initial risk off the matrix vs recount from the form', M.hiraChecks(hz).off.length, n); }
       say('Safety › HIRA status of the latest-due hazard vs report status', Object.values(last).filter(x => x.r.hazardsNoDue === 0 && x.h.sem !== M.st(x.r)).length, 0); } }
-  /* r224: the MOSR register's MSAG-owned rows (all time) are exactly the MOSR of Safety › MSAG status */
+  /* r224: the MOSR report's MSAG-owned rows (all time) are exactly the MOSR of Safety › OSR/MOSR status */
   /* r224: MOSR past the ORC time limit against a recount with the limits written out (no M.SMS, no M.mosrOrcLate) */
   /* r229: MOSR charts by level against the register's own columns (every report with a value is in the level charts, none twice at level 1) */
   if(A.mosr().loaded){ const R = A.mosr().rows;
@@ -2882,8 +2891,8 @@ M.consistency = function(){
         const o = (r.orc || []).join(' ').toUpperCase(), lim = /HIGH/.test(o) ? 1 : /MEDIUM/.test(o) ? 7 : 30;
         return (Date.parse(t) - Date.parse(String(r.submitted_date).slice(0, 10))) / 864e5 > lim; }).length); }
   if(A.mosr().loaded && A.safety().loaded && A.safety().data){ const sp = M.mosrSplit(A.mosr().rows), st = M.msagTotals(A.safety().data);
-    say('Safety › MOSR register MSAG-owned (all time) vs MSAG status total', sp.msag.open + sp.msag.closed, st.mosrT);
-    say('Safety › MOSR register MSAG-owned open (all time) vs MSAG status open', sp.msag.open, st.mosrO); }
+    say('Safety › MOSR report MSAG-owned (all time) vs OSR/MOSR status total', sp.msag.open + sp.msag.closed, st.mosrT);
+    say('Safety › MOSR report MSAG-owned open (all time) vs OSR/MOSR status open', sp.msag.open, st.mosrO); }
   if(A.eis().loaded){
     const cr = M.caReports(f), all = cr.flatMap(x => x.cas), cs = M.caSummary(all);
     say('Corrective actions: closed + open vs total', cs.closed + cs.open, cs.total);
@@ -3953,7 +3962,7 @@ const IA_MAP = [
   ['Main','Overdue','Work Queue › Overdue','Was a separate destination; overdue is the same list with one more condition. It also surfaces on Overview, so it no longer needs to be hunted for.'],
   ['Main','KPI Charts','Analytics › KPI charts','Trends over time are a different job from clearing a queue. Grouping them stops the two modes competing in one sidebar.'],
   ['Main','SPI','Analytics › SPI','Same reason. SPI is read monthly, not daily.'],
-  ['Main','Safety','Safety › MSAG status','MSAG report status is a monitoring view, not an action list for the QA team.'],
+  ['Main','Safety','Safety › OSR/MOSR status','MSAG report status is a monitoring view, not an action list for the QA team.'],
   ['Main','Report Status','Analytics › Event/IR report status','An extract view of a source system. It belongs with the other read-and-compare screens.'],
   ['Main','Audit Plan','Audit Plan › Timeline','Promoted to its own top-level entry: the annual programme is its own planning job, and it now opens on a timeline rather than a table.'],
   ['Detail','All Forms','Findings › All forms','The register, unfiltered.'],
@@ -4788,9 +4797,9 @@ function scrSafety(){
       stat('MOSR (MSAG-owned)', t.mosrT.toLocaleString('en-US'), 'Closed '+t.mosrC+' · Open '+t.mosrO),
       stat('Open reports', String(t.osrO + t.mosrO), 'awaiting action', (t.osrO + t.mosrO) > 0)
     ])
-    /* r224: scope said in QA terms — this table is not the MOSR register (every owner, period filter); M.consistency reconciles them */
+    /* r224: scope said in QA terms — this table is not the MOSR report (every owner, period filter); M.consistency reconciles them */
     + '<section class="sec">' + card('MSAG report status', 'Reports owned by MSAG groups on Coruson · all time (the period filter does not apply) · Confidential excluded · loaded '+esc(d.updated)
-        + ' · Safety › MOSR register lists every MOSR, whatever the owner',
+        + ' · Safety › MOSR report lists every MOSR, whatever the owner',
       plainTable('safety', [{l:'Group on Coruson',w:'240px'},{l:'OSR closed',ac:true},{l:'OSR open',ac:true},{l:'OSR total',ac:true},{l:'MOSR closed',ac:true},{l:'MOSR open',ac:true},{l:'MOSR total',ac:true}], rows, 40, 0, {full:true, compact:true, nosort:true}))   /* group headings between rows: order is the layout */
     + '</section>';
 }
@@ -5027,7 +5036,7 @@ function scrFormDetail(titles){
     + sel('afForm', [['','All forms']].concat(titles.map(t => [t, t])), BS.afForm) + '</div>'
     + (w ? w : '<div class="card-pad">'+plainTable('af-'+BS.afForm, cols, rows, 25, 980)+'</div>') + '</div></section>';
 }
-/* MOSR register (Eric 03/11/2026): the columns of "MOSR Database - Dashboard.xlsx" without the yellow ones
+/* MOSR report (Eric 03/11/2026): the columns of "MOSR Database - Dashboard.xlsx" without the yellow ones
    (Describe what happened, Actions taken, Reporter, Position). Data: classic loadMosr. */
 const MOSR_OCC = ['Aircraft Technical Defect', 'Cabin Defect', 'Others'];
 const mosrCell = v => { const t = Array.isArray(v) ? v.join(', ') : v; return t ? esc(t) : '—'; };
@@ -5054,7 +5063,7 @@ function scrMosr(){
       stat('Past ORC time limit', String(late.length), 'open · Low 30 days · Medium 7 days · High 24 h · AMO SMS §9.3.8.3', late.length > 0, false, late.length ? 'bmosrorc' : null)
     ])
     + mosrReconcile(scope)
-    + '<section class="sec">' + card('MOSR register', 'form MOSR, by submitted date · classifications from tab EVALUATION on Coruson · Occurrence Category: the groups under Technical only',
+    + '<section class="sec">' + card('MOSR report', 'form MOSR, by submitted date · classifications from tab EVALUATION on Coruson · Occurrence Category: the groups under Technical only',
       '<div class="od-row" style="--od-gap:12px;flex-wrap:wrap">'
       + segs('mosrSF', [['all','All'],['Open','Open'],['Closed','Closed']], BS.mosrSF)
       + sel('mosrOcc', [['','All categories']].concat(MOSR_OCC.map(o => [o, o])), BS.mosrOcc, 'Occurrence') + '</div>'
@@ -5082,14 +5091,14 @@ function showMosrOrc(){
       : '<p class="t-sub dim">No open MOSR past its time limit for the current filters.</p>');
   $('#betaModal .beta-modal-panel').classList.add('wide');
 }
-/* r224: the register (every owner, period filter) against Safety › MSAG status (MSAG-owned, all time), from the same rows */
+/* r224: the register (every owner, period filter) against Safety › OSR/MOSR status (MSAG-owned, all time), from the same rows */
 function mosrReconcile(scope){
   const s = M.mosrSplit(scope);
   const owners = Object.keys(s.owners).map(k => ({ k, t:s.owners[k].total, o:s.owners[k].open })).sort((a, b) => b.t - a.t || a.k.localeCompare(b.k));
   return '<section class="sec"><div class="card"><div class="card-pad" style="display:grid;gap:8px">'
-    + '<p class="t-small"><b>MOSR '+s.all.total+'</b> = <b>'+s.msag.total+'</b> owned by MSAG groups (the reports counted in Safety › MSAG status) + <b>'+s.other.total+'</b> other owners'
+    + '<p class="t-small"><b>MOSR '+s.all.total+'</b> = <b>'+s.msag.total+'</b> owned by MSAG groups (the reports counted in Safety › OSR/MOSR status) + <b>'+s.other.total+'</b> other owners'
     + ' · <b>Open '+s.all.open+'</b> = '+s.msag.open+' MSAG-owned + '+s.other.open+' other owners'
-    + ' · '+esc(periodLabel())+' (MSAG status counts all time, so its MOSR figures differ unless every year is selected).</p>'
+    + ' · '+esc(periodLabel())+' (OSR/MOSR status counts all time, so its MOSR figures differ unless every year is selected).</p>'
     + (owners.length ? '<details><summary class="t-small" style="cursor:pointer">Other owners ('+owners.length+')</summary>'
       + plainTable('mosr-owners', [{l:'Report owner on Coruson'},{l:'MOSR',ar:true},{l:'Open',ar:true}],
           owners.map(x => ['<span class="t-small">'+esc(x.k)+'</span>', '<span class="num">'+x.t+'</span>', x.o ? '<span class="num red strong">'+x.o+'</span>' : '<span class="num dim">0</span>']), 50, 0, { compact:true })
@@ -5618,7 +5627,8 @@ function showHiraChecks(){
     .concat(ck.limit.map(q => row(q.x.r, 'Hazard '+q.x.i, 'Tolerable risk: mitigation to be finished within '+M.SMS.tolerableDays+' days (AMO SMS §9.5 d)',
         'Initial risk <b>'+q.x.init.code+'</b> · date assessed '+esc(fdx(q.day))
         + (q.dDue !== null ? ' · due date '+esc(fdx(q.x.h.due))+' (<b>'+q.dDue+'</b> days)' : ' · no due date')
-        + (q.none ? ' · no preventive action under this hazard after <b>'+q.dEnd+'</b> days' : q.open ? ' · actions not all completed after <b>'+q.dEnd+'</b> days' : ' · last action completed '+esc(fdx(q.end))+' (<b>'+q.dEnd+'</b> days)'))))
+        + (q.none ? ' · no preventive action under this hazard after <b>'+q.dEnd+'</b> days' : q.open ? ' · actions not all completed after <b>'+q.dEnd+'</b> days'
+           : q.end ? ' · last action completed '+esc(fdx(q.end))+' (<b>'+q.dEnd+'</b> days)' : ' · the actions carry no date completed (section MITIGATION ACTION)'))))
     .concat(ck.intol.map(q => row(q.x.r, 'Hazard '+q.x.i, 'Intolerable risk: immediate action, report to the Accountable Manager (AMO SMS §9.5 d)',
         'Initial risk <b>'+q.x.init.code+'</b> · '+(q.none ? 'no preventive action under this hazard' : q.left+' preventive action'+(q.left === 1 ? '' : 's')+' without a date completed'))))
     .concat(ck.effect.map(q => row(q.r, 'All hazards', 'Effectiveness rating earlier than its monitoring period (AMO SMS §9.7)',
@@ -6388,7 +6398,7 @@ const KIOSK_STEPS = [
   { l:'Report status · EIS', go:() => { BS.rsTab = 'eis'; go('analytics','status'); } },
   { l:'Report status · F-088', go:() => { BS.rsTab = 'f088'; go('analytics','status'); } },
   { l:'SPI', go:() => go('safety','spi') },
-  { l:'MSAG status', go:() => go('safety','msag') },
+  { l:'OSR/MOSR status', go:() => go('safety','msag') },
   { l:'Audit Plan · Timeline', go:() => go('audit','timeline') }
 ];
 /* LED wall layout (Eric 03/11/2026): nobody touches the wall, so no search, filters or tabs (CSS body.kiosk), and
@@ -6579,7 +6589,7 @@ function scrGuideNew(){
     + '<tr><td>Work Queue</td><td>Act on reports: Open reports, Overdue, and PAVOI / MVOI awaiting verification.</td></tr>'
     + '<tr><td>Reports</td><td>Read the register by form: All forms, PAVOI / MVOI, CMR-CAR, ECAR, AMO-ECAR, MCAR.</td></tr>'
     + '<tr><td>Analytics</td><td>KPI charts, Early detection (KPI 2) and Event/IR report status on Coruson.</td></tr>'
-    + '<tr><td>Safety</td><td>HIRA, Additional mitigation, MSAG status, MOSR register, MOSR charts and SPI. Old links to these screens open here.</td></tr>'
+    + '<tr><td>Safety</td><td>HIRA, Additional mitigation, OSR/MOSR status, MOSR report, MOSR charts and SPI. Old links to these screens open here.</td></tr>'
     + '<tr><td>Audit Plan</td><td>The audit and inspection programme: timeline, schedule list and workflow stages.</td></tr>'
     + '<tr><td>Library</td><td>Controlled documents and this guide.</td></tr>'
     + '<tr><td>Admin</td><td>User management, report export and pinned widgets (administrators; a moderator sees report export only).</td></tr></table>'
@@ -6615,13 +6625,13 @@ function scrGuideNew(){
     + '<li><b>Work Queue</b>: Open reports (nearest target first), Overdue (with CAT), Awaiting verification (open PAVOI / MVOI with no verification round). Select a row to open the report.</li>'
     + '<li><b>Reports › All forms</b>: every report type. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings). With <b>MCCF</b> selected the list covers every unit on Coruson, with an Org unit column; MCCF outside QA AMO appear only here and are not counted in KPIs, Overview, Work Queue or Export. <b>AMO - Additional Mitigation</b> lists the title, source HIRA, actions and tasks, and a row opens its actions, tasks and verification. Its Target is the latest Target date of the actions; on-time or late compares <b>Date verified</b> with it, and a missing date shows in red.</li>'
     + '<li><b>Reports › PAVOI / MVOI</b>: register on the left (Form filter: PAVOI or MVOI), record on the right with the verification history and the RFI / Task list of open records. KPI 7 counts PAVOI and MVOI.</li>'
-    + '<li><b>Safety › HIRA</b>: the AMO - HIRA records in the layout of VJC-MQA-F-118 Risk Register, one row per hazard (specific component) declared on the form. The tiles give the HIRA of the period, closed and open, the hazards, and the HIRA per <b>Category</b> on Coruson, one tile per Category (FULLY EFFECTIVE, MVOI 3MT, MVOI 6MT, NOT EFFECTIVE). Select a tile to filter the register: HIRA shows the open ones, a Category tile shows its HIRA; select it again, or <b>Show all</b>, to clear. <b>Status</b> is one value per HIRA, graded on its latest due date. Initial and current risk rating are filled in the colour of their band on the AMO SMS risk matrix (§9.4.3): Intolerable red, Tolerable orange, Acceptable green. The risk matrix counts the hazards per cell. Each preventive action sits under the hazard it belongs to on the Coruson form. <b>Effectiveness rating</b> is the Category of the report as Coruson writes it, one value per HIRA; an effectiveness rating is filled in its colour. Select a HIRA number for the full record (20 columns): every hazard with its controls, measures, department and dates, and the report summary. <b>Workflow stages, RFI and tasks of this report</b> under the record lists the stages and every RFI and task of the workflow with its owner, section, status and dates.</li>'
+    + '<li><b>Safety › HIRA</b>: the AMO - HIRA records in the layout of VJC-MQA-F-118 Risk Register, one row per hazard (specific component) declared on the form. The tiles give the HIRA of the period, closed and open, the hazards, and the HIRA per <b>Category</b> on Coruson, in three tiles: FULLY EFFECTIVE, PARTIAL EFFECTIVE (with the Category MVOI 3MT) and NOT YET EFFECTIVE (with MVOI 6MT and INEFFECTIVE); a Category outside these gets its own tile. Select a tile to filter the register: HIRA shows the open ones, a Category tile shows its HIRA; select it again, or <b>Show all</b>, to clear. <b>Status</b> is one value per HIRA, graded on its latest due date. Initial and current risk rating are filled in the colour of their band on the AMO SMS risk matrix (§9.4.3): Intolerable red, Tolerable orange, Acceptable green. The risk matrix counts the hazards per cell. Each preventive action sits under the hazard it belongs to on the Coruson form. <b>Effectiveness rating</b> is the Category of the report as Coruson writes it, one value per HIRA, filled in the colour of its group (MVOI 3MT as Partial effective, MVOI 6MT as Not yet effective). <b>Preventive control / recovery measures</b> lists the actions of the sections PREVENTIVE ACTION and MITIGATION ACTION of the form. Select a HIRA number for the full record (20 columns): every hazard with its controls, measures, department and dates, and the report summary. <b>Workflow stages, RFI and tasks of this report</b> under the record lists the stages and every RFI and task of the workflow with its owner, section, status and dates.</li>'
     + '<li><b>Safety › HIRA · Compliance checks</b>: the button on the register card counts the items below for the HIRA of the period; select it for the list, and a row for the record. (1) Initial risk rating that is not the cell of Severity × Likelihood on the form; the record marks the cell with the matrix code. (2) Missing data: Severity, Likelihood, Initial or Current risk rating, Date assessed, Due date, a preventive action, the Effectiveness rating. (3) Tolerable initial risk whose due date or completion is more than 30 days after Date assessed (AMO SMS §9.5 d). (4) Intolerable initial risk with an action not completed. (5) Fully effective recorded less than 6 months, or Partial effective less than 3 months, after the last completed action (§9.7).</li>'
     + '<li><b>Safety › Additional mitigation</b>: the AMO - Additional Mitigation register, the same as Reports › All forms with that form chosen.</li>'
-    + '<li><b>Safety › MOSR register</b>: every MOSR by submitted date, with its classifications from Coruson. OSR forms carry no classifications; their counts are in Safety › MSAG status. The tile <b>Past ORC time limit</b> counts the MOSR still open after the risk-assessment time limit of their ORC level (AMO SMS §9.3.8.3): Very low and Low 30 days, Medium 7 days, High 24 hours; an open MOSR without ORC is listed after 30 days. Select the tile for the list.</li>'
+    + '<li><b>Safety › MOSR report</b>: every MOSR by submitted date, with its classifications from Coruson. OSR forms carry no classifications; their counts are in Safety › OSR/MOSR status. The tile <b>Past ORC time limit</b> counts the MOSR still open after the risk-assessment time limit of their ORC level (AMO SMS §9.3.8.3): Very low and Low 30 days, Medium 7 days, High 24 hours; an open MOSR without ORC is listed after 30 days. Select the tile for the list.</li>'
     + '<li><b>Safety › SPI</b>: one card per safety performance indicator, monthly rate against the SPT. A card at a trigger level states the action AMO SMS §10.6 requires: Level 1 close monitoring and trend analysis; Level 2 investigation into potential root causes; Level 3 immediate risk assessment, with the Accountable Manager informed immediately.</li>'
     + '<li><b>Analytics › KPI charts</b>: summary tiles, Closure by quarter, KPI 2, KPI 7 and KPI QC. Select a tile or a count for the reports behind it; closing a detail returns to that list.</li>'
-    + '<li><b>Safety › MSAG status</b>: OSR and MOSR closed, open and total for each MSAG group on Coruson. It counts all the data of these groups and ignores the Year and Month filter, so its figures differ from Safety › MOSR register.</li>'
+    + '<li><b>Safety › OSR/MOSR status</b>: OSR and MOSR closed, open and total for each MSAG group on Coruson. It counts all the data of these groups and ignores the Year and Month filter, so its figures differ from Safety › MOSR report.</li>'
     + '<li><b>Safety › MOSR charts</b>: form MOSR by submitted date, from the classifications of tab EVALUATION on Coruson. <b>Department responsible</b> at level 1 (area) and level 2 (unit within the area), <b>ORC</b> as a donut, <b>Occurrence category</b> at level 1 and one level-2 chart for each level 1 that has a level 2 (Technical, Standard &amp; Compliance, Human Factor, Contractor, Sub-contractor), and the base. Year and month come from the filter bar, the quarter is chosen in the tab. A report with two values counts in both; the caption states the reports without each classification, and a card states the reports recorded at level 1 only.</li>'
     + '<li><b>Analytics › Event/IR report status</b>: EIS and F-088 completeness on Coruson; the tiles count the reports complete on each check, the table shows workflow, linked reports, final report and status per report.</li>'
     + '<li><b>Audit Plan</b>: audits are split into <b>Scheduled</b> (the annual plan, MNT numbers) and <b>Unscheduled</b> (RSP Random Surveillance and SSP Specified Surveillance, raised as required). Plan progress and <b>Delayed</b> count scheduled audits only; unscheduled ones have their own tile, their own grid on the timeline and a <b>Programme</b> filter and column. The <b>Rescheduled</b> tile counts scheduled audits whose dates were changed on Coruson and opens their list with the reschedule reason; it turns red while any of them is not yet performed. On the timeline a rescheduled audit has an amber outer ring, and the schedule list shows a <b>Rescheduled</b> tag. Coruson reporting keeps only the current dates, so the original month is not shown. KPI tiles, a location × month view (one dot per audit, inspection or surveillance in its scheduled month; filter by type or show only upcoming / with overdue findings), and a schedule list. Select a dot or a row for its workflow stages and findings. A solid blue ring is an audit in status <b>Schedule Confirmed</b>; it counts as planned and open, like Scheduled. <b>Workflow stages</b>: for the QA AMO audits in the selected period, how many stages of each name are in each Galileo status; select an InProgress or PendingSignOff count for the audits concerned.</li>'
@@ -6642,7 +6652,7 @@ function scrGuideNew(){
     + '<li>A tile or table that shows a dash or "Loading…" is waiting for its data; it never shows 0 for data that has not arrived.</li>'
     + '<li>If a number looks wrong, check the record in Coruson first: the dashboard shows what Coruson holds.</li></ul>')
   + sec('led','LED wall mode',
-    '<p>Open the dashboard with <b>?kiosk=1</b> at the end of the address (30 seconds per page), or <b>?kiosk=60</b> for 60 seconds per page (5 to 600 seconds). The screen rotates Overview → Report status EIS → Report status F-088 → SPI → MSAG status → Audit Plan timeline, without navigation, search, tabs or filters. Pages scale to the height of the wall. A page still longer than the wall stays 4 seconds at the top, scrolls slowly to the bottom and stays 4 seconds, so it can stay longer than the seconds you set. Press Esc to stop. Sign in on the tab on show and keep it open; use one browser window. On the wall the data refreshes itself every hour (every 12 hours on a normal screen), and the page reloads when a new day starts. The top bar shows the time the data was loaded, and <b>last refresh failed</b> when the latest refresh did not complete; the previous data stays on show and the refresh is tried again after 15 minutes.</p>')
+    '<p>Open the dashboard with <b>?kiosk=1</b> at the end of the address (30 seconds per page), or <b>?kiosk=60</b> for 60 seconds per page (5 to 600 seconds). The screen rotates Overview → Report status EIS → Report status F-088 → SPI → OSR/MOSR status → Audit Plan timeline, without navigation, search, tabs or filters. Pages scale to the height of the wall. A page still longer than the wall stays 4 seconds at the top, scrolls slowly to the bottom and stays 4 seconds, so it can stay longer than the seconds you set. Press Esc to stop. Sign in on the tab on show and keep it open; use one browser window. On the wall the data refreshes itself every hour (every 12 hours on a normal screen), and the page reloads when a new day starts. The top bar shows the time the data was loaded, and <b>last refresh failed</b> when the latest refresh did not complete; the previous data stays on show and the refresh is tried again after 15 minutes.</p>')
   + sec('faq','Questions',
     '<p><b>The first opening is slow.</b> The first load of the day on a computer fetches everything from Galileo. Later openings use the saved copy.</p>'
     + '<p><b>I cannot see Admin screens, export buttons or the AI Assistant.</b> The User role is view only. Ask an administrator to change your role.</p>'

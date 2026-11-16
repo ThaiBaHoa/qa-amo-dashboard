@@ -5,6 +5,14 @@
 
 ---
 
+## ✅ r229-i1 — Safety: MVOI gộp vào Partial / Not yet effective, action từ MITIGATION ACTION, đổi tên tab (16/11/2026, EricThai)
+
+- **Yêu cầu (Eric 16/11, nối việc r228):** (1) thêm ô PARTIAL EFFECTIVE đếm chung MVOI 3MT, ô NOT YET EFFECTIVE đếm chung MVOI 6MT, bảng tô màu MVOI theo hai mức đó; (2) cột Preventive control lấy thêm action ở trường mới "Mitigation action"; (3) tab `MOSR register` → **MOSR report**, `MSAG status` → **OSR/MOSR status**.
+- **Probe 16/11:** 4 HIRA (14, 15, 23, 25) có section **MITIGATION ACTION** (trường Mitigation Action · Department · Target date; KHÔNG có Date completed), 14 section, `parent_section_id` = section mối nguy; HIRA-25 chỉ có section này. PREVENTIVE ACTION vẫn 106 section.
+- **Đã làm:** classic `buildHiraActions` nhận cả hai section (`noDone`, `target` cho section mới). `M.EFFECT`: MVOI 3MT thuộc partial, MVOI 6MT thuộc not (`effectOf().mvoi`); `M.hiraByCategory` 3 ô cố định full / partial / not + ô riêng cho Category lạ; `M.actOpen` để action section mới (không có ngày hoàn thành) không bị coi là còn mở; kiểm §9.7 không áp cho MVOI. Tên tab, tiêu đề thẻ, User guide đổi theo.
+- **Kiểm local dữ liệu thật (2025 + 2026):** 24 HIRA = FULLY 18 · PARTIAL 3 (HIRA-09, 23, 25) · NOT YET 3 (HIRA-04, 11, 22); ô MVOI tô vàng / đỏ. Action: HIRA-14 10, HIRA-15 5, HIRA-23 1+1+1+1, HIRA-25 2+2 (trước: 6, 2, 1+0+0+0, 0). Compliance checks 35 → 28 vì hết các mục thiếu Preventive action. Không có dòng `Consistency`.
+- **Tự chốt:** ô Effectiveness vẫn ghi đúng chữ Category (MVOI 3MT / 6MT), chỉ màu theo nhóm. Route và tên nội bộ (`safety/msag`, `safety/mosr`) giữ nguyên.
+
 ## ✅ r229 — Safety › MOSR charts theo cấp phân loại (14/11/2026, EricThai) — commit + push 14/11 theo lệnh Eric
 
 - **Yêu cầu:** `MQA dashboard website/MOSR Chart.docx` + `Taxanomy - Safety AMO - Updated 29-Sep-2026.xlsx` (Downloads của Eric): 2 biểu đồ Department responsible lv 1 và lv 2, ORC dạng donut, Occurrence category 1 biểu đồ lv 1 + mỗi lv 1 có con một biểu đồ lv 2 (4 cái). Dữ liệu từ tab Evaluation › Classifications.
