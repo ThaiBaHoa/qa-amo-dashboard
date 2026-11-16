@@ -900,6 +900,20 @@ body.kiosk .od-clamp-2{display:block;-webkit-line-clamp:unset;overflow:visible}
 /* every cell keeps its band colour (red / orange / green, Eric 11/11/2026); an empty cell only dims its count */
 .rmx-c.zero .num{opacity:.45}
 .rmx-c.zero .rmx-code{opacity:1}
+/* r231-i3 (Eric 16/11/2026): the count of a cell must stand apart from the cell code. EVERY cell keeps the exact colour of its
+   band (AMO SMS §9.4.3) — never tinted, faded or shaded. A cell that holds hazards is raised and ringed, with the count in a
+   white disc; a cell without hazards shows its code only. */
+.rmx{border-spacing:7px}
+.rmx thead th{font-size:13px;font-weight:700;padding-bottom:8px}
+.rmx thead th span{font-size:11.5px;margin-top:2px}
+.rmx-c{height:62px;border-radius:10px;padding:5px 4px;background:var(--rmx);transition:transform var(--dur-in,.15s) var(--ease-out,ease-out)}
+.rmx-c.zero .num{display:none}
+.rmx-c.zero .rmx-code{font-size:12px;font-weight:700;letter-spacing:.05em;opacity:.8}
+.rmx-c:not(.zero){box-shadow:0 0 0 2px var(--raised),0 0 0 4px var(--text),0 10px 18px -6px rgba(0,0,0,.45)}
+.rmx-c:not(.zero) .num{display:grid;place-items:center;width:32px;height:32px;margin:0 auto 3px;border-radius:50%;background:#fff;color:#14171a;font-size:17px;font-weight:800;line-height:1;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.rmx-c:not(.zero) .rmx-code{font-size:11px;font-weight:800;letter-spacing:.06em;opacity:1}
+.rmx-c:not(.zero):hover{transform:translateY(-2px)}
+@media (prefers-reduced-motion:reduce){.rmx-c{transition:none}.rmx-c:not(.zero):hover{transform:none}}
 /* F-118 outer table: bordered grid, merged HIRA cells, filled rating cells, full text in the two long columns */
 .hx{border-collapse:collapse;width:100%;min-width:1080px;font-size:13px;line-height:1.45}
 .hx th,.hx td{border:1px solid var(--border);padding:6px 8px;vertical-align:middle}
