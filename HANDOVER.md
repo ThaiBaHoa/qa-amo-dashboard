@@ -5,10 +5,11 @@
 
 ---
 
-## 🟡 Sổ tay rời r231 (16/11/2026, EricThai) — chữ đã cập nhật, ẢNH CHƯA CHỤP LẠI
+## ✅ Sổ tay rời r231 (16/11/2026, EricThai)
 
-- `HuongDan_SuDung_QA_AMO_Dashboard_r231.docx` (workspace) dựng từ vault `beta-src/manual.js`: mục "Điểm mới" thêm r228–r231; đăng nhập có ô đồng ý; 4.5 Safety viết lại phần HIRA (ô Category kiêm bộ lọc, MVOI, Mitigation action, hồ sơ có RFI/task), MOSR charts theo khối, tên tab MOSR report và OSR/MOSR status; 4.7 Library thêm Privacy policy, Terms of use, About.
-- **Ảnh:** chưa chụp được ảnh mới (cách chụp qua html2canvas + `/__shot` bị chặn trong phiên). Bỏ hình MOSR charts cũ (`07b-mosr-charts.png`, bố cục trước r229) khỏi sổ tay; chưa có hình HIRA; hình MOSR report (`05-mosr.png`) và SPI (`07-spi.png`) còn dải tab tên cũ. Cần chụp 1280×800: `05a-hira`, `05b-hira-register`, `05-mosr`, `07b-mosr-charts`, `07-spi`, rồi thêm lại dòng `IMG(...)` và callout trong `manual-shots-r220/callouts.json`.
+- `HuongDan_SuDung_QA_AMO_Dashboard_r231.docx` (workspace, 25 hình) dựng từ vault `beta-src/manual.js`: mục "Điểm mới" thêm r228–r231; đăng nhập có ô đồng ý; 4.5 Safety viết lại phần HIRA và MOSR charts, tên tab MOSR report và OSR/MOSR status; 4.7 Library thêm Privacy policy, Terms of use, About.
+- **Ảnh mới** (16/11, bản live r231, năm 2026) trong `manual-shots-r220/`: `05a-hira`, `05b-hira-register`, `05-mosr`, `07b-mosr-charts`, `07c-mosr-occurrence`, `07-spi`; ba ảnh cũ bị thay giữ ở `manual-shots-r220/_truoc-r231/`. Cách chụp: Edge qua Claude in Chrome, ép bố cục trang về 1280×800 bằng `zoom` + `width:1280px` trên `<html>` rồi cắt và đổi cỡ ảnh JPEG của công cụ (1568×711) về PNG 1280×800 — ảnh mềm hơn bộ cũ. Toạ độ callout đo từ DOM chia cho hệ số zoom.
+- Chưa mở file bằng Word để xem ngắt trang. Slide (`deck.js`) dùng chung `callouts.json` chưa dựng lại.
 
 ## ✅ r231 — Safety › MOSR charts chia khối theo bước phân loại (16/11/2026, EricThai)
 
