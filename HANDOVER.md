@@ -5,6 +5,13 @@
 
 ---
 
+## ✅ r234 — MOSR charts: bộ lọc theo khối, bấm cột mở danh sách MOSR (18/11/2026, EricThai)
+
+- **Bộ lọc theo khối:** Department responsible, ORC, Reporting base, Occurrence category mỗi khối một hàng lọc (Status, Hazard và các phân loại khối đó không vẽ); chỉ tác động lên khối đó. Quarter ở đầu trang vẫn áp cả trang.
+- **Bấm để xem danh sách:** mọi mark gọi `showMosrList` (cột Level 1, dòng Level 2, tổng khu vực, donut ORC, cột base kể cả Other, without a value). Danh sách tính trên đúng các dòng đã lọc của khối, phụ đề ghi bộ lọc đang áp.
+- **Kiểm local dữ liệu thật (2026, 215 MOSR):** Line 107, Line › Maintenance Station 84, ORC VERY LOW 64, SGN 69, Other 12, Technical 66, Technical › Aircraft Technical Defect 41, Department without a value 12: số trên biểu đồ khớp số dòng. Lọc ORC = VERY LOW ở khối Department: 64 MOSR, Line 31, khối Occurrence giữ 215.
+- **Chưa kiểm:** nền tối, điện thoại, LED. Sổ tay Word chưa dựng lại.
+
 ## ✅ r233 — Reports › All forms: ô chọn form gọn lại, Summary của Investigation Report (18/11/2026, EricThai)
 
 - **Ô chọn form** (`afTitles` trong `screens.js`): bỏ 6 form checklist, bỏ form đã có trang riêng (các tab Reports, trang Safety), ẩn form không có report trong kỳ đang lọc (Year / Month). Bảng khi chưa chọn form chỉ còn report của các form trong ô chọn.

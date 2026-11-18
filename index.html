@@ -825,6 +825,14 @@ body.rail .acct-t{display:none}
 .beta-ai-in{display:flex;gap:var(--s2);padding:var(--s3);border-top:1px solid var(--border)}
 .beta-ai-in textarea{flex:1;font:inherit;padding:8px;resize:none}
 /* MOSR charts */
+/* r234: a mark of the MOSR charts that opens its list (button), and the filter row of a stage */
+.mosr-hit{appearance:none;background:none;border:0;margin:0;padding:0;font:inherit;color:inherit;cursor:pointer;border-radius:6px}
+.mosr-hit:hover{background:color-mix(in srgb,var(--text) 7%,transparent)}
+.mosr-hit:focus-visible{outline:2px solid var(--accent-fg);outline-offset:2px}
+.rk-btn{width:100%;text-align:left}
+.mosr-leg-b{display:flex;align-items:center;gap:var(--s2);min-width:0;width:100%;text-align:left;padding:3px 4px}
+button.rk-total{padding:2px 6px}
+.mosr-fbar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:0 0 var(--s3)}
 .mosr-cols{display:flex;align-items:stretch;gap:var(--s2);height:280px;padding-top:var(--s2)}
 .mosr-col{flex:1 1 0;min-width:0;position:relative;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;text-align:center;padding-bottom:58px}
 .mosr-col>.num{flex:none}
@@ -5178,21 +5186,51 @@ function showMosrOrc(){
       : '<p class="t-sub dim">No open MOSR past its time limit for the current filters.</p>');
   $('#betaModal .beta-modal-panel').classList.add('wide');
 }
-/* r232 (Eric 18/11/2026): the MOSR of the MOSR charts period that carry no value for one classification
-   (which = dept | orc | occ) — the list behind "N without a value" in a stage caption */
+/* r234 (Eric 18/11/2026): MOSR charts — every stage has its own filters, and every mark opens the MOSR behind it.
+   A stage filters on the classifications it does not draw (MOSR_STAGE_DIMS); the filter values live in BS under
+   mf_<stage>_<dim>. mosrStageRows = the reports a stage draws; showMosrList recounts from the same rows, so the list
+   always holds exactly the reports of the mark. */
 const MOSR_NONE = { dept:['Department responsible', r => !(r.dept_lv || []).length], orc:['ORC', r => !(r.orc || []).length], occ:['Occurrence category', r => !(r.occ_lv || []).length] };
-function showMosrNone(which){
-  const A = API(), def = MOSR_NONE[which]; if(!def) return;
-  const list = A.mosr().rows.filter(r => inPeriod(r.submitted_date) && mosrQuarterOk(r.submitted_date) && def[1](r))
-    .sort((a, b) => String(b.report_number).localeCompare(String(a.report_number), undefined, { numeric:true }));
-  MODAL_REDRAW = null; MODAL_KEY = 'mosrnone:'+which;
-  openModal('MOSR without '+def[0], list.length+' report'+(list.length === 1 ? '' : 's')+' · '+periodLabel()+(BS.mosrQ ? ' · Q'+BS.mosrQ : '')+' · no value in '+def[0]+' on Coruson',
-    list.length ? '<div class="tbl-wrap"><table class="hx" style="min-width:0;width:100%"><thead><tr>'+['Report number','Submitted','Short summary','Report owner','Status'].map(h => '<th scope="col">'+h+'</th>').join('')+'</tr></thead><tbody>'
+const MOSR_STAGE_DIMS = { dept:['st','hz','orc','occ','base'], orc:['st','hz','area','occ','base'], base:['st','hz','area','orc','occ'], occ:['st','hz','area','orc','base'] };
+const MOSR_DIM_LABEL = { st:'Status', hz:'Hazard', area:'Area', orc:'ORC', occ:'Occurrence', base:'Workplace' };
+const MOSR_TEST = {
+  st:   (r, v) => r.report_status === v,   /* metrics-ok: MOSR Coruson status */
+  hz:   (r, v) => mosrHazard(r, v),
+  area: (r, v) => (r.dept_lv || []).some(p => p[0] === v),
+  orc:  (r, v) => (r.orc || []).includes(v),
+  occ:  (r, v) => (r.occ_lv || []).some(p => p[0] === v),
+  base: (r, v) => [].concat(r.base_group || []).includes(v) };
+const mfKey = (s, d) => 'mf_'+s+'_'+d;
+const mosrBaseRows = () => API().mosr().rows.filter(r => inPeriod(r.submitted_date) && mosrQuarterOk(r.submitted_date));
+const mosrStageRows = (s, all) => MOSR_STAGE_DIMS[s].reduce((rs, d) => { const v = BS[mfKey(s, d)]; return v ? rs.filter(r => MOSR_TEST[d](r, v)) : rs; }, all);
+const mosrStageFilterText = s => MOSR_STAGE_DIMS[s].filter(d => BS[mfKey(s, d)]).map(d => MOSR_DIM_LABEL[d]+': '+(d === 'hz' ? (BS[mfKey(s, d)] === 'yes' ? 'Yes' : 'No') : BS[mfKey(s, d)])).join(' · ');
+const MOSR_BASE_MAX = 9;   /* columns of the Reporting base chart; the smallest fold into "Other" */
+/* the reports behind one mark: s = stage, d = what the mark counts, a / b = its value(s) */
+function mosrPick(rows, s, d, a, b){
+  if(d === 'none') return rows.filter(MOSR_NONE[s][1]);
+  if(d === 'dept1' || d === 'occ1'){ const w = d === 'dept1' ? 'dept_lv' : 'occ_lv'; return rows.filter(r => (r[w] || []).some(p => p[0] === a)); }
+  if(d === 'dept2' || d === 'occ2'){ const w = d === 'dept2' ? 'dept_lv' : 'occ_lv'; return rows.filter(r => (r[w] || []).some(p => p[0] === a && p[1] === b)); }
+  if(d === 'orc') return rows.filter(r => (r.orc || []).includes(a));
+  if(d === 'base') return rows.filter(r => [].concat(r.base_group || []).includes(a));
+  if(d === 'baseother'){ const rest = new Set(mosrCount(rows, r => r.base_group).slice(MOSR_BASE_MAX - 1).map(x => x.k)); return rows.filter(r => [].concat(r.base_group || []).some(v => rest.has(v))); }
+  return [];
+}
+function showMosrList(ds){
+  const s = ds.s, d = ds.d, a = ds.a || '', b = ds.b || ''; if(!MOSR_STAGE_DIMS[s]) return;
+  const list = mosrPick(mosrStageRows(s, mosrBaseRows()), s, d, a, b)
+    .sort((x, y) => String(y.report_number).localeCompare(String(x.report_number), undefined, { numeric:true }));
+  const what = d === 'none' ? 'MOSR without '+MOSR_NONE[s][0] : d === 'baseother' ? 'MOSR · other workplaces' : 'MOSR · '+(b ? a+' › '+b : a);
+  const ft = mosrStageFilterText(s);
+  MODAL_REDRAW = null; MODAL_KEY = 'mosrlist:'+[s, d, a, b].join('|');
+  const txt = v => '<td class="hx-mid" style="white-space:normal">'+(v ? esc(v) : '—')+'</td>';
+  openModal(what, list.length+' report'+(list.length === 1 ? '' : 's')+' · '+periodLabel()+(BS.mosrQ ? ' · Q'+BS.mosrQ : '')+(ft ? ' · '+ft : ''),
+    list.length ? '<div class="tbl-wrap"><table class="hx" style="min-width:980px;width:100%"><thead><tr>'+['Report number','Submitted','Short summary','Workplace','Report owner','Department responsible','ORC','Occurrence category','Status'].map(h => '<th scope="col">'+h+'</th>').join('')+'</tr></thead><tbody>'
         + list.map(r => '<tr style="cursor:default"><td class="hx-c od-nowrap"><span class="row-id">'+esc(r.report_number)+extLink('report', r.report_id, r.report_number)+'</span></td>'
-          + '<td class="hx-c od-nowrap">'+esc(fdx(r.submitted_date))+'</td><td class="hx-mid" style="white-space:normal">'+esc(r.short || '—')+'</td>'
-          + '<td class="hx-mid" style="white-space:normal">'+esc(r.owner || '—')+'</td><td class="hx-c">'+statusChip(r.report_status === 'Closed' ? 'Closed' : r.report_status)+'</td></tr>').join('')   /* metrics-ok: MOSR Coruson status */
+          + '<td class="hx-c od-nowrap">'+esc(fdx(r.submitted_date))+'</td>'+txt(r.short)+txt([].concat(r.base || []).join(', '))+txt(r.owner)
+          + txt((r.dept || []).join(', '))+txt((r.orc || []).join(', '))+txt(mosrOccText(r).join(', '))
+          + '<td class="hx-c">'+statusChip(r.report_status === 'Closed' ? 'Closed' : r.report_status)+'</td></tr>').join('')   /* metrics-ok: MOSR Coruson status */
         + '</tbody></table></div>'
-      : '<p class="t-sub dim">Every MOSR of the period carries this classification.</p>');
+      : '<p class="t-sub dim">No MOSR for this value with the current filters.</p>');
   $('#betaModal .beta-modal-panel').classList.add('wide');
 }
 /* r224: the register (every owner, period filter) against Safety › OSR/MOSR status (MSAG-owned, all time), from the same rows */
@@ -5222,22 +5260,28 @@ function mosrFold(items, max){
   return items.slice(0, max - 1).concat({ k:'Other ('+rest.length+')', n:rest.reduce((a,x) => a + x.n, 0), other:true });
 }
 const mosrEmpty = '<div class="empty"><h3>No data</h3><p class="t-sub">No report in this period carries this value.</p></div>';
-function mosrColumns(items){
+/* hit = x => the data attributes that open the list of the mark (mosrHit), '' for a mark with nothing behind it */
+const mosrHit = (s, d, a, b) => ' data-act="bmosrlist" data-s="'+s+'" data-d="'+d+'" data-a="'+esc(a || '')+'" data-b="'+esc(b || '')+'"';
+const mosrTip = x => esc(x.k+': '+x.n+' — select to list the MOSR');
+function mosrColumns(items, hit){
   if(!items.length) return mosrEmpty;
   const max = Math.max(...items.map(x => x.n));
-  return '<div class="mosr-cols" role="img" aria-label="'+esc(items.map(x => x.k+': '+x.n).join(', '))+'">' + items.map(x =>
-    '<div class="mosr-col" title="'+esc(x.k+': '+x.n)+'"><span class="num strong">'+x.n+'</span>'
-    + '<span class="mosr-bar" style="height:'+Math.max(1, x.n/max*78).toFixed(1)+'%"></span><span class="mosr-lbl t-small">'+esc(x.k)+'</span></div>').join('') + '</div>';
+  return '<div class="mosr-cols" role="group" aria-label="'+esc(items.map(x => x.k+': '+x.n).join(', '))+'">' + items.map(x => {
+    const h = hit && x.n ? hit(x) : '';
+    return (h ? '<button type="button" class="mosr-col mosr-hit"'+h+' title="'+mosrTip(x)+'">' : '<div class="mosr-col" title="'+esc(x.k+': '+x.n)+'">')
+      + '<span class="num strong">'+x.n+'</span>'
+      + '<span class="mosr-bar" style="height:'+Math.max(1, x.n/max*78).toFixed(1)+'%"></span><span class="mosr-lbl t-small">'+esc(x.k)+'</span>'+(h ? '</button>' : '</div>'); }).join('') + '</div>';
 }
 /* colour follows the value, not its rank: a filter must not repaint the survivors (slots = value → colour 1…5) */
 const MOSR_ORC_SLOT = { '1 - VERY LOW':3, '2 - LOW':1, '3 - MEDIUM':4, '4 - HIGH':2 };
-function mosrPie(items, slots){
+function mosrPie(items, slots, hit){
   if(!items.length) return mosrEmpty;
   const S = slots || {}, total = items.reduce((a,x) => a + x.n, 0), R = 42, C = 2*Math.PI*R, free = [1,2,3,4,5].filter(s => !items.some(x => S[x.k] === s));
   const colour = x => x.other ? 'var(--text-3)' : 'var(--mosr-'+(S[x.k] || free.shift() || 5)+')';
-  let at = 0; const parts = items.map(x => { const c = colour(x), len = x.n/total*C, draw = Math.max(0.5, len - (items.length > 1 ? 1.5 : 0)); const seg = '<circle cx="60" cy="60" r="'+R+'" fill="none" stroke="'+c+'" stroke-width="20" stroke-dasharray="'+draw.toFixed(2)+' '+(C-draw).toFixed(2)+'" stroke-dashoffset="'+(-at).toFixed(2)+'" transform="rotate(-90 60 60)"><title>'+esc(x.k+': '+x.n)+'</title></circle>'; at += len; return { x, c, seg }; });
+  let at = 0; const parts = items.map(x => { const c = colour(x), h = hit ? hit(x) : '', len = x.n/total*C, draw = Math.max(0.5, len - (items.length > 1 ? 1.5 : 0)); const seg = '<circle cx="60" cy="60" r="'+R+'" fill="none" stroke="'+c+'" stroke-width="20" stroke-dasharray="'+draw.toFixed(2)+' '+(C-draw).toFixed(2)+'" stroke-dashoffset="'+(-at).toFixed(2)+'" transform="rotate(-90 60 60)"'+(h ? h+' style="cursor:pointer"' : '')+'><title>'+esc(x.k+': '+x.n)+'</title></circle>'; at += len; return { x, c, seg, h }; });
   return '<div class="mosr-pie"><svg viewBox="0 0 120 120" role="img" aria-label="'+esc(items.map(x => x.k+': '+x.n).join(', '))+'">'+parts.map(p => p.seg).join('')+'</svg>'
-    + '<ul class="mosr-leg">'+parts.map(p => '<li><i style="background:'+p.c+'"></i><span class="t-small od-fill">'+esc(p.x.k)+'</span><span class="num strong">'+p.x.n+'</span><span class="t-small dim num">'+M.pct(p.x.n, total)+'%</span></li>').join('')+'</ul></div>';
+    + '<ul class="mosr-leg">'+parts.map(p => { const row = '<i style="background:'+p.c+'"></i><span class="t-small od-fill">'+esc(p.x.k)+'</span><span class="num strong">'+p.x.n+'</span><span class="t-small dim num">'+M.pct(p.x.n, total)+'%</span>';
+        return '<li>'+(p.h ? '<button type="button" class="mosr-hit mosr-leg-b"'+p.h+' title="'+mosrTip(p.x)+'">'+row+'</button>' : row)+'</li>'; }).join('')+'</ul></div>';
 }
 /* horizontal bars with the full label (level-2 names are long): the label wraps, the count sits right */
 function mosrBars(items, flow){
@@ -5249,18 +5293,37 @@ function mosrBars(items, flow){
 /* r232 (Eric 18/11/2026): level 2 as RANKED LISTS — the form for many parts with long names and very unequal counts. A row is
    the full name with its count and share on one line and a bar under it, largest first, one hue (the stage colour).
    base = what a full bar stands for: the reports of the level 1 (share of the area) or the largest value (plain ranking). */
-function mosrRank(items, base, share){
-  return '<ol class="rk">' + items.map(x => '<li class="rk-row" title="'+esc(x.k+': '+x.n+(share ? ' · '+M.pct(x.n, base)+'% of the area' : ''))+'">'
-    + '<span class="rk-top"><span class="rk-k">'+esc(x.k)+'</span><span class="rk-v"><b class="num">'+x.n+'</b>'+(share ? '<span class="t-small dim num">'+M.pct(x.n, base)+'%</span>' : '')+'</span></span>'
-    + '<span class="rk-track"><span class="rk-fill" style="width:'+Math.max(1.5, x.n / Math.max(1, base) * 100).toFixed(1)+'%"></span></span></li>').join('') + '</ol>';
+function mosrRank(items, base, share, hit){
+  return '<ol class="rk">' + items.map(x => { const h = hit ? hit(x) : '';
+    const row = '<span class="rk-top"><span class="rk-k">'+esc(x.k)+'</span><span class="rk-v"><b class="num">'+x.n+'</b>'+(share ? '<span class="t-small dim num">'+M.pct(x.n, base)+'%</span>' : '')+'</span></span>'
+      + '<span class="rk-track"><span class="rk-fill" style="width:'+Math.max(1.5, x.n / Math.max(1, base) * 100).toFixed(1)+'%"></span></span>';
+    return h ? '<li><button type="button" class="rk-row rk-btn mosr-hit"'+h+' title="'+mosrTip(x)+'">'+row+'</button></li>'
+             : '<li class="rk-row" title="'+esc(x.k+': '+x.n)+'">'+row+'</li>'; }).join('') + '</ol>';
 }
 /* one panel per level 1 (small multiples), largest area first: its name, its reports, then its level-2 values ranked;
-   a bar is the value's share of the reports of that area, so bars compare across the panels */
-function mosrRankGroups(groups){
+   a bar is the value's share of the reports of that area, so bars compare across the panels.
+   hit1 / hit2 = the list behind the area total and behind a level-2 row */
+function mosrRankGroups(groups, hit1, hit2){
   if(!groups.length) return mosrEmpty;
-  return '<div class="rk-grid">' + groups.map(g => '<section class="rk-card" aria-label="'+esc(g.k)+'"><header class="rk-head"><h3>'+esc(g.k)+'</h3>'
-    + '<span class="rk-total"><b class="num">'+g.n+'</b><span class="t-small dim">report'+(g.n === 1 ? '' : 's')+esc(g.note || '')+'</span></span></header>'
-    + mosrRank(g.items, g.n, true) + '</section>').join('') + '</div>';
+  return '<div class="rk-grid">' + groups.map(g => { const tot = '<b class="num">'+g.n+'</b><span class="t-small dim">report'+(g.n === 1 ? '' : 's')+esc(g.note || '')+'</span>';
+    return '<section class="rk-card" aria-label="'+esc(g.k)+'"><header class="rk-head"><h3>'+esc(g.k)+'</h3>'
+    + (hit1 ? '<button type="button" class="rk-total mosr-hit"'+hit1(g)+' title="'+mosrTip(g)+'">'+tot+'</button>' : '<span class="rk-total">'+tot+'</span>')+'</header>'
+    + mosrRank(g.items, g.n, true, hit2 ? x => hit2(g, x) : null) + '</section>'; }).join('') + '</div>';
+}
+/* the filters of one stage: a select per classification the stage does not draw, the list values taken from the period */
+function mosrStageBar(s, all){
+  const A = API(), tax = A.mosr().tax || {};
+  const uniq = L => [...new Set(L.filter(Boolean))];
+  const opts = {
+    st: [['Open','Open'],['Closed','Closed']], hz: [['yes','Yes'],['no','No']],
+    area: uniq((tax.dept || []).map(t => t.k).concat(all.flatMap(r => (r.dept_lv || []).map(p => p[0])))).map(v => [v, v]),
+    orc: uniq(all.flatMap(r => r.orc || [])).sort().map(v => [v, v]),
+    occ: uniq((tax.occ || []).map(t => t.k).concat(all.flatMap(r => (r.occ_lv || []).map(p => p[0])))).map(v => [v, v]),
+    base: mosrCount(all, r => r.base_group).map(x => [x.k, x.k]) };
+  const on = MOSR_STAGE_DIMS[s].some(d => BS[mfKey(s, d)]);
+  return '<div class="mosr-fbar">' + MOSR_STAGE_DIMS[s].map(d => { const cur = BS[mfKey(s, d)] || '', L = opts[d];
+      return sel(mfKey(s, d), [['','All']].concat(L.some(o => o[0] === cur) || !cur ? L : L.concat([[cur, cur]])), cur, MOSR_DIM_LABEL[d]); }).join('')
+    + (on ? '<button class="link-b" type="button" data-act="bmosrclr" data-s="'+s+'">Clear filters</button>' : '') + '</div>';
 }
 /* r229 (Eric 14/11/2026, "MOSR Chart.docx"): DEPARTMENT RESPONSIBLE at level 1 and level 2, ORC as a donut, OCCURRENCE
    CATEGORY at level 1 and one level-2 chart per level 1 that has a level 2 (Technical, Standard & Compliance, Human Factor,
@@ -5269,8 +5332,10 @@ function scrMosrCharts(){
   const A = API();
   const w = lazyState('mosr', () => A.loadMosr(), () => A.mosr().loaded, 'MOSR');
   if(w) return w;
-  const rows = A.mosr().rows.filter(r => inPeriod(r.submitted_date) && mosrQuarterOk(r.submitted_date));
-  const dept = M.mosrLevels(rows, 'dept'), occ = M.mosrLevels(rows, 'occ'), orc = M.mosrOrc(rows);
+  const rows = mosrBaseRows();
+  /* r234: each stage counts its own filtered rows */
+  const R = { dept: mosrStageRows('dept', rows), orc: mosrStageRows('orc', rows), base: mosrStageRows('base', rows), occ: mosrStageRows('occ', rows) };
+  const dept = M.mosrLevels(R.dept, 'dept'), occ = M.mosrLevels(R.occ, 'occ'), orc = M.mosrOrc(R.orc);
   const period = periodLabel() + (BS.mosrQ ? ' · Q'+BS.mosrQ : '');
   const only1 = (m, a) => m.only1[a] ? ' · '+m.only1[a]+' at level 1 only' : '';
   const any = L => L.some(x => x.n);
@@ -5278,29 +5343,30 @@ function scrMosrCharts(){
      AMO: department responsible → ORC → occurrence category), so a chart is read with the stage it sits in. A stage has its
      step number, its question, its own bar colour and the count of reports classified; inside, level 1 comes first, then
      level 2. A level-2 chart with few values is a column chart; one with many takes the full width and flows into columns. */
-  /* r232: the reports without a value are one click away (showMosrNone) */
-  const cls = (which, none) => (rows.length - none)+' of '+rows.length+' MOSR classified'+(none ? ' · <button class="link-b" type="button" data-act="bmosrnone" data-k="'+which+'" title="List these MOSR">'+none+' without a value</button>' : '');
-  const stage = (no, colour, title, lead, body) => '<section class="sec mosr-stage"'+(colour ? ' style="--stage:var('+colour+')"' : '')+' aria-label="'+esc(title)+'">'
+  /* r232: the reports without a value are one click away */
+  const cls = (which, none) => (R[which].length - none)+' of '+R[which].length+' MOSR classified'+(none ? ' · <button class="link-b" type="button"'+mosrHit(which, 'none')+' title="List these MOSR">'+none+' without a value</button>' : '');
+  const stage = (no, colour, title, lead, key, body) => '<section class="sec mosr-stage"'+(colour ? ' style="--stage:var('+colour+')"' : '')+' aria-label="'+esc(title)+'">'
     + '<div class="mosr-stage-head">'+(no ? '<span class="mosr-step" aria-hidden="true">'+no+'</span>' : '')
-    + '<div><h2>'+esc(title)+'</h2><p class="t-small dim">'+lead+'</p></div></div>' + body + '</section>';
+    + '<div><h2>'+esc(title)+'</h2><p class="t-small dim">'+lead+'</p></div></div>' + mosrStageBar(key, rows) + body + '</section>';
   const deptGroups = dept.lv1.filter(x => (dept.lv2[x.k] || []).length).map(x => ({ k:x.k, n:x.n, note:only1(dept, x.k), items:dept.lv2[x.k] }));
-  const occCards = occ.lv1.map(x => x.k).filter(a => occ.parents.includes(a)).map(a => { const L = occ.lv2[a] || [], n = (occ.lv1.find(x => x.k === a) || { n:0 }).n;
-    return { wide: L.length > 6, html: card('Level 2 · '+a, n+' report'+(n === 1 ? '' : 's')+only1(occ, a), !L.length ? mosrEmpty : L.length > 6 ? '<div class="rk-flow">'+mosrRank(L, Math.max(...L.map(v => v.n)), false)+'</div>' : mosrColumns(L)) }; });
+  const occCards = occ.lv1.map(x => x.k).filter(a => occ.parents.includes(a)).map(a => { const L = occ.lv2[a] || [], n = (occ.lv1.find(x => x.k === a) || { n:0 }).n, hit = x => mosrHit('occ', 'occ2', a, x.k);
+    return { wide: L.length > 6, html: card('Level 2 · '+a, n+' report'+(n === 1 ? '' : 's')+only1(occ, a), !L.length ? mosrEmpty : L.length > 6 ? '<div class="rk-flow">'+mosrRank(L, Math.max(...L.map(v => v.n)), false, hit)+'</div>' : mosrColumns(L, hit)) }; });
   const small = occCards.filter(c => !c.wide), wide = occCards.filter(c => c.wide);
+  const baseItems = mosrFold(mosrCount(R.base, r => r.base_group), MOSR_BASE_MAX);
   return '<section class="sec"><div class="od-row" style="--od-gap:12px;flex-wrap:wrap;align-items:center">'
     + sel('mosrQ', [['','All quarters'],['1','Q1'],['2','Q2'],['3','Q3'],['4','Q4']], BS.mosrQ, 'Quarter')
     + '<span class="t-small dim">'+esc(period)+' · '+rows.length+' MOSR by submitted date · classifications from tab EVALUATION on Coruson · a report with two values counts in both</span></div></section>'
-    + stage(1, '--mosr-1', 'Department responsible', 'Which area and unit the occurrence belongs to · '+cls('dept', dept.none),
-        card('Level 1 · Area', '', any(dept.lv1) ? mosrColumns(dept.lv1) : mosrEmpty)
-        + card('Level 2 · Unit within each area', '', mosrRankGroups(deptGroups)))
+    + stage(1, '--mosr-1', 'Department responsible', 'Which area and unit the occurrence belongs to · '+cls('dept', dept.none), 'dept',
+        card('Level 1 · Area', '', any(dept.lv1) ? mosrColumns(dept.lv1, x => mosrHit('dept', 'dept1', x.k)) : mosrEmpty)
+        + card('Level 2 · Unit within each area', '', mosrRankGroups(deptGroups, g => mosrHit('dept', 'dept1', g.k), (g, x) => mosrHit('dept', 'dept2', g.k, x.k))))
     + '<div class="mosr-pair">'
-    + stage(2, '--mosr-2', 'ORC', 'Occurrence Reached Criticality: how critical the occurrence is · '+cls('orc', orc.none),
-        card('Reports per ORC level', 'Very low · Low · Medium · High', mosrPie(orc.list, MOSR_ORC_SLOT)))
-    + stage('', '', 'Reporting base', 'Where the report comes from · not a classification',
-        card('Reports per base', 'station code when the typed text carries one · blank not counted', mosrColumns(mosrFold(mosrCount(rows, r => r.base_group), 9))))
+    + stage(2, '--mosr-2', 'ORC', 'Occurrence Reached Criticality: how critical the occurrence is · '+cls('orc', orc.none), 'orc',
+        card('Reports per ORC level', 'Very low · Low · Medium · High', mosrPie(orc.list, MOSR_ORC_SLOT, x => mosrHit('orc', 'orc', x.k))))
+    + stage('', '', 'Reporting base', 'Where the report comes from · not a classification', 'base',
+        card('Reports per base', 'station code when the typed text carries one · blank not counted', mosrColumns(baseItems, x => x.other ? mosrHit('base', 'baseother') : mosrHit('base', 'base', x.k))))
     + '</div>'
-    + stage(3, '--mosr-3', 'Occurrence category', 'What kind of occurrence it is · '+cls('occ', occ.none),
-        card('Level 1 · Category', '', any(occ.lv1) ? mosrColumns(occ.lv1) : mosrEmpty)
+    + stage(3, '--mosr-3', 'Occurrence category', 'What kind of occurrence it is · '+cls('occ', occ.none), 'occ',
+        card('Level 1 · Category', '', any(occ.lv1) ? mosrColumns(occ.lv1, x => mosrHit('occ', 'occ1', x.k)) : mosrEmpty)
         + (small.length ? '<div class="mosr-stage-row">'+small.map(c => c.html).join('')+'</div>' : '')
         + wide.map(c => c.html).join(''));
 }
@@ -6624,7 +6690,8 @@ Object.assign(BETA_ACT, {
   bhira: el => showHira(el.dataset.id),
   bhirachecks: () => showHiraChecks(),
   bmosrorc: () => showMosrOrc(),
-  bmosrnone: el => showMosrNone(el.dataset.k),
+  bmosrlist: el => showMosrList(el.dataset),
+  bmosrclr: el => { MOSR_STAGE_DIMS[el.dataset.s].forEach(d => { BS[mfKey(el.dataset.s, d)] = ''; }); render(); },
   bhiraexp: el => hiraExport(el.dataset.k),
   bdoc: el => showDoc(el.dataset.id),
   bdoctab: el => showDoc(el.dataset.id, el.dataset.t),
@@ -6780,7 +6847,7 @@ function scrGuideNew(){
     + '<li><b>Safety › SPI</b>: one card per safety performance indicator, monthly rate against the SPT. A card at a trigger level states the action AMO SMSM §10.6 requires: Level 1 close monitoring and trend analysis; Level 2 investigation into potential root causes; Level 3 immediate risk assessment, with the Accountable Manager informed immediately.</li>'
     + '<li><b>Analytics › KPI charts</b>: summary tiles, Closure by quarter, KPI 2, KPI 7 and KPI QC. Select a tile or a count for the reports behind it; closing a detail returns to that list.</li>'
     + '<li><b>Safety › OSR/MOSR status</b>: OSR and MOSR closed, open and total for each MSAG group on Coruson. It counts all the data of these groups and ignores the Year and Month filter, so its figures differ from Safety › MOSR report.</li>'
-    + '<li><b>Safety › MOSR charts</b>: form MOSR by submitted date, from the classifications of tab EVALUATION on Coruson. The charts sit in stages, one per classification step, each with its own colour: <b>1 Department responsible</b> (level 1 area, then level 2 unit within each area), <b>2 ORC</b> (donut), <b>3 Occurrence category</b> (level 1, then one level-2 chart for each level 1 that has a level 2: Technical, Standard &amp; Compliance, Human Factor, Contractor, Sub-contractor); <b>Reporting base</b> stands beside ORC. Level 2 of the departments is one panel per area, largest first: the area, its reports, then its units ranked with their count and their share of the area (the bar). A level 2 with many values is a ranked list in the same form. Each stage states how many reports of the period carry that classification. Year and month come from the filter bar, the quarter is chosen in the tab. A report with two values counts in both; the caption states the reports without each classification — select <b>without a value</b> for their list — and a card states the reports recorded at level 1 only.</li>'
+    + '<li><b>Safety › MOSR charts</b>: form MOSR by submitted date, from the classifications of tab EVALUATION on Coruson. The charts sit in stages, one per classification step, each with its own colour: <b>1 Department responsible</b> (level 1 area, then level 2 unit within each area), <b>2 ORC</b> (donut), <b>3 Occurrence category</b> (level 1, then one level-2 chart for each level 1 that has a level 2: Technical, Standard &amp; Compliance, Human Factor, Contractor, Sub-contractor); <b>Reporting base</b> stands beside ORC. Level 2 of the departments is one panel per area, largest first: the area, its reports, then its units ranked with their count and their share of the area (the bar). A level 2 with many values is a ranked list in the same form. Each stage states how many reports of the period carry that classification. Year and month come from the filter bar, the quarter is chosen in the tab. A report with two values counts in both; the caption states the reports without each classification — select <b>without a value</b> for their list — and a card states the reports recorded at level 1 only. Each stage has its own filters (Status, Hazard and the classifications it does not draw), which apply to that stage only; select a column, a bar, a donut slice or an area total to list the MOSR it counts.</li>'
     + '<li><b>Analytics › Event/IR report status</b>: EIS and F-088 completeness on Coruson; the tiles count the reports complete on each check, the table shows workflow, linked reports, final report and status per report.</li>'
     + '<li><b>Audit Plan</b>: audits are split into <b>Scheduled</b> (the annual plan, MNT numbers) and <b>Unscheduled</b> (RSP Random Surveillance and SSP Specified Surveillance, raised as required). Plan progress and <b>Delayed</b> count scheduled audits only; unscheduled ones have their own tile, their own grid on the timeline and a <b>Programme</b> filter and column. The <b>Rescheduled</b> tile counts scheduled audits whose dates were changed on Coruson and opens their list with the reschedule reason; it turns red while any of them is not yet performed. On the timeline a rescheduled audit has an amber outer ring, and the schedule list shows a <b>Rescheduled</b> tag. Coruson reporting keeps only the current dates, so the original month is not shown. KPI tiles, a location × month view (one dot per audit, inspection or surveillance in its scheduled month; filter by type or show only upcoming / with overdue findings), and a schedule list. Select a dot or a row for its workflow stages and findings. A solid blue ring is an audit in status <b>Schedule Confirmed</b>; it counts as planned and open, like Scheduled. <b>Workflow stages</b>: for the QA AMO audits in the selected period, how many stages of each name are in each Galileo status; select an InProgress or PendingSignOff count for the audits concerned.</li>'
     + '<li><b>Library › Documents</b>: browse by document type; the document number opens copyholders (on time, late, overdue) and the workflow.</li></ul>')
