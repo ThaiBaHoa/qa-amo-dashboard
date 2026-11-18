@@ -5,6 +5,14 @@
 
 ---
 
+## ✅ r233 — Reports › All forms: ô chọn form gọn lại, Summary của Investigation Report (18/11/2026, EricThai)
+
+- **Ô chọn form** (`afTitles` trong `screens.js`): bỏ 6 form checklist, bỏ form đã có trang riêng (các tab Reports, trang Safety), ẩn form không có report trong kỳ đang lọc (Year / Month). Bảng khi chưa chọn form chỉ còn report của các form trong ô chọn.
+- Giữ F-088, EIS, MQA Event Investigation Report: Analytics › Event/IR report status chỉ theo dõi trạng thái, bảng chi tiết chỉ có ở All forms (Eric đã xem demo, duyệt).
+- **Summary của Investigation Report** = trường `BRIEF DETAILS` (`BRIEF_FORMS`, nạp trong `loadRfiSum`); lỗi nạp không làm mất summary của form khác.
+- **Kiểm local dữ liệu thật (2026):** ô chọn còn 13 form, All forms 514 report; 5/6 MQA Investigation Report hiện BRIEF DETAILS, MQA-IR-2025/015 trống trên Coruson. Đếm Galileo 18/11: form này 20 report (2025: 14, 2026: 6), đều thuộc QA AMO.
+- **Còn mở:** sổ tay Word chưa dựng lại (mục 4.3 còn ghi All forms gồm mọi form, kể cả CMR-CAR và ECAR).
+
 ## ✅ r232 — trang Safety theo `page safety revise.docx` bản 18/11 (18/11/2026, EricThai)
 
 - Nguồn yêu cầu: `page safety revise.docx` (workspace tài liệu, sửa 18/11 09:53) + ba nhận xét của Eric khi xem demo.

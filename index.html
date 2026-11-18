@@ -4999,9 +4999,22 @@ function mccfOutRows(){
 }
 /* r224: forced = a form title — Safety › Additional mitigation shows the AMO - Additional Mitigation register here,
    without the form picker (form of All forms is left as the user set it) */
+/* r233 (Eric 18/11/2026): the form list of All forms. Left out: the base / workshop / store checklists, the forms that
+   have their own page (the Reports tabs, the Safety tabs), and a form with no report in the period. All forms with no
+   form chosen lists the reports of these forms only. A form opened from a tile stays in the list while it is chosen. */
+const AF_CHECKLISTS = ['A-CHECK, C-CHECK CHECKLIST FOR BASE MAINTENANCE', 'C Check', 'Battery Workshop Inspection',
+  'Hangar Check Surveillance Checklist', 'Store Inspection', 'Wheel Workshop Inspection'];
+const AF_OWN_PAGE = ['PAVOI', 'MVOI', 'CMR-CAR', 'CMR CAR', 'ECAR', 'AMO-ECAR', 'AMO ECAR', 'MCAR', '1. OSR', 'MOSR',
+  'AMO - HIRA', 'AMO - Additional Mitigation', 'AMO - SPI'];
+const AF_OUT = new Set(AF_CHECKLISTS.concat(AF_OWN_PAGE));
+function afTitles(chosen){
+  const t = new Set(applyFilters(REPORTS).concat(applyFilters(mccfOutRows())).map(r => r.code).filter(c => c && !AF_OUT.has(c)));
+  if(chosen) t.add(chosen);
+  return [...t].sort();
+}
 function scrAllForms(forced){
   const form = forced || BS.afForm;
-  const titles = [...new Set(REPORTS.map(r => r.code))].sort();
+  const titles = afTitles(forced ? '' : BS.afForm), listed = new Set(titles);
   const A = API();
   if(form === A.EIS_TITLE || form === A.QCS_TITLE) return scrFormDetail(titles);
   /* AMO - HIRA (r171): its three EVALUATION classifications replace Form and CAT */
@@ -5019,7 +5032,7 @@ function scrAllForms(forced){
                            : pv ? ['number','form','status','rfv','raisedBy','pvOwner','raised','target','dtd','rfi']
                            : form === 'MCCF' ? ['number','orgUnit','status','summary','owner','issued','raised','target','dtd','cat','rfi']
                            : ['number','form','status','summary','owner','issued','raised','target','dtd','cat','rfi'],   /* r191: + Summary, RFI · r194: + Issued to */
-                rows: rs => form ? rs.filter(r => r.code === form) : rs };
+                rows: rs => form ? rs.filter(r => r.code === form) : rs.filter(r => listed.has(r.code)) };
   if(REAL && !hira && !capa) lazy('rfisum:'+rxFrom(), loadRfiSum, rxReady);
   let rows = cfg.rows(scoped().concat(hira || capa ? [] : applyQuery(applyFilters(mccfOutRows()))));
   if(state.cat) rows = rows.filter(r => r.cat === state.cat);
@@ -5032,7 +5045,7 @@ function scrAllForms(forced){
     ]) : '')
     + '<section class="sec"><div class="card'+(hira || capa ? ' af-hira' : '')+'"><div class="card-head"><h2>'+(forced ? esc(forced) : 'All forms')+'</h2>'
     + (forced ? '<span class="t-small dim od-fill">VJC-AMO-CAPA records, one row per report: a row opens its mitigation actions, tasks and verification. The same register is under Reports › All forms.</span>'
-      : '<span class="t-small dim od-fill">Every report type the dashboard loads — '+titles.length+' forms. The tabs above keep the five finding forms with their own columns.'+(form === 'MCCF' ? (MCCF_OUT.st === 'ready' ? ' MCCF here covers every unit on Coruson; those outside QA AMO are not counted in KPIs or Overview.' : MCCF_OUT.st === 'error' ? ' Could not load the MCCF of units outside QA AMO: only QA AMO is listed.' : ' Loading the MCCF of units outside QA AMO…') : '')+'</span>')
+      : '<span class="t-small dim od-fill">'+titles.length+' forms with reports in the period.'+(form === 'MCCF' ? (MCCF_OUT.st === 'ready' ? ' MCCF here covers every unit on Coruson; those outside QA AMO are not counted in KPIs or Overview.' : MCCF_OUT.st === 'error' ? ' Could not load the MCCF of units outside QA AMO: only QA AMO is listed.' : ' Loading the MCCF of units outside QA AMO…') : '')+'</span>')
     + (forced ? '' : sel('afForm', [['','All forms']].concat(titles.map(t => [t, t])), form)) + '</div>'
     + tableHTML('findings/all'+(form ? '/'+form : ''), cfg, rows) + '</div></section>';
 }
@@ -6278,6 +6291,7 @@ function showAudit(id){
    MVOI-002 has 2 completed tasks and showed '—' while the query looked for the RFI title only. Loaded once, on
    the first register that shows these columns. */
 const RX = { rfi: null, sum: null, from: null };
+const BRIEF_FORMS = ['MQA Investigation Report', 'MQA Event Investigation Report'];
 /* only the years in view: from 1 Jan of the earliest selected year (no year filter = everything) */
 const rxFrom = () => state.filters.years.length ? Math.min(...state.filters.years) + '-01-01' : '2000-01-01';
 function plainText(h){
@@ -6296,6 +6310,14 @@ async function loadRfiSum(){
   const q = s => "'" + String(s).replace(/'/g, "''") + "'";
   const ouF = '(' + A.orgUnitIds().map(i => 'organisational_unit_id eq ' + i).join(' or ') + ') and valid_to eq null and summary ne null and raised_date ge ' + since;
   /* a few summaries carry pasted images (~1 MB each, probe 03/10): text-sized ones only, the rest by id */
+  /* r233 (Eric 18/11/2026): the Investigation Report forms read BRIEF DETAILS of the form (General Information; DESCRIPTION
+     OF THE EVENT on MQA Event Investigation Report) in the Summary column, not the Coruson summary. Probe 18/11: 20/20
+     MQA Investigation Report carry the field. Its failure keeps the other summaries. */
+  const irIds = A.allData().filter(r => ids.has(r.report_id) && BRIEF_FORMS.includes(r.report_title)).map(r => r.report_id);
+  const irChunks = []; for(let i = 0; i < irIds.length; i += 8) irChunks.push(irIds.slice(i, i + 8));
+  const briefP = Promise.all(irChunks.map(c => A.fetchAll(A.G_URL + 'dwanalytics_report_field?$select=report_id,value_text&$filter='
+    + encodeURIComponent("field_name eq 'BRIEF DETAILS' and (" + c.map(id => 'report_id eq ' + id).join(' or ') + ')'))))
+    .then(a => a.flat(), e => { console.warn('BRIEF DETAILS load error:', e); return null; });
   const [parts, sums, big] = await Promise.all([
     Promise.all(chunks.map(c => A.fetchAll(A.G_URL + 'dwreporting_report_task?$select=report_id,report_title,task_id,task_title,task_owner,task_status,task_target_date,task_completed_date'
       + '&$filter=' + encodeURIComponent("task_title ne null and report_created_date ge " + since + " and (" + c.map(t => 'report_title eq ' + q(t)).join(' or ') + ')')))),
@@ -6307,6 +6329,9 @@ async function loadRfiSum(){
   const sum = {};
   sums.forEach(x => { const s = plainText(x.summary); if(s && ids.has(x.report_id)) sum[x.report_id] = s; });
   RX.big = new Set(big.map(x => x.report_id).filter(id => ids.has(id)));
+  const brief = await briefP;
+  if(brief){ irIds.forEach(id => { delete sum[id]; RX.big.delete(id); });
+    brief.forEach(f => { const t = plainText(f.value_text); if(t) sum[f.report_id] = t; }); }
   RX.rfi = rfi; RX.sum = sum; RX.from = from;
 }
 const rxReady = () => !!RX.rfi && RX.from <= rxFrom();
@@ -6746,7 +6771,7 @@ function scrGuideNew(){
   + sec('screens','Screens',
     '<ul><li><b>Overview</b>: key indicators (including audits completed against the plan with those delayed past their scheduled month, open and overdue PAVOI / MVOI, reports closed late, MCAR under extension, overdue mitigation tasks from HIRA / CAPA and F-088 / investigation reports overdue themselves or through a corrective action), overdue reports by CAT with the most overdue, open reports by form, recent report events.</li>'
     + '<li><b>Work Queue</b>: Open reports (nearest target first), Overdue (with CAT), Awaiting verification (open PAVOI / MVOI with no verification round). Select a row to open the report.</li>'
-    + '<li><b>Reports › All forms</b>: every report type. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings). With <b>MCCF</b> selected the list covers every unit on Coruson, with an Org unit column; MCCF outside QA AMO appear only here and are not counted in KPIs, Overview, Work Queue or Export. <b>AMO - Additional Mitigation</b> lists the title, source HIRA, actions and tasks, and a row opens its actions, tasks and verification. Its Target is the latest Target date of the actions; on-time or late compares <b>Date verified</b> with it, and a missing date shows in red.</li>'
+    + '<li><b>Reports › All forms</b>: the forms with reports in the period, without the forms that have their own page (the other Reports tabs, the Safety tabs) and the base, workshop and store checklists. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings). With <b>MCCF</b> selected the list covers every unit on Coruson, with an Org unit column; MCCF outside QA AMO appear only here and are not counted in KPIs, Overview, Work Queue or Export. <b>AMO - Additional Mitigation</b> lists the title, source HIRA, actions and tasks, and a row opens its actions, tasks and verification. Its Target is the latest Target date of the actions; on-time or late compares <b>Date verified</b> with it, and a missing date shows in red.</li>'
     + '<li><b>Reports › PAVOI / MVOI</b>: register on the left (Form filter: PAVOI or MVOI), record on the right with the verification history and the RFI / Task list of open records. KPI 7 counts PAVOI and MVOI.</li>'
     + '<li><b>Safety › HIRA</b>: the AMO - HIRA records in the layout of VJC-MQA-F-118 Risk Register, one row per hazard (specific component) declared on the form. The tiles give the HIRA of the period, closed and open, the specific components, and the HIRA per <b>Category</b> on Coruson, in three tiles: FULLY EFFECTIVE, PARTIAL EFFECTIVE (with the Category MVOI 3MT) and NOT YET EFFECTIVE (with MVOI 6MT), each filled in the colour of its Effectiveness rating; a Category outside these gets its own tile. Select a tile to filter the register: HIRA shows the open ones, a Category tile shows its HIRA; select it again, or <b>Show all</b>, to clear. <b>Status</b> is one value per HIRA, graded on its latest due date. Initial and current risk rating are filled in the colour of their band on the AMO SMSM risk matrix (§9.4.3): Intolerable red, Tolerable orange, Acceptable green. The risk matrix counts the hazards per cell. Each preventive action sits under the hazard it belongs to on the Coruson form. <b>Effectiveness rating</b> is the Category of the report as Coruson writes it, one value per HIRA, filled in the colour of its group (MVOI 3MT as Partial effective, MVOI 6MT as Not yet effective). <b>Preventive control / recovery measures</b> lists the actions of the sections PREVENTIVE ACTION and MITIGATION ACTION of the form. Select a HIRA number for the full record (20 columns): every hazard with its controls, measures, department and dates, and the report summary. <b>Workflow stages, RFI and tasks of this report</b> under the record gives Form, Status, Owner and Org unit, the stages (stage, status, owner) and every RFI and task of the workflow with its owner, section, status and dates.</li>'
     + '<li><b>Safety › HIRA · Compliance checks</b>: the button on the register card counts the items below for the HIRA of the period; select it for the list, and a row for the record. (1) Initial risk rating that is not the cell of Severity × Likelihood on the form; the record marks the cell with the matrix code. (2) Missing data: Severity, Likelihood, Initial or Current risk rating, Date assessed, Due date, a preventive action, the Effectiveness rating. (3) Tolerable initial risk whose due date or completion is more than 30 days after Date assessed (AMO SMSM §9.5 d). (4) Intolerable initial risk with an action not completed. (5) Fully effective recorded less than 6 months, or Partial effective less than 3 months, after the last completed action (§9.7).</li>'
