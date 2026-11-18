@@ -416,6 +416,12 @@ select.ctl{min-width:168px;cursor:pointer}
 }
 .kpi:hover{background:var(--raised);border-color:var(--border-strong)}
 .kpi[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}   /* r228: a tile that filters the list under it */
+/* r232 (Eric 18/11/2026): a Category tile of Safety › HIRA is filled with the colour of its effectiveness group (M.EFFECT), the same
+   fill as the Effectiveness rating cells of the register under it — the exact colour, never tinted. Pressed = ringed. */
+.kpi[data-fill]{background:var(--fill);border-color:var(--fill)}
+.kpi[data-fill]:hover{background:var(--fill);border-color:var(--text)}
+.kpi[data-fill] .kpi-lbl,.kpi[data-fill] .kpi-val,.kpi[data-fill] .kpi-note{color:var(--fill-ink)}
+.kpi[data-fill][aria-pressed="true"]{border-color:var(--fill);box-shadow:0 0 0 2px var(--raised),0 0 0 4px var(--text)}
 .kpi>*{display:block}
 .kpi-lbl{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);font-weight:650}
 .kpi-val{font-family:var(--mono);font-size:clamp(28px,3vw,38px);font-weight:700;line-height:1.05;letter-spacing:-.03em;color:var(--text)}
@@ -845,6 +851,26 @@ body.rail .acct-t{display:none}
 .mosr-pair{display:grid;gap:var(--s4);grid-template-columns:repeat(auto-fit,minmax(min(420px,100%),1fr));margin-block:var(--s4)}
 .mosr-pair>.mosr-stage{margin:0}
 .mosr-flow>.mosr-grp{margin-bottom:var(--s4)}
+/* r232: ranked lists of a level 2 (mosrRank / mosrRankGroups). One hue, the stage colour; names and figures keep the text tokens.
+   A panel per level 1; inside, name + count + share on one line, the bar under it. */
+.rk-grid{display:grid;gap:var(--s4);grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));align-items:start}
+.rk-card{border:1px solid var(--border);border-radius:var(--r-card);padding:var(--s3) var(--s4) var(--s4);background:var(--surface,var(--raised));display:grid;gap:var(--s3);min-width:0}
+.rk-head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);padding-bottom:var(--s2);border-bottom:2px solid var(--stage,var(--border-strong))}
+.rk-head h3{margin:0;font-size:15px;line-height:1.3;overflow-wrap:anywhere}
+.rk-total{display:flex;align-items:baseline;gap:6px;flex:none}
+.rk-total b{font-size:22px;line-height:1}
+.rk{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.rk-row{display:grid;gap:4px;min-width:0}
+.rk-top{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3)}
+.rk-k{font-size:13px;line-height:1.3;overflow-wrap:anywhere;min-width:0}
+.rk-v{display:flex;align-items:baseline;gap:6px;flex:none}
+.rk-v b{font-size:14px}
+.rk-v .dim{min-width:34px;text-align:right}
+.rk-track{display:block;height:8px;border-radius:4px;background:color-mix(in srgb,var(--text) 8%,transparent)}
+.rk-fill{display:block;height:100%;border-radius:4px;background:var(--stage,var(--data-1))}
+.rk-flow{columns:3 300px;column-gap:var(--s6,32px)}
+.rk-flow .rk{display:block}
+.rk-flow .rk-row{break-inside:avoid;margin-bottom:10px}
 @media (max-width:767px){.mosr-pie{grid-template-columns:minmax(0,1fr)}.mosr-pie svg{max-width:190px;margin-inline:auto}}
 /* LED wall (?kiosk=): no sidebar, no bottom bar, no assistant — same as classic body.kiosk */
 body.kiosk .sidebar, body.kiosk .botnav, body.kiosk #betaAiBtn, body.kiosk .beta-ai, body.kiosk .filterbar{display:none !important}
@@ -885,7 +911,7 @@ body.kiosk .od-clamp-2{display:block;-webkit-line-clamp:unset;overflow:visible}
    instead of the table inside its wrapper (Eric 11/11/2026) */
 .card-pad > *{min-width:0}
 .af-hira td[data-l="Days to due"], .af-hira td[data-l="Days to due"] *{white-space:normal}
-/* r224 Safety: risk rating chip and risk matrix. Band colours come from METRICS M.RISK (AMO SMS §9.4.3) inline;
+/* r224 Safety: risk rating chip and risk matrix. Band colours come from METRICS M.RISK (AMO SMSM §9.4.3) inline;
    dark ink on every band (contrast ≥ 5.2 : 1), the same fills in both themes. */
 .risk-chip{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;line-height:18px;white-space:nowrap}
 .risk-chip b{font-variant-numeric:tabular-nums;font-weight:800}
@@ -901,7 +927,7 @@ body.kiosk .od-clamp-2{display:block;-webkit-line-clamp:unset;overflow:visible}
 .rmx-c.zero .num{opacity:.45}
 .rmx-c.zero .rmx-code{opacity:1}
 /* r231-i3 (Eric 16/11/2026): the count of a cell must stand apart from the cell code. EVERY cell keeps the exact colour of its
-   band (AMO SMS §9.4.3) — never tinted, faded or shaded. A cell that holds hazards is raised and ringed, with the count in a
+   band (AMO SMSM §9.4.3) — never tinted, faded or shaded. A cell that holds hazards is raised and ringed, with the count in a
    white disc; a cell without hazards shows its code only. */
 .rmx{border-spacing:7px}
 .rmx thead th{font-size:13px;font-weight:700;padding-bottom:8px}
@@ -2135,7 +2161,7 @@ const NAV = [
   /* r224 (Eric 09/11/2026): the Safety reports gathered on one page — HIRA register (VJC-MQA-F-118 layout), AMO -
      Additional Mitigation, MSAG status, MOSR register and charts, SPI. Their old routes redirect (MOVED_ROUTES). */
   { id:'safety',    label:'Safety',     icon:'shield',   task:'safety',  title:'Safety',
-    lead:'AMO safety management: hazard register, risk mitigation, safety reports and safety performance.',
+    lead:'',   /* r232 (Eric 18/11/2026): no lead under the Safety title */
     tabs:[
       {id:'hira',      label:'HIRA'},
       {id:'mitigation',label:'Additional mitigation'},
@@ -2393,7 +2419,7 @@ function fromReal(r){
      late closed  = Lately Closed (summary.late).
      CA risk      = F-088 / EIS / Event Investigation Report overdue: report Overdue OR any CA Overdue (caRisk).
      mitigation   = HIRA with Additional mitigation = Yes · AMO - Additional Mitigation tasks (capaTaskStats).
-     risk         = AMO SMS §9.4.3 matrix (M.RISK); HIRA hazards = classic hiraHazardMap (HOW MANY rule, r221-i3).
+     risk         = AMO SMSM §9.4.3 matrix (M.RISK); HIRA hazards = classic hiraHazardMap (HOW MANY rule, r221-i3).
      audits       = MNT + RSP + SSP scope (r204); year = scheduled year, month = scheduled start month;
                     open = InProgress / Performed / Scheduled (renderAuditKpi 7676).
                     delayed = scheduled month ended, not Performed / Closed (Eric 30/09/2026).
@@ -2543,7 +2569,7 @@ const M = {
              capa: capa.length, tasks: A.capaTaskStats(capa.map(r => r.id)) };
   },
 
-  /* risk rating (r224) — AMO SMS Iss01Rev02 §9.4.3 risk matrix (p. 9-17) and §9.5 actions. The ONE definition of
+  /* risk rating (r224) — AMO SMSM Iss01Rev02 §9.4.3 risk matrix (p. 9-17) and §9.5 actions. The ONE definition of
      the bands, their colours and the cell → band map; Safety › HIRA register, its record and the matrix read it.
      Code = probability digit + severity letter, as the form and VJC-MQA-F-118 write it ("4D").
      Fills (Eric 11/11/2026): red, orange, green — the same red and green as M.EFFECT. Black ink: 5.3 : 1 on #FF0000,
@@ -2633,7 +2659,7 @@ const M = {
     return out;
   },
   /* data checks of the HIRA register (r224, Eric 11/11/2026) on a hiraHazards list:
-     off     = hazards whose recorded initial risk rating is not the cell of their Severity × Likelihood (AMO SMS §9.4.3);
+     off     = hazards whose recorded initial risk rating is not the cell of their Severity × Likelihood (AMO SMSM §9.4.3);
      missHz  = hazards with required fields empty (x.miss);
      missRep = HIRA with report-level data missing: Effectiveness rating (Category), preventive actions. */
   hiraChecks(list){
@@ -2660,22 +2686,24 @@ const M = {
     return { off, missHz, missRep, limit, intol, effect, sms: limit.length + intol.length + effect.length,
              total: off.length + missHz.length + missRep.length + limit.length + intol.length + effect.length };
   },
-  /* AMO SMS Iss01Rev02 time limits (review 11/11/2026): §9.5 d) Tolerable → mitigation finished in 30 days from the identified day
+  /* AMO SMSM Iss01Rev02 time limits (review 11/11/2026): §9.5 d) Tolerable → mitigation finished in 30 days from the identified day
      (taken as DATE ASSESSED); §9.7 effectiveness; §9.3.8.3 risk assessment by Occurrence Criticality (ORC) level: Low within 30 days,
      Medium within 7 days, High immediately (to the MSC within 24 hours, §8.5.4 step 3). ORC names as the Coruson list writes them. */
-  SMS: { tolerableDays: 30, partialMonths: 3, fullyMonths: 6, orcDays: { 'VERY LOW':30, 'LOW':30, 'MEDIUM':7, 'HIGH':1, 'VERY HIGH':1 }, orcNone: 30 },
+  SMS: { tolerableDays: 30, partialMonths: 3, fullyMonths: 6 },
+  /* KPI MOSR (r232, Eric 18/11/2026): a MOSR is to be closed within 15 days of its raised date */
+  MOSR_KPI_DAYS: 15,
   isoToday: () => new Date(TODAY.getTime() - TODAY.getTimezoneOffset() * 6e4).toISOString().slice(0, 10),
   daysBetween: (a, b) => Math.round((Date.parse(String(b).slice(0, 10)) - Date.parse(String(a).slice(0, 10))) / 864e5),
   addMonths(d, n){ const t = new Date(String(d).slice(0, 10) + 'T00:00:00Z'); t.setUTCMonth(t.getUTCMonth() + n); return t.toISOString().slice(0, 10); },
   monthsBetween(a, b){ let n = 0; while(M.addMonths(a, n + 1) <= String(b).slice(0, 10)) n++; return n; },
-  /* open MOSR older than the time limit of their ORC level (the strictest when several are selected); no ORC = not assessed,
-     listed once past the longest limit. A report still Open is the only trace Coruson gives of an assessment not finished. */
-  mosrOrcLate(rows){
-    const today = M.isoToday(), S = M.SMS;
-    return (rows || []).filter(r => r.report_status === 'Open' && r.submitted_date).map(r => {
-      const lv = (r.orc || []).map(v => String(v).replace(/^\s*\d+\s*-\s*/, '').trim().toUpperCase()).filter(v => S.orcDays[v] !== undefined);
-      const limit = lv.length ? Math.min(...lv.map(v => S.orcDays[v])) : S.orcNone;
-      return { r, level: (r.orc || []).join(', '), limit, age: M.daysBetween(r.submitted_date, today) };
+  /* KPI MOSR (r232, Eric 18/11/2026 — replaces the ORC time limits of r224): open MOSR more than M.MOSR_KPI_DAYS days after
+     their raised date (submitted date when Coruson holds no raised date). from = that date, due = from + limit,
+     age = days from `from` to today, over = age − limit. */
+  mosrKpiLate(rows){
+    const today = M.isoToday(), limit = M.MOSR_KPI_DAYS;
+    return (rows || []).filter(r => r.report_status === 'Open' && (r.raised_date || r.submitted_date)).map(r => {
+      const from = String(r.raised_date || r.submitted_date).slice(0, 10), age = M.daysBetween(from, today);
+      return { r, from, limit, age, over: age - limit, due: new Date(Date.parse(from) + limit * 864e5).toISOString().slice(0, 10) };
     }).filter(x => x.age > x.limit);
   },
   /* HIRA per Category (r228, Eric 14/11/2026; r229-i1, 16/11/2026): the tiles of Safety › HIRA, which also filter the register
@@ -2688,7 +2716,7 @@ const M = {
     const A = API(), cls = A.hira().map || {}, by = {}; let none = 0, total = 0;
     const fixed = { full:    { id: 'full', title: 'FULLY EFFECTIVE', note: 'HIRA · Category on Coruson', ids: [] },
                     partial: { id: 'partial', title: 'PARTIAL EFFECTIVE', note: 'HIRA · Category PARTIAL EFFECTIVE or MVOI 3MT', ids: [] },
-                    not:     { id: 'not', title: 'NOT YET EFFECTIVE', note: 'HIRA · Category NOT YET EFFECTIVE, INEFFECTIVE or MVOI 6MT', ids: [] } };
+                    not:     { id: 'not', title: 'NOT YET EFFECTIVE', note: 'HIRA · Category NOT YET EFFECTIVE or MVOI 6MT', ids: [] } };
     Object.values(cls).forEach(c => { if(c.catId && !M.effectOf(c.effect)) by[c.catId] = by[c.catId] || { id: c.catId, title: c.effect, note: 'HIRA · Category on Coruson', ids: [] }; });
     (reps || []).filter(r => r.code === A.HIRA_TITLE).forEach(r => { const c = cls[r.id] || {}, e = M.effectOf(c.effect); total++;
       if(e) fixed[e.key].ids.push(r.id); else if(c.catId) by[c.catId].ids.push(r.id); else none++; });
@@ -2918,7 +2946,7 @@ M.consistency = function(){
         say('Safety › HIRA initial risk off the matrix vs recount from the form', M.hiraChecks(hz).off.length, n); }
       say('Safety › HIRA status of the latest-due hazard vs report status', Object.values(last).filter(x => x.r.hazardsNoDue === 0 && x.h.sem !== M.st(x.r)).length, 0); } }
   /* r224: the MOSR report's MSAG-owned rows (all time) are exactly the MOSR of Safety › OSR/MOSR status */
-  /* r224: MOSR past the ORC time limit against a recount with the limits written out (no M.SMS, no M.mosrOrcLate) */
+  /* r232: KPI MOSR against a recount with the limit written out (no M.MOSR_KPI_DAYS, no M.mosrKpiLate) */
   /* r229: MOSR charts by level against the register's own columns (every report with a value is in the level charts, none twice at level 1) */
   if(A.mosr().loaded){ const R = A.mosr().rows;
     [['dept', r => r.dept], ['occ', r => r.occ_raw]].forEach(([w, raw]) => { const m = M.mosrLevels(R, w);
@@ -2926,10 +2954,9 @@ M.consistency = function(){
       say('Safety › MOSR charts ' + w + ' level 1 vs recount', m.lv1.reduce((t, x) => t + x.n, 0), R.reduce((t, r) => t + new Set((r[w + '_lv'] || []).map(p => p[0])).size, 0)); });
     say('Safety › MOSR charts ORC vs register column', M.mosrOrc(R).list.reduce((t, x) => t + x.n, 0), R.reduce((t, r) => t + r.orc.length, 0)); }
   if(A.mosr().loaded){ const t = M.isoToday();
-    say('Safety › MOSR past ORC time limit vs recount', M.mosrOrcLate(A.mosr().rows).length,
-      A.mosr().rows.filter(r => { if(r.report_status !== 'Open' || !r.submitted_date) return false;
-        const o = (r.orc || []).join(' ').toUpperCase(), lim = /HIGH/.test(o) ? 1 : /MEDIUM/.test(o) ? 7 : 30;
-        return (Date.parse(t) - Date.parse(String(r.submitted_date).slice(0, 10))) / 864e5 > lim; }).length); }
+    say('Safety › KPI MOSR (open past raised + 15 days) vs recount', M.mosrKpiLate(A.mosr().rows).length,
+      A.mosr().rows.filter(r => { const d = r.raised_date || r.submitted_date; if(r.report_status !== 'Open' || !d) return false;
+        return (Date.parse(t) - Date.parse(String(d).slice(0, 10))) / 864e5 > 15; }).length); }
   if(A.mosr().loaded && A.safety().loaded && A.safety().data){ const sp = M.mosrSplit(A.mosr().rows), st = M.msagTotals(A.safety().data);
     say('Safety › MOSR report MSAG-owned (all time) vs OSR/MOSR status total', sp.msag.open + sp.msag.closed, st.mosrT);
     say('Safety › MOSR report MSAG-owned open (all time) vs OSR/MOSR status open', sp.msag.open, st.mosrO); }
@@ -4160,7 +4187,7 @@ function render(){
   } else {
     const nav = NAV_BY_ID[s], tab = state.tab[s];
     html = '<div class="page-head"><span class="t-micro">'+esc(TASK_LABEL[nav.task])+'</span>'
-      + '<h1>'+esc(nav.title)+'</h1><p class="t-sub">'+esc(nav.lead)+'</p>'
+      + '<h1>'+esc(nav.title)+'</h1>'+(nav.lead ? '<p class="t-sub">'+esc(nav.lead)+'</p>' : '')
       + (nav.tabs ? '<div class="tabs" role="tablist" aria-label="'+esc(nav.title)+' sections">'
           + nav.tabs.map(t=>'<button class="tab" type="button" role="tab" data-go="'+s+'" data-tab="'+t.id+'"'
               + ' aria-selected="'+(t.id===tab)+'">'+esc(t.label)+'</button>').join('')
@@ -4436,7 +4463,7 @@ document.addEventListener('keydown', e=>{
    ========================================================================== */
 const API = () => window.BETA_API;
 const BS = { pg:{}, ataLevel:'2', ataY:TODAY.getFullYear(), ataM:TODAY.getMonth()+1, k2g:'nature',
-             rsTab:'f088', rsSF:'all', rsQ:'', mosrSF:'all', mosrOcc:'', mosrQ:'', afForm:'', exForm:'',
+             rsTab:'f088', rsSF:'all', rsQ:'', mosrSF:'all', mosrOcc:'', mosrHz:'', mosrQ:'', afForm:'', exForm:'',
              docType:null, docSt:'', docRev:'', docQ:'', usersF:'all', fbMsg:'' };
 const LAZY = {};
 function betaResetLazy(){ Object.keys(LAZY).forEach(k => delete LAZY[k]); }
@@ -4838,8 +4865,7 @@ function scrSafety(){
       stat('Open reports', String(t.osrO + t.mosrO), 'awaiting action', (t.osrO + t.mosrO) > 0)
     ])
     /* r224: scope said in QA terms — this table is not the MOSR report (every owner, period filter); M.consistency reconciles them */
-    + '<section class="sec">' + card('MSAG report status', 'Reports owned by MSAG groups on Coruson · all time (the period filter does not apply) · Confidential excluded · loaded '+esc(d.updated)
-        + ' · Safety › MOSR report lists every MOSR, whatever the owner',
+    + '<section class="sec">' + card('MSAG report status', '',   /* r232 (Eric 18/11/2026): no note on the card; the scope is in the User guide */
       plainTable('safety', [{l:'Group on Coruson',w:'240px'},{l:'OSR closed',ac:true},{l:'OSR open',ac:true},{l:'OSR total',ac:true},{l:'MOSR closed',ac:true},{l:'MOSR open',ac:true},{l:'MOSR total',ac:true}], rows, 40, 0, {full:true, compact:true, nosort:true}))   /* group headings between rows: order is the layout */
     + '</section>';
 }
@@ -4867,7 +4893,7 @@ function spiChart(spi){
     + '<line x1="'+L+'" x2="'+(W-R)+'" y1="'+(T+ih)+'" y2="'+(T+ih)+'" stroke="var(--hairline)"/>' + sptLine
     + '<path d="'+path+'" fill="none" stroke="var(--text-2)" stroke-width="1.8"/>' + pts + xl + '</svg>';
 }
-/* the action AMO SMS §10.6 c), d) requires at each alert level */
+/* the action AMO SMSM §10.6 c), d) requires at each alert level */
 const SPI_ACTION = { 1:'Close monitoring and trend analysis.', 2:'Investigation into potential root causes.',
   3:'Immediate risk assessment; the Accountable Manager must be informed immediately.' };
 function scrSpi(){
@@ -4891,7 +4917,7 @@ function scrSpi(){
     return '<div class="card"><div class="card-head"><h2 class="od-truncate">'+esc(spi.title || spi.number)+'</h2>'+badge+'</div>'
       + '<div class="card-pad" style="display:grid;gap:8px"><span class="t-small dim">'+esc(spi.number)
       + ' · SPT (CAAV) '+esc(spi.sptApproved ?? '—')+' · previous year '+esc(spi.prevYear ?? '—')+' · '+(spi.direction === 'higher' ? 'higher' : 'lower')+' is better</span>'
-      + (e.status !== 'na' && e.currentLevel >= 1 ? '<span class="t-small"><b>Required action (AMO SMS §10.6):</b> '+SPI_ACTION[Math.min(3, e.currentLevel)]+'</span>' : '')
+      + (e.status !== 'na' && e.currentLevel >= 1 ? '<span class="t-small"><b>Required action (AMO SMSM §10.6):</b> '+SPI_ACTION[Math.min(3, e.currentLevel)]+'</span>' : '')
       + spiChart(spi) + (spi.remark ? '<span class="t-small">'+esc(spi.remark)+'</span>' : '') + '</div></div>';
   }).join('');
   return tiles([
@@ -5078,7 +5104,10 @@ function scrFormDetail(titles){
 }
 /* MOSR report (Eric 03/11/2026): the columns of "MOSR Database - Dashboard.xlsx" without the yellow ones
    (Describe what happened, Actions taken, Reporter, Position). Data: classic loadMosr. */
-const MOSR_OCC = ['Aircraft Technical Defect', 'Cabin Defect', 'Others'];
+/* r232 (Eric 18/11/2026): Occurrence category = every level 1 of the Coruson list (Technical, Standard & Compliance, Human
+   Factor, Operational, Contractor, Sub-contractor, Others) with its level 2, from occ_lv — no longer the groups under Technical only */
+const mosrOccText = r => (r.occ_lv || []).map(p => p[1] ? p[0]+' › '+p[1] : p[0]);
+const mosrHazard = (r, v) => (r.hazard || []).some(h => String(h).trim().toLowerCase() === v);
 const mosrCell = v => { const t = Array.isArray(v) ? v.join(', ') : v; return t ? esc(t) : '—'; };
 function scrMosr(){
   const A = API();
@@ -5086,49 +5115,71 @@ function scrMosr(){
   if(w) return w;
   const q = (state.rowQuery || '').toLowerCase();
   const scope = A.mosr().rows.filter(r => inPeriod(r.submitted_date));
+  /* level-1 categories: the Coruson list, then any value recorded outside it; a stored filter that is no longer a level 1 is dropped */
+  const occOpts = [...new Set(((A.mosr().tax || {}).occ || []).map(t => t.k).concat(scope.flatMap(r => (r.occ_lv || []).map(p => p[0]))))];
+  const occF = occOpts.includes(BS.mosrOcc) ? BS.mosrOcc : '';
   const rows = scope
     .filter(r => BS.mosrSF === 'all' || r.report_status === BS.mosrSF)   /* metrics-ok: MOSR Coruson status */
-    .filter(r => !BS.mosrOcc || r.occ.includes(BS.mosrOcc))
-    .filter(r => !q || [r.report_number, r.short, r.summary, r.base, r.owner, r.dept.join(' ')].join(' ').toLowerCase().includes(q))
+    .filter(r => !occF || (r.occ_lv || []).some(p => p[0] === occF))
+    .filter(r => !BS.mosrHz || mosrHazard(r, BS.mosrHz))
+    .filter(r => !q || [r.report_number, r.short, r.summary, r.base, r.owner, r.dept.join(' '), mosrOccText(r).join(' ')].join(' ').toLowerCase().includes(q))
     .sort((a,b) => String(b.report_number).localeCompare(String(a.report_number), undefined, { numeric:true }));
   const open = scope.filter(r => r.report_status === 'Open').length;   /* metrics-ok: MOSR Coruson status */
   const closed = scope.filter(r => r.report_status === 'Closed').length;   /* metrics-ok: MOSR Coruson status */
-  const noClass = scope.filter(r => !r.occ_raw.length).length, late = M.mosrOrcLate(scope);
+  const noClass = scope.filter(r => !r.occ_raw.length).length, late = M.mosrKpiLate(scope);
   const txt = (v, n) => { const t = v || ''; return t ? '<span class="t-small od-clamp-'+n+'" title="'+esc(t)+'">'+esc(t)+'</span>' : '—'; };
   return tiles([
       stat('MOSR (all owners)', String(scope.length), periodLabel()),
       stat('Open', String(open), 'status on Coruson', open > 0),
       stat('Closed', String(closed), 'status on Coruson'),
       stat('Not classified', String(noClass), 'no Occurrence Category on Coruson'),
-      stat('Past ORC time limit', String(late.length), 'open · Low 30 days · Medium 7 days · High 24 h · AMO SMS §9.3.8.3', late.length > 0, false, late.length ? 'bmosrorc' : null)
+      stat('KPI MOSR', String(late.length), 'open more than '+M.MOSR_KPI_DAYS+' days after the raised date', late.length > 0, false, late.length ? 'bmosrorc' : null)
     ])
     + mosrReconcile(scope)
-    + '<section class="sec">' + card('MOSR report', 'form MOSR, by submitted date · classifications from tab EVALUATION on Coruson · Occurrence Category: the groups under Technical only',
+    + '<section class="sec">' + card('MOSR report', '',
       '<div class="od-row" style="--od-gap:12px;flex-wrap:wrap">'
       + segs('mosrSF', [['all','All'],['Open','Open'],['Closed','Closed']], BS.mosrSF)
-      + sel('mosrOcc', [['','All categories']].concat(MOSR_OCC.map(o => [o, o])), BS.mosrOcc, 'Occurrence') + '</div>'
-      + '<div class="af-hira">' + plainTable('mosr', [{l:'Submitted',fit:true},{l:'Report number',fit:true},{l:'Short summary'},{l:'Report summary'},{l:'Base'},{l:'Report owner'},{l:'Department responsible'},{l:'ORC'},{l:'Hazard?'},{l:'Hazard type'},{l:'Occurrence category'},{l:'Status'}],
+      + sel('mosrOcc', [['','All categories']].concat(occOpts.map(o => [o, o])), occF, 'Occurrence')
+      + sel('mosrHz', [['','All'],['yes','Yes'],['no','No']], BS.mosrHz, 'Hazard') + '</div>'
+      + '<div class="af-hira">' + plainTable('mosr', [{l:'Submitted',fit:true},{l:'Report number',fit:true},{l:'Short summary'},{l:'Report summary'},{l:'Workplace'},{l:'Report owner'},{l:'Department responsible'},{l:'ORC'},{l:'Hazard?'},{l:'Hazard type'},{l:'Occurrence category'},{l:'Status'}],
           rows.map(r => ['<span class="num">'+fdx(r.submitted_date)+'</span>',
             '<span class="row-id">'+esc(r.report_number)+extLink('report', r.report_id, r.report_number)+'</span>',
             txt(r.short, 3), txt(r.summary, 3), '<span class="t-small">'+mosrCell(r.base)+'</span>', '<span class="t-small">'+mosrCell(r.owner)+'</span>',
             '<span class="t-small">'+mosrCell(r.dept)+'</span>', '<span class="t-small">'+mosrCell(r.orc)+'</span>', '<span class="t-small">'+mosrCell(r.hazard)+'</span>',
-            '<span class="t-small">'+mosrCell(r.hazard_type)+'</span>', '<span class="t-small">'+mosrCell(r.occ)+'</span>',
+            '<span class="t-small">'+mosrCell(r.hazard_type)+'</span>', '<span class="t-small">'+mosrCell(mosrOccText(r))+'</span>',
             statusChip(r.report_status === 'Closed' ? 'Closed' : r.report_status)]), 25, 1180,   /* metrics-ok: MOSR Coruson status */
-          { sortVals: rows.map(r => [String(r.submitted_date || '').slice(0, 10), r.report_number, r.short, r.summary, r.base, r.owner, r.dept.join(', '), r.orc.join(', '), r.hazard.join(', '), r.hazard_type.join(', '), r.occ.join(', '), r.report_status]) }) + '</div>') + '</section>';
+          { sortVals: rows.map(r => [String(r.submitted_date || '').slice(0, 10), r.report_number, r.short, r.summary, r.base, r.owner, r.dept.join(', '), r.orc.join(', '), r.hazard.join(', '), r.hazard_type.join(', '), mosrOccText(r).join(', '), r.report_status]) }) + '</div>') + '</section>';
 }
 
-/* The list behind the 'Past ORC time limit' tile (M.mosrOrcLate): open MOSR of the period older than the risk-assessment time limit
-   of their Occurrence Criticality level, AMO SMS §9.3.8.3 */
+/* The list behind the 'KPI MOSR' tile (M.mosrKpiLate, r232): open MOSR of the period more than 15 days after their raised date */
 function showMosrOrc(){
-  const A = API(), list = M.mosrOrcLate(A.mosr().rows.filter(r => inPeriod(r.submitted_date))).sort((a, b) => (b.age - b.limit) - (a.age - a.limit));
+  const A = API(), list = M.mosrKpiLate(A.mosr().rows.filter(r => inPeriod(r.submitted_date))).sort((a, b) => b.over - a.over);
   MODAL_REDRAW = null; MODAL_KEY = 'mosrorc';
-  openModal('Open MOSR past the ORC time limit', list.length+' report'+(list.length === 1 ? '' : 's')+' · '+periodLabel()+' · risk assessment: Low within 30 days, Medium within 7 days, High immediately (AMO SMS §9.3.8.3)',
-    list.length ? '<div class="tbl-wrap"><table class="hx" style="min-width:0;width:100%"><thead><tr>'+['Report number','Submitted','Report owner','ORC','Days open','Time limit'].map(h => '<th scope="col">'+h+'</th>').join('')+'</tr></thead><tbody>'
+  openModal('KPI MOSR', list.length+' open MOSR past the time limit · '+periodLabel()+' · time limit: raised date + '+M.MOSR_KPI_DAYS+' days',
+    list.length ? '<div class="tbl-wrap"><table class="hx" style="min-width:0;width:100%"><thead><tr>'+['Report number','Raised','Time limit (raised + '+M.MOSR_KPI_DAYS+' d)','Report owner','ORC','Days open','Days past limit'].map(h => '<th scope="col">'+h+'</th>').join('')+'</tr></thead><tbody>'
         + list.map(x => '<tr style="cursor:default"><td class="hx-c od-nowrap"><span class="row-id">'+esc(x.r.report_number)+extLink('report', x.r.report_id, x.r.report_number)+'</span></td>'
-          + '<td class="hx-c od-nowrap">'+esc(fdx(x.r.submitted_date))+'</td><td class="hx-mid" style="white-space:normal">'+esc(x.r.owner || '—')+'</td>'
-          + '<td class="hx-c">'+(x.level ? esc(x.level) : missingData('Not assessed'))+'</td><td class="hx-c"><b>'+x.age+'</b></td><td class="hx-c">'+x.limit+' day'+(x.limit === 1 ? '' : 's')+'</td></tr>').join('')
+          + '<td class="hx-c od-nowrap">'+esc(fdx(x.from))+(x.r.raised_date ? '' : '<br><span class="t-small dim">submitted date</span>')+'</td><td class="hx-c od-nowrap">'+esc(fdx(x.due))+'</td>'
+          + '<td class="hx-mid" style="white-space:normal">'+esc(x.r.owner || '—')+'</td>'
+          + '<td class="hx-c">'+((x.r.orc || []).length ? esc(x.r.orc.join(', ')) : missingData('Not assessed'))+'</td><td class="hx-c">'+x.age+'</td><td class="hx-c"><b>'+x.over+'</b></td></tr>').join('')
         + '</tbody></table></div>'
       : '<p class="t-sub dim">No open MOSR past its time limit for the current filters.</p>');
+  $('#betaModal .beta-modal-panel').classList.add('wide');
+}
+/* r232 (Eric 18/11/2026): the MOSR of the MOSR charts period that carry no value for one classification
+   (which = dept | orc | occ) — the list behind "N without a value" in a stage caption */
+const MOSR_NONE = { dept:['Department responsible', r => !(r.dept_lv || []).length], orc:['ORC', r => !(r.orc || []).length], occ:['Occurrence category', r => !(r.occ_lv || []).length] };
+function showMosrNone(which){
+  const A = API(), def = MOSR_NONE[which]; if(!def) return;
+  const list = A.mosr().rows.filter(r => inPeriod(r.submitted_date) && mosrQuarterOk(r.submitted_date) && def[1](r))
+    .sort((a, b) => String(b.report_number).localeCompare(String(a.report_number), undefined, { numeric:true }));
+  MODAL_REDRAW = null; MODAL_KEY = 'mosrnone:'+which;
+  openModal('MOSR without '+def[0], list.length+' report'+(list.length === 1 ? '' : 's')+' · '+periodLabel()+(BS.mosrQ ? ' · Q'+BS.mosrQ : '')+' · no value in '+def[0]+' on Coruson',
+    list.length ? '<div class="tbl-wrap"><table class="hx" style="min-width:0;width:100%"><thead><tr>'+['Report number','Submitted','Short summary','Report owner','Status'].map(h => '<th scope="col">'+h+'</th>').join('')+'</tr></thead><tbody>'
+        + list.map(r => '<tr style="cursor:default"><td class="hx-c od-nowrap"><span class="row-id">'+esc(r.report_number)+extLink('report', r.report_id, r.report_number)+'</span></td>'
+          + '<td class="hx-c od-nowrap">'+esc(fdx(r.submitted_date))+'</td><td class="hx-mid" style="white-space:normal">'+esc(r.short || '—')+'</td>'
+          + '<td class="hx-mid" style="white-space:normal">'+esc(r.owner || '—')+'</td><td class="hx-c">'+statusChip(r.report_status === 'Closed' ? 'Closed' : r.report_status)+'</td></tr>').join('')   /* metrics-ok: MOSR Coruson status */
+        + '</tbody></table></div>'
+      : '<p class="t-sub dim">Every MOSR of the period carries this classification.</p>');
   $('#betaModal .beta-modal-panel').classList.add('wide');
 }
 /* r224: the register (every owner, period filter) against Safety › OSR/MOSR status (MSAG-owned, all time), from the same rows */
@@ -5182,6 +5233,22 @@ function mosrBars(items, flow){
     '<div class="bar-row" style="cursor:default;grid-template-columns:minmax(120px,1.3fr) minmax(0,1.4fr) auto" title="'+esc(x.k+': '+x.n)+'"><span class="t-small" style="overflow-wrap:anywhere">'+esc(x.k)+'</span>'
     + '<span class="bar-track"><span class="bar-fill" style="width:'+(x.n/max*100)+'%"></span></span><span class="num strong od-nowrap">'+x.n+'</span></div>').join('') + '</div>';
 }
+/* r232 (Eric 18/11/2026): level 2 as RANKED LISTS — the form for many parts with long names and very unequal counts. A row is
+   the full name with its count and share on one line and a bar under it, largest first, one hue (the stage colour).
+   base = what a full bar stands for: the reports of the level 1 (share of the area) or the largest value (plain ranking). */
+function mosrRank(items, base, share){
+  return '<ol class="rk">' + items.map(x => '<li class="rk-row" title="'+esc(x.k+': '+x.n+(share ? ' · '+M.pct(x.n, base)+'% of the area' : ''))+'">'
+    + '<span class="rk-top"><span class="rk-k">'+esc(x.k)+'</span><span class="rk-v"><b class="num">'+x.n+'</b>'+(share ? '<span class="t-small dim num">'+M.pct(x.n, base)+'%</span>' : '')+'</span></span>'
+    + '<span class="rk-track"><span class="rk-fill" style="width:'+Math.max(1.5, x.n / Math.max(1, base) * 100).toFixed(1)+'%"></span></span></li>').join('') + '</ol>';
+}
+/* one panel per level 1 (small multiples), largest area first: its name, its reports, then its level-2 values ranked;
+   a bar is the value's share of the reports of that area, so bars compare across the panels */
+function mosrRankGroups(groups){
+  if(!groups.length) return mosrEmpty;
+  return '<div class="rk-grid">' + groups.map(g => '<section class="rk-card" aria-label="'+esc(g.k)+'"><header class="rk-head"><h3>'+esc(g.k)+'</h3>'
+    + '<span class="rk-total"><b class="num">'+g.n+'</b><span class="t-small dim">report'+(g.n === 1 ? '' : 's')+esc(g.note || '')+'</span></span></header>'
+    + mosrRank(g.items, g.n, true) + '</section>').join('') + '</div>';
+}
 /* r229 (Eric 14/11/2026, "MOSR Chart.docx"): DEPARTMENT RESPONSIBLE at level 1 and level 2, ORC as a donut, OCCURRENCE
    CATEGORY at level 1 and one level-2 chart per level 1 that has a level 2 (Technical, Standard & Compliance, Human Factor,
    Contractor, Sub-contractor). Levels = the Coruson lists (Taxonomy Safety AMO); counts through M.mosrLevels / M.mosrOrc. */
@@ -5194,36 +5261,33 @@ function scrMosrCharts(){
   const period = periodLabel() + (BS.mosrQ ? ' · Q'+BS.mosrQ : '');
   const only1 = (m, a) => m.only1[a] ? ' · '+m.only1[a]+' at level 1 only' : '';
   const any = L => L.some(x => x.n);
-  /* level 2 of the departments, grouped under their level 1 in the order of the level-1 chart */
-  const deptLv2 = dept.lv1.filter(x => (dept.lv2[x.k] || []).length).map(x =>
-    '<div class="mosr-grp" style="display:grid;gap:4px"><span class="t-micro">'+esc(x.k)+' <span class="dim">'+x.n+only1(dept, x.k)+'</span></span>'+mosrBars(dept.lv2[x.k])+'</div>').join('');
   /* r231 (Eric 16/11/2026): the charts are grouped in stages, one per step of the classification on Coruson (Taxonomy Safety
      AMO: department responsible → ORC → occurrence category), so a chart is read with the stage it sits in. A stage has its
      step number, its question, its own bar colour and the count of reports classified; inside, level 1 comes first, then
      level 2. A level-2 chart with few values is a column chart; one with many takes the full width and flows into columns. */
-  const cls = (n, none) => (rows.length - none)+' of '+rows.length+' MOSR classified'+(none ? ' · '+none+' without a value' : '');
+  /* r232: the reports without a value are one click away (showMosrNone) */
+  const cls = (which, none) => (rows.length - none)+' of '+rows.length+' MOSR classified'+(none ? ' · <button class="link-b" type="button" data-act="bmosrnone" data-k="'+which+'" title="List these MOSR">'+none+' without a value</button>' : '');
   const stage = (no, colour, title, lead, body) => '<section class="sec mosr-stage"'+(colour ? ' style="--stage:var('+colour+')"' : '')+' aria-label="'+esc(title)+'">'
     + '<div class="mosr-stage-head">'+(no ? '<span class="mosr-step" aria-hidden="true">'+no+'</span>' : '')
     + '<div><h2>'+esc(title)+'</h2><p class="t-small dim">'+lead+'</p></div></div>' + body + '</section>';
+  const deptGroups = dept.lv1.filter(x => (dept.lv2[x.k] || []).length).map(x => ({ k:x.k, n:x.n, note:only1(dept, x.k), items:dept.lv2[x.k] }));
   const occCards = occ.lv1.map(x => x.k).filter(a => occ.parents.includes(a)).map(a => { const L = occ.lv2[a] || [], n = (occ.lv1.find(x => x.k === a) || { n:0 }).n;
-    return { wide: L.length > 6, html: card('Level 2 · '+a, n+' report'+(n === 1 ? '' : 's')+only1(occ, a), !L.length ? mosrEmpty : L.length > 6 ? mosrBars(L, true) : mosrColumns(L)) }; });
+    return { wide: L.length > 6, html: card('Level 2 · '+a, n+' report'+(n === 1 ? '' : 's')+only1(occ, a), !L.length ? mosrEmpty : L.length > 6 ? '<div class="rk-flow">'+mosrRank(L, Math.max(...L.map(v => v.n)), false)+'</div>' : mosrColumns(L)) }; });
   const small = occCards.filter(c => !c.wide), wide = occCards.filter(c => c.wide);
-  /* the level-1 values as the Coruson list writes them */
-  const names = w => ((A.mosr().tax || {})[w] || []).map(t => t.k).join(' · ');
   return '<section class="sec"><div class="od-row" style="--od-gap:12px;flex-wrap:wrap;align-items:center">'
     + sel('mosrQ', [['','All quarters'],['1','Q1'],['2','Q2'],['3','Q3'],['4','Q4']], BS.mosrQ, 'Quarter')
     + '<span class="t-small dim">'+esc(period)+' · '+rows.length+' MOSR by submitted date · classifications from tab EVALUATION on Coruson · a report with two values counts in both</span></div></section>'
-    + stage(1, '--mosr-1', 'Department responsible', 'Which area and unit the occurrence belongs to · '+cls(rows.length, dept.none),
-        card('Level 1 · Area', esc(names('dept')), any(dept.lv1) ? mosrColumns(dept.lv1) : mosrEmpty)
-        + card('Level 2 · Unit within each area', 'stations count under Maintenance Station', deptLv2 ? '<div class="mosr-flow">'+deptLv2+'</div>' : mosrEmpty))
+    + stage(1, '--mosr-1', 'Department responsible', 'Which area and unit the occurrence belongs to · '+cls('dept', dept.none),
+        card('Level 1 · Area', '', any(dept.lv1) ? mosrColumns(dept.lv1) : mosrEmpty)
+        + card('Level 2 · Unit within each area', '', mosrRankGroups(deptGroups)))
     + '<div class="mosr-pair">'
-    + stage(2, '--mosr-2', 'ORC', 'Occurrence Reached Criticality: how critical the occurrence is · '+cls(rows.length, orc.none),
+    + stage(2, '--mosr-2', 'ORC', 'Occurrence Reached Criticality: how critical the occurrence is · '+cls('orc', orc.none),
         card('Reports per ORC level', 'Very low · Low · Medium · High', mosrPie(orc.list, MOSR_ORC_SLOT)))
     + stage('', '', 'Reporting base', 'Where the report comes from · not a classification',
         card('Reports per base', 'station code when the typed text carries one · blank not counted', mosrColumns(mosrFold(mosrCount(rows, r => r.base_group), 9))))
     + '</div>'
-    + stage(3, '--mosr-3', 'Occurrence category', 'What kind of occurrence it is · '+cls(rows.length, occ.none),
-        card('Level 1 · Category', esc(names('occ')), any(occ.lv1) ? mosrColumns(occ.lv1) : mosrEmpty)
+    + stage(3, '--mosr-3', 'Occurrence category', 'What kind of occurrence it is · '+cls('occ', occ.none),
+        card('Level 1 · Category', '', any(occ.lv1) ? mosrColumns(occ.lv1) : mosrEmpty)
         + (small.length ? '<div class="mosr-stage-row">'+small.map(c => c.html).join('')+'</div>' : '')
         + wide.map(c => c.html).join(''));
 }
@@ -5461,7 +5525,7 @@ async function sendFeedback(){
    ========================================================================== */
 const HIRA_F118 = { existing:'Existing controls', consequence:'Potential specific consequence', severity:'Severity',
   likelihood:'Likelihood', initRisk:'Initial risk rating', assessed:'Date assessed', nextReview:'Next review date', effect:'Effectiveness rating' };
-/* a rating chip: code + band label on the band colour of AMO SMS §9.4.3; a value that is not a matrix code is shown as written */
+/* a rating chip: code + band label on the band colour of AMO SMSM §9.4.3; a value that is not a matrix code is shown as written */
 function riskChip(k, raw){
   if(!k) return raw ? '<span class="t-small" title="Not a risk matrix code">'+esc(raw)+'</span>' : '<span class="dim">—</span>';
   const tip = k.label+' · severity '+k.s+' '+M.RISK.sev[k.s]+' · probability '+k.p+' '+M.RISK.prob[k.p][0]+' · '+k.action;
@@ -5477,7 +5541,7 @@ function hiraKv(v){
 /* calc (optional) = the cell Severity × Likelihood gives when the recorded rating is another one: marked in the cell */
 const hiraRiskTd = (k, raw, calc) => k
   ? '<td class="hx-fill" style="background:'+k.hex+';color:'+k.ink+'" title="'+esc(k.label+' · '+M.RISK.sev[k.s]+' × '+M.RISK.prob[k.p][0]+' · '+k.action)+'"><b>'+k.code+'</b><span>'+esc(k.label)+'</span>'
-    + (calc ? '<span class="hx-off" title="'+esc('Severity × Likelihood on the form gives '+calc.code+' '+calc.label+' ('+M.RISK.sev[calc.s]+' × '+M.RISK.prob[calc.p][0]+', AMO SMS §9.4.3)')+'">⚠ Matrix: '+calc.code+'</span>' : '')+'</td>'
+    + (calc ? '<span class="hx-off" title="'+esc('Severity × Likelihood on the form gives '+calc.code+' '+calc.label+' ('+M.RISK.sev[calc.s]+' × '+M.RISK.prob[calc.p][0]+', AMO SMSM §9.4.3)')+'">⚠ Matrix: '+calc.code+'</span>' : '')+'</td>'
   : '<td class="hx-c">'+(raw ? '<span title="Not a risk matrix code">'+esc(raw)+'</span>' : missingData('Missing'))+'</td>';
 /* one value per HIRA (r228: the report's Category on Coruson): the cell spans the HIRA's hazards */
 const hiraEffectTd = (v, span) => { const e = M.effectOf(v);
@@ -5526,9 +5590,9 @@ function riskMatrixCard(hz, which){
   const legend = '<div class="od-row" style="--od-gap:14px;flex-wrap:wrap">' + Object.keys(R.bands).map(b => { const x = R.bands[b];
     return '<span class="od-row t-small" style="--od-gap:6px"><span class="risk-chip" style="background:'+x.hex+';color:'+x.ink+'">'+esc(x.label)+'</span>'
       + '<span class="num strong">'+mx.bands[b]+'</span><span class="dim">'+esc(x.action)+'</span></span>'; }).join('') + '</div>';
-  return card('Risk matrix', 'Hazards per cell, '+(which === 'init' ? 'initial' : 'current')+' risk rating · AMO SMS §9.4.3'
+  return card('Risk matrix', 'Hazards per cell · AMO SMSM §9.4.3'
       + (mx.none ? ' · '+mx.none+' hazard'+(mx.none === 1 ? '' : 's')+' without a matrix code' : ''),
-    segs('hiraRisk', [['cur','Current risk'],['init','Initial risk']], which) + table + legend);
+    segs('hiraRisk', [['init','Initial risk'],['cur','Current risk']], which) + table + legend);
 }
 function scrHira(){
   const A = API();
@@ -5549,8 +5613,8 @@ function scrHira(){
   const nOpen = reps.filter(isOpen).length, cat = M.hiraByCategory(reps), catErr = A.hira().catErr;
   /* the tiles filter the register (BS.hiraF, M.hiraFilter): HIRA → the open ones, a Category tile → its HIRA; a second click clears */
   const flt = M.hiraFilter(reps, BS.hiraF), shown = flt ? flt.rows : reps;
-  const fTile = (label, value, sub, key) => stat(label, value, sub, false, false, 'bset',
-    ' data-k="hiraF" data-v="'+(BS.hiraF === key ? '' : esc(key))+'" aria-pressed="'+(BS.hiraF === key)+'" title="'+(BS.hiraF === key ? 'Show all HIRA' : 'Show these HIRA in the register')+'"');
+  const fTile = (label, value, sub, key, fill) => stat(label, value, sub, false, false, 'bset',
+    (fill ? ' data-fill style="--fill:'+fill.hex+';--fill-ink:'+fill.ink+'"' : '')+' data-k="hiraF" data-v="'+(BS.hiraF === key ? '' : esc(key))+'" aria-pressed="'+(BS.hiraF === key)+'" title="'+(BS.hiraF === key ? 'Show all HIRA' : 'Show these HIRA in the register')+'"');
   const note = (merged ? '<p class="t-small dim">'+merged+' HIRA: the preventive actions could not be assigned to a hazard from the form (no link, numbering and creation time do not separate them) — shown across the HIRA and marked.</p>' : '')
     + (catErr ? '<p class="t-small" style="color:var(--danger,#e5484d)">The Category of the HIRA reports could not be loaded ('+esc(catErr)+'): Effectiveness rating shows Missing and the Category tiles show —.</p>' : '')
     + (!catErr && cat.none ? '<p class="t-small dim">'+cat.none+' HIRA without a Category on Coruson — not counted in the Category tiles.</p>' : '')
@@ -5558,15 +5622,15 @@ function scrHira(){
     + (!regErr && absent.length && hz.length ? '<p class="t-small dim">Not found on the Coruson form, shown as —: '+esc(absent.map(k => HIRA_F118[k]).join(', '))+'.</p>' : '');
   return tiles([
       fTile('HIRA', String(reps.length), (reps.length - nOpen)+' closed · '+nOpen+' open · '+periodLabel(), 'open'),
-      stat('Hazards', String(hz.length), 'specific components of the generic hazards'),
+      stat('Specific components', String(hz.length), 'of the generic hazards'),
     ].concat(catErr ? [stat('Category', '—', 'could not be loaded from Coruson', true)]
-      : cat.list.map(c => fTile(c.title, String(c.n), c.note, 'cat:'+c.id))))
+      : cat.list.map(c => fTile(c.title, String(c.n), c.note, 'cat:'+c.id, M.EFFECT[c.id]))))
     + '<section class="sec">' + riskMatrixCard(hz, which) + '</section>'
     + '<section class="sec"><div class="card af-hira"><div class="card-head"><h2>HIRA register</h2>'
     + '<span class="t-small dim od-fill">VJC-MQA-F-118 Risk Register · one row per hazard · select a row for the full record</span>'
     /* r228: the Compliance checks tile gave its place to the Category tiles; the list stays one click away */
     + '<span class="od-row" style="--od-gap:8px">'
-    + (ck.total ? '<button class="btn" type="button" data-act="bhirachecks" title="'+esc('Risk rating off the matrix '+ck.off.length+' · missing data '+nMiss+' · AMO SMS time limits '+ck.sms)+'">Compliance checks ('+ck.total+')</button>' : '')
+    + (ck.total ? '<button class="btn" type="button" data-act="bhirachecks" title="'+esc('Risk rating off the matrix '+ck.off.length+' · missing data '+nMiss+' · AMO SMSM time limits '+ck.sms)+'">Compliance checks ('+ck.total+')</button>' : '')
     + (CAN_EXPORT() && reps.length ? '<button class="btn" type="button" data-act="bhiraexp" data-k="xlsx">Export Excel</button>'
         + '<button class="btn" type="button" data-act="bhiraexp" data-k="pdf">Export PDF</button>' : '') + '</span></div>'
     + (note ? '<div class="card-pad">'+note+'</div>' : '')
@@ -5673,20 +5737,20 @@ function showHiraChecks(){
     + '<td class="hx-c od-nowrap">'+hz+'</td><td class="hx-mid" style="white-space:normal">'+esc(type)+'</td><td class="hx-mid" style="white-space:normal">'+detail+'</td></tr>';
   const rows = ck.off.map(x => row(x.r, 'Hazard '+x.i, 'Initial risk rating not consistent with Severity × Likelihood',
         'Recorded <b>'+x.init.code+'</b> '+esc(x.init.label)+' · Severity × Likelihood on the form ('+esc(M.RISK.sev[x.calc.s]+' × '+M.RISK.prob[x.calc.p][0])+') gives <b>'+x.calc.code+'</b> '+esc(x.calc.label)))
-    .concat(ck.limit.map(q => row(q.x.r, 'Hazard '+q.x.i, 'Tolerable risk: mitigation to be finished within '+M.SMS.tolerableDays+' days (AMO SMS §9.5 d)',
+    .concat(ck.limit.map(q => row(q.x.r, 'Hazard '+q.x.i, 'Tolerable risk: mitigation to be finished within '+M.SMS.tolerableDays+' days (AMO SMSM §9.5 d)',
         'Initial risk <b>'+q.x.init.code+'</b> · date assessed '+esc(fdx(q.day))
         + (q.dDue !== null ? ' · due date '+esc(fdx(q.x.h.due))+' (<b>'+q.dDue+'</b> days)' : ' · no due date')
         + (q.none ? ' · no preventive action under this hazard after <b>'+q.dEnd+'</b> days' : q.open ? ' · actions not all completed after <b>'+q.dEnd+'</b> days'
            : q.end ? ' · last action completed '+esc(fdx(q.end))+' (<b>'+q.dEnd+'</b> days)' : ' · the actions carry no date completed (section MITIGATION ACTION)'))))
-    .concat(ck.intol.map(q => row(q.x.r, 'Hazard '+q.x.i, 'Intolerable risk: immediate action, report to the Accountable Manager (AMO SMS §9.5 d)',
+    .concat(ck.intol.map(q => row(q.x.r, 'Hazard '+q.x.i, 'Intolerable risk: immediate action, report to the Accountable Manager (AMO SMSM §9.5 d)',
         'Initial risk <b>'+q.x.init.code+'</b> · '+(q.none ? 'no preventive action under this hazard' : q.left+' preventive action'+(q.left === 1 ? '' : 's')+' without a date completed'))))
-    .concat(ck.effect.map(q => row(q.r, 'All hazards', 'Effectiveness rating earlier than its monitoring period (AMO SMS §9.7)',
+    .concat(ck.effect.map(q => row(q.r, 'All hazards', 'Effectiveness rating earlier than its monitoring period (AMO SMSM §9.7)',
         '<b>'+esc(String(q.value).toUpperCase())+'</b> needs '+(q.need === M.SMS.fullyMonths ? 'more than '+q.need : q.need)+' months without a related incident · '
         + (q.notDone ? q.notDone+' action'+(q.notDone === 1 ? '' : 's')+' without a date completed' : !q.last ? 'no action completed' : 'last action completed '+esc(fdx(q.last))+' (<b>'+q.months+'</b> month'+(q.months === 1 ? '' : 's')+' ago)'))))
     .concat(ck.missRep.map(q => row(q.r, 'All hazards', 'Missing data', esc(q.miss.join(', ')))))
     .concat(ck.missHz.map(x => row(x.r, 'Hazard '+x.i, 'Missing data', esc(x.miss.join(', ')))));
   MODAL_REDRAW = null; MODAL_KEY = 'hirachecks';
-  openModal('HIRA compliance checks', ck.total+' item'+(ck.total === 1 ? '' : 's')+' · '+periodLabel()+' · risk matrix AMO SMS §9.4.3 · select a row for the HIRA record',
+  openModal('HIRA compliance checks', ck.total+' item'+(ck.total === 1 ? '' : 's')+' · '+periodLabel()+' · risk matrix AMO SMSM §9.4.3 · select a row for the HIRA record',
     rows.length ? '<div class="tbl-wrap"><table class="hx" style="min-width:0;width:100%"><thead><tr>'+['HIRA number','Hazard','Check','Detail'].map(h => '<th scope="col">'+h+'</th>').join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>'
                 : '<p class="t-sub dim">No item for the current filters.</p>');
   $('#betaModal .beta-modal-panel').classList.add('wide');
@@ -5943,7 +6007,15 @@ function showReport(id){
       + (findings(rowsOf(r)) || block('Finding', r.finding_desc));
   } else {
     const st = wfStages(id, 'rpt:'+id);
-    body = head + kv([['Form', r.report_title], ['Org unit', r.org_unit_name], ['Department', r.dept], ['Owner', r.owner_name],
+    /* r232 (Eric 18/11/2026): a Safety report (AMO - HIRA, AMO - Additional Mitigation) keeps Form, Status, Owner, Org unit;
+       its workflow stages keep Stage, Status, Owner */
+    const safetyRep = rep.code === A.HIRA_TITLE || rep.code === A.CAPA_TITLE;
+    body = safetyRep ? kv([['Form', r.report_title], ['Status', chip(rep.status), true], ['Owner', r.owner_name], ['Org unit', r.org_unit_name]])
+      + (rep.code === A.HIRA_TITLE ? hiraHazardBlock(id, 'rpt:'+id) : capaDetailBlock(id, 'rpt:'+id))
+      + '<div style="display:grid;gap:8px"><span class="t-micro">Workflow stages'+(Array.isArray(st) && st.length ? ' ('+st.length+')' : '')+'</span>'
+        + stagesTable('rpt-stages', st, true) + '</div>'
+      + (rep.code === A.HIRA_TITLE ? wfTasksBlock(id, 'rpt:'+id) : '')
+    : head + kv([['Form', r.report_title], ['Org unit', r.org_unit_name], ['Department', r.dept], ['Owner', r.owner_name],
         ['Issued to', r.issued_person], ['Finding level', r.finding_level], ['Repetitive', r.is_rep ? 'Yes' : 'No'],
         ['Audit', [r.audit_number, r.audit_title].filter(Boolean).join(' · ') || null], ['Source report', r.report_ref],
         ['Raised date', fdx(r.raised_date)], ['Target date', fdx(r.Target_date)],
@@ -6161,7 +6233,7 @@ function wfTasksBlock(id, key){
        '<span class="tag">'+esc(t.task_status || '—')+'</span>', '<span class="num">'+fdx(t.task_target_date)+'</span>', '<span class="num">'+fdx(t.task_completed_date)+'</span>']), 50, 760, { compact:true })
     + '</div>';
 }
-function stagesTable(tableKey, stages){
+function stagesTable(tableKey, stages, brief){
   if(stages === null) return '<p class="t-small dim">Loading workflow stages…</p>';
   if(stages.err) return '<p class="t-sub red">Could not load workflow stages: '+esc(stages.err)+'</p>';
   if(!stages.length) return '<p class="t-sub dim">No workflow stages recorded.</p>';
@@ -6175,6 +6247,7 @@ function stagesTable(tableKey, stages){
       '<span class="num">'+fdx(s.started_date)+'</span>', '<span class="num">'+fdx(s.target_date)+'</span>',
       '<span class="num">'+fdx(s.completed_date)+'</span>', '<span class="num">'+(dur == null ? '—' : dur+' d')+'</span>'];
   });
+  if(brief) return plainTable(tableKey, [{l:'Stage'},{l:'Status'},{l:'Owner'}], rows.map(c => c.slice(0, 3)), 30, 0, { compact:true });
   return plainTable(tableKey, [{l:'Stage'},{l:'Status'},{l:'Owner'},{l:'Start'},{l:'Due'},{l:'Completed'},{l:'Duration',ar:true}], rows, 30, 760, { compact:true });
 }
 
@@ -6526,6 +6599,7 @@ Object.assign(BETA_ACT, {
   bhira: el => showHira(el.dataset.id),
   bhirachecks: () => showHiraChecks(),
   bmosrorc: () => showMosrOrc(),
+  bmosrnone: el => showMosrNone(el.dataset.k),
   bhiraexp: el => hiraExport(el.dataset.k),
   bdoc: el => showDoc(el.dataset.id),
   bdoctab: el => showDoc(el.dataset.id, el.dataset.t),
@@ -6664,9 +6738,9 @@ function scrGuideNew(){
     + '<tr><td>KPI 2 · Early-detection rate</td><td>Share of AMO-ECAR already found earlier by an MCAR: same Nature of finding group, or finding text overlapping at least 50%.</td></tr>'
     + '<tr><td>KPI 7 · PAVOI / MVOI assessed</td><td>PAVOI and MVOI with at least one verification round ÷ all PAVOI and MVOI in the period. Withdrawn records are excluded from both. The percentage is withheld while verification rounds are still loading. Green ≥ 75%, amber ≥ 50%, red below 50%. The 30-day verification window is a warning flag only, not part of the formula.</td></tr>'
     + '<tr><td>KPI QC · ATA ratio</td><td>Internal QC findings of month N−1 (CMR-CAR flagged QC + QC PI Report) ÷ ECAR of month N, by ATA chapter. Effective when internal ≥ ECAR.</td></tr>'
-    + '<tr><td>SPI trigger level</td><td>Consecutive latest months where the SPI rate is worse than the SPT approved by CAAV (or the form marks a trigger): 1, 2 or 3+ months = Level 1, 2, 3 (AMO SMS §10.6).</td></tr>'
-    + '<tr><td>Risk band (HIRA)</td><td>Probability digit + severity letter (for example 4C) on the AMO SMS risk matrix, §9.4.3: Intolerable, Tolerable or Acceptable.</td></tr>'
-    + '<tr><td>HIRA compliance checks</td><td>Hazards and HIRA of the period that fail a check: rating off the matrix, missing data, AMO SMS time limits (§9.5 d, §9.7). One item per hazard or HIRA and per check.</td></tr>'
+    + '<tr><td>SPI trigger level</td><td>Consecutive latest months where the SPI rate is worse than the SPT approved by CAAV (or the form marks a trigger): 1, 2 or 3+ months = Level 1, 2, 3 (AMO SMSM §10.6).</td></tr>'
+    + '<tr><td>Risk band (HIRA)</td><td>Probability digit + severity letter (for example 4C) on the AMO SMSM risk matrix, §9.4.3: Intolerable, Tolerable or Acceptable.</td></tr>'
+    + '<tr><td>HIRA compliance checks</td><td>Hazards and HIRA of the period that fail a check: rating off the matrix, missing data, AMO SMSM time limits (§9.5 d, §9.7). One item per hazard or HIRA and per check.</td></tr>'
     + '<tr><td>MOSR past ORC time limit</td><td>MOSR with status Open whose age since the submitted date exceeds the time limit of its ORC level (§9.3.8.3).</td></tr>'
     + '<tr><td>Completed on Coruson</td><td>EIS / F-088: all input fields filled, and an RFI or Task on the management stage (or the stage completed), and a final report file in the REPORT tab.</td></tr></table>')
   + sec('screens','Screens',
@@ -6674,14 +6748,14 @@ function scrGuideNew(){
     + '<li><b>Work Queue</b>: Open reports (nearest target first), Overdue (with CAT), Awaiting verification (open PAVOI / MVOI with no verification round). Select a row to open the report.</li>'
     + '<li><b>Reports › All forms</b>: every report type. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings). With <b>MCCF</b> selected the list covers every unit on Coruson, with an Org unit column; MCCF outside QA AMO appear only here and are not counted in KPIs, Overview, Work Queue or Export. <b>AMO - Additional Mitigation</b> lists the title, source HIRA, actions and tasks, and a row opens its actions, tasks and verification. Its Target is the latest Target date of the actions; on-time or late compares <b>Date verified</b> with it, and a missing date shows in red.</li>'
     + '<li><b>Reports › PAVOI / MVOI</b>: register on the left (Form filter: PAVOI or MVOI), record on the right with the verification history and the RFI / Task list of open records. KPI 7 counts PAVOI and MVOI.</li>'
-    + '<li><b>Safety › HIRA</b>: the AMO - HIRA records in the layout of VJC-MQA-F-118 Risk Register, one row per hazard (specific component) declared on the form. The tiles give the HIRA of the period, closed and open, the hazards, and the HIRA per <b>Category</b> on Coruson, in three tiles: FULLY EFFECTIVE, PARTIAL EFFECTIVE (with the Category MVOI 3MT) and NOT YET EFFECTIVE (with MVOI 6MT and INEFFECTIVE); a Category outside these gets its own tile. Select a tile to filter the register: HIRA shows the open ones, a Category tile shows its HIRA; select it again, or <b>Show all</b>, to clear. <b>Status</b> is one value per HIRA, graded on its latest due date. Initial and current risk rating are filled in the colour of their band on the AMO SMS risk matrix (§9.4.3): Intolerable red, Tolerable orange, Acceptable green. The risk matrix counts the hazards per cell. Each preventive action sits under the hazard it belongs to on the Coruson form. <b>Effectiveness rating</b> is the Category of the report as Coruson writes it, one value per HIRA, filled in the colour of its group (MVOI 3MT as Partial effective, MVOI 6MT as Not yet effective). <b>Preventive control / recovery measures</b> lists the actions of the sections PREVENTIVE ACTION and MITIGATION ACTION of the form. Select a HIRA number for the full record (20 columns): every hazard with its controls, measures, department and dates, and the report summary. <b>Workflow stages, RFI and tasks of this report</b> under the record lists the stages and every RFI and task of the workflow with its owner, section, status and dates.</li>'
-    + '<li><b>Safety › HIRA · Compliance checks</b>: the button on the register card counts the items below for the HIRA of the period; select it for the list, and a row for the record. (1) Initial risk rating that is not the cell of Severity × Likelihood on the form; the record marks the cell with the matrix code. (2) Missing data: Severity, Likelihood, Initial or Current risk rating, Date assessed, Due date, a preventive action, the Effectiveness rating. (3) Tolerable initial risk whose due date or completion is more than 30 days after Date assessed (AMO SMS §9.5 d). (4) Intolerable initial risk with an action not completed. (5) Fully effective recorded less than 6 months, or Partial effective less than 3 months, after the last completed action (§9.7).</li>'
+    + '<li><b>Safety › HIRA</b>: the AMO - HIRA records in the layout of VJC-MQA-F-118 Risk Register, one row per hazard (specific component) declared on the form. The tiles give the HIRA of the period, closed and open, the specific components, and the HIRA per <b>Category</b> on Coruson, in three tiles: FULLY EFFECTIVE, PARTIAL EFFECTIVE (with the Category MVOI 3MT) and NOT YET EFFECTIVE (with MVOI 6MT), each filled in the colour of its Effectiveness rating; a Category outside these gets its own tile. Select a tile to filter the register: HIRA shows the open ones, a Category tile shows its HIRA; select it again, or <b>Show all</b>, to clear. <b>Status</b> is one value per HIRA, graded on its latest due date. Initial and current risk rating are filled in the colour of their band on the AMO SMSM risk matrix (§9.4.3): Intolerable red, Tolerable orange, Acceptable green. The risk matrix counts the hazards per cell. Each preventive action sits under the hazard it belongs to on the Coruson form. <b>Effectiveness rating</b> is the Category of the report as Coruson writes it, one value per HIRA, filled in the colour of its group (MVOI 3MT as Partial effective, MVOI 6MT as Not yet effective). <b>Preventive control / recovery measures</b> lists the actions of the sections PREVENTIVE ACTION and MITIGATION ACTION of the form. Select a HIRA number for the full record (20 columns): every hazard with its controls, measures, department and dates, and the report summary. <b>Workflow stages, RFI and tasks of this report</b> under the record gives Form, Status, Owner and Org unit, the stages (stage, status, owner) and every RFI and task of the workflow with its owner, section, status and dates.</li>'
+    + '<li><b>Safety › HIRA · Compliance checks</b>: the button on the register card counts the items below for the HIRA of the period; select it for the list, and a row for the record. (1) Initial risk rating that is not the cell of Severity × Likelihood on the form; the record marks the cell with the matrix code. (2) Missing data: Severity, Likelihood, Initial or Current risk rating, Date assessed, Due date, a preventive action, the Effectiveness rating. (3) Tolerable initial risk whose due date or completion is more than 30 days after Date assessed (AMO SMSM §9.5 d). (4) Intolerable initial risk with an action not completed. (5) Fully effective recorded less than 6 months, or Partial effective less than 3 months, after the last completed action (§9.7).</li>'
     + '<li><b>Safety › Additional mitigation</b>: the AMO - Additional Mitigation register, the same as Reports › All forms with that form chosen.</li>'
-    + '<li><b>Safety › MOSR report</b>: every MOSR by submitted date, with its classifications from Coruson. OSR forms carry no classifications; their counts are in Safety › OSR/MOSR status. The tile <b>Past ORC time limit</b> counts the MOSR still open after the risk-assessment time limit of their ORC level (AMO SMS §9.3.8.3): Very low and Low 30 days, Medium 7 days, High 24 hours; an open MOSR without ORC is listed after 30 days. Select the tile for the list.</li>'
-    + '<li><b>Safety › SPI</b>: one card per safety performance indicator, monthly rate against the SPT. A card at a trigger level states the action AMO SMS §10.6 requires: Level 1 close monitoring and trend analysis; Level 2 investigation into potential root causes; Level 3 immediate risk assessment, with the Accountable Manager informed immediately.</li>'
+    + '<li><b>Safety › MOSR report</b>: every MOSR by submitted date, with its classifications from Coruson. OSR forms carry no classifications; their counts are in Safety › OSR/MOSR status. <b>Occurrence category</b> gives level 1 and level 2 of the Coruson list; filter the register by status, occurrence category (level 1) and <b>Hazard</b> (Yes / No). The tile <b>KPI MOSR</b> counts the MOSR still open more than 15 days after their raised date. Select the tile for the list, with the days open and the days past the limit.</li>'
+    + '<li><b>Safety › SPI</b>: one card per safety performance indicator, monthly rate against the SPT. A card at a trigger level states the action AMO SMSM §10.6 requires: Level 1 close monitoring and trend analysis; Level 2 investigation into potential root causes; Level 3 immediate risk assessment, with the Accountable Manager informed immediately.</li>'
     + '<li><b>Analytics › KPI charts</b>: summary tiles, Closure by quarter, KPI 2, KPI 7 and KPI QC. Select a tile or a count for the reports behind it; closing a detail returns to that list.</li>'
     + '<li><b>Safety › OSR/MOSR status</b>: OSR and MOSR closed, open and total for each MSAG group on Coruson. It counts all the data of these groups and ignores the Year and Month filter, so its figures differ from Safety › MOSR report.</li>'
-    + '<li><b>Safety › MOSR charts</b>: form MOSR by submitted date, from the classifications of tab EVALUATION on Coruson. The charts sit in stages, one per classification step, each with its own colour: <b>1 Department responsible</b> (level 1 area, then level 2 unit within each area), <b>2 ORC</b> (donut), <b>3 Occurrence category</b> (level 1, then one level-2 chart for each level 1 that has a level 2: Technical, Standard &amp; Compliance, Human Factor, Contractor, Sub-contractor); <b>Reporting base</b> stands beside ORC. Each stage states how many reports of the period carry that classification. Year and month come from the filter bar, the quarter is chosen in the tab. A report with two values counts in both; the caption states the reports without each classification, and a card states the reports recorded at level 1 only.</li>'
+    + '<li><b>Safety › MOSR charts</b>: form MOSR by submitted date, from the classifications of tab EVALUATION on Coruson. The charts sit in stages, one per classification step, each with its own colour: <b>1 Department responsible</b> (level 1 area, then level 2 unit within each area), <b>2 ORC</b> (donut), <b>3 Occurrence category</b> (level 1, then one level-2 chart for each level 1 that has a level 2: Technical, Standard &amp; Compliance, Human Factor, Contractor, Sub-contractor); <b>Reporting base</b> stands beside ORC. Level 2 of the departments is one panel per area, largest first: the area, its reports, then its units ranked with their count and their share of the area (the bar). A level 2 with many values is a ranked list in the same form. Each stage states how many reports of the period carry that classification. Year and month come from the filter bar, the quarter is chosen in the tab. A report with two values counts in both; the caption states the reports without each classification — select <b>without a value</b> for their list — and a card states the reports recorded at level 1 only.</li>'
     + '<li><b>Analytics › Event/IR report status</b>: EIS and F-088 completeness on Coruson; the tiles count the reports complete on each check, the table shows workflow, linked reports, final report and status per report.</li>'
     + '<li><b>Audit Plan</b>: audits are split into <b>Scheduled</b> (the annual plan, MNT numbers) and <b>Unscheduled</b> (RSP Random Surveillance and SSP Specified Surveillance, raised as required). Plan progress and <b>Delayed</b> count scheduled audits only; unscheduled ones have their own tile, their own grid on the timeline and a <b>Programme</b> filter and column. The <b>Rescheduled</b> tile counts scheduled audits whose dates were changed on Coruson and opens their list with the reschedule reason; it turns red while any of them is not yet performed. On the timeline a rescheduled audit has an amber outer ring, and the schedule list shows a <b>Rescheduled</b> tag. Coruson reporting keeps only the current dates, so the original month is not shown. KPI tiles, a location × month view (one dot per audit, inspection or surveillance in its scheduled month; filter by type or show only upcoming / with overdue findings), and a schedule list. Select a dot or a row for its workflow stages and findings. A solid blue ring is an audit in status <b>Schedule Confirmed</b>; it counts as planned and open, like Scheduled. <b>Workflow stages</b>: for the QA AMO audits in the selected period, how many stages of each name are in each Galileo status; select an InProgress or PendingSignOff count for the audits concerned.</li>'
     + '<li><b>Library › Documents</b>: browse by document type; the document number opens copyholders (on time, late, overdue) and the workflow.</li></ul>')

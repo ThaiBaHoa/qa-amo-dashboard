@@ -2536,7 +2536,7 @@ const QA_AMO_AUDITORS = new Set([
   'Nguyen Son Hai',
 ]);
 
-const APP_REV = '2026.11.16-r231-i3';
+const APP_REV = '2026.11.18-r232';
 // Màu mặc định Chart.js đọc được trên CẢ dark lẫn light (mặc định #666 quá tối trên dark)
 if (window.Chart) {
   Chart.defaults.color = '#8B949E';
@@ -10089,7 +10089,7 @@ function mosrLevels(items){
 }
 async function loadMosr(){
   const [raw,fields,sums,items,groups,users]=await Promise.all([
-    fetchAll(G_URL+'dwreporting_report_summary?$select=report_id,report_number,report_status,owner_id,form_name,submitted_date,modified_date&$filter='+encodeURIComponent("valid_to eq null and report_title eq 'MOSR'"), true),
+    fetchAll(G_URL+'dwreporting_report_summary?$select=report_id,report_number,report_status,owner_id,form_name,submitted_date,raised_date,modified_date&$filter='+encodeURIComponent("valid_to eq null and report_title eq 'MOSR'"), true),
     fetchAll(G_URL+'dwanalytics_report_form_section_field?$select=report_id,field_name,text_value&$filter='+encodeURIComponent("report_title eq 'MOSR' and (startswith(field_name,'SHORT SUMMARY') or startswith(field_name,'BASE'))"), true),
     fetchAll(G_URL+'dwanalytics_report?$select=id,report_id,summary&$filter='+encodeURIComponent("form_name eq 'MOSR' and summary ne null and valid_to eq null and length(summary) lt 30000"), true),
     fetchAll(G_URL+'dwanalytics_lists?$select=list_name,list_item_id,list_item_name,list_item_parent_id,list_item_status&$filter='+encodeURIComponent("list_name eq 'OCCURRENCE CATEGORY' or list_name eq 'DEPARTMENT RESPONSIBLE'"), true),
@@ -10120,7 +10120,7 @@ async function loadMosr(){
     if(!ex || new Date(r.modified_date)>new Date(ex.modified_date)) m[r.report_id]=r;
   });
   const out={};
-  Object.values(m).forEach(r=>{ out[r.report_id]={report_id:r.report_id, report_number:r.report_number, report_status:r.report_status, submitted_date:r.submitted_date,
+  Object.values(m).forEach(r=>{ out[r.report_id]={report_id:r.report_id, report_number:r.report_number, report_status:r.report_status, submitted_date:r.submitted_date, raised_date:r.raised_date||null,
     owner:ownerName[r.owner_id]||'', owner_id:r.owner_id||null, msag:msagIds.has(r.owner_id) && safetyFormKind(r.form_name)==='MOSR', short:'', summary:'', base:'', base_group:'', dept:[], orc:[], hazard:[], hazard_type:[], occ:[], occ_raw:[], dept_lv:[], occ_lv:[]}; });
   fields.forEach(f=>{ const o=out[f.report_id]; if(!o || !f.text_value) return;
     if(f.field_name.startsWith('BASE')){ o.base=f.text_value.trim(); o.base_group=mosrBaseGroup(f.text_value); } else o.short=f.text_value.trim(); });
