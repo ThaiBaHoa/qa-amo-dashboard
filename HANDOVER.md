@@ -10,7 +10,7 @@
 - Nguồn yêu cầu: `page safety revise.docx` (workspace tài liệu, sửa 18/11 09:53) + ba nhận xét của Eric khi xem demo.
 - **Chữ:** AMO SMS → AMO SMSM (screens, metrics, guide, manual nguồn); bỏ lead dưới tiêu đề Safety; bỏ ghi chú ở thẻ MSAG report status, MOSR report, MOSR charts Level 1 / Level 2.
 - **HIRA:** ô Specific components; ba ô Category tô đúng màu `M.EFFECT` (không làm nhạt); Risk matrix: Initial risk trước Current risk (mặc định vẫn Current). Hồ sơ report HIRA / Additional Mitigation: Form, Status, Owner, Org unit; Workflow stages: Stage, Status, Owner.
-- **MOSR report:** cột Workplace; Occurrence category cấp 1 › cấp 2 (`occ_lv`), lọc cấp 1 + lọc Hazard Yes / No; **KPI MOSR** = Open quá 15 ngày từ raised date (`M.mosrKpiLate`, `loadMosr` thêm `raised_date`). Chỉ đếm report còn Open — Eric chưa xác nhận có đếm report đóng trễ hay không.
+- **MOSR report:** cột Workplace; Occurrence category cấp 1 › cấp 2 (`occ_lv`), lọc cấp 1 + lọc Hazard Yes / No; **KPI MOSR** = Open quá 15 ngày từ raised date (`M.mosrKpiLate`, `loadMosr` thêm `raised_date`). Chỉ đếm report còn Open, không đếm report đóng trễ (Eric chốt 18/11/2026).
 - **MOSR charts:** "N without a value" mở danh sách; Level 2 = khung theo khu vực, đơn vị xếp hạng kèm số và % (`mosrRankGroups`). Treemap đã thử, Eric bác ("khó nhìn") — đừng đề xuất lại.
 - **Kiểm local dữ liệu thật (2026, 215 MOSR):** KPI MOSR 6; without a value: Department 12, ORC 96, Occurrence 13; bộ lọc Occurrence đủ 6 nhóm; hồ sơ HIRA đúng cột. Chưa kiểm: nền tối, điện thoại, LED, hồ sơ Additional Mitigation.
 - **Còn mở:** sổ tay Word chưa dựng lại (nguồn `manual.js` mới đổi chữ SMSM; mục 4.5 còn mô tả Past ORC time limit và Occurrence category chỉ Technical).
