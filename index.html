@@ -441,7 +441,7 @@ select.ctl{min-width:168px;cursor:pointer}
 .kpi-mix-i .num{color:var(--text);font-weight:600}
 .kpi-mix-i .od-truncate{min-width:0}
 .kpi-forms-l{display:grid;gap:1px;min-width:0;margin-top:var(--s1)}
-.kpi-forms-i{display:grid;grid-template-columns:minmax(0,1fr) 44px 64px;gap:6px;align-items:center;width:100%;font-size:13px;color:var(--text-2);text-align:left;padding:3px 4px;border-radius:4px}
+.kpi-forms-i{display:grid;grid-template-columns:minmax(56px,1fr) minmax(20px,34px) minmax(38px,52px) minmax(18px,30px);gap:4px;align-items:center;width:100%;font-size:13px;color:var(--text-2);text-align:left;padding:3px 4px;border-radius:4px}
 .kpi-forms-i>span+span{text-align:right}
 button.kpi-forms-i:hover{background:var(--raised)}
 .kpi-forms-h{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)}
@@ -2725,23 +2725,23 @@ const M = {
   mosrHazards: rows => (rows || []).filter(r => (r.hazard || []).some(h => String(h).trim().toLowerCase() === 'yes')),
   /* r235 (MQAD 18/11/2026): open findings by form, beside the audit plan on Overview and in the All forms picker.
      One entry per form group; every report of `rows` falls in exactly one (the groups add up to M.summary(rows)).
-     overdue = reports past target, EXCEPT the Event Investigation Summary: its overdue is the number of CORRECTIVE
-     ACTIONS past their target (Eric 19/11/2026; unit 'CA'), null until the corrective actions are loaded (loadEis). */
-  formCount(rows, ca){
-    const s = M.summary(rows), o = { total: s.total, open: s.open, overdue: s.overdue, unit: 'report' };
-    if(ca){ const A = API(); o.unit = 'CA'; o.reportOverdue = s.overdue;
-      o.overdue = A.eis().loaded ? M.caSummary(rows.flatMap(r => (A.eis().ca || {})[r.id] || [])).overdue : null; }
+     r235-i3 (Eric 19/11/2026, anh Ngoc's rule): two kinds of overdue, never added together —
+       overdue = PROCESS: reports past target (M.summary);
+       ca      = WORK: the corrective actions of those reports { total, overdue } (M.caSummary), null until they
+                 are loaded (loadEis). A form with no corrective action has ca.total 0 and shows no CA figure. */
+  formCount(rows){
+    const A = API(), s = M.summary(rows), o = { total: s.total, open: s.open, overdue: s.overdue, ca: null };
+    if(REAL && A.eis().loaded){ const c = M.caSummary(rows.flatMap(r => (A.eis().ca || {})[r.id] || [])); o.ca = { total: c.total, overdue: c.overdue }; }
     return o;
   },
-  isCaForm: code => !!REAL && code === API().EIS_TITLE,
   openByForm(rows){
     const eis = REAL ? API().EIS_TITLE : '';
     const G = [{ k:'MCAR', p:r => r.form === 'mcar', tab:'mcar' }, { k:'AMO-ECAR', p:r => r.form === 'amoecar', tab:'amoecar' },
                { k:'SR', p:r => r.code === 'Surveillance Report', f:'Surveillance Report' },
-               { k:'EIS', p:r => !!eis && r.code === eis, f:eis, ca:true },
+               { k:'EIS', p:r => !!eis && r.code === eis, f:eis },
                { k:'PAVOI / MVOI', p:r => r.form === 'pavoi' || r.form === 'mvoi', tab:'pavoi' }];
     const left = new Set(rows);
-    const out = G.map(g => { const rs = rows.filter(g.p); rs.forEach(r => left.delete(r)); return Object.assign({ k:g.k, tab:g.tab || '', f:g.f || '' }, M.formCount(rs, g.ca)); });
+    const out = G.map(g => { const rs = rows.filter(g.p); rs.forEach(r => left.delete(r)); return Object.assign({ k:g.k, tab:g.tab || '', f:g.f || '' }, M.formCount(rs)); });
     out.push(Object.assign({ k:'Other forms', tab:'all', f:'' }, M.formCount([...left])));
     return out;
   },
@@ -2929,9 +2929,9 @@ M.consistency = function(){
   /* r235: the open findings by form add up to the Overview totals; the EIS overdue is the corrective-action count of its reports */
   { const g = M.openByForm(qa);
     say('Overview › open by form vs open', g.reduce((t, x) => t + x.open, 0), s.open);
-    say('Overview › overdue by form (reports) vs overdue', g.reduce((t, x) => t + (x.unit === 'CA' ? x.reportOverdue : x.overdue), 0), s.overdue);
-    if(REAL && A.eis().loaded) say('Overview › EIS overdue vs corrective actions past target', g.find(x => x.k === 'EIS').overdue,
-      qa.filter(r => r.code === A.EIS_TITLE).reduce((t, r) => t + ((A.eis().ca || {})[r.id] || []).filter(M.isOverdue).length, 0)); }
+    say('Overview › process overdue by form vs overdue', g.reduce((t, x) => t + x.overdue, 0), s.overdue);
+    if(REAL && A.eis().loaded) say('Overview › CA overdue by form vs corrective actions past target', g.reduce((t, x) => t + x.ca.overdue, 0),
+      qa.reduce((t, r) => t + ((A.eis().ca || {})[r.id] || []).filter(M.isOverdue).length, 0)); }
   if(A.mosr().loaded) say('Safety › MOSR hazards vs HAZARD? = Yes', M.mosrHazards(A.mosr().rows).length,
     A.mosr().rows.filter(r => /(^|,)\s*yes\s*(,|$)/i.test((r.hazard || []).join(','))).length);
   if(typeof kpiChartStats === 'function'){ const k = kpiChartStats(f); say('KPI charts on-time vs Overview', k.s.onTimeRate, s.onTimeRate); say('KPI charts total vs Overview', k.s.total, s.total); }
@@ -3451,19 +3451,21 @@ function kpiTile(o){
     + '<span class="kpi-foot">'+(o.trend||'')+'<span class="kpi-note">'+esc(o.note)+'</span></span>'
     + (o.mix ? mixBlock(o.mix, o.mixSub) : spark(o.series, !!o.alarm)) + '</button>';
 }
-/* r235: open findings by form — one row per form group of M.openByForm: open, then overdue (EIS: corrective actions).
+/* r235: open findings by form — one row per form group of M.openByForm. r235-i3: two overdue columns,
+   Process (reports past target) and CA (corrective actions past target); a form with no corrective action shows none.
    Not one button like the other tiles: each row opens the register of its form. */
 function formsTile(G, total){
-  const od = x => x.overdue === null ? '<span class="num dim" title="loading corrective actions">…</span>'
-    : '<span class="num'+(x.overdue ? ' red strong' : ' dim')+'">'+x.overdue+(x.unit === 'CA' && x.overdue ? ' CA' : '')+'</span>';
-  return '<div class="kpi kpi-forms'+(G.some(x => x.overdue) ? ' alarm' : '')+'" style="cursor:default">'
+  const n = v => '<span class="num'+(v ? ' red strong' : ' dim')+'">'+v+'</span>';
+  const ca = x => x.ca === null ? '<span class="num dim" title="loading corrective actions">…</span>' : x.ca.total ? n(x.ca.overdue) : '<span class="num dim" title="no corrective actions on this form">–</span>';
+  const say = x => x.k+': '+x.open+' open, '+x.overdue+' reports overdue'+(x.ca === null ? ', corrective actions loading' : x.ca.total ? ', '+x.ca.overdue+' corrective actions overdue' : '');
+  return '<div class="kpi kpi-forms'+(G.some(x => x.overdue || (x.ca && x.ca.overdue)) ? ' alarm' : '')+'" style="cursor:default">'
     + '<span class="kpi-lbl">Open findings by form</span>'
     + '<span class="kpi-val od-nowrap">'+total+'</span>'
-    + '<span class="kpi-forms-l"><span class="kpi-forms-i kpi-forms-h"><span>Form</span><span>Open</span><span>Overdue</span></span>'
+    + '<span class="kpi-forms-l"><span class="kpi-forms-i kpi-forms-h"><span>Form</span><span>Open</span><span title="reports past target">Process</span><span title="corrective actions past target">CA</span></span>'
     + G.map(x => '<button class="kpi-forms-i" type="button" '+(x.f ? 'data-act="bovform" data-f="'+esc(x.f)+'"' : 'data-go="findings" data-tab="'+x.tab+'"')
-        + ' aria-label="'+esc(x.k+': '+x.open+' open, '+(x.overdue === null ? 'overdue loading' : x.overdue+(x.unit === 'CA' ? ' corrective actions' : '')+' overdue'))+'">'
-        + '<span class="od-truncate">'+esc(x.k)+'</span><span class="num strong">'+x.open+'</span>'+od(x)+'</button>').join('')
-    + '</span><span class="kpi-note">EIS overdue = corrective actions past target · overdue reports: Work Process</span></div>';
+        + ' aria-label="'+esc(say(x))+'">'
+        + '<span class="od-truncate">'+esc(x.k)+'</span><span class="num strong">'+x.open+'</span>'+n(x.overdue)+ca(x)+'</button>').join('')
+    + '</span><span class="kpi-note">Overdue · Process = reports past target · CA = corrective actions past target</span></div>';
 }
 /* A tile's breakdown: parts [{k, v, c}] in a fixed order (status colours; warn and accent never adjacent,
    CVD check 30/09/2026), 2px surface gap between segments, total in the centre, legend with every count. */
@@ -5074,8 +5076,8 @@ function afTitles(chosen){
   if(chosen) t.add(chosen);
   return [...t].sort();
 }
-const afLabel = (t, rows, ca) => { const c = M.formCount(rows, ca);
-  return t+' ('+c.total+(c.overdue === null ? '' : c.overdue ? ' · '+c.overdue+(ca ? ' CA' : '')+' overdue' : '')+')'; };
+const afLabel = (t, rows) => { const c = M.formCount(rows);
+  return t+' ('+c.total+(c.overdue ? ' · '+c.overdue+' overdue' : '')+(c.ca && c.ca.overdue ? ' · '+c.ca.overdue+' CA overdue' : '')+')'; };
 function scrAllForms(forced){
   const form = forced || BS.afForm;
   const titles = afTitles(forced ? '' : BS.afForm), listed = new Set(titles);
@@ -5099,7 +5101,7 @@ function scrAllForms(forced){
                 rows: rs => form ? rs.filter(r => r.code === form) : rs.filter(r => listed.has(r.code)) };
   if(REAL && !hira && !capa) lazy('rfisum:'+rxFrom(), loadRfiSum, rxReady);
   /* r235 (MQAD 18/11/2026): every form in the picker shows its reports and its overdue for the current filters —
-     the rows the register lists when the form is chosen (M.formCount; EIS overdue = corrective actions) */
+     the rows the register lists when the form is chosen (M.formCount: reports overdue, then corrective actions overdue) */
   const afBase = forced ? [] : scoped().concat(applyQuery(applyFilters(mccfOutRows())));
   if(REAL && !forced && titles.includes(A.EIS_TITLE)) lazy('eis', () => A.loadEis(), () => A.eis().loaded);
   let rows = cfg.rows(scoped().concat(hira || capa ? [] : applyQuery(applyFilters(mccfOutRows()))));
@@ -5114,7 +5116,7 @@ function scrAllForms(forced){
     + '<section class="sec"><div class="card'+(hira || capa ? ' af-hira' : '')+'"><div class="card-head"><h2>'+(forced ? esc(forced) : 'All forms')+'</h2>'
     + (forced ? '<span class="t-small dim od-fill">VJC-AMO-CAPA records, one row per report: a row opens its mitigation actions, tasks and verification. The same register is under Reports › All forms.</span>'
       : '<span class="t-small dim od-fill">'+titles.length+' forms with reports in the period.'+(form === 'MCCF' ? (MCCF_OUT.st === 'ready' ? ' MCCF here covers every unit on Coruson; those outside QA AMO are not counted in KPIs or Overview.' : MCCF_OUT.st === 'error' ? ' Could not load the MCCF of units outside QA AMO: only QA AMO is listed.' : ' Loading the MCCF of units outside QA AMO…') : '')+'</span>')
-    + (forced ? '' : sel('afForm', [['', afLabel('All forms', afBase.filter(r => listed.has(r.code)))]].concat(titles.map(t => [t, afLabel(t, afBase.filter(r => r.code === t), M.isCaForm(t))])), form)) + '</div>'
+    + (forced ? '' : sel('afForm', [['', afLabel('All forms', afBase.filter(r => listed.has(r.code)))]].concat(titles.map(t => [t, afLabel(t, afBase.filter(r => r.code === t))])), form)) + '</div>'
     + tableHTML('findings/all'+(form ? '/'+form : ''), cfg, rows) + '</div></section>';
 }
 /* AMO - HIRA classification columns (values from loadHiraCls; '—' when the report has none) */

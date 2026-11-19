@@ -5,6 +5,12 @@
 
 ---
 
+## ✅ r235-i3 — Open findings by form tách cột Process và CA (19/11/2026, EricThai)
+
+- **Nguyên tắc (anh Ngọc, qua Eric 19/11):** corrective action quá hạn = công việc quá hạn; report quá hạn = process quá hạn. Nhìn dashboard phải phân biệt được ngay, nên không có con số nào cộng hai loại.
+- **Sửa:** `formsTile` có 4 cột Form / Open / Process / CA. `M.formCount` luôn trả overdue theo report và thêm `ca` (null khi chưa `loadEis`). Luật "EIS overdue đếm theo CA" của r235 không còn: EIS giờ hiện cả hai cột (Process 1 vì MQA-EIS-020, CA 0).
+- **All forms:** nhãn trong ô chọn form thêm "· M CA overdue" khi có.
+
 ## ✅ r235-i2 — ô F-088 / IR overdue thành F-088 / EIS overdue, đếm corrective action (19/11/2026, EricThai)
 
 - **Eric 19/11:** IR không có corrective action; ô phải hiện số CA quá hạn, nên với MQA-EIS-020 (report quá hạn, 0 CA quá hạn) ô hiện 0 chứ không phải 1.
