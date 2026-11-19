@@ -2147,7 +2147,7 @@ function ic(name,size,cls){
 const NAV = [
   { id:'overview',  label:'Overview',   icon:'grid',     task:'monitor', title:'Overview',
     lead:'QA AMO reports and audits for the selected period.' },
-  { id:'work',      label:'Work Queue', icon:'inbox',    task:'act',     title:'Work Queue',
+  { id:'work',      label:'Work Process', icon:'inbox',    task:'act',     title:'Work Process',
     lead:'Reports requiring action: open, overdue and awaiting verification.',
     tabs:[
       {id:'open',   label:'Open reports'},
@@ -2411,7 +2411,7 @@ function fromReal(r){
 /* METRICS-SRC:BEGIN */
 /* METRICS:BEGIN ==============================================================
    METRICS — the ONE place where report scope, the period rule, status groups and every
-   indicator are defined. Every screen (Overview, Work Queue, Findings, Analytics, Audit
+   indicator are defined. Every screen (Overview, Work Process, Findings, Analytics, Audit
    Plan, exports, detail views) calls these; none compares a status string or computes a
    rate on its own. Change a definition here and every screen follows.
      · build.mjs refuses to build when UI code outside this block compares a report status
@@ -2921,8 +2921,8 @@ M.consistency = function(){
   say('in-target open (KPI charts) vs classic kk-open', s.inTarget, cls('Open'));
   say('CAT III vs classic', s.cat.III, raw.filter(r => r.overdue_cat === 'CAT III').length);
   say('Repetitive vs classic is_rep', s.repetitive, raw.filter(r => r.is_rep).length);
-  say('Work Queue › Open lane vs open', LANES['work/open'].rows(qa).length, s.open);
-  say('Work Queue › Overdue lane vs overdue', LANES['work/overdue'].rows(qa).length, s.overdue);
+  say('Work Process › Open lane vs open', LANES['work/open'].rows(qa).length, s.open);
+  say('Work Process › Overdue lane vs overdue', LANES['work/overdue'].rows(qa).length, s.overdue);
   if(typeof overviewStats === 'function'){ const o = overviewStats(qa); say('Overview on-time vs summary', o.s.onTimeRate, s.onTimeRate); say('Overview open vs summary', o.s.open, s.open); }
   /* r235: the open findings by form add up to the Overview totals; the EIS overdue is the corrective-action count of its reports */
   { const g = M.openByForm(qa);
@@ -3461,7 +3461,7 @@ function formsTile(G, total){
     + G.map(x => '<button class="kpi-forms-i" type="button" '+(x.f ? 'data-act="bovform" data-f="'+esc(x.f)+'"' : 'data-go="findings" data-tab="'+x.tab+'"')
         + ' aria-label="'+esc(x.k+': '+x.open+' open, '+(x.overdue === null ? 'overdue loading' : x.overdue+(x.unit === 'CA' ? ' corrective actions' : '')+' overdue'))+'">'
         + '<span class="od-truncate">'+esc(x.k)+'</span><span class="num strong">'+x.open+'</span>'+od(x)+'</button>').join('')
-    + '</span><span class="kpi-note">EIS overdue = corrective actions past target</span></div>';
+    + '</span><span class="kpi-note">EIS overdue = corrective actions past target · overdue reports: Work Process</span></div>';
 }
 /* A tile's breakdown: parts [{k, v, c}] in a fixed order (status colours; warn and accent never adjacent,
    CVD check 30/09/2026), 2px surface gap between segments, total in the centre, legend with every count. */
@@ -3789,7 +3789,7 @@ function renderLane(screen, tab){
   if(state.cat) rows = rows.filter(r=>r.cat === state.cat);
   /* r191: Summary / RFI columns load once, on the first register that shows them */
   if(REAL && cfg.cols.some(c => c === 'rfi' || c === 'summary')) lazy('rfisum:'+rxFrom(), loadRfiSum, rxReady);
-  /* r191: form filter on Work Queue › Open / Overdue (Eric 03/10) — BS.wqForm_<tab>, counts per form code */
+  /* r191: form filter on Work Process › Open / Overdue (Eric 03/10) — BS.wqForm_<tab>, counts per form code */
   let formSel = '';
   if(screen === 'work' && (tab === 'open' || tab === 'overdue')){
     const fk = 'wqForm_'+tab, cnt = {};
@@ -4085,8 +4085,8 @@ function placeholder(nav, tabDef){
    ========================================================================== */
 const IA_MAP = [
   ['Main','Overview','Overview','Kept as the landing screen, rebuilt from four chart cards into a decision surface: what is open, what is late, what moved.'],
-  ['Main','Open Reports','Work Queue › Open reports','"Open" is a state of a finding, not a category of report. It belongs in the queue of things to action.'],
-  ['Main','Overdue','Work Queue › Overdue','Was a separate destination; overdue is the same list with one more condition. It also surfaces on Overview, so it no longer needs to be hunted for.'],
+  ['Main','Open Reports','Work Process › Open reports','"Open" is a state of a finding, not a category of report. It belongs in the queue of things to action.'],
+  ['Main','Overdue','Work Process › Overdue','Was a separate destination; overdue is the same list with one more condition. It also surfaces on Overview, so it no longer needs to be hunted for.'],
   ['Main','KPI Charts','Analytics › KPI charts','Trends over time are a different job from clearing a queue. Grouping them stops the two modes competing in one sidebar.'],
   ['Main','SPI','Analytics › SPI','Same reason. SPI is read monthly, not daily.'],
   ['Main','Safety','Safety › OSR/MOSR status','MSAG report status is a monitoring view, not an action list for the QA team.'],
@@ -4120,7 +4120,7 @@ function renderRationale(){
     + '<h2>What changed, and why</h2><ul>'
     + '<li><span class="strong">Seven entries instead of twenty-two.</span> One original destination, Query Builder, was dropped. Every other one still exists, most of them moved from the sidebar into a secondary tab row, where they cost nothing until you are on that screen.</li>'
     + '<li><span class="strong">The five form types became tabs.</span> PAVOI, CMR-CAR, ECAR, AMO-ECAR and MCAR are five views of one register. As five sidebar items they competed with Overview for attention; as a tab row they read as what they are — a choice within Findings.</li>'
-    + '<li><span class="strong">Overdue stopped being a place.</span> It was a destination in the old model and a state in the data. Now it is a lane in the Work Queue and a block on Overview, so nobody has to remember to go and look.</li>'
+    + '<li><span class="strong">Overdue stopped being a place.</span> It was a destination in the old model and a state in the data. Now it is a lane in the Work Process and a block on Overview, so nobody has to remember to go and look.</li>'
     + '<li><span class="strong">One filter bar instead of a year picker per page.</span> Year and month (each multi-select, so Jul–Sep or 2025 against 2026 is one pick) and department sit above every data screen and survive navigation, so a question asked on Overview stays asked when you drill into the list behind it.</li>'
     + '<li><span class="strong">Early Detection was filed by what it is, not by who could open it.</span> It sat under Admin because of permissions. It is an analysis screen, and it now sits with the other analysis screens.</li>'
     + '<li><span class="strong">Global search.</span> With 22 flat entries, finding one report number meant knowing which of five form pages it lived on. Ctrl-K searches report numbers, audits, aircraft registrations and people at once.</li>'
@@ -4144,7 +4144,7 @@ function renderRationale(){
     + '<h2>Responsive model</h2><ul>'
     + '<li><span class="strong">1280px and up</span> — full sidebar with labels, collapsible to a 64px icon rail from the topbar. The rail keeps tooltips, so nothing becomes a guess.</li>'
     + '<li><span class="strong">768–1279px</span> — the rail is the default; the toggle expands it when there is room to spare.</li>'
-    + '<li><span class="strong">Below 768px</span> — the sidebar is replaced by a bottom bar of five: Overview, Work Queue, Findings, Audit Plan and More. The remaining three entries live in the More drawer. Tables reflow into cards, so nothing scrolls sideways.</li>'
+    + '<li><span class="strong">Below 768px</span> — the sidebar is replaced by a bottom bar of five: Overview, Work Process, Findings, Audit Plan and More. The remaining three entries live in the More drawer. Tables reflow into cards, so nothing scrolls sideways.</li>'
     + '<li>Every breakpoint keeps the same seven entries in the same order. The navigation does not reshuffle as the window changes size.</li>'
     + '</ul>'
 
@@ -5039,7 +5039,7 @@ function scrStatus(){
    FINDINGS · ALL FORMS (every report type) and OSR / MOSR
    ========================================================================== */
 /* MCCF raised outside QA AMO (Eric 03/11/2026): rows of All forms only. They stay out of REPORTS, so KPIs, Overview,
-   Work Queue and Export keep the QA AMO scope. Summary and RFI / Task go into RX, where their columns read them. */
+   Work Process and Export keep the QA AMO scope. Summary and RFI / Task go into RX, where their columns read them. */
 const MCCF_OUT = { src:null, rows:[], sum:{} };
 function mccfOutRows(){
   const A = API();
@@ -6860,7 +6860,7 @@ function scrGuideNew(){
     '<p>Eight sections, named after the work they support:</p>'
     + '<table><tr><th>Section</th><th>Use it to</th></tr>'
     + '<tr><td>Overview</td><td>See key indicators for the selected period. Every tile goes to the screen behind it.</td></tr>'
-    + '<tr><td>Work Queue</td><td>Act on reports: Open reports, Overdue, and PAVOI / MVOI awaiting verification.</td></tr>'
+    + '<tr><td>Work Process</td><td>Act on reports: Open reports, Overdue, and PAVOI / MVOI awaiting verification.</td></tr>'
     + '<tr><td>Reports</td><td>Read the register by form: All forms, PAVOI / MVOI, CMR-CAR, ECAR, AMO-ECAR, MCAR.</td></tr>'
     + '<tr><td>Analytics</td><td>KPI charts, Early detection (KPI 2) and Event/IR report status on Coruson.</td></tr>'
     + '<tr><td>Safety</td><td>HIRA, Additional mitigation, OSR/MOSR status, MOSR report, MOSR charts and SPI. Old links to these screens open here.</td></tr>'
@@ -6896,8 +6896,8 @@ function scrGuideNew(){
     + '<tr><td>Completed on Coruson</td><td>EIS / F-088: all input fields filled, and an RFI or Task on the management stage (or the stage completed), and a final report file in the REPORT tab.</td></tr></table>')
   + sec('screens','Screens',
     '<ul><li><b>Overview</b>: key indicators (including audits completed against the plan with those delayed past their scheduled month, open and overdue PAVOI / MVOI, reports closed late, MCAR under extension, overdue mitigation tasks from HIRA / CAPA and F-088 / investigation reports overdue themselves or through a corrective action), overdue reports by CAT with the most overdue, open reports by form, recent report events.</li>'
-    + '<li><b>Work Queue</b>: Open reports (nearest target first), Overdue (with CAT), Awaiting verification (open PAVOI / MVOI with no verification round). Select a row to open the report.</li>'
-    + '<li><b>Reports › All forms</b>: the forms with reports in the period, without the forms that have their own page (the other Reports tabs, the Safety tabs) and the base, workshop and store checklists. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings). With <b>MCCF</b> selected the list covers every unit on Coruson, with an Org unit column; MCCF outside QA AMO appear only here and are not counted in KPIs, Overview, Work Queue or Export. <b>AMO - Additional Mitigation</b> lists the title, source HIRA, actions and tasks, and a row opens its actions, tasks and verification. Its Target is the latest Target date of the actions; on-time or late compares <b>Date verified</b> with it, and a missing date shows in red.</li>'
+    + '<li><b>Work Process</b>: Open reports (nearest target first), Overdue (with CAT), Awaiting verification (open PAVOI / MVOI with no verification round). Select a row to open the report.</li>'
+    + '<li><b>Reports › All forms</b>: the forms with reports in the period, without the forms that have their own page (the other Reports tabs, the Safety tabs) and the base, workshop and store checklists. Choose a form in the list; <b>MQA Event Investigation Summary</b> and <b>QC Spot Check Report</b> show their own columns, and the report number opens the detail (corrective actions, findings). With <b>MCCF</b> selected the list covers every unit on Coruson, with an Org unit column; MCCF outside QA AMO appear only here and are not counted in KPIs, Overview, Work Process or Export. <b>AMO - Additional Mitigation</b> lists the title, source HIRA, actions and tasks, and a row opens its actions, tasks and verification. Its Target is the latest Target date of the actions; on-time or late compares <b>Date verified</b> with it, and a missing date shows in red.</li>'
     + '<li><b>Reports › PAVOI / MVOI</b>: register on the left (Form filter: PAVOI or MVOI), record on the right with the verification history and the RFI / Task list of open records. KPI 7 counts PAVOI and MVOI.</li>'
     + '<li><b>Safety › HIRA</b>: the AMO - HIRA records in the layout of VJC-MQA-F-118 Risk Register, one row per hazard (specific component) declared on the form. The tiles give the HIRA of the period, closed and open, the specific components, and the HIRA per <b>Category</b> on Coruson, in three tiles: FULLY EFFECTIVE, PARTIAL EFFECTIVE (with the Category MVOI 3MT) and NOT YET EFFECTIVE (with MVOI 6MT), each filled in the colour of its Effectiveness rating; a Category outside these gets its own tile. Select a tile to filter the register: HIRA shows the open ones, a Category tile shows its HIRA; select it again, or <b>Show all</b>, to clear. <b>Status</b> is one value per HIRA, graded on its latest due date. Initial and current risk rating are filled in the colour of their band on the AMO SMSM risk matrix (§9.4.3): Intolerable red, Tolerable orange, Acceptable green. The risk matrix counts the hazards per cell. Each preventive action sits under the hazard it belongs to on the Coruson form. <b>Effectiveness rating</b> is the Category of the report as Coruson writes it, one value per HIRA, filled in the colour of its group (MVOI 3MT as Partial effective, MVOI 6MT as Not yet effective). <b>Preventive control / recovery measures</b> lists the actions of the sections PREVENTIVE ACTION and MITIGATION ACTION of the form. Select a HIRA number for the full record (20 columns): every hazard with its controls, measures, department and dates, and the report summary. <b>Workflow stages, RFI and tasks of this report</b> under the record gives Form, Status, Owner and Org unit, the stages (stage, status, owner) and every RFI and task of the workflow with its owner, section, status and dates.</li>'
     + '<li><b>Safety › HIRA · Compliance checks</b>: the button on the register card counts the items below for the HIRA of the period; select it for the list, and a row for the record. (1) Initial risk rating that is not the cell of Severity × Likelihood on the form; the record marks the cell with the matrix code. (2) Missing data: Severity, Likelihood, Initial or Current risk rating, Date assessed, Due date, a preventive action, the Effectiveness rating. (3) Tolerable initial risk whose due date or completion is more than 30 days after Date assessed (AMO SMSM §9.5 d). (4) Intolerable initial risk with an action not completed. (5) Fully effective recorded less than 6 months, or Partial effective less than 3 months, after the last completed action (§9.7).</li>'

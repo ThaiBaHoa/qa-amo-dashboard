@@ -5,6 +5,12 @@
 
 ---
 
+## ✅ r235-i1 — Work Queue đổi tên thành Work Process; chốt luật EIS của ô Open findings by form (19/11/2026, EricThai)
+
+- **Eric 19/11 sau khi xem r235:** ô *Open findings by form* hiện overdue của **corrective action**, nên EIS = 0 khi không có CA quá hạn là đúng (không đặt 1 cho MQA-EIS-020). Report quá hạn xem ở trang Work Process. Điểm "có đổi luật EIS không" trong mục r235 dưới đây coi như đã đóng.
+- **Đổi tên:** `Work Queue` thành `Work Process` ở nhãn điều hướng, tiêu đề trang, User guide (`guide.js`), sổ tay (`manual.js`), nhãn trong `M.consistency()`. Id trang `work` và các lane `work/open`, `work/overdue` giữ nguyên, link cũ vẫn chạy.
+- **Chưa làm:** bản Word của sổ tay chưa xuất lại; `deck.js` (slide giới thiệu cũ) còn chữ Work Queue.
+
 ## ✅ r235 — yêu cầu MQAD 18/11, đợt 1: open finding theo form, số cạnh tên form, ô Hazards (19/11/2026, EricThai)
 
 - **Nguồn yêu cầu:** `yêu cầu mới của MQAD 18Nov2026.docx` (workspace tài liệu) + 4 điểm Eric chốt 19/11 (`GHI_NHAN_TUAN.md` W47). Eric duyệt demo local 19/11.
