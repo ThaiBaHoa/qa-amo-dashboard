@@ -5,6 +5,13 @@
 
 ---
 
+## ✅ r235-i2 — ô F-088 / IR overdue thành F-088 / EIS overdue, đếm corrective action (19/11/2026, EricThai)
+
+- **Eric 19/11:** IR không có corrective action; ô phải hiện số CA quá hạn, nên với MQA-EIS-020 (report quá hạn, 0 CA quá hạn) ô hiện 0 chứ không phải 1.
+- **Sửa:** `beta-template.html` `renderOverview`: nhãn `F-088 / EIS overdue`, giá trị và cảnh báo lấy `CA.ca.overdue`, vòng tròn đếm CA. `manual.js` §chỉ số sửa mô tả. Nhãn dòng đối chiếu trong `M.consistency()` đổi tên, phép so không đổi.
+- **Lưu ý:** đây là đổi ngược quyết định 30/09/2026 (đếm theo report vì MQA-RP-072 / 074 quá hạn mà không có CA quá hạn). Những report kiểu đó giờ chỉ thấy ở ô *Overdue* và *Work Process › Overdue*.
+- **Chưa kiểm trên màn hình** (bản local hết phiên đăng nhập); build lint + syntax OK.
+
 ## ✅ r235-i1 — Work Queue đổi tên thành Work Process; chốt luật EIS của ô Open findings by form (19/11/2026, EricThai)
 
 - **Eric 19/11 sau khi xem r235:** ô *Open findings by form* hiện overdue của **corrective action**, nên EIS = 0 khi không có CA quá hạn là đúng (không đặt 1 cho MQA-EIS-020). Report quá hạn xem ở trang Work Process. Điểm "có đổi luật EIS không" trong mục r235 dưới đây coi như đã đóng.
