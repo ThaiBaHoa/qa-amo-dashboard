@@ -5,6 +5,17 @@
 
 ---
 
+## ✅ r235 — yêu cầu MQAD 18/11, đợt 1: open finding theo form, số cạnh tên form, ô Hazards (19/11/2026, EricThai)
+
+- **Nguồn yêu cầu:** `yêu cầu mới của MQAD 18Nov2026.docx` (workspace tài liệu) + 4 điểm Eric chốt 19/11 (`GHI_NHAN_TUAN.md` W47). Eric duyệt demo local 19/11.
+- **Overview:** ô *Audits completed vs plan* lên đầu; cạnh nó ô *Open findings by form* (`formsTile` trong `beta-template.html`) thay ô *Open reports* để lưới giữ 12 ô. Dòng: MCAR, AMO-ECAR, SR, EIS, PAVOI / MVOI, Other forms; bấm dòng mở danh sách form đó.
+- **Luật EIS (Eric 19/11):** overdue của EIS = số corrective action quá hạn (`M.formCount(rows, true)`), hiện "…" tới khi `loadEis` xong. Hệ quả: MQA-EIS-020 quá hạn ở cấp report, 0 CA quá hạn ⇒ dòng EIS hiện 0; report đó vẫn được đếm ở ô *Overdue* và *F-088 / IR overdue*. Đã báo Eric, chưa có ý kiến đổi.
+- **All forms:** ô chọn form hiện `Tên form (số report · số overdue)` theo bộ lọc đang áp (`afLabel`, `afBase` trong `screens.js`).
+- **MOSR report:** ô *Hazards* (`M.mosrHazards`), bấm = đặt bộ lọc Hazard = Yes.
+- **Kiểm local dữ liệu thật (2026):** Open findings by form 12 + 0 + 6 + 1 + 24 + 29 = 72 = Open 63 + Overdue 9; All forms 496 report, 7 overdue = dòng Other forms; Hazards 31 / 215 MOSR, bấm ra đúng 31 dòng; `M.consistency()` rỗng.
+- **Chưa kiểm:** nền tối, điện thoại, LED / kiosk. User guide và sổ tay Word chưa nhắc ô mới (mục Overview của `manual.js`).
+- **Còn lại của yêu cầu 18/11:** đợt 2 (MOR lên Overview: form `MOR` 14 và `AMO MOR` 3 report đã có trong dữ liệu, còn probe trường ngày xảy ra sự cố cho mốc 30 ngày theo VJC-SQA-SOP-012 §7.4.1; RCA MCAR-ECAR; Contributing IR-EIS) và đợt 3 (Performance theo nhân viên bản rút gọn với danh sách cứng; Nature of finding QC chờ sửa form Coruson). Hai điểm chờ Eric: hạn theo quy trình (SOP-005 §4.4.3: Level 1 5 ngày, Level 2 45 ngày; SR 15 ngày) thay hay đặt cạnh Target date; hạn AMO-ECAR.
+
 ## ✅ r234 — MOSR charts: bộ lọc theo khối, bấm cột mở danh sách MOSR (18/11/2026, EricThai)
 
 - **Bộ lọc theo khối:** Department responsible, ORC, Reporting base, Occurrence category mỗi khối một hàng lọc (Status, Hazard và các phân loại khối đó không vẽ); chỉ tác động lên khối đó. Quarter ở đầu trang vẫn áp cả trang.
