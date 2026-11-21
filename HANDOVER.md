@@ -5,6 +5,15 @@
 
 ---
 
+## ⏳ Yêu cầu MQAD 18/11, đợt 2 — ĐÃ PROBE, chưa viết spec, chưa code (21/11/2026, máy nhà)
+
+- **Kết quả probe đầy đủ:** vault `MQA dashboard website/Dot2_MOR_RCA_Contributing_Probe.md` (bảng, truy vấn đã chạy). Probe qua console `classic.html` trên trang live (admin), chỉ đọc.
+- **MOR:** ngày xảy ra sự cố = `dwanalytics_report_field`, `field_name eq 'DATE & TIME'` với `section_name = 'MOR HEADING'` (`value_text`), đúng một dòng cho mỗi report, dùng cho cả form `MOR` và `AMO MOR`. Không dùng `dwanalytics_report_form_section_field` (2 đến 3 dòng trùng tên, không có section). `form_field_id` đổi theo revision form. Năm 2026: 18 report (MOR 14, AMO MOR 4), 4 Open; thử mốc 30 ngày từ ngày xảy ra: 0 Open quá hạn, 8 đóng sau 30 ngày (theo target workflow chỉ 1 Lately Closed).
+- **RCA (MCAR, `AMO ECAR`):** trường `RCA categorisation` (CheckList nhiều dòng, hai cấp `1. MAN` / `1.2 …`, có `Other`) và `RCA analysis` (TextArea). 2026: MCAR 77/87 có phân loại, AMO ECAR 19/21. Cấp 1 phải suy từ số đầu của cấp 2.
+- **Contributing (IR, EIS, F-088):** trường `Contributing Factors Checklist MEDA` (CheckList, nhóm A đến J + mục con đánh số). Tên section đổi theo revision form, khoá theo `field_name`. Số mục con lặp giữa các nhóm: cần bảng cha con của danh sách (chưa probe; hướng `dwanalytics_lists`, `list_item_parent_id`).
+- **Chờ chốt:** file gửi S&C Manager về MOR ở vault `02-Bao-Cao/2026-11-21_MOR-Dashboard-Tinh-trang-va-diem-can-chot-gui-SC.md` + .docx (12 điểm: form nào, mốc 30 ngày tính từ ngày xảy ra hay từ báo cáo ban đầu, mức C / D, overdue đếm gì, cách đặt số report AMO MOR…), Eric chưa gửi. SOP-012 §7.4.1 c và SMSM §5.5.4 d ghi "30 days after the incident"; MOPM §3.8.6.2 d (bản Iss04Rev08 TR03 trong revmd) ghi "30 days following the initial report". Eric còn chốt: IR-EIS gồm form nào.
+- **Còn lại:** probe bảng cha con MEDA / RCA và RCA các năm trước 2026; đối chiếu số MOR với Coruson; viết spec; thêm chỉ số vào `METRICS` + `M.consistency()` trước khi vẽ màn. Đợt 3 chưa bắt đầu.
+
 ## ✅ r236 — Safety › OSR/MOSR status: tỷ lệ bảng trên màn hình rộng (21/11/2026, máy nhà) — ĐÃ PUSH `1dd2314`, LIVE (curl 21/11: classic `APP_REV` = r236, index có `tbl-msag`)
 
 - **Eric 21/11 (ảnh chụp cửa sổ ~2830 px):** chữ bảng MSAG report status nhỏ (15 px) trong khi 7 cột trải hết bề rộng, cột số cách nhau ~370 px.
