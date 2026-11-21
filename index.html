@@ -504,6 +504,19 @@ button.kpi-forms-i:hover{background:var(--raised)}
 /* MSAG report status: group names one step up from t-small (14px) */
 .tbl .t-grp{font-size:16px;line-height:1.5;color:var(--text-2);white-space:nowrap}
 .tbl .t-grp-h{font-size:14px}
+/* Eric 21/11/2026: on a wide window the 7 short columns of OSR/MOSR status sat far apart under 15px text.
+   The type follows the window width (15px up to 1,660px, 22px from 2,640px); the line height and the row padding give
+   back what the type takes, so a row grows by 2px at most. At 15px every value below equals the fixed one above.
+   Two rules set Group | OSR | MOSR apart. Not on phones (rows reflow to cards) nor on the LED wall (kioskFit sizes it). */
+@media (min-width:768px){
+  body:not(.kiosk) .tbl.tbl-msag{font-size:clamp(15px, 3px + .72vw, 22px)}
+  body:not(.kiosk) .tbl.tbl-msag th{font-size:.8em}
+  body:not(.kiosk) .tbl.tbl-msag td{padding-top:calc(11.5px - .3em);padding-bottom:calc(11.5px - .3em);line-height:calc(.7em + 13.5px)}
+  body:not(.kiosk) .tbl-msag .t-grp{font-size:1.0667em;line-height:calc(.9em + 9.6px)}
+  body:not(.kiosk) .tbl-msag .t-grp-h{font-size:.9333em}
+  body:not(.kiosk) .tbl-msag th:nth-child(2), body:not(.kiosk) .tbl-msag td:nth-child(2),
+  body:not(.kiosk) .tbl-msag th:nth-child(5), body:not(.kiosk) .tbl-msag td:nth-child(5){border-left:1px solid var(--border)}
+}
 .row-main{display:grid;gap:2px}
 .row-main>*{display:block}
 .row-main>button{justify-self:start;text-align:left;padding-left:0}   /* a stretched button centres its text */
@@ -4607,7 +4620,8 @@ function searchBox(key, cur, ph){
      (BS.sort[key] = {c, dir}); a column with col.nosort stays plain
    · r205: every table sorts by its headers — without opt.sortVals the value is read from the cell text
      (cellKey: dates, counts, "12d over"); opt.nosort keeps a table plain; opt.head / opt.tail = leading /
-     trailing rows (a TOTAL row) that stay in place · col.fit: column as narrow as its content, the free width goes to the text columns */
+     trailing rows (a TOTAL row) that stay in place · col.fit: column as narrow as its content, the free width goes to the text columns
+   · opt.cls: one more class on the table, for a table with its own proportions (OSR/MOSR status: tbl-msag) */
 function plainTable(key, cols, rows, size, minW, opt){
   opt = opt || {};
   const al = c => [c.ac ? 'ac' : c.ar ? 'ar' : '', c.fit ? 'fit' : ''].filter(Boolean).join(' ');
@@ -4641,7 +4655,7 @@ function plainTable(key, cols, rows, size, minW, opt){
       + '<button type="button" data-act="bpage" data-k="'+key+'" data-p="'+(p+1)+'"'+(p===pages?' disabled':'')+' aria-label="Next page">'+ic('chevron',14,'')+'</button></div>';
   }
   /* many columns: keep a readable minimum and scroll inside the card (phones reflow to cards) */
-  return '<div class="tbl-wrap'+(opt.full ? ' tbl-full' : '')+'"><table class="tbl'+(cols.some(c => c.fit) ? ' tbl-fit' : '')+(minW ? ' beta-minw' : '')+(opt.compact ? ' tbl-compact' : '')+'"'+(minW ? ' style="--beta-minw:'+minW+'px"' : '')+'><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>'
+  return '<div class="tbl-wrap'+(opt.full ? ' tbl-full' : '')+'"><table class="tbl'+(cols.some(c => c.fit) ? ' tbl-fit' : '')+(minW ? ' beta-minw' : '')+(opt.compact ? ' tbl-compact' : '')+(opt.cls ? ' '+opt.cls : '')+'"'+(minW ? ' style="--beta-minw:'+minW+'px"' : '')+'><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table></div>'
     + '<div class="tbl-foot"><span class="t-small dim">Showing '+((p-1)*size+1)+'–'+Math.min(p*size, rows.length)+' of '+rows.length+'</span>'+pager+'</div>';
 }
 /* r205: the sort value of a table cell, read from what it shows — "08 Oct 2026" / "08 Oct" → date,
@@ -4930,7 +4944,7 @@ function scrSafety(){
     ])
     /* r224: scope said in QA terms — this table is not the MOSR report (every owner, period filter); M.consistency reconciles them */
     + '<section class="sec">' + card('MSAG report status', '',   /* r232 (Eric 18/11/2026): no note on the card; the scope is in the User guide */
-      plainTable('safety', [{l:'Group on Coruson',w:'240px'},{l:'OSR closed',ac:true},{l:'OSR open',ac:true},{l:'OSR total',ac:true},{l:'MOSR closed',ac:true},{l:'MOSR open',ac:true},{l:'MOSR total',ac:true}], rows, 40, 0, {full:true, compact:true, nosort:true}))   /* group headings between rows: order is the layout */
+      plainTable('safety', [{l:'Group on Coruson',w:'22%'},{l:'OSR closed',ac:true},{l:'OSR open',ac:true},{l:'OSR total',ac:true},{l:'MOSR closed',ac:true},{l:'MOSR open',ac:true},{l:'MOSR total',ac:true}], rows, 40, 0, {full:true, compact:true, nosort:true, cls:'tbl-msag'}))   /* group headings between rows: order is the layout */
     + '</section>';
 }
 

@@ -5,6 +5,15 @@
 
 ---
 
+## ⏳ r236 — Safety › OSR/MOSR status: tỷ lệ bảng trên màn hình rộng (21/11/2026, máy nhà) — CHƯA PUSH
+
+- **Eric 21/11 (ảnh chụp cửa sổ ~2830 px):** chữ bảng MSAG report status nhỏ (15 px) trong khi 7 cột trải hết bề rộng, cột số cách nhau ~370 px.
+- **Sửa (chỉ giao diện):** `beta-template.html` khối CSS `.tbl-msag` sau `.t-grp-h`; `screens.js` `plainTable` thêm `opt.cls`, `scrSafety` truyền `cls:'tbl-msag'` và cột đầu `w:'22%'` (trước 240px). Cỡ chữ bảng theo bề rộng cửa sổ `clamp(15px, 3px + .72vw, 22px)`; padding và line-height hàng co lại tương ứng; hai vạch dọc tách Group | OSR | MOSR. Không áp cho điện thoại (< 768 px) và LED / kiosk.
+- **Đo trên trang tĩnh dựng từ CSS bản build + số trong ảnh của Eric (Edge headless):** ≤ 1660 px không đổi (chữ 15 px, hàng 40 px, bảng 776 px); 1920 px chữ 16,7 px; 2560 px chữ 21,3 px; 2830 px chữ 22 px, hàng 41,7 px, bảng 817 px (+41 px), cột số 369 → 326 px, cột tên 304 → 543 px. Ảnh 500 px trước / sau trùng từng byte.
+- **Eric duyệt ảnh trước / sau 21/11.** `APP_REV` = `2026.11.21-r236` (đổi layout, spec khác r235); `CLAUDE.md` Rev current, `PROJECT_TECH_SPEC.md` Version + §14 và `QA_AMO_Dashboard.md` (obsidian-mind: header + §8, Eric cho sửa thẳng 21/11) đã cập nhật; `check-doc-sync.sh` xanh.
+- **Chưa làm:** chưa xem với dữ liệu thật (bản local cần đăng nhập, proxy trả 401), xem trên trang live sau khi push; chưa kiểm trên màn LED thật (theo thiết kế không đổi).
+- Sao lưu nguồn trước khi sửa: `rebuild UIUX/beta-src-bak-20261121/`.
+
 ## ✅ r235-i3 — Open findings by form tách cột Process và CA (19/11/2026, EricThai)
 
 - **Nguyên tắc (anh Ngọc, qua Eric 19/11):** corrective action quá hạn = công việc quá hạn; report quá hạn = process quá hạn. Nhìn dashboard phải phân biệt được ngay, nên không có con số nào cộng hai loại.
